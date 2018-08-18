@@ -1,8 +1,9 @@
 import glob
-
+import PIL
 import matplotlib.pyplot as plt
 from scipy import misc
-
+from numpy import array
+from time import time
 from exceptions import TypeError, ShapeError, NotSupportedError, ArgumentError
 
 
@@ -36,6 +37,11 @@ class frames(object):
             raise ArgumentError("Invalid color selected for channel extraction")
         return self.images[index][:, :, colors.index(color)]
 
+    def shift_frame_with_wraparound(self, index, shift_x, shift_y):
+        pil_image = PIL.Image.fromarray(self.images[index])
+        im2_offset = PIL.ImageChops.offset(pil_image, xoffset=shift_x, yoffset=shift_y)
+        self.images[index] = array(im2_offset)
+
 
 if __name__ == "__main__":
     names = glob.glob('Images/2012_*.tif')
@@ -46,6 +52,9 @@ if __name__ == "__main__":
     except Exception as e:
         print("Error: " + e.message)
         exit()
+
+    frames_read.shift_frame_with_wraparound(0, 110, -200)
+
     try:
         image_green = frames_read.extract_channel(0, 'green')
     except ArgumentError as e:
