@@ -1,5 +1,5 @@
 class Configuration(object):
     def __init__(self):
         self.mono_channel = 'green'
-        self.local_contrast_stride = 10
-        self.local_contrast_threshold = 20
+        self.frame_score_pixel_stride = 2
+        self.alignment_rectangle_scale_factor = 10

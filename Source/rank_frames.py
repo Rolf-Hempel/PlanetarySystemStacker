@@ -1,7 +1,9 @@
 import glob
+from time import time
 
 from configuration import Configuration
 from frames import Frames
+from numpy import gradient, sqrt, average, diff
 
 
 class RankFrames(object):
@@ -12,21 +14,37 @@ class RankFrames(object):
         frames.add_monochrome(self.configuration.mono_channel)
         self.frames_mono = frames.frames_mono
         self.frame_ranks = []
+        self.frame_ranks_max_index = None
+        self.frame_ranks_max_value = None
 
     def frame_score(self):
+        start = time()
         for frame in self.frames_mono:
-            self.frame_ranks.append(self.local_contrast(frame, self.configuration.local_contrast_stride))
+            self.frame_ranks.append(self.local_contrast(frame, self.configuration.frame_score_pixel_stride))
+        self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),key=lambda i:i[1], reverse=True)]
+        self.frame_ranks_max_index = self.quality_sorted_indices[0]
+        self.frame_ranks_max_value = self.frame_ranks[self.frame_ranks_max_index]
+        self.frame_ranks /= self.frame_ranks_max_value
+        end = time()
+
+        print('Elapsed time in ranking images: {}'.format(end - start))
+        print("Index of maximum: " + str(self.frame_ranks_max_index))
+        print("Frame scores: " + str(self.frame_ranks))
+        print("Frame scores (sorted): " + str([self.frame_ranks[i] for i in self.quality_sorted_indices]))
+        print("Sorted index list: " + str(self.quality_sorted_indices))
 
     def local_contrast(self, frame, stride):
-        sum_horizontal = sum(sum(abs(frame[::stride, 2::stride] - frame[::stride, :-2:stride]) * (
-                    frame[::stride, 1:-1:stride] > self.configuration.local_contrast_threshold)))
-        sum_vertical = sum(sum(abs(frame[2::stride, ::stride] - frame[:-2:stride, ::stride]) * (
-                    frame[1:-1:stride, ::stride] > self.configuration.local_contrast_threshold)))
-        return min(sum_horizontal, sum_vertical)
+        frame_strided = frame[::stride, ::stride]
+        dx = diff(frame_strided)[1:, :]          # remove the first row
+        dy = diff(frame_strided, axis=0)[:, 1:]  # remove the first column
+        dnorm = sqrt(dx ** 2 + dy ** 2)
+        sharpness = average(dnorm)
+        return sharpness
 
 
 if __name__ == "__main__":
-    names = glob.glob('Images/2012_*.tif')
+    names = glob.glob('Images/Mond*.jpg')
+    print (names)
     configuration = Configuration()
     try:
         frames = Frames(names, type='image')
@@ -38,4 +56,3 @@ if __name__ == "__main__":
 
     rank_frames = RankFrames(frames, configuration)
     rank_frames.frame_score()
-    print("Frame scores: " + str(rank_frames.frame_ranks))
