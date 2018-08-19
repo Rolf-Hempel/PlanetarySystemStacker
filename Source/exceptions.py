@@ -41,3 +41,13 @@ class ArgumentError(Error):
 
     def __init__(self, message):
         self.message = message
+
+class WrongOrderingError(Error):
+    """Exception raised if a method is called before required input is available.
+
+    Attributes:
+        message -- explanation of the error
+    """
+
+    def __init__(self, message):
+        self.message = message
