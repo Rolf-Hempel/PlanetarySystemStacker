@@ -29,6 +29,8 @@ class Frames(object):
         else:
             raise TypeError("Image type not supported")
 
+        self.frames_mono = None
+
     def extract_channel(self, index, color):
         if not self.color:
             raise ShapeError("Cannot extract green channel from monochrome image")

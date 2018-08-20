@@ -3,7 +3,7 @@ from time import time
 
 from configuration import Configuration
 from frames import Frames
-from numpy import gradient, sqrt, average, diff
+from miscellaneous import local_contrast
 
 
 class RankFrames(object):
@@ -13,6 +13,7 @@ class RankFrames(object):
         self.configuration = configuration
         frames.add_monochrome(self.configuration.mono_channel)
         self.frames_mono = frames.frames_mono
+        self.quality_sorted_indices = None
         self.frame_ranks = []
         self.frame_ranks_max_index = None
         self.frame_ranks_max_value = None
@@ -20,7 +21,7 @@ class RankFrames(object):
     def frame_score(self):
         start = time()
         for frame in self.frames_mono:
-            self.frame_ranks.append(self.local_contrast(frame, self.configuration.frame_score_pixel_stride))
+            self.frame_ranks.append(local_contrast(frame, self.configuration.frame_score_pixel_stride))
         self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),key=lambda i:i[1], reverse=True)]
         self.frame_ranks_max_index = self.quality_sorted_indices[0]
         self.frame_ranks_max_value = self.frame_ranks[self.frame_ranks_max_index]
@@ -32,14 +33,6 @@ class RankFrames(object):
         print("Frame scores: " + str(self.frame_ranks))
         print("Frame scores (sorted): " + str([self.frame_ranks[i] for i in self.quality_sorted_indices]))
         print("Sorted index list: " + str(self.quality_sorted_indices))
-
-    def local_contrast(self, frame, stride):
-        frame_strided = frame[::stride, ::stride]
-        dx = diff(frame_strided)[1:, :]          # remove the first row
-        dy = diff(frame_strided, axis=0)[:, 1:]  # remove the first column
-        dnorm = sqrt(dx ** 2 + dy ** 2)
-        sharpness = average(dnorm)
-        return sharpness
 
 
 if __name__ == "__main__":
