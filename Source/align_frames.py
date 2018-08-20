@@ -18,6 +18,7 @@ class AlignFrames(object):
         self.shape = frames.shape
         self.frame_shifts = None
         self.intersection_shape = None
+        self.mean_frame = None
         self.configuration = configuration
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
         self.frame_ranks_max_index = rank_frames.frame_ranks_max_index
@@ -65,37 +66,36 @@ class AlignFrames(object):
     def align_frames(self):
         if self.x_low_opt == None:
             raise WrongOrderingError("Method 'align_frames' is called before 'select_alignment_rect'")
-        else:
-            self.frame_shifts = []
-            self.reference_window = self.frames_mono[self.frame_ranks_max_index][self.y_low_opt:self.y_high_opt,
-                                    self.x_low_opt:self.x_high_opt]
-            self.reference_window_shape = self.reference_window.shape
-            for index, frame in enumerate(self.frames_mono):
-                if index == self.frame_ranks_max_index:
-                    self.frame_shifts.append([0, 0])
-                else:
-                    frame_window = self.frames_mono[index][self.y_low_opt:self.y_high_opt,
-                                   self.x_low_opt:self.x_high_opt]
-                    self.frame_shifts.append(
-                        self.translation(self.reference_window, frame_window, self.reference_window_shape))
-            self.intersection_shape = (
-                max(b[0] for b in self.frame_shifts), min(b[0] for b in self.frame_shifts) + self.shape[0],
-                max(b[1] for b in self.frame_shifts), min(b[1] for b in self.frame_shifts) + self.shape[1])
+        self.frame_shifts = []
+        self.reference_window = self.frames_mono[self.frame_ranks_max_index][self.y_low_opt:self.y_high_opt,
+                                self.x_low_opt:self.x_high_opt]
+        self.reference_window_shape = self.reference_window.shape
+        for index, frame in enumerate(self.frames_mono):
+            if index == self.frame_ranks_max_index:
+                self.frame_shifts.append([0, 0])
+            else:
+                frame_window = self.frames_mono[index][self.y_low_opt:self.y_high_opt,
+                               self.x_low_opt:self.x_high_opt]
+                self.frame_shifts.append(
+                    self.translation(self.reference_window, frame_window, self.reference_window_shape))
+        self.intersection_shape = [
+            [max(b[0] for b in self.frame_shifts), min(b[0] for b in self.frame_shifts) + self.shape[0]],
+            [max(b[1] for b in self.frame_shifts), min(b[1] for b in self.frame_shifts) + self.shape[1]]]
 
     def average_frame(self, frames, shifts):
         if self.intersection_shape == None:
             raise WrongOrderingError("Method 'average_frames' is called before 'align_frames'")
-        else:
-            number_frames = len(frames)
-            buffer = empty([number_frames, self.intersection_shape[1] - self.intersection_shape[0],
-                            self.intersection_shape[3] - self.intersection_shape[2]])
-            for index, frame in enumerate(frames):
-                buffer[index, :, :] = frame[
-                                      self.intersection_shape[0] - shifts[index][0]:self.intersection_shape[1] -
-                                                                                    shifts[index][0],
-                                      self.intersection_shape[2] - shifts[index][1]:self.intersection_shape[3] -
-                                                                                    shifts[index][1]]
-            return mean(buffer, axis=0)
+        number_frames = len(frames)
+        buffer = empty([number_frames, self.intersection_shape[0][1] - self.intersection_shape[0][0],
+                        self.intersection_shape[1][1] - self.intersection_shape[1][0]])
+        for index, frame in enumerate(frames):
+            buffer[index, :, :] = frame[
+                                  self.intersection_shape[0][0] - shifts[index][0]:self.intersection_shape[0][1] -
+                                                                                shifts[index][0],
+                                  self.intersection_shape[1][0] - shifts[index][1]:self.intersection_shape[1][1] -
+                                                                                shifts[index][1]]
+        self.mean_frame = mean(buffer, axis=0)
+        return self.mean_frame
 
 
 if __name__ == "__main__":
