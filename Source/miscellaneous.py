@@ -10,6 +10,14 @@ def quality_measure(frame):
     return sharpness
 
 
+def quality_measure_alternative(frame, black_threshold=40.):
+    sum_horizontal = sum(sum(abs(frame[:, 2:] - frame[:, :-2]) / (frame[:, 1:-1] + 0.0001) * (
+            frame[:, 1:-1] > black_threshold)))
+    sum_vertical = sum(sum(abs(frame[2:, :] - frame[:-2, :]) / (frame[1:-1, :] + 0.0001) * (
+            frame[1:-1, :] > black_threshold)))
+    return min(sum_horizontal, sum_vertical)
+
+
 def local_contrast(frame, stride):
     frame_strided = frame[::stride, ::stride]
     dx = diff(frame_strided)[1:, :]  # remove the first row
