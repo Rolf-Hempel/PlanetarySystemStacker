@@ -99,7 +99,8 @@ class AlignFrames(object):
 
 
 if __name__ == "__main__":
-    names = glob.glob('Images/2012*.tif')
+    # names = glob.glob('Images/2012*.tif')
+    names = glob.glob('Images/Example-3*.jpg')
     print(names)
     configuration = Configuration()
     try:

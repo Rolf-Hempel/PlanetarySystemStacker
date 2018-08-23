@@ -51,8 +51,6 @@ class AlignmentPoints(object):
                 box = mean_frame[y_low:y_high, x_low:x_high]
                 self.alignment_boxes.append(box)
                 self.alignment_boxes_coordinates.append([y, x, y_low, y_high, x_low, x_high])
-                stride = 1
-                # self.alignment_boxes_structure.append(local_contrast(box, stride))
                 self.alignment_boxes_structure.append(quality_measure(box))
                 self.alignment_boxes_max_brightness.append(amax(box))
         self.alignment_boxes_number = len(self.alignment_boxes)
@@ -79,9 +77,6 @@ class AlignmentPoints(object):
             box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy, x_low + dx:x_high + dx]
             point_shifts.append(self.align_frames.translation(self.alignment_boxes[box_index], box_in_frame,
                                                               box_in_frame.shape))
-            # shifts = point_shifts[-1]
-            # if abs(shifts[0])>0 or abs(shifts[1])>0:
-            #     print ("y: " + str(y_center) + ", x: " + str(x_center) + "dy: " + str(shifts[0]) + ", dx: " + str(shifts[1]))
         return point_shifts
 
 
@@ -96,15 +91,15 @@ def insert_cross(frame, y_center, x_center, cross_half_len, color):
         rgb = [0, 0, 255]
     else:
         rgb = [255, 255, 255]
-    for y in range(y_center - cross_half_len, y_center + cross_half_len):
+    for y in range(y_center - cross_half_len, y_center + cross_half_len+1):
         frame[y, x_center] = rgb
-    for x in range(x_center - cross_half_len, x_center + cross_half_len):
+    for x in range(x_center - cross_half_len, x_center + cross_half_len+1):
         frame[y_center, x] = rgb
 
 
 if __name__ == "__main__":
-    # names = glob.glob('Images/2012*.tif')
-    names = glob.glob('Images/Example-3*.jpg')
+    names = glob.glob('Images/2012*.tif')
+    # names = glob.glob('Images/Example-3*.jpg')
     print(names)
     configuration = Configuration()
     try:
@@ -185,10 +180,20 @@ if __name__ == "__main__":
     # plt.imshow(reference_frame_with_alignment_points)
     # plt.show()
 
+    frame_index_details = 0
+    y_center_low_details = 0
+    y_center_high_details = 4000
+    x_center_low_details = 0
+    x_center_high_details = 6000
+    warp_threshold = 4
+    box_size_half = int(configuration.alignment_box_size / 2)
+
+    all_point_shifts = []
     for frame_index in range(frames.number):
         frame_with_shifts = reference_frame_with_alignment_points.copy()
         start = time()
         point_shifts = alignment_points.compute_alignment_point_shifts(frame_index)
+        all_point_shifts.append(point_shifts)
         end = time()
         print("Elapsed time in computing point shifts for frame number " + str(frame_index) + ": " + str(end - start))
         for point_index, [index, [y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
@@ -198,3 +203,42 @@ if __name__ == "__main__":
                          cross_half_len, 'red')
         plt.imshow(frame_with_shifts)
         plt.show()
+
+        if frame_index == frame_index_details:
+            reference_frame = reference_frame_with_alignment_points.copy()
+            point_shifts = all_point_shifts[frame_index]
+            for point_index, [index, [y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
+                    alignment_points.alignment_points):
+                if y_center_low_details <= y_center <= y_center_high_details and x_center_low_details <= x_center <= x_center_high_details:
+                    reference_frame_box = reference_frame[y_center - box_size_half:y_center + box_size_half,
+                                      x_center - box_size_half:x_center + box_size_half]
+                    dy = align_frames.intersection_shape[0][0] - align_frames.frame_shifts[frame_index][0]
+                    dx = align_frames.intersection_shape[1][0] - align_frames.frame_shifts[frame_index][1]
+                    box_in_frame = stack((frames.frames_mono[frame_index],) * 3, -1)[
+                                   y_center - box_size_half + dy:y_center + box_size_half + dy,
+                                   x_center - box_size_half + dx:x_center + box_size_half + dx]
+                    insert_cross(box_in_frame, box_size_half, box_size_half, cross_half_len, 'red')
+                    point_dy = point_shifts[point_index][0]
+                    point_dx = point_shifts[point_index][1]
+                    if max(abs(point_dy), abs(point_dx)) < warp_threshold:
+                        continue
+                    print("frame shifts: " + str(dy) + ", " + str(dx))
+                    print ("Point shifts: " + str(point_dy) + ", " + str(point_dx))
+                    box_in_frame_shifted = stack((frames.frames_mono[frame_index],) * 3, -1)[
+                                           y_center - box_size_half + dy-point_dy:y_center + box_size_half + dy-point_dy,
+                                           x_center - box_size_half + dx-point_dx:x_center + box_size_half + dx-point_dx]
+                    insert_cross(box_in_frame_shifted, box_size_half, box_size_half, cross_half_len, 'red')
+                    fig = plt.figure(figsize=(8, 3))
+                    ax1 = plt.subplot(1, 3, 1)
+                    ax2 = plt.subplot(1, 3, 2, sharex=ax1, sharey=ax1)
+                    ax3 = plt.subplot(1, 3, 3, sharex=ax2, sharey=ax2)
+                    ax1.imshow(reference_frame_box)
+                    ax1.set_axis_off()
+                    ax1.set_title('Reference frame, y :' + str(y_center) + ", x:" + str(x_center))
+                    ax2.imshow(box_in_frame)
+                    ax2.set_axis_off()
+                    ax2.set_title('Frame, dy: ' + str(dy) + ", dx: " + str(dx))
+                    ax3.imshow(box_in_frame_shifted)
+                    ax3.set_axis_off()
+                    ax3.set_title('De-warped, dy: ' + str(point_dy) + ", dx: " + str(point_dx))
+                    plt.show()
