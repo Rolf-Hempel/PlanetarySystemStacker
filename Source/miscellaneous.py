@@ -26,6 +26,7 @@ def local_contrast(frame, stride):
     sharpness = average(dnorm)
     return sharpness
 
+
 def insert_cross(frame, y_center, x_center, cross_half_len, color):
     if color == 'white':
         rgb = [255, 255, 255]
