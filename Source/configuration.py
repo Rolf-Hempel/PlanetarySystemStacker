@@ -8,5 +8,6 @@ class Configuration(object):
         self.alignment_box_size = 40
         self.alignment_point_structure_threshold = 0.1
         self.alignment_point_brightness_threshold = 10
+        self.alignment_point_contrast_threshold = 15
         self.alignment_point_method = 'LocalSearch'
         self.alignment_point_search_width = 20

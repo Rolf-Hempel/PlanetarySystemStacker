@@ -3,7 +3,7 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack
+from numpy import arange, amax, stack, amin
 from skimage.feature import register_translation
 
 from align_frames import AlignFrames
@@ -42,9 +42,14 @@ class AlignmentPoints(object):
         self.alignment_boxes_coordinates = []
         self.alignment_boxes_structure = []
         self.alignment_boxes_max_brightness = []
+        self.alignment_boxes_min_brightness = []
 
-        for y in arange(step_size, mean_frame_shape[0] - step_size, step_size, dtype=int):
-            for x in arange(step_size, mean_frame_shape[1] - step_size, step_size, dtype=int):
+        for y in arange(box_size_half + self.configuration.alignment_point_search_width,
+                        mean_frame_shape[0] - box_size_half - self.configuration.alignment_point_search_width,
+                        step_size, dtype=int):
+            for x in arange(box_size_half + self.configuration.alignment_point_search_width,
+                            mean_frame_shape[1] - box_size_half - self.configuration.alignment_point_search_width,
+                            step_size, dtype=int):
                 y_low = y - box_size_half
                 y_high = y + box_size_half
                 x_low = x - box_size_half
@@ -54,17 +59,20 @@ class AlignmentPoints(object):
                 self.alignment_boxes_coordinates.append([y, x, y_low, y_high, x_low, x_high])
                 self.alignment_boxes_structure.append(quality_measure(box))
                 self.alignment_boxes_max_brightness.append(amax(box))
+                self.alignment_boxes_min_brightness.append(amin(box))
         self.alignment_boxes_number = len(self.alignment_boxes)
         structure_max = max(self.alignment_boxes_structure)
         self.alignment_boxes_structure = [item / structure_max for item in self.alignment_boxes_structure]
 
-    def select_alignment_points(self, structure_threshold, brightness_threshold):
+    def select_alignment_points(self, structure_threshold, brightness_threshold, contrast_threshold):
         if self.alignment_boxes == None:
             raise WrongOrderingError("Attempt to select alignment points before alignment boxes are created")
         self.alignment_points = [[box_index, item] for [box_index, item] in enumerate(self.alignment_boxes_coordinates)
                                  if
                                  self.alignment_boxes_structure[box_index] > structure_threshold and
-                                 self.alignment_boxes_max_brightness[box_index] > brightness_threshold]
+                                 self.alignment_boxes_max_brightness[box_index] > brightness_threshold and
+                                 self.alignment_boxes_max_brightness[box_index] - self.alignment_boxes_min_brightness[
+                                     box_index] > contrast_threshold]
         self.alignment_points_number = len(self.alignment_points)
 
     def compute_alignment_point_shifts(self, frame_index):
@@ -114,9 +122,9 @@ class AlignmentPoints(object):
                 return [dy_min, dx_min]
             else:
                 deviation_min, dy_min, dx_min = deviation_min_r, dy_min_r, dx_min_r
-        print("search local match unsuccessful: y_low: " + str(y_low) + ", x_low: " + str(x_low))
-        print(
-            "search local match unsuccessful: y: " + str((y_high + y_low) / 2.) + ", x: " + str((x_high + x_low) / 2.))
+        # print("search local match unsuccessful: y_low: " + str(y_low) + ", x_low: " + str(x_low))
+        # print(
+        #     "search local match unsuccessful: y: " + str((y_high + y_low) / 2.) + ", x: " + str((x_high + x_low) / 2.))
         return [None, None]
 
 
@@ -185,10 +193,12 @@ if __name__ == "__main__":
 
     structure_threshold = configuration.alignment_point_structure_threshold
     brightness_threshold = configuration.alignment_point_brightness_threshold
+    contrast_threshold = configuration.alignment_point_contrast_threshold
     print("Selection of alignment points, structure threshold: " + str(
-        structure_threshold) + ", brightness threshold: " + str(brightness_threshold))
+        structure_threshold) + ", brightness threshold: " + str(brightness_threshold) + ", contrast threshold: " + str(
+        contrast_threshold))
     start = time()
-    alignment_points.select_alignment_points(structure_threshold, brightness_threshold)
+    alignment_points.select_alignment_points(structure_threshold, brightness_threshold, contrast_threshold)
     end = time()
     print('Elapsed time in alignment point selection: {}'.format(end - start))
     print("Number of alignment points selected: " + str(alignment_points.alignment_points_number))

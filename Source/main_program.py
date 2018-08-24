@@ -72,10 +72,12 @@ if __name__ == "__main__":
 
     structure_threshold = configuration.alignment_point_structure_threshold
     brightness_threshold = configuration.alignment_point_brightness_threshold
+    contrast_threshold = configuration.alignment_point_contrast_threshold
     print("Selection of alignment points, structure threshold: " + str(
-        structure_threshold) + ", brightness threshold: " + str(brightness_threshold))
+        structure_threshold) + ", brightness threshold: " + str(brightness_threshold) + ", contrast threshold: " + str(
+        contrast_threshold))
     start = time()
-    alignment_points.select_alignment_points(structure_threshold, brightness_threshold)
+    alignment_points.select_alignment_points(structure_threshold, brightness_threshold, contrast_threshold)
     end = time()
     print('Elapsed time in alignment point selection: {}'.format(end - start))
     print("Number of alignment points selected: " + str(alignment_points.alignment_points_number))
