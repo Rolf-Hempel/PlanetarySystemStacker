@@ -90,9 +90,6 @@ class AlignmentPoints(object):
         return point_shifts, errors, diffphases
 
 
-
-
-
 if __name__ == "__main__":
     names = glob.glob('Images/2012*.tif')
     # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
@@ -221,7 +218,7 @@ if __name__ == "__main__":
                     print("frame shifts: " + str(dy) + ", " + str(dx))
                     if configuration.alignment_point_subpixel:
                         print("Point shifts: " + str(point_dy) + ", " + str(point_dx) + ", Error: "
-                              +str(errors[point_index]) + ", diffphase: " + str(diffphases[point_index]))
+                              + str(errors[point_index]) + ", diffphase: " + str(diffphases[point_index]))
                     else:
                         print("Point shifts: " + str(point_dy) + ", " + str(point_dx))
 
