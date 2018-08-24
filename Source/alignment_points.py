@@ -8,9 +8,9 @@ from skimage.feature import register_translation
 
 from align_frames import AlignFrames
 from configuration import Configuration
-from exceptions import WrongOrderingError
+from exceptions import WrongOrderingError, NotSupportedError
 from frames import Frames
-from miscellaneous import quality_measure, insert_cross
+from miscellaneous import quality_measure, insert_cross, circle_around
 from rank_frames import RankFrames
 
 
@@ -78,16 +78,46 @@ class AlignmentPoints(object):
             dy = self.align_frames.intersection_shape[0][0] - self.align_frames.frame_shifts[frame_index][0]
             dx = self.align_frames.intersection_shape[1][0] - self.align_frames.frame_shifts[frame_index][1]
             box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy, x_low + dx:x_high + dx]
-            if self.configuration.alignment_point_subpixel:
+            if self.configuration.alignment_point_method == 'Subpixel':
                 shift_pixel, error, diffphase = register_translation(self.alignment_boxes[box_index], box_in_frame,
                                                                      10, space='real')
                 diffphases.append(diffphase)
                 errors.append(error)
-            else:
+            elif self.configuration.alignment_point_method == 'CrossCorrelation':
                 shift_pixel = self.align_frames.translation(self.alignment_boxes[box_index], box_in_frame,
                                                             box_in_frame.shape)
+            elif self.configuration.alignment_point_method == 'LocalSearch':
+                shift_pixel = self.search_local_match(self.alignment_boxes[box_index],
+                                                      self.frames.frames_mono[frame_index],
+                                                      y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                                                      self.configuration.alignment_point_search_width)
+            else:
+                raise NotSupportedError(
+                    "The point shift computation method " + self.configuration.alignment_point_method + " is not implemented")
             point_shifts.append(shift_pixel)
         return point_shifts, errors, diffphases
+
+    def search_local_match(self, reference_box, frame, y_low, y_high, x_low, x_high, search_width):
+        deviation_min = 1000000
+        dy_min = None
+        dx_min = None
+        dev = []
+        for r in arange(search_width + 1):
+            circle_r = circle_around(0, 0, r)
+            deviation_min_r, dy_min_r, dx_min_r = 1000000, None, None
+            for (dx, dy) in circle_r:
+                deviation = abs(reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
+                if deviation < deviation_min_r:
+                    deviation_min_r, dy_min_r, dx_min_r = deviation, dy, dx
+            dev.append(deviation_min_r)
+            if deviation_min_r >= deviation_min:
+                return [dy_min, dx_min]
+            else:
+                deviation_min, dy_min, dx_min = deviation_min_r, dy_min_r, dx_min_r
+        print("search local match unsuccessful: y_low: " + str(y_low) + ", x_low: " + str(x_low))
+        print(
+            "search local match unsuccessful: y: " + str((y_high + y_low) / 2.) + ", x: " + str((x_high + x_low) / 2.))
+        return [None, None]
 
 
 if __name__ == "__main__":
@@ -190,9 +220,12 @@ if __name__ == "__main__":
         print("Elapsed time in computing point shifts for frame number " + str(frame_index) + ": " + str(end - start))
         for point_index, [index, [y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
                 alignment_points.alignment_points):
-            insert_cross(frame_with_shifts, y_center + int(round(point_shifts[point_index][0])),
-                         x_center + int(round(point_shifts[point_index][1])),
-                         cross_half_len, 'red')
+            if point_shifts[point_index][0] == None:
+                insert_cross(frame_with_shifts, y_center, x_center, cross_half_len, 'green')
+            else:
+                insert_cross(frame_with_shifts, y_center + int(round(point_shifts[point_index][0])),
+                             x_center + int(round(point_shifts[point_index][1])),
+                             cross_half_len, 'red')
         plt.imshow(frame_with_shifts)
         plt.show()
 
@@ -209,14 +242,19 @@ if __name__ == "__main__":
                                    y_center - box_size_half + dy:y_center + box_size_half + dy,
                                    x_center - box_size_half + dx:x_center + box_size_half + dx]
                     insert_cross(box_in_frame, box_size_half, box_size_half, cross_half_len, 'red')
-                    point_dy = point_shifts[point_index][0]
-                    point_dx = point_shifts[point_index][1]
-                    point_dy_int = int(round(point_dy))
-                    point_dx_int = int(round(point_dx))
-                    if max(abs(point_dy), abs(point_dx)) < warp_threshold:
+                    if point_shifts[point_index][0] == None:
+                        point_dy = point_dx = point_dy_int = point_dx_int = 0
+                        color_cross = 'green'
+                    else:
+                        point_dy = point_shifts[point_index][0]
+                        point_dx = point_shifts[point_index][1]
+                        point_dy_int = int(round(point_dy))
+                        point_dx_int = int(round(point_dx))
+                        color_cross = 'red'
+                    if max(abs(point_dy), abs(point_dx)) < warp_threshold and not point_shifts[point_index][0] == None:
                         continue
                     print("frame shifts: " + str(dy) + ", " + str(dx))
-                    if configuration.alignment_point_subpixel:
+                    if configuration.alignment_point_method == 'Subpixel':
                         print("Point shifts: " + str(point_dy) + ", " + str(point_dx) + ", Error: "
                               + str(errors[point_index]) + ", diffphase: " + str(diffphases[point_index]))
                     else:
@@ -225,7 +263,7 @@ if __name__ == "__main__":
                     box_in_frame_shifted = stack((frames.frames_mono[frame_index],) * 3, -1)[
                                            y_center - box_size_half + dy - point_dy_int:y_center + box_size_half + dy - point_dy_int,
                                            x_center - box_size_half + dx - point_dx_int:x_center + box_size_half + dx - point_dx_int]
-                    insert_cross(box_in_frame_shifted, box_size_half, box_size_half, cross_half_len, 'red')
+                    insert_cross(box_in_frame_shifted, box_size_half, box_size_half, cross_half_len, color_cross)
                     fig = plt.figure(figsize=(12, 6))
                     ax1 = plt.subplot(1, 3, 1)
                     ax2 = plt.subplot(1, 3, 2, sharex=ax1, sharey=ax1)

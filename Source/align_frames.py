@@ -7,7 +7,7 @@ from numpy.fft import fft2, ifft2
 from configuration import Configuration
 from exceptions import WrongOrderingError
 from frames import Frames
-from miscellaneous import quality_measure
+from miscellaneous import quality_measure, translation
 from rank_frames import RankFrames
 
 
@@ -48,21 +48,6 @@ class AlignFrames(object):
             x_high += incr_x
         return (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt)
 
-    def translation(self, frame_0, frame_1, shape):
-        """Return translation vector to register images."""
-
-        f0 = fft2(frame_0)
-        f1 = fft2(frame_1)
-        ir = abs(ifft2((f0 * f1.conjugate()) / (abs(f0) * abs(f1))))
-        ty, tx = unravel_index(argmax(ir), shape)
-
-        if ty > shape[0] // 2:
-            ty -= shape[0]
-        if tx > shape[1] // 2:
-            tx -= shape[1]
-        # The shift value means that frame_1 must be shifted by this amount to register with frame_0.
-        return [ty, tx]
-
     def align_frames(self):
         if self.x_low_opt == None:
             raise WrongOrderingError("Method 'align_frames' is called before 'select_alignment_rect'")
@@ -77,7 +62,7 @@ class AlignFrames(object):
                 frame_window = self.frames_mono[index][self.y_low_opt:self.y_high_opt,
                                self.x_low_opt:self.x_high_opt]
                 self.frame_shifts.append(
-                    self.translation(self.reference_window, frame_window, self.reference_window_shape))
+                    translation(self.reference_window, frame_window, self.reference_window_shape))
         self.intersection_shape = [
             [max(b[0] for b in self.frame_shifts), min(b[0] for b in self.frame_shifts) + self.shape[0]],
             [max(b[1] for b in self.frame_shifts), min(b[1] for b in self.frame_shifts) + self.shape[1]]]

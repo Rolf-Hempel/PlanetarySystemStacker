@@ -1,4 +1,6 @@
 from numpy import sqrt, average, diff
+from numpy import unravel_index, argmax
+from numpy.fft import fft2, ifft2
 
 
 def quality_measure(frame):
@@ -27,6 +29,22 @@ def local_contrast(frame, stride):
     return sharpness
 
 
+def translation(frame_0, frame_1, shape):
+    """Return translation vector to register images."""
+
+    f0 = fft2(frame_0)
+    f1 = fft2(frame_1)
+    ir = abs(ifft2((f0 * f1.conjugate()) / (abs(f0) * abs(f1))))
+    ty, tx = unravel_index(argmax(ir), shape)
+
+    if ty > shape[0] // 2:
+        ty -= shape[0]
+    if tx > shape[1] // 2:
+        tx -= shape[1]
+    # The shift value means that frame_1 must be shifted by this amount to register with frame_0.
+    return [ty, tx]
+
+
 def insert_cross(frame, y_center, x_center, cross_half_len, color):
     if color == 'white':
         rgb = [255, 255, 255]
@@ -42,3 +60,21 @@ def insert_cross(frame, y_center, x_center, cross_half_len, color):
         frame[y, x_center] = rgb
     for x in range(x_center - cross_half_len, x_center + cross_half_len + 1):
         frame[y_center, x] = rgb
+
+
+def circle_around(x, y, r):
+    if r == 0:
+        yield (x, y)
+    i, j = x - r, y - r
+    while i < x + r:
+        i += 1
+        yield (i, j)
+    while j < y + r:
+        j += 1
+        yield (i, j)
+    while i > x - r:
+        i -= 1
+        yield (i, j)
+    while j > y - r:
+        j -= 1
+        yield (i, j)
