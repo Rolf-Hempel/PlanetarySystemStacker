@@ -79,3 +79,10 @@ if __name__ == "__main__":
     end = time()
     print('Elapsed time in alignment point selection: {}'.format(end - start))
     print("Number of alignment points selected: " + str(alignment_points.alignment_points_number))
+
+    for frame_index in range(frames.number):
+        frame_with_shifts = reference_frame_with_alignment_points.copy()
+        start = time()
+        point_shifts, errors, diffphases = alignment_points.compute_alignment_point_shifts(frame_index)
+        end = time()
+        print("Elapsed time in computing point shifts for frame number " + str(frame_index) + ": " + str(end - start))
