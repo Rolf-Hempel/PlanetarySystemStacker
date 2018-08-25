@@ -23,10 +23,6 @@ class AlignmentPoints(object):
         self.y_locations = None
         self.x_locations = None
         self.alignment_boxes = None
-        self.alignment_boxes_coordinates = None
-        self.alignment_boxes_structure = None
-        self.alignment_boxes_max_brightness = None
-        self.alignment_boxes_number = None
         self.alignment_points = None
 
         self.average_frame_number = max(ceil(frames.number * configuration.average_frame_percent / 100.), 1)
@@ -58,24 +54,27 @@ class AlignmentPoints(object):
                 x_low = x - box_size_half
                 x_high = x + box_size_half
                 box = mean_frame[y_low:y_high, x_low:x_high]
-                self.alignment_boxes.append(box)
-                self.alignment_boxes_coordinates.append([j, i, y, x, y_low, y_high, x_low, x_high])
-                self.alignment_boxes_structure.append(quality_measure(box))
-                self.alignment_boxes_max_brightness.append(amax(box))
-                self.alignment_boxes_min_brightness.append(amin(box))
-        self.alignment_boxes_number = len(self.alignment_boxes)
-        structure_max = max(self.alignment_boxes_structure)
-        self.alignment_boxes_structure = [item / structure_max for item in self.alignment_boxes_structure]
+                alignment_box = {}
+                alignment_box['box'] = box
+                alignment_box['coordinates'] = (j, i, y, x, y_low, y_high, x_low, x_high)
+                alignment_box['structure'] = quality_measure(box)
+                alignment_box['max_brightness'] = amax(box)
+                alignment_box['min_brightness'] = amin(box)
+                self.alignment_boxes.append(alignment_box)
+        structure_max = max(alignment_box['structure'] for alignment_box in self.alignment_boxes)
+        for alignment_box in self.alignment_boxes:
+            alignment_box['structure'] /= structure_max
 
     def select_alignment_points(self, structure_threshold, brightness_threshold, contrast_threshold):
         if self.alignment_boxes == None:
             raise WrongOrderingError("Attempt to select alignment points before alignment boxes are created")
-        self.alignment_points = [[box_index, item] for [box_index, item] in enumerate(self.alignment_boxes_coordinates)
+        self.alignment_points = [[box_index, coordinates] for [box_index, coordinates] in
+                                 enumerate(box['coordinates'] for box in self.alignment_boxes)
                                  if
-                                 self.alignment_boxes_structure[box_index] > structure_threshold and
-                                 self.alignment_boxes_max_brightness[box_index] > brightness_threshold and
-                                 self.alignment_boxes_max_brightness[box_index] - self.alignment_boxes_min_brightness[
-                                     box_index] > contrast_threshold]
+                                 self.alignment_boxes[box_index]['structure'] > structure_threshold and
+                                 self.alignment_boxes[box_index]['max_brightness'] > brightness_threshold and
+                                 self.alignment_boxes[box_index]['max_brightness'] -
+                                 self.alignment_boxes[box_index]['min_brightness'] > contrast_threshold]
 
     def compute_alignment_point_shifts(self, frame_index):
         if self.alignment_points == None:
@@ -89,15 +88,15 @@ class AlignmentPoints(object):
             dx = self.align_frames.intersection_shape[1][0] - self.align_frames.frame_shifts[frame_index][1]
             box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy, x_low + dx:x_high + dx]
             if self.configuration.alignment_point_method == 'Subpixel':
-                shift_pixel, error, diffphase = register_translation(self.alignment_boxes[box_index], box_in_frame,
+                shift_pixel, error, diffphase = register_translation(self.alignment_boxes[box_index]['box'], box_in_frame,
                                                                      10, space='real')
                 diffphases.append(diffphase)
                 errors.append(error)
             elif self.configuration.alignment_point_method == 'CrossCorrelation':
-                shift_pixel = self.align_frames.translation(self.alignment_boxes[box_index], box_in_frame,
+                shift_pixel = self.align_frames.translation(self.alignment_boxes[box_index]['box'], box_in_frame,
                                                             box_in_frame.shape)
             elif self.configuration.alignment_point_method == 'LocalSearch':
-                shift_pixel = self.search_local_match(self.alignment_boxes[box_index],
+                shift_pixel = self.search_local_match(self.alignment_boxes[box_index]['box'],
                                                       self.frames.frames_mono[frame_index],
                                                       y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                                                       self.configuration.alignment_point_search_width)
@@ -191,7 +190,7 @@ if __name__ == "__main__":
     alignment_points.create_alignment_boxes(step_size, box_size)
     end = time()
     print('Elapsed time in alignment box creation: {}'.format(end - start))
-    print("Number of alignment boxes created: " + str(alignment_points.alignment_boxes_number))
+    print("Number of alignment boxes created: " + str(len(alignment_points.alignment_boxes)))
 
     structure_threshold = configuration.alignment_point_structure_threshold
     brightness_threshold = configuration.alignment_point_brightness_threshold

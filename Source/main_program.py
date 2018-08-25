@@ -68,7 +68,7 @@ if __name__ == "__main__":
     alignment_points.create_alignment_boxes(step_size, box_size)
     end = time()
     print('Elapsed time in alignment box creation: {}'.format(end - start))
-    print("Number of alignment boxes created: " + str(alignment_points.alignment_boxes_number))
+    print("Number of alignment boxes created: " + str(len(alignment_points.alignment_boxes)))
 
     structure_threshold = configuration.alignment_point_structure_threshold
     brightness_threshold = configuration.alignment_point_brightness_threshold
