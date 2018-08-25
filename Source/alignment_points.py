@@ -42,11 +42,11 @@ class AlignmentPoints(object):
         self.alignment_boxes_min_brightness = []
 
         self.y_locations = arange(box_size_half + self.configuration.alignment_point_search_width,
-                        mean_frame_shape[0] - box_size_half - self.configuration.alignment_point_search_width,
-                        step_size, dtype=int)
+                                  mean_frame_shape[0] - box_size_half - self.configuration.alignment_point_search_width,
+                                  step_size, dtype=int)
         self.x_locations = arange(box_size_half + self.configuration.alignment_point_search_width,
-                            mean_frame_shape[1] - box_size_half - self.configuration.alignment_point_search_width,
-                            step_size, dtype=int)
+                                  mean_frame_shape[1] - box_size_half - self.configuration.alignment_point_search_width,
+                                  step_size, dtype=int)
         for j, y in enumerate(self.y_locations):
             for i, x in enumerate(self.x_locations):
                 y_low = y - box_size_half
@@ -88,7 +88,8 @@ class AlignmentPoints(object):
             dx = self.align_frames.intersection_shape[1][0] - self.align_frames.frame_shifts[frame_index][1]
             box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy, x_low + dx:x_high + dx]
             if self.configuration.alignment_point_method == 'Subpixel':
-                shift_pixel, error, diffphase = register_translation(self.alignment_boxes[box_index]['box'], box_in_frame,
+                shift_pixel, error, diffphase = register_translation(self.alignment_boxes[box_index]['box'],
+                                                                     box_in_frame,
                                                                      10, space='real')
                 diffphases.append(diffphase)
                 errors.append(error)
@@ -126,7 +127,7 @@ class AlignmentPoints(object):
         # print("search local match unsuccessful: y_low: " + str(y_low) + ", x_low: " + str(x_low))
         # print(
         #     "search local match unsuccessful: y: " + str((y_high + y_low) / 2.) + ", x: " + str((x_high + x_low) / 2.))
-        return [None, None]
+        return [0, 0]
 
 
 if __name__ == "__main__":

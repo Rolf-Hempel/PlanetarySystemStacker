@@ -11,3 +11,5 @@ class Configuration(object):
         self.alignment_point_contrast_threshold = 15
         self.alignment_point_method = 'LocalSearch'
         self.alignment_point_search_width = 20
+        self.quality_area_number_y = 10
+        self.quality_area_number_x = 12
