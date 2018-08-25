@@ -1,8 +1,7 @@
 import glob
 
 import matplotlib.pyplot as plt
-from numpy import unravel_index, argmax, empty, mean
-from numpy.fft import fft2, ifft2
+from numpy import empty, mean, arange
 
 from configuration import Configuration
 from exceptions import WrongOrderingError
@@ -27,25 +26,17 @@ class AlignFrames(object):
     def select_alignment_rect(self, scale_factor):
         dim_y, dim_x = self.shape[0:2]
         rect_y = int(self.shape[0] / scale_factor)
-        incr_y = int(rect_y)
         rect_x = int(self.shape[1] / scale_factor)
-        incr_x = int(rect_x)
-        x_low = 0
-        x_high = x_low + rect_x
         quality = -1.
-        while x_high <= dim_x:
-            y_low = 0
-            y_high = y_low + rect_y
-            while y_high <= dim_y:
+        for x_low in arange(0, dim_x - rect_x + 1, rect_x):
+            x_high = x_low + rect_x
+            for y_low in arange(0, dim_y - rect_y + 1, rect_y):
+                y_high = y_low + rect_y
                 new_quality = quality_measure(
                     self.frames_mono[self.frame_ranks_max_index][y_low:y_high, x_low:x_high])
                 if new_quality > quality:
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (x_low, x_high, y_low, y_high)
                     quality = new_quality
-                y_low += incr_y
-                y_high += incr_y
-            x_low += incr_x
-            x_high += incr_x
         return (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt)
 
     def align_frames(self):
@@ -76,9 +67,9 @@ class AlignFrames(object):
         for index, frame in enumerate(frames):
             buffer[index, :, :] = frame[
                                   self.intersection_shape[0][0] - shifts[index][0]:self.intersection_shape[0][1] -
-                                                                                shifts[index][0],
+                                                                                   shifts[index][0],
                                   self.intersection_shape[1][0] - shifts[index][1]:self.intersection_shape[1][1] -
-                                                                                shifts[index][1]]
+                                                                                   shifts[index][1]]
         self.mean_frame = mean(buffer, axis=0)
         return self.mean_frame
 
