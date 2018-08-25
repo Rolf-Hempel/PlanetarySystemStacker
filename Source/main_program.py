@@ -80,7 +80,7 @@ if __name__ == "__main__":
     alignment_points.select_alignment_points(structure_threshold, brightness_threshold, contrast_threshold)
     end = time()
     print('Elapsed time in alignment point selection: {}'.format(end - start))
-    print("Number of alignment points selected: " + str(alignment_points.alignment_points_number))
+    print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
 
     for frame_index in range(frames.number):
         frame_with_shifts = reference_frame_with_alignment_points.copy()

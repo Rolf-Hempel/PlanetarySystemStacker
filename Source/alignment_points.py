@@ -20,13 +20,14 @@ class AlignmentPoints(object):
         self.frames = frames
         self.rank_frames = rank_frames
         self.align_frames = align_frames
+        self.y_locations = None
+        self.x_locations = None
         self.alignment_boxes = None
         self.alignment_boxes_coordinates = None
         self.alignment_boxes_structure = None
         self.alignment_boxes_max_brightness = None
         self.alignment_boxes_number = None
         self.alignment_points = None
-        self.alignment_points_number = None
 
         self.average_frame_number = max(ceil(frames.number * configuration.average_frame_percent / 100.), 1)
         self.align_frames.average_frame(
@@ -44,19 +45,21 @@ class AlignmentPoints(object):
         self.alignment_boxes_max_brightness = []
         self.alignment_boxes_min_brightness = []
 
-        for y in arange(box_size_half + self.configuration.alignment_point_search_width,
+        self.y_locations = arange(box_size_half + self.configuration.alignment_point_search_width,
                         mean_frame_shape[0] - box_size_half - self.configuration.alignment_point_search_width,
-                        step_size, dtype=int):
-            for x in arange(box_size_half + self.configuration.alignment_point_search_width,
+                        step_size, dtype=int)
+        self.x_locations = arange(box_size_half + self.configuration.alignment_point_search_width,
                             mean_frame_shape[1] - box_size_half - self.configuration.alignment_point_search_width,
-                            step_size, dtype=int):
+                            step_size, dtype=int)
+        for j, y in enumerate(self.y_locations):
+            for i, x in enumerate(self.x_locations):
                 y_low = y - box_size_half
                 y_high = y + box_size_half
                 x_low = x - box_size_half
                 x_high = x + box_size_half
                 box = mean_frame[y_low:y_high, x_low:x_high]
                 self.alignment_boxes.append(box)
-                self.alignment_boxes_coordinates.append([y, x, y_low, y_high, x_low, x_high])
+                self.alignment_boxes_coordinates.append([j, i, y, x, y_low, y_high, x_low, x_high])
                 self.alignment_boxes_structure.append(quality_measure(box))
                 self.alignment_boxes_max_brightness.append(amax(box))
                 self.alignment_boxes_min_brightness.append(amin(box))
@@ -73,7 +76,6 @@ class AlignmentPoints(object):
                                  self.alignment_boxes_max_brightness[box_index] > brightness_threshold and
                                  self.alignment_boxes_max_brightness[box_index] - self.alignment_boxes_min_brightness[
                                      box_index] > contrast_threshold]
-        self.alignment_points_number = len(self.alignment_points)
 
     def compute_alignment_point_shifts(self, frame_index):
         if self.alignment_points == None:
@@ -81,7 +83,7 @@ class AlignmentPoints(object):
         point_shifts = []
         diffphases = []
         errors = []
-        for point_index, [box_index, [y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
+        for point_index, [box_index, [j, i, y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
                 self.alignment_points):
             dy = self.align_frames.intersection_shape[0][0] - self.align_frames.frame_shifts[frame_index][0]
             dx = self.align_frames.intersection_shape[1][0] - self.align_frames.frame_shifts[frame_index][1]
@@ -201,13 +203,13 @@ if __name__ == "__main__":
     alignment_points.select_alignment_points(structure_threshold, brightness_threshold, contrast_threshold)
     end = time()
     print('Elapsed time in alignment point selection: {}'.format(end - start))
-    print("Number of alignment points selected: " + str(alignment_points.alignment_points_number))
+    print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
 
     start = time()
     reference_frame_with_alignment_points = stack((align_frames.frames_mono[align_frames.frame_ranks_max_index],) * 3,
                                                   -1)
     cross_half_len = 5
-    for [index, [y_center, x_center, y_low, y_high, x_low, x_high]] in alignment_points.alignment_points:
+    for [index, [j, i, y_center, x_center, y_low, y_high, x_low, x_high]] in alignment_points.alignment_points:
         insert_cross(reference_frame_with_alignment_points, y_center, x_center, cross_half_len, 'white')
     end = time()
     print('Elapsed time in drawing alignment points: {}'.format(end - start))
@@ -228,7 +230,7 @@ if __name__ == "__main__":
         point_shifts, errors, diffphases = alignment_points.compute_alignment_point_shifts(frame_index)
         end = time()
         print("Elapsed time in computing point shifts for frame number " + str(frame_index) + ": " + str(end - start))
-        for point_index, [index, [y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
+        for point_index, [index, [j, i, y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
                 alignment_points.alignment_points):
             if point_shifts[point_index][0] == None:
                 insert_cross(frame_with_shifts, y_center, x_center, cross_half_len, 'green')
@@ -241,7 +243,7 @@ if __name__ == "__main__":
 
         if frame_index == frame_index_details:
             reference_frame = reference_frame_with_alignment_points.copy()
-            for point_index, [index, [y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
+            for point_index, [index, [j, i, y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
                     alignment_points.alignment_points):
                 if y_center_low_details <= y_center <= y_center_high_details and x_center_low_details <= x_center <= x_center_high_details:
                     reference_frame_box = reference_frame[y_center - box_size_half:y_center + box_size_half,
