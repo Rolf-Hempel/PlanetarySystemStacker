@@ -1,8 +1,9 @@
 import glob
+from time import time
 
 from configuration import Configuration
 from frames import Frames
-from miscellaneous import local_contrast
+from miscellaneous import local_contrast, quality_measure_sobel
 
 
 class RankFrames(object):
@@ -20,6 +21,7 @@ class RankFrames(object):
     def frame_score(self):
         for frame in self.frames_mono:
             self.frame_ranks.append(local_contrast(frame, self.configuration.frame_score_pixel_stride))
+            # self.frame_ranks.append(quality_measure_sobel(frame)) # Ten times slower but twice as good
         self.quality_sorted_indices = [b[0] for b in
                                        sorted(enumerate(self.frame_ranks), key=lambda i: i[1], reverse=True)]
         self.frame_ranks_max_index = self.quality_sorted_indices[0]
@@ -40,4 +42,9 @@ if __name__ == "__main__":
         exit()
 
     rank_frames = RankFrames(frames, configuration)
+    start = time()
     rank_frames.frame_score()
+    end = time()
+    for index, frame in enumerate(names):
+        print ("Frame rank for no. " + str(index) + ": " + str(rank_frames.frame_ranks[index]))
+    print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))

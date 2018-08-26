@@ -1,6 +1,7 @@
-from numpy import sqrt, average, diff
+from numpy import sqrt, average, diff, sum, hypot
 from numpy import unravel_index, argmax
 from numpy.fft import fft2, ifft2
+from scipy.ndimage import sobel
 
 
 def quality_measure(frame):
@@ -18,6 +19,15 @@ def quality_measure_alternative(frame, black_threshold=40.):
     sum_vertical = sum(sum(abs(frame[2:, :] - frame[:-2, :]) / (frame[1:-1, :] + 0.0001) * (
             frame[1:-1, :] > black_threshold)))
     return min(sum_horizontal, sum_vertical)
+
+
+def quality_measure_sobel(frame):
+    frame_int32 = frame.astype('int32')
+    dx = sobel(frame_int32, 0)  # vertical derivative
+    dy = sobel(frame_int32, 1)  # horizontal derivative
+    mag = hypot(dx, dy)  # magnitude
+    sharpness = sum(mag)
+    return sharpness
 
 
 def local_contrast(frame, stride):
