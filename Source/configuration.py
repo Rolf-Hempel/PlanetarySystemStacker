@@ -13,4 +13,5 @@ class Configuration(object):
         self.alignment_point_search_width = 20
         self.quality_area_number_y = 10
         self.quality_area_number_x = 12
-        self.quality_area_pixel_stride = 1
+        self.quality_area_pixel_stride = 2
+        self.quality_area_frame_percent = 10.
