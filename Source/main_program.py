@@ -6,6 +6,7 @@ from alignment_points import AlignmentPoints
 from configuration import Configuration
 from frames import Frames
 from rank_frames import RankFrames
+from quality_areas import QualityAreas
 
 if __name__ == "__main__":
     names = glob.glob('Images/2012*.tif')
@@ -88,3 +89,11 @@ if __name__ == "__main__":
         point_shifts, errors, diffphases = alignment_points.compute_alignment_point_shifts(frame_index)
         end = time()
         print("Elapsed time in computing point shifts for frame number " + str(frame_index) + ": " + str(end - start))
+
+    start = time()
+    quality_areas = QualityAreas(configuration, frames, align_frames, alignment_points)
+    quality_areas.select_best_frames()
+    quality_areas.truncate_best_frames()
+    end = time()
+    print('Elapsed time in quality area creation and frame ranking: {}'.format(end - start))
+    print("Number of frames to be stacked for each quality area: " + str(quality_areas.stack_size))
