@@ -131,13 +131,18 @@ class AlignmentPoints(object):
 
 
 if __name__ == "__main__":
-    names = glob.glob('Images/2012*.tif')
-    # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
-    # names = glob.glob('Images/Example-3*.jpg')
+    type = 'video'
+    if type == 'image':
+        names = glob.glob('Images/2012*.tif')
+        # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
+        # names = glob.glob('Images/Example-3*.jpg')
+    else:
+        names = 'Videos/short_video.avi'
     print(names)
+
     configuration = Configuration()
     try:
-        frames = Frames(names, type='image')
+        frames = Frames(names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
