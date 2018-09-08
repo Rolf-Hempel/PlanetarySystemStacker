@@ -1,10 +1,12 @@
 import glob
-import PIL
+
+import cv2
 import matplotlib.pyplot as plt
-from scipy import misc
+from PIL import ImageChops, Image
 from numpy import array
-from time import time
-from exceptions import TypeError, ShapeError, NotSupportedError, ArgumentError
+from scipy import misc
+
+from exceptions import TypeError, ShapeError, ArgumentError
 
 
 class Frames(object):
@@ -13,21 +15,32 @@ class Frames(object):
             self.frames = [misc.imread(path) for path in names]
             self.number = len(names)
             self.shape = self.frames[0].shape
-            if len(self.shape) == 2:
-                self.color = False
-            elif len(self.shape) == 3:
-                self.color = True
-            else:
-                raise ShapeError("Image shape not supported")
             for image in self.frames:
                 if image.shape != self.shape:
                     raise ShapeError("Images have different size")
                 elif len(self.shape) != len(image.shape):
                     raise ShapeError("Mixing grayscale and color images not supported")
         elif type == 'video':
-            raise NotSupportedError("Video files are not supported yet")
+            cap = cv2.VideoCapture(names)
+            self.number = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            self.frames = []
+            for frame_index in range(self.number):
+                ret, frame = cap.read()
+                if ret:
+                    self.frames.append(frame)
+                else:
+                    raise IOError("Error in reading video frame")
+            cap.release()
+            self.shape = self.frames[0].shape
         else:
             raise TypeError("Image type not supported")
+
+        if len(self.shape) == 2:
+            self.color = False
+        elif len(self.shape) == 3:
+            self.color = True
+        else:
+            raise ShapeError("Image shape not supported")
 
         self.frames_mono = None
 
@@ -49,22 +62,26 @@ class Frames(object):
             self.frames_mono = self.frames
 
     def shift_frame_with_wraparound(self, index, shift_x, shift_y):
-        pil_image = PIL.Image.fromarray(self.frames[index])
-        im2_offset = PIL.ImageChops.offset(pil_image, xoffset=shift_x, yoffset=shift_y)
+        pil_image = Image.fromarray(self.frames[index])
+        im2_offset = ImageChops.offset(pil_image, xoffset=shift_x, yoffset=shift_y)
         self.frames[index] = array(im2_offset)
 
 
 if __name__ == "__main__":
-    names = glob.glob('Images/2012_*.tif')
+    type = 'video'
+    if type == 'image':
+        names = glob.glob('Images/2012_*.tif')
+    else:
+        names = 'Videos/short_video.avi'
     try:
-        frames = Frames(names, type='image')
+        frames = Frames(names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
         print("Error: " + e.message)
         exit()
 
-    frames.shift_frame_with_wraparound(0, 110, -200)
+    frames.shift_frame_with_wraparound(0, 100, -200)
 
     try:
         image_green = frames.extract_channel(0, 'green')
