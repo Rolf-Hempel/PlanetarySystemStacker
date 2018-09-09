@@ -192,7 +192,6 @@ if __name__ == "__main__":
     print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
 
     for frame_index in range(frames.number):
-        frame_with_shifts = reference_frame_with_alignment_points.copy()
         start = time()
         point_shifts, errors, diffphases = alignment_points.compute_alignment_point_shifts(frame_index)
         end = time()

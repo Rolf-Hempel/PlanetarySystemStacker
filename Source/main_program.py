@@ -131,20 +131,21 @@ if __name__ == "__main__":
     print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
 
     # For all frames: Compute the local shifts for all alignment points (to be used for de-warping).
+    start = time()
     for frame_index in range(frames.number):
-        frame_with_shifts = reference_frame_with_alignment_points.copy()
-        start = time()
         point_shifts, errors, diffphases = alignment_points.compute_alignment_point_shifts(frame_index)
-        end = time()
-        print("Elapsed time in computing point shifts for frame number " + str(frame_index) + ": " + str(end - start))
+    end = time()
+    print("Elapsed time in computing point shifts for all frames: " + str(end - start))
 
     # Create a regular grid of quality areas. The fractional sizes of the areas in x and y, as compared to the full
     # frame, are specified in the configuration object.
     start = time()
     quality_areas = QualityAreas(configuration, frames, align_frames, alignment_points)
 
-    # For each quality area select the frames with the highest quality.
+    # For each quality area rank the frames according to the local contrast.
     quality_areas.select_best_frames()
+
+    # Truncate the list of frames to be stacked to the same number for each quality area.
     quality_areas.truncate_best_frames()
     end = time()
     print('Elapsed time in quality area creation and frame ranking: {}'.format(end - start))
