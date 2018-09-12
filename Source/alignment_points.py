@@ -25,7 +25,7 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin
+from numpy import arange, amax, stack, amin, hypot
 from skimage.feature import register_translation
 
 from align_frames import AlignFrames
@@ -62,8 +62,11 @@ class AlignmentPoints(object):
         self.align_frames = align_frames
         self.y_locations = None
         self.x_locations = None
+        self.y_locations_number = None
+        self.x_locations_number = None
         self.alignment_boxes = None
         self.alignment_points = None
+        self.alignment_point_neighbors = None
 
         # Compute the number of frames to be used for creating the mean frame.
         self.average_frame_number = max(
@@ -74,8 +77,8 @@ class AlignmentPoints(object):
         self.align_frames.average_frame([self.frames.frames_mono[i] for i in
                                          self.rank_frames.quality_sorted_indices[
                                          :self.average_frame_number]],
-            [self.align_frames.frame_shifts[i] for i in
-             self.rank_frames.quality_sorted_indices[:self.average_frame_number]])
+                                        [self.align_frames.frame_shifts[i] for i in
+                                         self.rank_frames.quality_sorted_indices[:self.average_frame_number]])
 
     def create_alignment_boxes(self, step_size, box_size):
         """
@@ -99,15 +102,20 @@ class AlignmentPoints(object):
                                   mean_frame_shape[0] - box_size_half -
                                   self.configuration.alignment_point_search_width,
                                   step_size, dtype=int)
+        self.y_locations_number = len(self.y_locations)
         self.x_locations = arange(box_size_half + self.configuration.alignment_point_search_width,
                                   mean_frame_shape[1] - box_size_half -
                                   self.configuration.alignment_point_search_width,
                                   step_size, dtype=int)
+        self.x_locations_number = len(self.x_locations)
+
         for j, y in enumerate(self.y_locations):
+            # Compute the y index bounds of the row of alignment boxes.
+            y_low = y - box_size_half
+            y_high = y + box_size_half
+            alignment_box_row = []
             for i, x in enumerate(self.x_locations):
-                # Compute the index bounds of the alignment box.
-                y_low = y - box_size_half
-                y_high = y + box_size_half
+                # Compute the x index bounds of the alignment box.
                 x_low = x - box_size_half
                 x_high = x + box_size_half
 
@@ -116,6 +124,10 @@ class AlignmentPoints(object):
 
                 # Initialize a dictionary for the alignment box which contains all related info.
                 alignment_box = {}
+
+                # Initialize the type of the alignment box to None. Later it will be changed to 'alignment point'
+                # or 'alignment point neighbor' if there is enough structure at this point or in the neighborhood.
+                alignment_box['type'] = None
                 alignment_box['box'] = box
                 alignment_box['coordinates'] = (j, i, y, x, y_low, y_high, x_low, x_high)
 
@@ -124,12 +136,20 @@ class AlignmentPoints(object):
                 alignment_box['structure'] = Miscellaneous.quality_measure(box)
                 alignment_box['max_brightness'] = amax(box)
                 alignment_box['min_brightness'] = amin(box)
-                self.alignment_boxes.append(alignment_box)
+
+                # Initialize the index of the corresponding element in the list of alignment points to "None".
+                alignment_box['alignment_point_index'] = None
+                alignment_box_row.append(alignment_box)
+
+            # Append the row of alignment boxes to the 2D grid structure of alignment boxes.
+            self.alignment_boxes.append(alignment_box_row)
 
         # Normalize the structure information for all boxes by dividing by the maximum value.
-        structure_max = max(alignment_box['structure'] for alignment_box in self.alignment_boxes)
-        for alignment_box in self.alignment_boxes:
-            alignment_box['structure'] /= structure_max
+        structure_max = max((alignment_box['structure'] for alignment_box in alignment_box_row) for alignment_box_row in
+                            self.alignment_boxes)
+        for alignment_box_row in self.alignment_boxes:
+            for alignment_box in alignment_box_row:
+                alignment_box['structure'] /= structure_max
 
     def select_alignment_points(self, structure_threshold, brightness_threshold,
                                 contrast_threshold):
@@ -150,15 +170,63 @@ class AlignmentPoints(object):
             raise WrongOrderingError(
                 "Attempt to select alignment points before alignment boxes are created")
 
-        self.alignment_points = [[box_index, coordinates] for [box_index, coordinates] in
-                                 enumerate(box['coordinates'] for box in self.alignment_boxes) if
-                                 self.alignment_boxes[box_index][
-                                     'structure'] > structure_threshold and
-                                 self.alignment_boxes[box_index][
-                                     'max_brightness'] > brightness_threshold and
-                                 self.alignment_boxes[box_index]['max_brightness'] -
-                                 self.alignment_boxes[box_index][
-                                     'min_brightness'] > contrast_threshold]
+        # Check for each alignment box if it qualifies for being an alignment point.
+        self.alignment_points = []
+        alignment_point_index = 0
+        for alignment_box_row in self.alignment_boxes:
+            for alignment_box in alignment_box_row:
+                if alignment_box['structure'] > structure_threshold and alignment_box[
+                    'max_brightness'] > brightness_threshold and alignment_box[
+                    'max_brightness'] - alignment_box['min_brightness'] > contrast_threshold:
+                    # This point satisfies the conditions for an alignment point. Append its coordinates to the list.
+                    self.alignment_points.append(alignment_box['coordinates'])
+                    alignment_box['type'] = 'alignment point'
+                    alignment_box['alignment_point_index'] = alignment_point_index
+                    alignment_point_index += 1
+
+        # Check all alignment boxes which did not qualify for being an alignment point, if there are alignment points
+        # in the neighborhood. In this case compute the weights with which the shifts at those points are interpolated
+        # to this position.
+        #
+        # First, initialize the list of the points in the neighborhood of alignment points.
+        self.alignment_point_neighbors = []
+        alignment_point_neighbor_index = 0
+        for alignment_box_row in self.alignment_boxes:
+            for alignment_box in alignment_box_row:
+                # The box did not qualify for being an alignment point.
+                if alignment_box['alignment_point_index'] is None:
+                    j_center = alignment_box['coordinates'][0]
+                    i_center = alignment_box['coordinates'][1]
+
+                    # Circle around the point and look for "contributing" alignment points in the neighborhood.
+                    contributing_alignment_points = []
+                    weight_sum = 0.
+
+                    # Limit the radius of the search circle according to a configuration parameter.
+                    for r in arange(1, configuration.alignment_box_max_neighbor_distance):
+                        circle = Miscellaneous.circle_around(i_center, j_center, r)
+                        for (i, j) in circle:
+                            if 0 <= i < self.x_locations_number and 0 <= j < self.y_locations_number and \
+                                    self.alignment_boxes[j][i]['type'] is not None:
+                                # Alignment point found. Compute its distance and weight, and add it to the list.
+                                contributing_alignment_point = {}
+                                contributing_alignment_point['alignment_point_index'] = self.alignment_boxes[j][i][
+                                    'alignment_point_index']
+                                contributing_alignment_point['weight'] = 1. / hypot(i - i_center, j - j_center)
+                                weight_sum += contributing_alignment_point['weight']
+                                contributing_alignment_points.append(contributing_alignment_point)
+
+                    # Normalize the weights such that their sum is 1.
+                    for contributing_alignment_point in contributing_alignment_points:
+                        contributing_alignment_point['weight'] /= weight_sum
+
+                    # The list of alignment points in the neighborhood is not empty. Add the point to the list of
+                    # "alignment point neighbors".
+                    if contributing_alignment_points:
+                        self.alignment_point_neighbors.append(contributing_alignment_points)
+                        alignment_box['type'] = 'alignment point neighbor'
+                        alignment_box['alignment_point_index'] = alignment_point_neighbor_index
+                        alignment_point_neighbor_index += 1
 
     def compute_alignment_point_shifts(self, frame_index):
         """
@@ -433,7 +501,7 @@ if __name__ == "__main__":
         # Insert small crosses into the reference frame showing local shifts. If a shift has been
         # computed, insert a red cross next to the unshifted white one. Otherwise replace the white
         # cross with a green one.
-        for point_index, [index, [j, i, y_center, x_center, y_low, y_high, x_low, x_high]]\
+        for point_index, [index, [j, i, y_center, x_center, y_low, y_high, x_low, x_high]] \
                 in enumerate(alignment_points.alignment_points):
             if point_shifts[point_index][0] == None:
                 Miscellaneous.insert_cross(frame_with_shifts, y_center, x_center, cross_half_len,
@@ -490,7 +558,7 @@ if __name__ == "__main__":
                     # The three views are displayed only if the shift is larger than a given
                     # threshold and a shift has been computed at all.
                     if max(abs(point_dy), abs(point_dx)) < warp_threshold and not \
-                    point_shifts[point_index][0] == None:
+                            point_shifts[point_index][0] == None:
                         continue
                     print("frame shifts: " + str(dy) + ", " + str(dx))
 
@@ -507,9 +575,9 @@ if __name__ == "__main__":
                     #  or red cross.
                     box_in_frame_shifted = stack((frames.frames_mono[frame_index],) * 3, -1)[
                                            y_center - box_size_half + dy - point_dy_int:y_center
-                                            + box_size_half + dy - point_dy_int,
+                                                                                        + box_size_half + dy - point_dy_int,
                                            x_center - box_size_half + dx - point_dx_int:x_center
-                                            + box_size_half + dx - point_dx_int]
+                                                                                        + box_size_half + dx - point_dx_int]
                     Miscellaneous.insert_cross(box_in_frame_shifted, box_size_half, box_size_half,
                                                cross_half_len, color_cross)
 
