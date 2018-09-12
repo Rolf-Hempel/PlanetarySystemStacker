@@ -39,10 +39,11 @@ class Frames(object):
 
     def __init__(self, names, type='video'):
         """
-        Initialize the Frame object, and read all images. Images can be stored in a video file or as single images in
-        a directory.
+        Initialize the Frame object, and read all images. Images can be stored in a video file or
+        as single images in a directory.
 
-        :param names: In case "video": name of the video file. In case "image": list of names for all images.
+        :param names: In case "video": name of the video file. In case "image": list of names for
+                      all images.
         :param type: Either "video" or "image"
         """
 
@@ -106,8 +107,9 @@ class Frames(object):
 
     def add_monochrome(self, color):
         """
-        Same as method "extract_channel", but for all frames. Add a list of monochrome frames "self.frames_mono". If
-        the original frames are monochrome, just point the monochrome frame list to the original images (no deep copy!).
+        Same as method "extract_channel", but for all frames. Add a list of monochrome frames
+        "self.frames_mono". If the original frames are monochrome, just point the monochrome frame
+        list to the original images (no deep copy!).
 
         :param color: Either "red" or "green" or "blue"
         :return: -
@@ -123,8 +125,9 @@ class Frames(object):
 
     def shift_frame_with_wraparound(self, index, shift_x, shift_y):
         """
-        This is an experimental method, not used in the current Code. It shifts a frame in y and x directions with
-        wrap-around in both directions. The result is stored at the original location!
+        This is an experimental method, not used in the current Code. It shifts a frame in y and
+        x directions with wrap-around in both directions. The result is stored at the original
+        location!
 
         :param index: Frame index
         :param shift_x: Shift in x (pixels)
@@ -139,8 +142,8 @@ class Frames(object):
 
 if __name__ == "__main__":
 
-    # Images can either be extracted from a video file or a batch of single photographs. Select the example for
-    # the test run.
+    # Images can either be extracted from a video file or a batch of single photographs. Select
+    # the example for the test run.
     type = 'video'
     if type == 'image':
         names = glob.glob('Images/2012_*.tif')
@@ -166,8 +169,8 @@ if __name__ == "__main__":
     plt.imshow(image_green, cmap='Greys_r')
     plt.show()
 
-    # Create monochrome versions of all frames. If the original frames are monochrome, just point the monochrome frame
-    # list to the original images (no deep copy!).
+    # Create monochrome versions of all frames. If the original frames are monochrome, just point
+    # the monochrome frame list to the original images (no deep copy!).
     try:
         frames.add_monochrome('red')
     except ArgumentError as e:

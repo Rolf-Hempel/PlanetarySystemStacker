@@ -25,14 +25,14 @@ from time import time
 
 from configuration import Configuration
 from frames import Frames
-from miscellaneous import local_contrast, quality_measure_sobel
+from miscellaneous import Miscellaneous
 
 
 class RankFrames(object):
     """
-        Rank frames according to their overall sharpness. Experiments with different algorithms have been made. The
-        classical "Sobel" algorithm is good but slow. An alternative is implemented in method "local_contrast" in
-        module "miscellaneous".
+        Rank frames according to their overall sharpness. Experiments with different algorithms
+        have been made. The classical "Sobel" algorithm is good but slow. An alternative is
+        implemented in method "local_contrast" in module "miscellaneous".
 
     """
 
@@ -48,9 +48,10 @@ class RankFrames(object):
         self.shape = frames.shape
         self.configuration = configuration
 
-        # The whole quality analysis and shift determination process is performed on a monochrome version of the
-        # frames. If the original frames are in RGB, the monochrome channel can be selected via a configuration
-        # parameter. Add a list of monochrome images for all frames to the "Frames" object.
+        # The whole quality analysis and shift determination process is performed on a monochrome
+        # version of the frames. If the original frames are in RGB, the monochrome channel can be
+        # selected via a configuration parameter. Add a list of monochrome images for all frames to
+        # the "Frames" object.
         frames.add_monochrome(self.configuration.mono_channel)
         self.frames_mono = frames.frames_mono
         self.quality_sorted_indices = None
@@ -67,12 +68,15 @@ class RankFrames(object):
 
         # For all frames compute the quality with method "local_contrast" in module "miscellaneous".
         for frame in self.frames_mono:
-            self.frame_ranks.append(local_contrast(frame, self.configuration.frame_score_pixel_stride))
-            # self.frame_ranks.append(quality_measure_sobel(frame)) # Ten times slower but twice as good
+            self.frame_ranks.append(Miscellaneous.local_contrast(frame,
+                self.configuration.frame_score_pixel_stride))
+            # Ten times slower but twice as good:
+            # self.frame_ranks.append(Miscellaneous.local_contrast_sobel(frame))
+
 
         # Sort the frame indices in descending order of quality.
-        self.quality_sorted_indices = [b[0] for b in
-                                       sorted(enumerate(self.frame_ranks), key=lambda i: i[1], reverse=True)]
+        self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),
+                                                            key=lambda i: i[1], reverse=True)]
 
         # Set the index of the best frame, and normalize all quality values.
         self.frame_ranks_max_index = self.quality_sorted_indices[0]
@@ -82,11 +86,12 @@ class RankFrames(object):
 
 if __name__ == "__main__":
 
-    # Images can either be extracted from a video file or a batch of single photographs. Select the example for
-    # the test run.
+    # Images can either be extracted from a video file or a batch of single photographs. Select
+    # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob('Images/2012*.tif')
+        names = glob.glob(
+            'Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
@@ -109,5 +114,5 @@ if __name__ == "__main__":
     rank_frames.frame_score()
     end = time()
     for index, frame_rank in enumerate(rank_frames.frame_ranks):
-        print ("Frame rank for no. " + str(index) + ": " + str(frame_rank))
+        print("Frame rank for no. " + str(index) + ": " + str(frame_rank))
     print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
