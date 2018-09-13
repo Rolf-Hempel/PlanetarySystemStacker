@@ -245,24 +245,35 @@ class AlignmentPoints(object):
                         alignment_point_neighbor_index += 1
 
     def compute_alignment_point_shifts(self, frame_index, alignment_point_list=None,
-                                       alignment_point_neighbor_list=None):
+                                       alignment_point_neighbor_list=None, alignment_box_mask=None):
         """
         For each alignment point compute the shifts in y and x relative to the mean frame. Three
         different methods can be used to compute the shift values:
         - a subpixel algorithm from "skimage.feature"
         - a phase correlation algorithm (miscellaneous.translation)
-        - a local search algorithm (spiralling from center outwards), see method
-        "search_local_match"
+        - a local search algorithm (spiralling outwards), see method "search_local_match"
+        After computing the shift vectors for the alignment points, shift vectors are interpolated
+        for neighbors of those alignment points. Make sure that all contributing alignment points
+        for those neighbors are included in the list of alignment points.
+
+        This method can be called in three different ways, depending on optional parameters:
+        - Shifts are computed for all alignment boxes if no optional parameter is set.
+        - If "alignment_point_list" and "alignment_point_neighbor_list" are specified, shifts are
+          computed for points on those lists only.
+        - If the "alignment_box_mask" is set, shifts are computed for alignment box positions where
+          the corresponding mask entry is "True".
 
         :param frame_index: Index of the selected frame in the list of frames.
         :param alignment_point_list: List of alignment point indices. If not specified, shifts are
                computed for all alignment points in the frame.
         :param alignment_point_neighbor_list: List of alignment point neighbor indices. If not
                specified, shifts are computed for all alignment point neighbors in the frame.
+        :param alignment_box_mask: 2D boolean array. Shifts are computed at locations where the
+                                   mask entry is "True".
         :return: -
         """
 
-        if self.alignment_points == None:
+        if self.alignment_points is None:
             raise WrongOrderingError(
                 "Attempt to compute alignment point shifts before selecting alingment points")
 
@@ -270,67 +281,134 @@ class AlignmentPoints(object):
         self.y_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float64)
         self.x_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float64)
 
-        # If no list is specified explicitly, compute shifts for all alignment points.
-        if alignment_point_list is not None:
-            ap_list = alignment_point_list
+        # A mask defines the locations where shift vectors are to be computed.
+        if alignment_box_mask is not None:
+
+            # First compute shifts at alignment points.
+            for alignment_box_row in self.alignment_boxes:
+                for alignment_box in alignment_box_row:
+                    # If not an alignment point, go to the next box.
+                    if alignment_box['type'] != 'alignment point':
+                        continue
+                    j = alignment_box['coordinates'][0]
+                    i = alignment_box['coordinates'][1]
+                    # The mask is "True": Compute the shift vector.
+                    if alignment_box_mask[j][i]:
+                        self.compute_shift_alignment_point(j, i,
+                            alignment_box['coordinates'][4], alignment_box['coordinates'][5],
+                            alignment_box['coordinates'][6], alignment_box['coordinates'][7])
+
+            # Now compute shifts at alignment point neighbors.
+            for alignment_box_row in self.alignment_boxes:
+                for alignment_box in alignment_box_row:
+                    # If not an alignment point neighbor, go to the next box.
+                    if alignment_box['type'] != 'alignment point neighbor':
+                        continue
+                    j = alignment_box['coordinates'][0]
+                    i = alignment_box['coordinates'][1]
+                    # The mask is "True": Compute the shift vector.
+                    if alignment_box_mask[j][i]:
+                        self.compute_shift_neighbor_point(j, i, self.alignment_point_neighbors[
+                            alignment_box['alignment_point_neighbor_index']][2])
+
+        # Alignment box positions are not specified via a mask.
         else:
-            ap_list = self.alignment_points
-
-        # If no list is specified explicitly, compute shifts for all alignment point neighbors.
-        if alignment_point_neighbor_list is not None:
-            ap_neighbor_list = alignment_point_neighbor_list
-        else:
-            ap_neighbor_list = self.alignment_point_neighbors
-
-        # For each alignment point, compute the shift for the given frame index.
-        for [j, i, y_center, x_center, y_low, y_high, x_low, x_high] in ap_list:
-
-            # The offsets dy and dx are caused by two effects: First, the mean frame is smaller
-            # than the original frames. It only contains their intersection. And second, because the
-            # given frame is globally shifted as compared to the mean frame.
-            dy = self.align_frames.intersection_shape[0][0] - \
-                 self.align_frames.frame_shifts[frame_index][0]
-            dx = self.align_frames.intersection_shape[1][0] - \
-                 self.align_frames.frame_shifts[frame_index][1]
-
-            # Cut out the alignment box from the given frame. Take into account the offsets
-            # explained above.
-            box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy,
-                           x_low + dx:x_high + dx]
-
-            # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
-            if self.configuration.alignment_point_method == 'Subpixel':
-                shift_pixel, error, diffphase = register_translation(
-                    self.alignment_boxes[j][i]['box'], box_in_frame, 10, space='real')
-
-            # Use a simple phase shift computation (contained in module "miscellaneous").
-            elif self.configuration.alignment_point_method == 'CrossCorrelation':
-                shift_pixel = Miscellaneous.translation(self.alignment_boxes[j][i]['box'],
-                                                        box_in_frame, box_in_frame.shape)
-
-            # Use a local search (see method "search_local_match" below.
-            elif self.configuration.alignment_point_method == 'LocalSearch':
-                shift_pixel = self.search_local_match(self.alignment_boxes[j][i]['box'],
-                                                      self.frames.frames_mono[frame_index],
-                                                      y_low + dy, y_high + dy, x_low + dx,
-                                                      x_high + dx,
-                                                      self.configuration.alignment_point_search_width)
+            # If no list is specified explicitly, compute shifts for all alignment points.
+            if alignment_point_list is not None:
+                ap_list = alignment_point_list
             else:
-                raise NotSupportedError("The point shift computation method " +
-                    self.configuration.alignment_point_method + " is not implemented")
+                ap_list = self.alignment_points
 
-            # Copy pixel shift values into the shift arrays, and append them to the point_shifts
-            # list.
-            self.y_shifts[j][i] = shift_pixel[0]
-            self.x_shifts[j][i] = shift_pixel[1]
+            # If no list is specified explicitly, compute shifts for all alignment point neighbors.
+            if alignment_point_neighbor_list is not None:
+                ap_neighbor_list = alignment_point_neighbor_list
+            else:
+                ap_neighbor_list = self.alignment_point_neighbors
 
-        # For each alignment point neighbor, compute the shifts for the given frame index.
-        for [j_center, i_center, contributing_alignment_points] in ap_neighbor_list:
-            for ap in contributing_alignment_points:
-                j = self.alignment_points[ap['alignment_point_index']][0]
-                i = self.alignment_points[ap['alignment_point_index']][1]
-                self.y_shifts[j_center][i_center] += ap['weight'] * self.y_shifts[j][i]
-                self.x_shifts[j_center][i_center] += ap['weight'] * self.x_shifts[j][i]
+            # For each alignment point, compute the shift for the given frame index.
+            for [j, i, y_center, x_center, y_low, y_high, x_low, x_high] in ap_list:
+                self.compute_shift_alignment_point(j, i, y_low, y_high, x_low, x_high)
+
+            # For each alignment point neighbor, compute the shifts for the given frame index.
+            for [j, i, contributing_alignment_points] in ap_neighbor_list:
+                self.compute_shift_neighbor_point(j, i, contributing_alignment_points)
+
+    def compute_shift_alignment_point(self, j, i, y_low, y_high, x_low, x_high):
+        """
+        Compute the pixel shift vector at a given alignment point. The resulting shifts in y and x
+        direction are assigned to the corresponding entries in arrays self.y_shifts and
+        self.x_shifts.
+
+        :param j: Row index (y) of alignment box
+        :param i: Column index (x) of alignment box
+        :param y_low: Lower y pixel index bound of alignment box
+        :param y_high: Upper y pixel index bound of alignment box
+        :param x_low: Lower x pixel index bound of alignment box
+        :param x_high: Upper x pixel index bound of alignment box
+        :return: -
+        """
+
+        # The offsets dy and dx are caused by two effects: First, the mean frame is smaller
+        # than the original frames. It only contains their intersection. And second, because the
+        # given frame is globally shifted as compared to the mean frame.
+        dy = self.align_frames.intersection_shape[0][0] - \
+             self.align_frames.frame_shifts[frame_index][0]
+        dx = self.align_frames.intersection_shape[1][0] - \
+             self.align_frames.frame_shifts[frame_index][1]
+
+        # Cut out the alignment box from the given frame. Take into account the offsets
+        # explained above.
+        box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy,
+                       x_low + dx:x_high + dx]
+
+        # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
+        if self.configuration.alignment_point_method == 'Subpixel':
+            shift_pixel, error, diffphase = register_translation(
+                self.alignment_boxes[j][i]['box'], box_in_frame, 10, space='real')
+
+        # Use a simple phase shift computation (contained in module "miscellaneous").
+        elif self.configuration.alignment_point_method == 'CrossCorrelation':
+            shift_pixel = Miscellaneous.translation(self.alignment_boxes[j][i]['box'],
+                                                    box_in_frame, box_in_frame.shape)
+
+        # Use a local search (see method "search_local_match" below.
+        elif self.configuration.alignment_point_method == 'LocalSearch':
+            shift_pixel = self.search_local_match(self.alignment_boxes[j][i]['box'],
+                                                  self.frames.frames_mono[frame_index],
+                                                  y_low + dy, y_high + dy, x_low + dx,
+                                                  x_high + dx,
+                                                  self.configuration.alignment_point_search_width)
+        else:
+            raise NotSupportedError("The point shift computation method " +
+                                    self.configuration.alignment_point_method + " is not implemented")
+
+        # Copy pixel shift values into the shift arrays, and append them to the point_shifts
+        # list.
+        self.y_shifts[j][i] = shift_pixel[0]
+        self.x_shifts[j][i] = shift_pixel[1]
+
+    def compute_shift_neighbor_point(self, j, i, contributing_alignment_points):
+        """
+        Compute the pixel shift vector at a given alignment point neighbor, by interpolating from
+        the alignment points in the neighborhood. Make sure that the shifts for those alignment
+        points are computed before calling this method.. The resulting shifts in y and x
+        direction are assigned to the corresponding entries in arrays self.y_shifts and
+        self.x_shifts.
+
+        :param j: Row index (y) of alignment box
+        :param i: Column index (x) of alignment box
+        :param contributing_alignment_points: locations and interpolation weights for
+                                              alignment points in the neighborhood
+        :return: -
+        """
+
+        self.y_shifts[j][i] = 0.
+        self.x_shifts[j][i] = 0.
+        for ap in contributing_alignment_points:
+            j_ap = self.alignment_points[ap['alignment_point_index']][0]
+            i_ap = self.alignment_points[ap['alignment_point_index']][1]
+            self.y_shifts[j][i] += ap['weight'] * self.y_shifts[j_ap][i_ap]
+            self.x_shifts[j][i] += ap['weight'] * self.x_shifts[j_ap][i_ap]
 
     def search_local_match(self, reference_box, frame, y_low, y_high, x_low, x_high, search_width):
         """
