@@ -272,8 +272,7 @@ class AlignmentPoints(object):
                computed for all alignment points in the frame.
         :param alignment_point_neighbor_list: List of alignment point neighbor indices. If not
                specified, shifts are computed for all alignment point neighbors in the frame.
-        :param alignment_box_mask: 2D boolean array. Shifts are computed at locations where the
-                                   mask entry is "True".
+        :param use_ap_mask: If True, a mask specifies which alignment points are to be computed.
         :return: -
         """
 
@@ -287,6 +286,11 @@ class AlignmentPoints(object):
 
         # A mask defines the locations where shift vectors are to be computed.
         if use_ap_mask:
+
+            # Check if mask ist initialized.
+            if self.ap_mask is None:
+                raise WrongOrderingError(
+                    "Attempt to compute shift vectors without setting the mask first")
 
             # First make sure that all "contributing alignment points" of alignment point neighbors
             # are included in the mask.
