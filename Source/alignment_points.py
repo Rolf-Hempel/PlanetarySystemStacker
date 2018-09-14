@@ -216,7 +216,7 @@ class AlignmentPoints(object):
                     weight_sum = 0.
 
                     # Limit the radius of the search circle according to a configuration parameter.
-                    for r in arange(1, configuration.alignment_box_max_neighbor_distance):
+                    for r in arange(1, self.configuration.alignment_box_max_neighbor_distance+1):
                         circle = Miscellaneous.circle_around(i_center, j_center, r)
                         for (i, j) in circle:
                             if 0 <= i < self.x_locations_number and 0 <= j < \
@@ -296,8 +296,10 @@ class AlignmentPoints(object):
             # are included in the mask.
             for alignment_box_row in self.alignment_boxes:
                 for alignment_box in alignment_box_row:
+                    j = alignment_box['coordinates'][0]
+                    i = alignment_box['coordinates'][1]
                     # If not an alignment point neighbor, go to the next box.
-                    if alignment_box['type'] != 'alignment point neighbor':
+                    if alignment_box['type'] != 'alignment point neighbor' or not self.ap_mask[j][i]:
                         continue
                     for ap in self.alignment_point_neighbors[alignment_box[
                                                             'alignment_point_neighbor_index']][2]:
@@ -314,7 +316,7 @@ class AlignmentPoints(object):
                     i = alignment_box['coordinates'][1]
                     # The mask is "True": Compute the shift vector.
                     if self.ap_mask[j][i]:
-                        self.compute_shift_alignment_point(j, i,
+                        self.compute_shift_alignment_point(frame_index, j, i,
                             alignment_box['coordinates'][4], alignment_box['coordinates'][5],
                             alignment_box['coordinates'][6], alignment_box['coordinates'][7])
 
@@ -347,18 +349,19 @@ class AlignmentPoints(object):
 
             # For each alignment point, compute the shift for the given frame index.
             for [j, i, y_center, x_center, y_low, y_high, x_low, x_high] in ap_list:
-                self.compute_shift_alignment_point(j, i, y_low, y_high, x_low, x_high)
+                self.compute_shift_alignment_point(frame_index, j, i, y_low, y_high, x_low, x_high)
 
             # For each alignment point neighbor, compute the shifts for the given frame index.
             for [j, i, contributing_alignment_points] in ap_neighbor_list:
                 self.compute_shift_neighbor_point(j, i, contributing_alignment_points)
 
-    def compute_shift_alignment_point(self, j, i, y_low, y_high, x_low, x_high):
+    def compute_shift_alignment_point(self, frame_index, j, i, y_low, y_high, x_low, x_high):
         """
         Compute the pixel shift vector at a given alignment point. The resulting shifts in y and x
         direction are assigned to the corresponding entries in arrays self.y_shifts and
         self.x_shifts.
 
+        :param frame_index: Index of the selected frame in the list of frames
         :param j: Row index (y) of alignment box
         :param i: Column index (x) of alignment box
         :param y_low: Lower y pixel index bound of alignment box
@@ -429,6 +432,7 @@ class AlignmentPoints(object):
             i_ap = self.alignment_points[ap['alignment_point_index']][1]
             self.y_shifts[j][i] += ap['weight'] * self.y_shifts[j_ap][i_ap]
             self.x_shifts[j][i] += ap['weight'] * self.x_shifts[j_ap][i_ap]
+        pass
 
     def search_local_match(self, reference_box, frame, y_low, y_high, x_low, x_high, search_width):
         """

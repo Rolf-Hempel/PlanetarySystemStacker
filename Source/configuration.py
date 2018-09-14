@@ -28,7 +28,7 @@ class Configuration(object):
         self.average_frame_percent = 20.
         self.alignment_box_step_size = 100
         self.alignment_box_size = 60
-        self.alignment_box_max_neighbor_distance = 2
+        self.alignment_box_max_neighbor_distance = 1
         self.alignment_point_structure_threshold = 0.1
         self.alignment_point_brightness_threshold = 10
         self.alignment_point_contrast_threshold = 15

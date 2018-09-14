@@ -24,6 +24,7 @@ import glob
 from time import time
 
 from numpy import arange, ceil
+import matplotlib.pyplot as plt
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
@@ -31,6 +32,7 @@ from configuration import Configuration
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
+from exceptions import InternalError
 
 
 class QualityAreas(object):
@@ -107,8 +109,7 @@ class QualityAreas(object):
 
         # Cycle through all alignment points. For each point append its index to the alignment
         # point list of the quality area which contains the point.
-        for point_index, [box_index,
-                          [j, i, y_center, x_center, y_low, y_high, x_low, x_high]] in enumerate(
+        for point_index, [j, i, y_center, x_center, y_low, y_high, x_low, x_high] in enumerate(
                 self.alignment_points.alignment_points):
             y_index = min(int(y_center / self.quality_area_size_y), self.y_dim - 1)
             x_index = min(int(x_center / self.quality_area_size_x), self.x_dim - 1)
@@ -151,7 +152,7 @@ class QualityAreas(object):
                         reverse=True)]
 
         # For quality areas without alignment points, use method "best_frame_indices_in_empty_areas"
-        # to copy ranks from the nearest quality are with alignment points.
+        # to copy ranks from the nearest quality area with alignment points.
         for index_y, quality_area_row in enumerate(self.quality_areas):
             for index_x, quality_area in enumerate(quality_area_row):
                 if not quality_area['alignment_point_indices']:
@@ -181,7 +182,7 @@ class QualityAreas(object):
                     return self.quality_areas[compare_y][compare_x]['best_frame_indices']
         # This should never happen, because it means that there is not any quality area with an
         # alignment point.
-        return []
+        raise InternalError("No quality area contains any alignment point")
 
     def truncate_best_frames(self):
         """
@@ -314,8 +315,7 @@ if __name__ == "__main__":
     # For all frames: Compute the local shifts for all alignment points (to be used for de-warping).
     for frame_index in range(frames.number):
         start = time()
-        point_shifts, errors, diffphases = alignment_points.compute_alignment_point_shifts(
-            frame_index)
+        alignment_points.compute_alignment_point_shifts(frame_index)
         end = time()
         print("Elapsed time in computing point shifts for frame number " + str(
             frame_index) + ": " + str(end - start))
@@ -333,3 +333,7 @@ if __name__ == "__main__":
     end = time()
     print('Elapsed time in quality area creation and frame ranking: {}'.format(end - start))
     print("Number of frames to be stacked for each quality area: " + str(quality_areas.stack_size))
+
+    alignment_points.ap_mask_initialize()
+    alignment_points.ap_mask_set(4, 6, 4, 6)
+    alignment_points.compute_alignment_point_shifts(0, use_ap_mask=True)

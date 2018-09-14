@@ -73,3 +73,13 @@ class WrongOrderingError(Error):
 
     def __init__(self, message):
         self.message = message
+
+class InternalError(Error):
+    """Exception raised if an internal error occurred which should never happen.
+
+    Attributes:
+        message -- explanation of the error
+    """
+
+    def __init__(self, message):
+        self.message = message
