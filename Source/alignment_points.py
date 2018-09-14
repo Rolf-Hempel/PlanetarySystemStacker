@@ -25,7 +25,7 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin, hypot, zeros, float64
+from numpy import arange, amax, stack, amin, hypot, zeros, full, float64
 from skimage.feature import register_translation
 
 from align_frames import AlignFrames
@@ -69,6 +69,7 @@ class AlignmentPoints(object):
         self.alignment_point_neighbors = None
         self.y_shifts = None
         self.x_shifts = None
+        self.ap_mask = None
 
         # Compute the number of frames to be used for creating the mean frame.
         self.average_frame_number = max(
@@ -154,8 +155,9 @@ class AlignmentPoints(object):
             self.alignment_boxes.append(alignment_box_row)
 
         # Normalize the structure information for all boxes by dividing by the maximum value.
-        structure_max = max(alignment_box_row[i]['structure'] for alignment_box_row in self.alignment_boxes for
-                            i in range(self.x_locations_number))
+        structure_max = max(
+            alignment_box_row[i]['structure'] for alignment_box_row in self.alignment_boxes for
+            i in range(self.x_locations_number))
         for alignment_box_row in self.alignment_boxes:
             for alignment_box in alignment_box_row:
                 alignment_box['structure'] /= structure_max
@@ -245,7 +247,8 @@ class AlignmentPoints(object):
                         alignment_point_neighbor_index += 1
 
     def compute_alignment_point_shifts(self, frame_index, alignment_point_list=None,
-                                       alignment_point_neighbor_list=None, alignment_box_mask=None):
+                                       alignment_point_neighbor_list=None,
+                                       use_ap_mask=False):
         """
         For each alignment point compute the shifts in y and x relative to the mean frame. Three
         different methods can be used to compute the shift values:
@@ -260,8 +263,9 @@ class AlignmentPoints(object):
         - Shifts are computed for all alignment boxes if no optional parameter is set.
         - If "alignment_point_list" and "alignment_point_neighbor_list" are specified, shifts are
           computed for points on those lists only.
-        - If the "alignment_box_mask" is set, shifts are computed for alignment box positions where
-          the corresponding mask entry is "True".
+        - If "use_ap_mask" is set to "True", shifts are computed for alignment box positions where
+          the corresponding mask entry is "True". This mode requires that the mask has been
+          set before by calling method "ap_mask_set".
 
         :param frame_index: Index of the selected frame in the list of frames.
         :param alignment_point_list: List of alignment point indices. If not specified, shifts are
@@ -278,13 +282,25 @@ class AlignmentPoints(object):
                 "Attempt to compute alignment point shifts before selecting alingment points")
 
         # Reset the pixel shift array values in y and x.
-        self.y_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float64)
-        self.x_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float64)
+        self.y_shifts[:, :] = 0.
+        self.x_shifts[:, :] = 0.
 
         # A mask defines the locations where shift vectors are to be computed.
-        if alignment_box_mask is not None:
+        if use_ap_mask:
 
-            # First compute shifts at alignment points.
+            # First make sure that all "contributing alignment points" of alignment point neighbors
+            # are included in the mask.
+            for alignment_box_row in self.alignment_boxes:
+                for alignment_box in alignment_box_row:
+                    # If not an alignment point neighbor, go to the next box.
+                    if alignment_box['type'] != 'alignment point neighbor':
+                        continue
+                    for ap in self.alignment_point_neighbors[alignment_box[
+                                                            'alignment_point_neighbor_index']][2]:
+                        self.ap_mask[self.alignment_points[ap['alignment_point_index']][0],
+                                     self.alignment_points[ap['alignment_point_index']][1]] = True
+
+            # Compute shifts at alignment points.
             for alignment_box_row in self.alignment_boxes:
                 for alignment_box in alignment_box_row:
                     # If not an alignment point, go to the next box.
@@ -293,7 +309,7 @@ class AlignmentPoints(object):
                     j = alignment_box['coordinates'][0]
                     i = alignment_box['coordinates'][1]
                     # The mask is "True": Compute the shift vector.
-                    if alignment_box_mask[j][i]:
+                    if self.ap_mask[j][i]:
                         self.compute_shift_alignment_point(j, i,
                             alignment_box['coordinates'][4], alignment_box['coordinates'][5],
                             alignment_box['coordinates'][6], alignment_box['coordinates'][7])
@@ -307,11 +323,11 @@ class AlignmentPoints(object):
                     j = alignment_box['coordinates'][0]
                     i = alignment_box['coordinates'][1]
                     # The mask is "True": Compute the shift vector.
-                    if alignment_box_mask[j][i]:
+                    if self.ap_mask[j][i]:
                         self.compute_shift_neighbor_point(j, i, self.alignment_point_neighbors[
                             alignment_box['alignment_point_neighbor_index']][2])
 
-        # Alignment box positions are not specified via a mask.
+        # Alignment box positions are specified via lists.
         else:
             # If no list is specified explicitly, compute shifts for all alignment points.
             if alignment_point_list is not None:
@@ -473,6 +489,40 @@ class AlignmentPoints(object):
 
         # If within the maximum search radius no optimum could be found, return [0, 0].
         return [0, 0]
+
+    def ap_mask_initialize(self):
+        """
+        Initialize the alignment point mask used to specify at which alignment box locations shift
+        vectors are to be computed. This method (and at least one call to "ap_mask_set" must be
+        called before calling "compute_alignment_point_shifts".
+
+        :return: -
+        """
+
+        self.ap_mask = full((self.y_locations_number, self.x_locations_number), False, dtype=bool)
+
+    def ap_mask_set(self, j_ap_low, j_ap_high, i_ap_low, i_ap_high):
+        """
+        Register a rectangular patch of alignment box locations for shift vector computation.
+
+        :param j_ap_low:  lower bound of alignment box indices in y direction
+        :param j_ap_high: upper bound of alignment box indices in y direction
+        :param i_ap_low:  lower bound of alignment box indices in x direction
+        :param i_ap_high: upper bound of alignment box indices in x direction
+        :return: -
+        """
+
+        self.ap_mask[j_ap_low:j_ap_high, i_ap_low:i_ap_high] = True
+
+    def ap_mask_reset(self):
+        """
+        Reset the alignment point mask everywhere to False. After this call, the mask can be re-used
+        for the definition of another alignment box selection.
+
+        :return: -
+        """
+
+        self.ap_mask[:, :] = False
 
 
 if __name__ == "__main__":
