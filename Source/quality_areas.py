@@ -88,6 +88,12 @@ class QualityAreas(object):
         self.x_highs[-1] = mean_frame_shape[1]
         self.x_dim = len(self.x_lows)
 
+        # Distribute alignment box coordinates among the quality areas in y and x directions.
+        self.qa_ap_index_y_lows, self.qa_ap_index_y_highs = \
+            self.ap_index_bounds(self.y_lows, self.y_highs, self.alignment_points.y_locations)
+        self.qa_ap_index_x_lows, self.qa_ap_index_x_highs = \
+            self.ap_index_bounds(self.x_lows, self.x_highs, self.alignment_points.x_locations)
+
         # Initialize the list of quality areas.
         self.quality_areas = []
 
@@ -114,6 +120,73 @@ class QualityAreas(object):
             y_index = min(int(y_center / self.quality_area_size_y), self.y_dim - 1)
             x_index = min(int(x_center / self.quality_area_size_x), self.x_dim - 1)
             self.quality_areas[y_index][x_index]['alignment_point_indices'].append(point_index)
+
+    def ap_index_bounds(self, qa_lows, qa_highs, ap_coordinates):
+        """
+        Distribute alignment boxes in one coordinate direction (y or x) among the quality area
+        bounds. Treat the special case that the first quality area does not contain an any
+        box in this direction. In this case select the first two boxes beyond the quality area,
+        to enable linear interpolation into the first quality area. The same is done for the last
+        quality area.
+
+        For inner quality areas it is assumed that there is at least one alignment box per area.
+
+        :param qa_lows: Coordinates of the lower bounds of all quality areas in this direction
+        :param qa_highs: Coordinates of the upper bounds of all quality areas in this direction
+        :param ap_coordinates: Coordinates of all alignment points in ths direction
+        :return: two lists (qa_ap_index_lows, qa_ap_index_highs) with lower and upper index bounds
+                 in the ap_coordinates list for all quality areas in the given coordinate direction
+        """
+
+        # Treat the first alignment area separately. Its lower bound is the first alignment point.
+        qa_ap_index_lows = [0]
+
+        # Starting with the second alignment point, search for the first one on the upper area
+        # border or beyond it. Take it as the upper index bound.
+        for ap_index, ap_value in enumerate(ap_coordinates[1:]):
+            if ap_value >= qa_highs[0]:
+                qa_ap_index_highs = [ap_index + 1]
+                break
+
+        # For interior quality areas
+        for qa_index_m1, qa_low in enumerate(qa_lows[1:-1]):
+
+            # The index of the quality area (qa_index) has to be increased by one because the list
+            # used for the enumerator starts with the second entry.
+            qa_index = qa_index_m1 + 1
+            qa_high = qa_highs[qa_index]
+
+            # For the lower index bound, look for the first alignment point on the lower border
+            # or beyond in reversed order.
+            for ap_index, ap_value in reversed(list(enumerate(ap_coordinates))):
+                if ap_value <= qa_low:
+                    qa_ap_index_lows.append(ap_index)
+                    break
+
+            # For the upper index bound, look for the first alignment point on the upper border
+            # or beyond.
+            for ap_index, ap_value in enumerate(ap_coordinates):
+                if ap_value >= qa_high:
+                    qa_ap_index_highs.append(ap_index)
+                    break
+
+        # The last alignment point index was removed from the search. If this is the upper bound
+        # for the last inner quality area, it has not been assigned to the index_highs list. In
+        # this case this list is one entry short. In this case add the index of the last alignment
+        # point as the upper index bound.
+        if len(qa_ap_index_highs) < len(qa_ap_index_lows):
+            qa_ap_index_highs.append(len(ap_coordinates) - 1)
+
+        # In analogy to the first quality area, treat the case of the last quality area separately
+        # as well.
+        for ap_index, ap_value in reversed(list(enumerate(ap_coordinates))):
+            if ap_value <= qa_lows[-1]:
+                qa_ap_index_lows.append(ap_index)
+                break
+        # The upper index bound is always the last alignment point index.
+        qa_ap_index_highs.append(len(ap_coordinates) - 1)
+
+        return qa_ap_index_lows, qa_ap_index_highs
 
     def select_best_frames(self):
         """
@@ -208,7 +281,6 @@ class QualityAreas(object):
             for index_x, quality_area in enumerate(quality_area_row):
                 quality_area['best_frame_indices'] = quality_area['best_frame_indices'][
                                                      :self.stack_size]
-
 
 if __name__ == "__main__":
 
@@ -325,6 +397,25 @@ if __name__ == "__main__":
     start = time()
     quality_areas = QualityAreas(configuration, frames, align_frames, alignment_points)
 
+    print ("")
+    print ("Distribution of alignment point indices among quality areas in y direction:")
+    for index_y, y_low in enumerate(quality_areas.y_lows):
+        y_high = quality_areas.y_highs[index_y]
+        print ("Lower y pixel: " + str(y_low) + ", upper y pixel index: " + str(y_high) +
+               ", lower ap coordinate: " +
+               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_lows[index_y]]) +
+               ", upper ap coordinate: " +
+               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y]]))
+    for index_x, x_low in enumerate(quality_areas.x_lows):
+        x_high = quality_areas.x_highs[index_x]
+        print("Lower x pixel: " + str(x_low) + ", upper x pixel index: " + str(x_high) +
+              ", lower ap coordinate: " +
+              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_lows[index_x]]) +
+              ", upper ap coordinate: " +
+              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x]]))
+    print("")
+
+
     # For each quality area rank the frames according to the local contrast.
     quality_areas.select_best_frames()
 
@@ -333,6 +424,7 @@ if __name__ == "__main__":
     end = time()
     print('Elapsed time in quality area creation and frame ranking: {}'.format(end - start))
     print("Number of frames to be stacked for each quality area: " + str(quality_areas.stack_size))
+
 
     alignment_points.ap_mask_initialize()
     alignment_points.ap_mask_set(4, 6, 4, 6)
