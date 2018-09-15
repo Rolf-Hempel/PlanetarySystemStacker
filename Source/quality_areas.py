@@ -282,6 +282,16 @@ class QualityAreas(object):
                 quality_area['best_frame_indices'] = quality_area['best_frame_indices'][
                                                      :self.stack_size]
 
+                # Register the coordinates of this quality area with all frames where it is used.
+                for frame_index in quality_area['best_frame_indices']:
+
+                    # If for this frame the list is empty, initialize it as a list of lists.
+                    # Otherwise append the 2-list with quality area coordinates.
+                    if self.frames.used_quality_areas[frame_index]:
+                        self.frames.used_quality_areas[frame_index].append([index_y, index_x])
+                    else:
+                        self.frames.used_quality_areas[frame_index] = [[index_y, index_x]]
+
 if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
@@ -427,5 +437,5 @@ if __name__ == "__main__":
 
 
     alignment_points.ap_mask_initialize()
-    alignment_points.ap_mask_set(4, 6, 4, 6)
+    alignment_points.ap_mask_set(6, 8, 9, 11)
     alignment_points.compute_alignment_point_shifts(0, use_ap_mask=True)

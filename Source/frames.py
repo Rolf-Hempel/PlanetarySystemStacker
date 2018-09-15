@@ -87,6 +87,9 @@ class Frames(object):
         # Initialize list of monochrome frames.
         self.frames_mono = None
 
+        # Initialize the list with used quality areas for every frame.
+        self.used_quality_areas = [0 for i in range(self.number)]
+
     def extract_channel(self, index, color):
         """
         Extract a color channel from an RGB frame.

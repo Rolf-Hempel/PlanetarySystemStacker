@@ -520,7 +520,7 @@ class AlignmentPoints(object):
         :return: -
         """
 
-        self.ap_mask[j_ap_low:j_ap_high, i_ap_low:i_ap_high] = True
+        self.ap_mask[j_ap_low:j_ap_high+1, i_ap_low:i_ap_high+1] = True
 
     def ap_mask_reset(self):
         """

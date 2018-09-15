@@ -135,8 +135,12 @@ class AlignFrames(object):
         # [x_low, x_high]]
         self.intersection_shape = [[max(b[0] for b in self.frame_shifts),
                                     min(b[0] for b in self.frame_shifts) + self.shape[0]],
-            [max(b[1] for b in self.frame_shifts),
-             min(b[1] for b in self.frame_shifts) + self.shape[1]]]
+                                    [max(b[1] for b in self.frame_shifts),
+                                    min(b[1] for b in self.frame_shifts) + self.shape[1]]]
+        self.intersection_number_pixels = (self.intersection_shape[0][1] -
+                                           self.intersection_shape[0][0]) * \
+                                          (self.intersection_shape[1][1] -
+                                           self.intersection_shape[1][0])
 
     def average_frame(self, frames, shifts):
         """
