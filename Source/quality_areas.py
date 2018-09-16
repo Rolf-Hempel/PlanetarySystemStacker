@@ -23,16 +23,15 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 import glob
 from time import time
 
-from numpy import arange, ceil
-import matplotlib.pyplot as plt
+from numpy import arange, ceil, empty, float32
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
+from exceptions import InternalError
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
-from exceptions import InternalError
 
 
 class QualityAreas(object):
@@ -102,6 +101,7 @@ class QualityAreas(object):
             y_high = self.y_highs[index_y]
             quality_area_row = []
             for index_x, x_low in enumerate(self.x_lows):
+
                 # For each quality area, store coordinate bounds and empty lists for alignment
                 # points and frame qualities in a dictionary. The dictionaries are stored in a a 2D
                 # list structure (row-wise).
@@ -110,6 +110,30 @@ class QualityAreas(object):
                 quality_area['coordinates'] = [y_low, y_high, x_low, x_high]
                 quality_area['alignment_point_indices'] = []
                 quality_area['frame_qualities'] = []
+
+                # Prepare for the interpolation of shift vectors, to be re-used for all frames
+                # in the stacking process. First, create y and x coordinate vectors for alignment
+                # boxes used by the quality area.
+                quality_area['interpolation_coords_y'] = self.alignment_points.y_locations[
+                                                         self.qa_ap_index_y_lows[index_y]:
+                                                         self.qa_ap_index_y_highs[index_y]]
+                quality_area['interpolation_coords_x'] = self.alignment_points.x_locations[
+                                                         self.qa_ap_index_x_lows[index_x]:
+                                                         self.qa_ap_index_x_highs[index_x]]
+
+                # For every quality area, create a numpy array which for every point contains a
+                # 2D vector with pixel coordinates. The array is used for interpolating shift
+                # vectors.
+                vector_field = empty((y_high-y_low+1, x_high-x_low+1, 2), dtype=float32)
+                for j in range(y_high-y_low+1):
+                    for i in range(x_high-x_low+1):
+                        vector_field[j, i, 0] = float(j + y_low)
+                        vector_field[j, i, 1] = float(i + x_low)
+
+                # Reshape the interpolation point field to a linear array of (y,x) vectors.
+                quality_area['interpolation_points'] = vector_field.reshape(
+                    (y_high - y_low + 1) * (x_high - x_low + 1), 2)
+
                 quality_area_row.append(quality_area)
             self.quality_areas.append(quality_area_row)
 

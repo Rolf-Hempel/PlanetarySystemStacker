@@ -23,30 +23,50 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 import glob
 from time import time
 
-from numpy import arange, ceil, float32, empty
-import matplotlib.pyplot as plt
+from numpy import float32, empty
 from scipy.interpolate import RegularGridInterpolator
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
 from frames import Frames
-from miscellaneous import Miscellaneous
-from rank_frames import RankFrames
-from exceptions import InternalError
 from quality_areas import QualityAreas
+from rank_frames import RankFrames
 
 
 class StackFrames(object):
+    """
+        For every frame de-warp the quality areas selected for stacking. Then stack all the
+        de-warped frame sections into a single image.
+
+    """
 
     def __init__(self, configuration, frames, align_frames, alignment_points, quality_areas):
+        """
+        Initialze the StackFrames object. In particular, allocate empty numpy arrays used in the
+        stacking process for buffering, pixel shifts in y and x, and the final stacked image. The
+        size of all those objects in y and x directions is equal to the intersection of all frames.
+
+        :param configuration: Configuration object with parameters
+        :param frames: Frames object with all video frames
+        :param align_frames: AlignFrames object with global shift information for all frames
+        :param alignment_points: AlignmentPoints object with information of all alignment points
+        :param quality_areas: QualityAreas object with information on all quality areas
+        """
+
         self.configuration = configuration
         self.frames = frames
         self.align_frames = align_frames
         self.alignment_points = alignment_points
         self.quality_areas = quality_areas
         self.stack_size = quality_areas.stack_size
+
+        # Create a mask array which specifies the alignment box locations where shifts are to be
+        # computed.
         self.alignment_points.ap_mask_initialize()
+
+        # The arrays for the stacked image and the intermediate buffer need to accommodate three
+        # color channels in the case of color images.
         if self.frames.color:
             self.stacked_image = empty(
                 [self.align_frames.intersection_shape[0][1] -
@@ -61,23 +81,76 @@ class StackFrames(object):
                  self.align_frames.intersection_shape[1][1] -
                  self.align_frames.intersection_shape[1][0]], dtype=float32)
             self.buffer = self.stacked_image.copy()
-        self.pixel_shift_y = self.stacked_image = empty(
-                [self.align_frames.intersection_shape[0][1] -
-                 self.align_frames.intersection_shape[0][0],
-                 self.align_frames.intersection_shape[1][1] -
-                 self.align_frames.intersection_shape[1][0]], dtype=float32)
+
+        # Initialize arrays used to store y and x shift values for each frame pixel.
+        self.pixel_shift_y = empty(
+            [self.align_frames.intersection_shape[0][1] -
+             self.align_frames.intersection_shape[0][0],
+             self.align_frames.intersection_shape[1][1] -
+             self.align_frames.intersection_shape[1][0]], dtype=float32)
         self.pixel_shift_x = self.pixel_shift_y.copy()
 
     def stack_frame(self, frame_index):
+        """
+        For a given frame select de-warp those quality areas which have been marked for stacking.
+        To this end, first interpolate the shift vectors between the alignment box positions, then
+        use the remap function of OpenCV to do de-warp the frame. Finally, combine the processed
+        parts of this frame with the other frames to produce the final stacked image.
+
+        :param frame_index: Index of the current frame
+        :return: -
+        """
+
+        # Because the areas selected for stacking are different for every frame, first reset the
+        # alignment point mask.
         self.alignment_points.ap_mask_reset()
+
+        # If this frame is used in at least one quality area, prepare mask for shift computation.
         if self.frames.used_quality_areas[frame_index]:
             for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
                 self.alignment_points.ap_mask_set(self.quality_areas.qa_ap_index_y_lows[index_y],
                                                   self.quality_areas.qa_ap_index_y_highs[index_y],
                                                   self.quality_areas.qa_ap_index_x_lows[index_x],
                                                   self.quality_areas.qa_ap_index_x_highs[index_x])
+
+            # Compute the shifts in y and x for all mask locations.
             self.alignment_points.compute_alignment_point_shifts(frame_index, use_ap_mask=True)
 
+            # Interpolate y and x shifts between alignment boxes.
+            for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
+                quality_area = self.quality_areas[index_y, index_x]
+
+                # Cut out the 2D window with y shift values for all alignment boxes used by this
+                # quality area.
+                data_y = alignment_points.y_shifts[self.quality_areas.qa_ap_index_y_lows[index_y]:
+                                                   self.quality_areas.qa_ap_index_y_highs[index_y],
+                                                   self.quality_areas.qa_ap_index_x_lows[index_x]:
+                                                   self.quality_areas.qa_ap_index_x_highs[index_x]]
+                interpolator_y = RegularGridInterpolator((quality_area['interpolation_coords_y'],
+                                                          quality_area['interpolation_coords_x']),
+                                                         data_y)
+
+                # Interpolate y shifts for all points within the quality area.
+                self.pixel_shift_y[quality_area['coordinates'][0]:quality_area['coordinates'][1],
+                quality_area['coordinates'][2]:quality_area['coordinates'][3]] = interpolator_y(
+                    quality_area['interpolation_points'])
+
+                # Do the same for x shifts.
+                data_x = alignment_points.x_shifts[self.quality_areas.qa_ap_index_y_lows[index_y]:
+                                                   self.quality_areas.qa_ap_index_y_highs[index_y],
+                                                   self.quality_areas.qa_ap_index_x_lows[index_x]:
+                                                   self.quality_areas.qa_ap_index_x_highs[index_x]]
+                interpolator_x = RegularGridInterpolator((quality_area['interpolation_coords_y'],
+                                                          quality_area['interpolation_coords_x']),
+                                                         data_x)
+
+                # Interpolate x shifts for all points within the quality area.
+                self.pixel_shift_x[quality_area['coordinates'][0]:quality_area['coordinates'][1],
+                quality_area['coordinates'][2]:quality_area['coordinates'][3]] = interpolator_x(
+                    quality_area['interpolation_points'])
+
+                # Still missing: De-warping of quality area section of frame with opencv.remap
+                # and stacking.
 
 if __name__ == "__main__":
 
