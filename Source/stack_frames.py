@@ -92,9 +92,9 @@ class StackFrames(object):
 
     def stack_frame(self, frame_index):
         """
-        For a given frame select de-warp those quality areas which have been marked for stacking.
+        For a given frame de-warp those quality areas which have been marked for stacking.
         To this end, first interpolate the shift vectors between the alignment box positions, then
-        use the remap function of OpenCV to do de-warp the frame. Finally, combine the processed
+        use the remap function of OpenCV to de-warp the frame. Finally, combine the processed
         parts of this frame with the other frames to produce the final stacked image.
 
         :param frame_index: Index of the current frame
