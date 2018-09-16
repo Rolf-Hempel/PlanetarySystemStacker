@@ -128,7 +128,7 @@ class StackFrames(object):
                                                    self.quality_areas.qa_ap_index_x_highs[index_x]]
                 interpolator_y = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
-                                                         data_y, bounds_error=False)
+                                                         data_y, bounds_error=False, fill_value=None)
 
                 # Interpolate y shifts for all points within the quality area.
                 self.pixel_shift_y[quality_area['coordinates'][0]:quality_area['coordinates'][1],
@@ -144,7 +144,7 @@ class StackFrames(object):
                                                    self.quality_areas.qa_ap_index_x_highs[index_x]]
                 interpolator_x = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
-                                                         data_x, bounds_error=False)
+                                                         data_x, bounds_error=False, fill_value=None)
 
                 # Interpolate x shifts for all points within the quality area.
                 self.pixel_shift_x[quality_area['coordinates'][0]:quality_area['coordinates'][1],
@@ -155,7 +155,7 @@ class StackFrames(object):
 
                 # Still missing: De-warping of quality area section of frame with opencv.remap
                 # and stacking.
-                pass
+            pass
 
 if __name__ == "__main__":
 
