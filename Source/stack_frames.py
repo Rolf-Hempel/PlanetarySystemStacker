@@ -118,7 +118,7 @@ class StackFrames(object):
 
             # Interpolate y and x shifts between alignment boxes.
             for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
-                quality_area = self.quality_areas[index_y, index_x]
+                quality_area = self.quality_areas.quality_areas[index_y][index_x]
 
                 # Cut out the 2D window with y shift values for all alignment boxes used by this
                 # quality area.
@@ -128,12 +128,14 @@ class StackFrames(object):
                                                    self.quality_areas.qa_ap_index_x_highs[index_x]]
                 interpolator_y = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
-                                                         data_y)
+                                                         data_y, bounds_error=False)
 
                 # Interpolate y shifts for all points within the quality area.
                 self.pixel_shift_y[quality_area['coordinates'][0]:quality_area['coordinates'][1],
                 quality_area['coordinates'][2]:quality_area['coordinates'][3]] = interpolator_y(
-                    quality_area['interpolation_points'])
+                    quality_area['interpolation_points']).reshape(
+                    quality_area['coordinates'][1] - quality_area['coordinates'][0],
+                    quality_area['coordinates'][3] - quality_area['coordinates'][2])
 
                 # Do the same for x shifts.
                 data_x = alignment_points.x_shifts[self.quality_areas.qa_ap_index_y_lows[index_y]:
@@ -142,15 +144,18 @@ class StackFrames(object):
                                                    self.quality_areas.qa_ap_index_x_highs[index_x]]
                 interpolator_x = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
-                                                         data_x)
+                                                         data_x, bounds_error=False)
 
                 # Interpolate x shifts for all points within the quality area.
                 self.pixel_shift_x[quality_area['coordinates'][0]:quality_area['coordinates'][1],
                 quality_area['coordinates'][2]:quality_area['coordinates'][3]] = interpolator_x(
-                    quality_area['interpolation_points'])
+                    quality_area['interpolation_points']).reshape(
+                    quality_area['coordinates'][1] - quality_area['coordinates'][0],
+                    quality_area['coordinates'][3] - quality_area['coordinates'][2])
 
                 # Still missing: De-warping of quality area section of frame with opencv.remap
                 # and stacking.
+                pass
 
 if __name__ == "__main__":
 
@@ -253,14 +258,14 @@ if __name__ == "__main__":
                ", lower ap coordinate: " +
                str(alignment_points.y_locations[quality_areas.qa_ap_index_y_lows[index_y]]) +
                ", upper ap coordinate: " +
-               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y]]))
+               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y]-1]))
     for index_x, x_low in enumerate(quality_areas.x_lows):
         x_high = quality_areas.x_highs[index_x]
         print("Lower x pixel: " + str(x_low) + ", upper x pixel index: " + str(x_high) +
               ", lower ap coordinate: " +
               str(alignment_points.x_locations[quality_areas.qa_ap_index_x_lows[index_x]]) +
               ", upper ap coordinate: " +
-              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x]]))
+              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x]-1]))
     print("")
 
     # For each quality area rank the frames according to the local contrast.
@@ -273,3 +278,6 @@ if __name__ == "__main__":
     print("Number of frames to be stacked for each quality area: " + str(quality_areas.stack_size))
 
     stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, quality_areas)
+
+    for index, frame in enumerate(frames.frames):
+        stack_frames.stack_frame(index)

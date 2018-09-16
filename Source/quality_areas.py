@@ -124,15 +124,15 @@ class QualityAreas(object):
                 # For every quality area, create a numpy array which for every point contains a
                 # 2D vector with pixel coordinates. The array is used for interpolating shift
                 # vectors.
-                vector_field = empty((y_high-y_low+1, x_high-x_low+1, 2), dtype=float32)
-                for j in range(y_high-y_low+1):
-                    for i in range(x_high-x_low+1):
+                vector_field = empty((y_high-y_low, x_high-x_low, 2), dtype=float32)
+                for j in range(y_high-y_low):
+                    for i in range(x_high-x_low):
                         vector_field[j, i, 0] = float(j + y_low)
                         vector_field[j, i, 1] = float(i + x_low)
 
                 # Reshape the interpolation point field to a linear array of (y,x) vectors.
                 quality_area['interpolation_points'] = vector_field.reshape(
-                    (y_high - y_low + 1) * (x_high - x_low + 1), 2)
+                    (y_high - y_low) * (x_high - x_low), 2)
 
                 quality_area_row.append(quality_area)
             self.quality_areas.append(quality_area_row)
@@ -159,7 +159,9 @@ class QualityAreas(object):
         :param qa_highs: Coordinates of the upper bounds of all quality areas in this direction
         :param ap_coordinates: Coordinates of all alignment points in ths direction
         :return: two lists (qa_ap_index_lows, qa_ap_index_highs) with lower and upper index bounds
-                 in the ap_coordinates list for all quality areas in the given coordinate direction
+                 in the ap_coordinates list for all quality areas in the given coordinate direction.
+                 The upper bounds are increased by one, so that an array slice of the form
+                  "lower bound : upper bound" includes the upper bound index.
         """
 
         # Treat the first alignment area separately. Its lower bound is the first alignment point.
@@ -169,7 +171,7 @@ class QualityAreas(object):
         # border or beyond it. Take it as the upper index bound.
         for ap_index, ap_value in enumerate(ap_coordinates[1:]):
             if ap_value >= qa_highs[0]:
-                qa_ap_index_highs = [ap_index + 1]
+                qa_ap_index_highs = [ap_index + 2]
                 break
 
         # For interior quality areas
@@ -191,7 +193,7 @@ class QualityAreas(object):
             # or beyond.
             for ap_index, ap_value in enumerate(ap_coordinates):
                 if ap_value >= qa_high:
-                    qa_ap_index_highs.append(ap_index)
+                    qa_ap_index_highs.append(ap_index + 1)
                     break
 
         # The last alignment point index was removed from the search. If this is the upper bound
@@ -199,7 +201,7 @@ class QualityAreas(object):
         # this case this list is one entry short. In this case add the index of the last alignment
         # point as the upper index bound.
         if len(qa_ap_index_highs) < len(qa_ap_index_lows):
-            qa_ap_index_highs.append(len(ap_coordinates) - 1)
+            qa_ap_index_highs.append(len(ap_coordinates))
 
         # In analogy to the first quality area, treat the case of the last quality area separately
         # as well.
@@ -208,7 +210,7 @@ class QualityAreas(object):
                 qa_ap_index_lows.append(ap_index)
                 break
         # The upper index bound is always the last alignment point index.
-        qa_ap_index_highs.append(len(ap_coordinates) - 1)
+        qa_ap_index_highs.append(len(ap_coordinates))
 
         return qa_ap_index_lows, qa_ap_index_highs
 
