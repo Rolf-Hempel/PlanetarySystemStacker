@@ -25,7 +25,7 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin, hypot, zeros, full, float64
+from numpy import arange, amax, stack, amin, hypot, zeros, full, float32
 from skimage.feature import register_translation
 
 from align_frames import AlignFrames
@@ -114,8 +114,8 @@ class AlignmentPoints(object):
         self.x_locations_number = len(self.x_locations)
 
         # Initialize the pixel shift arrays in y and x for all alignment box locations.
-        self.y_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float64)
-        self.x_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float64)
+        self.y_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float32)
+        self.x_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float32)
 
         for j, y in enumerate(self.y_locations):
             # Compute the y index bounds of the row of alignment boxes.

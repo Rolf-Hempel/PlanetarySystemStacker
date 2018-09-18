@@ -23,8 +23,9 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 import glob
 from time import time
 
-from numpy import float32, empty
+from numpy import float32, empty, zeros
 from scipy.interpolate import RegularGridInterpolator
+from cv2 import remap, INTER_LINEAR, BORDER_TRANSPARENT
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
@@ -75,7 +76,7 @@ class StackFrames(object):
                  self.align_frames.intersection_shape[1][0], 3], dtype=float32)
             self.buffer = self.stacked_image.copy()
         else:
-            self.stacked_image = empty(
+            self.stacked_image = zeros(
                 [self.align_frames.intersection_shape[0][1] -
                  self.align_frames.intersection_shape[0][0],
                  self.align_frames.intersection_shape[1][1] -
@@ -90,12 +91,12 @@ class StackFrames(object):
              self.align_frames.intersection_shape[1][0]], dtype=float32)
         self.pixel_shift_x = self.pixel_shift_y.copy()
 
-    def stack_frame(self, frame_index):
+    def add_frame_contribution(self, frame_index):
         """
         For a given frame de-warp those quality areas which have been marked for stacking.
         To this end, first interpolate the shift vectors between the alignment box positions, then
-        use the remap function of OpenCV to de-warp the frame. Finally, combine the processed
-        parts of this frame with the other frames to produce the final stacked image.
+        use the remap function of OpenCV to de-warp the frame. Finally, add the processed
+        parts of this frame to the contributions by the other frames to produce the stacked image.
 
         :param frame_index: Index of the current frame
         :return: -
@@ -113,19 +114,30 @@ class StackFrames(object):
                                                   self.quality_areas.qa_ap_index_x_lows[index_x],
                                                   self.quality_areas.qa_ap_index_x_highs[index_x])
 
+            # Compute global offsets of current frame relative to intersection frame.
+            dy = self.align_frames.intersection_shape[0][0] - \
+                 self.align_frames.frame_shifts[frame_index][0]
+            dx = self.align_frames.intersection_shape[1][0] - \
+                 self.align_frames.frame_shifts[frame_index][1]
+
             # Compute the shifts in y and x for all mask locations.
             self.alignment_points.compute_alignment_point_shifts(frame_index, use_ap_mask=True)
 
-            # Interpolate y and x shifts between alignment boxes.
+            # For each quality area used for this frame, compute its contribution to the stacked
+            # image. First, interpolate y and x shifts between alignment boxes.
             for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
                 quality_area = self.quality_areas.quality_areas[index_y][index_x]
 
                 # Cut out the 2D window with y shift values for all alignment boxes used by this
-                # quality area.
-                data_y = alignment_points.y_shifts[self.quality_areas.qa_ap_index_y_lows[index_y]:
-                                                   self.quality_areas.qa_ap_index_y_highs[index_y],
-                                                   self.quality_areas.qa_ap_index_x_lows[index_x]:
-                                                   self.quality_areas.qa_ap_index_x_highs[index_x]]
+                # quality area. Combine global offsets with local shifts.
+
+                # Still missing: Add y coordinate !!
+
+                data_y = dy - alignment_points.y_shifts[
+                              self.quality_areas.qa_ap_index_y_lows[index_y]:
+                              self.quality_areas.qa_ap_index_y_highs[index_y],
+                              self.quality_areas.qa_ap_index_x_lows[index_x]:
+                              self.quality_areas.qa_ap_index_x_highs[index_x]]
 
                 # Build the linear interpolation operator.
                 interpolator_y = RegularGridInterpolator((quality_area['interpolation_coords_y'],
@@ -140,10 +152,14 @@ class StackFrames(object):
                     quality_area['coordinates'][3] - quality_area['coordinates'][2])
 
                 # Do the same for x shifts.
-                data_x = alignment_points.x_shifts[self.quality_areas.qa_ap_index_y_lows[index_y]:
-                                                   self.quality_areas.qa_ap_index_y_highs[index_y],
-                                                   self.quality_areas.qa_ap_index_x_lows[index_x]:
-                                                   self.quality_areas.qa_ap_index_x_highs[index_x]]
+
+                # Still missing: Add x coordinate !!
+
+                data_x = dx - alignment_points.x_shifts[
+                              self.quality_areas.qa_ap_index_y_lows[index_y]:
+                              self.quality_areas.qa_ap_index_y_highs[index_y],
+                              self.quality_areas.qa_ap_index_x_lows[index_x]:
+                              self.quality_areas.qa_ap_index_x_highs[index_x]]
 
                 # Build the linear interpolation operator.
                 interpolator_x = RegularGridInterpolator((quality_area['interpolation_coords_y'],
@@ -157,9 +173,26 @@ class StackFrames(object):
                     quality_area['coordinates'][1] - quality_area['coordinates'][0],
                     quality_area['coordinates'][3] - quality_area['coordinates'][2])
 
-                # Still missing: De-warping of quality area section of frame with opencv.remap
-                # and stacking.
-            pass
+                # De-warp the quality area window and add the result to the summation buffer.
+                self.stacked_image += remap(self.frames.frames[frame_index], data_x, data_y,
+                                            INTER_LINEAR, None, BORDER_TRANSPARENT)
+
+    def stack_frames(self):
+        """
+        Combine the sharp areas of all frames into a single stacked image.
+
+        :return: -
+        """
+
+        # Add the contributions of all frames to the summation buffer.
+        for index, frame in enumerate(self.frames.frames):
+            self.add_frame_contribution(index)
+
+        # Divide the summation buffer by the number of contributing frames per quality area.
+        self.stacked_image /= self.stack_size
+
+        # Still missing: Conversion to 16bit int
+
 
 if __name__ == "__main__":
 
@@ -285,5 +318,4 @@ if __name__ == "__main__":
 
     stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, quality_areas)
 
-    for index, frame in enumerate(frames.frames):
-        stack_frames.stack_frame(index)
+    stack_frames.stack_frames()
