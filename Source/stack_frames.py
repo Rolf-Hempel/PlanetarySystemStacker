@@ -126,6 +126,8 @@ class StackFrames(object):
                                                    self.quality_areas.qa_ap_index_y_highs[index_y],
                                                    self.quality_areas.qa_ap_index_x_lows[index_x]:
                                                    self.quality_areas.qa_ap_index_x_highs[index_x]]
+
+                # Build the linear interpolation operator.
                 interpolator_y = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
                                                          data_y, bounds_error=False, fill_value=None)
@@ -142,6 +144,8 @@ class StackFrames(object):
                                                    self.quality_areas.qa_ap_index_y_highs[index_y],
                                                    self.quality_areas.qa_ap_index_x_lows[index_x]:
                                                    self.quality_areas.qa_ap_index_x_highs[index_x]]
+
+                # Build the linear interpolation operator.
                 interpolator_x = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
                                                          data_x, bounds_error=False, fill_value=None)
@@ -254,15 +258,17 @@ if __name__ == "__main__":
     print ("Distribution of alignment point indices among quality areas in y direction:")
     for index_y, y_low in enumerate(quality_areas.y_lows):
         y_high = quality_areas.y_highs[index_y]
-        print ("Lower y pixel: " + str(y_low) + ", upper y pixel index: " + str(y_high) +
-               ", lower ap coordinate: " +
+        print ("QA y index: " + str(index_y) + ", Lower y pixel: " + str(y_low) +
+               ", upper y pixel index: " + str(y_high) + ", lower ap coordinate: " +
                str(alignment_points.y_locations[quality_areas.qa_ap_index_y_lows[index_y]]) +
                ", upper ap coordinate: " +
                str(alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y]-1]))
+    print("")
+    print("Distribution of alignment point indices among quality areas in x direction:")
     for index_x, x_low in enumerate(quality_areas.x_lows):
         x_high = quality_areas.x_highs[index_x]
-        print("Lower x pixel: " + str(x_low) + ", upper x pixel index: " + str(x_high) +
-              ", lower ap coordinate: " +
+        print("QA x index: " + str(index_x) + ", Lower x pixel: " + str(x_low) +
+              ", upper x pixel index: " + str(x_high) + ", lower ap coordinate: " +
               str(alignment_points.x_locations[quality_areas.qa_ap_index_x_lows[index_x]]) +
               ", upper ap coordinate: " +
               str(alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x]-1]))
