@@ -255,6 +255,18 @@ class AlignmentPoints(object):
         - a subpixel algorithm from "skimage.feature"
         - a phase correlation algorithm (miscellaneous.translation)
         - a local search algorithm (spiralling outwards), see method "search_local_match"
+
+        Be careful with the sign of the local shift values. For the first two methods, a positive
+        value means that the current frame has to be shifted in the positive coordinate direction
+        in order to make objects in the frame match with their counterparts in the reference frame.
+        In other words: If the shift is positive, an object in the current frame is at lower pixel
+        coordinates as compared to the reference. This is very counter-intuitive, but to make the
+        three methods consistent, the same approach was followed in the implementation of the third
+        method "search_local_match", contained in this module. There, a pixel box around an
+        alignment point in the current frame is moved until the content of the box matches with the
+        corresponding box in the reference frame. If at this point the box is shifted towards a
+        higher coordinate value, this value is returned with a negative sign as the local shift.
+
         After computing the shift vectors for the alignment points, shift vectors are interpolated
         for neighbors of those alignment points. Make sure that all contributing alignment points
         for those neighbors are included in the list of alignment points.

@@ -21,11 +21,12 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import glob
+from cv2 import remap, INTER_LINEAR, BORDER_TRANSPARENT
 from time import time
 
-from numpy import float32, empty, zeros
+import matplotlib.pyplot as plt
+from numpy import float32, int16, empty, zeros, meshgrid
 from scipy.interpolate import RegularGridInterpolator
-from cv2 import remap, INTER_LINEAR, BORDER_TRANSPARENT
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
@@ -69,27 +70,32 @@ class StackFrames(object):
         # The arrays for the stacked image and the intermediate buffer need to accommodate three
         # color channels in the case of color images.
         if self.frames.color:
-            self.stacked_image = empty(
-                [self.align_frames.intersection_shape[0][1] -
-                 self.align_frames.intersection_shape[0][0],
-                 self.align_frames.intersection_shape[1][1] -
-                 self.align_frames.intersection_shape[1][0], 3], dtype=float32)
-            self.buffer = self.stacked_image.copy()
+            self.stacked_image_buffer = empty([self.align_frames.intersection_shape[0][1] -
+                                               self.align_frames.intersection_shape[0][0],
+                                               self.align_frames.intersection_shape[1][1] -
+                                               self.align_frames.intersection_shape[1][0], 3],
+                                              dtype=float32)
+            self.stacked_image = empty([self.align_frames.intersection_shape[0][1] -
+                                        self.align_frames.intersection_shape[0][0],
+                                        self.align_frames.intersection_shape[1][1] -
+                                        self.align_frames.intersection_shape[1][0], 3], dtype=int16)
         else:
-            self.stacked_image = zeros(
-                [self.align_frames.intersection_shape[0][1] -
-                 self.align_frames.intersection_shape[0][0],
-                 self.align_frames.intersection_shape[1][1] -
-                 self.align_frames.intersection_shape[1][0]], dtype=float32)
-            self.buffer = self.stacked_image.copy()
+            self.stacked_image_buffer = zeros([self.align_frames.intersection_shape[0][1] -
+                                               self.align_frames.intersection_shape[0][0],
+                                               self.align_frames.intersection_shape[1][1] -
+                                               self.align_frames.intersection_shape[1][0]],
+                                              dtype=float32)
+            self.stacked_image = zeros([self.align_frames.intersection_shape[0][1] -
+                                        self.align_frames.intersection_shape[0][0],
+                                        self.align_frames.intersection_shape[1][1] -
+                                        self.align_frames.intersection_shape[1][0]], dtype=int16)
 
         # Initialize arrays used to store y and x shift values for each frame pixel.
-        self.pixel_shift_y = empty(
-            [self.align_frames.intersection_shape[0][1] -
-             self.align_frames.intersection_shape[0][0],
-             self.align_frames.intersection_shape[1][1] -
-             self.align_frames.intersection_shape[1][0]], dtype=float32)
-        self.pixel_shift_x = self.pixel_shift_y.copy()
+        self.pixel_map_y = empty([
+            self.align_frames.intersection_shape[0][1] - self.align_frames.intersection_shape[0][0],
+            self.align_frames.intersection_shape[1][1] - self.align_frames.intersection_shape[1][
+                0]], dtype=float32)
+        self.pixel_map_x = self.pixel_map_y.copy()
 
     def add_frame_contribution(self, frame_index):
         """
@@ -128,54 +134,64 @@ class StackFrames(object):
             for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
                 quality_area = self.quality_areas.quality_areas[index_y][index_x]
 
+                # Extract index bounds in y and x for this quality area. Interpolations and stacking
+                # are restricted to this index range.
+                y_low, y_high, x_low, x_high = quality_area['coordinates'][0:4]
+
                 # Cut out the 2D window with y shift values for all alignment boxes used by this
-                # quality area. Combine global offsets with local shifts.
+                # quality area. Combine global offsets with local shifts, and add the y coordinates
+                # at the alignment box positions. As the result, "data_y" (and "data_x", below,
+                # respectively) contain the mapping coordinates as required by the OpenCV function
+                # "remap".
 
-                # Still missing: Add y coordinate !!
+                # Set the y and x coordinates at the alignment box locations within the window.
+                x_coords, y_coords = meshgrid(self.alignment_points.x_locations[
+                                              self.quality_areas.qa_ap_index_x_lows[index_x]:
+                                              self.quality_areas.qa_ap_index_x_highs[index_x]],
+                                              self.alignment_points.y_locations[
+                                              self.quality_areas.qa_ap_index_y_lows[index_y]:
+                                              self.quality_areas.qa_ap_index_y_highs[index_y]],
+                                              sparse=True)
 
-                data_y = dy - alignment_points.y_shifts[
-                              self.quality_areas.qa_ap_index_y_lows[index_y]:
-                              self.quality_areas.qa_ap_index_y_highs[index_y],
-                              self.quality_areas.qa_ap_index_x_lows[index_x]:
-                              self.quality_areas.qa_ap_index_x_highs[index_x]]
+                # Compute the y mapping coordinates at alignment box positions.
+                data_y = y_coords + dy - self.alignment_points.y_shifts[
+                                         self.quality_areas.qa_ap_index_y_lows[index_y]:
+                                         self.quality_areas.qa_ap_index_y_highs[index_y],
+                                         self.quality_areas.qa_ap_index_x_lows[index_x]:
+                                         self.quality_areas.qa_ap_index_x_highs[index_x]]
 
                 # Build the linear interpolation operator.
                 interpolator_y = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
-                                                         data_y, bounds_error=False, fill_value=None)
+                                                         data_y, bounds_error=False,
+                                                         fill_value=None)
 
                 # Interpolate y shifts for all points within the quality area.
-                self.pixel_shift_y[quality_area['coordinates'][0]:quality_area['coordinates'][1],
-                quality_area['coordinates'][2]:quality_area['coordinates'][3]] = interpolator_y(
-                    quality_area['interpolation_points']).reshape(
-                    quality_area['coordinates'][1] - quality_area['coordinates'][0],
-                    quality_area['coordinates'][3] - quality_area['coordinates'][2])
+                self.pixel_map_y[y_low:y_high, x_low:x_high] = interpolator_y(
+                    quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
 
                 # Do the same for x shifts.
-
-                # Still missing: Add x coordinate !!
-
-                data_x = dx - alignment_points.x_shifts[
-                              self.quality_areas.qa_ap_index_y_lows[index_y]:
-                              self.quality_areas.qa_ap_index_y_highs[index_y],
-                              self.quality_areas.qa_ap_index_x_lows[index_x]:
-                              self.quality_areas.qa_ap_index_x_highs[index_x]]
+                data_x = x_coords + dx - alignment_points.x_shifts[
+                                         self.quality_areas.qa_ap_index_y_lows[index_y]:
+                                         self.quality_areas.qa_ap_index_y_highs[index_y],
+                                         self.quality_areas.qa_ap_index_x_lows[index_x]:
+                                         self.quality_areas.qa_ap_index_x_highs[index_x]]
 
                 # Build the linear interpolation operator.
                 interpolator_x = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
-                                                         data_x, bounds_error=False, fill_value=None)
+                                                         data_x, bounds_error=False,
+                                                         fill_value=None)
 
                 # Interpolate x shifts for all points within the quality area.
-                self.pixel_shift_x[quality_area['coordinates'][0]:quality_area['coordinates'][1],
-                quality_area['coordinates'][2]:quality_area['coordinates'][3]] = interpolator_x(
-                    quality_area['interpolation_points']).reshape(
-                    quality_area['coordinates'][1] - quality_area['coordinates'][0],
-                    quality_area['coordinates'][3] - quality_area['coordinates'][2])
+                self.pixel_map_x[y_low:y_high, x_low:x_high] = interpolator_x(
+                    quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
 
                 # De-warp the quality area window and add the result to the summation buffer.
-                self.stacked_image += remap(self.frames.frames[frame_index], data_x, data_y,
-                                            INTER_LINEAR, None, BORDER_TRANSPARENT)
+                self.stacked_image_buffer[y_low:y_high, x_low:x_high, :] += remap(
+                    self.frames.frames[frame_index], self.pixel_map_x[y_low:y_high, x_low:x_high],
+                    self.pixel_map_y[y_low:y_high, x_low:x_high], INTER_LINEAR, None,
+                    BORDER_TRANSPARENT)
 
     def stack_frames(self):
         """
@@ -189,9 +205,11 @@ class StackFrames(object):
             self.add_frame_contribution(index)
 
         # Divide the summation buffer by the number of contributing frames per quality area.
-        self.stacked_image /= self.stack_size
+        self.stacked_image_buffer /= self.stack_size
 
-        # Still missing: Conversion to 16bit int
+        # Convert float image buffer to 16bit int.
+        self.stacked_image = self.stacked_image_buffer.astype(int16)
+        return self.stacked_image
 
 
 if __name__ == "__main__":
@@ -201,13 +219,13 @@ if __name__ == "__main__":
     type = 'video'
     if type == 'image':
         names = glob.glob(
-            'Images/2012*.tif')
-        # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
-        # names = glob.glob('Images/Example-3*.jpg')
+            'Images/2012*.tif')  # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
+        #  names = glob.glob('Images/Example-3*.jpg')
     else:
         names = 'Videos/short_video.avi'
     print(names)
 
+    start_over_all = time()
     # Get configuration parameters.
     configuration = Configuration()
     try:
@@ -265,7 +283,8 @@ if __name__ == "__main__":
     alignment_points.create_alignment_boxes(step_size, box_size)
     end = time()
     print('Elapsed time in alignment box creation: {}'.format(end - start))
-    print("Number of alignment boxes created: " + str(len(alignment_points.alignment_boxes)))
+    print("Number of alignment boxes created: " + str(
+        len(alignment_points.alignment_boxes) * len(alignment_points.alignment_boxes[0])))
 
     # An alignment box is selected as an alignment point if it satisfies certain conditions
     # regarding local contrast etc.
@@ -287,24 +306,24 @@ if __name__ == "__main__":
     start = time()
     quality_areas = QualityAreas(configuration, frames, align_frames, alignment_points)
 
-    print ("")
-    print ("Distribution of alignment point indices among quality areas in y direction:")
+    print("")
+    print("Distribution of alignment point indices among quality areas in y direction:")
     for index_y, y_low in enumerate(quality_areas.y_lows):
         y_high = quality_areas.y_highs[index_y]
-        print ("QA y index: " + str(index_y) + ", Lower y pixel: " + str(y_low) +
-               ", upper y pixel index: " + str(y_high) + ", lower ap coordinate: " +
-               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_lows[index_y]]) +
-               ", upper ap coordinate: " +
-               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y]-1]))
+        print("QA y index: " + str(index_y) + ", Lower y pixel: " + str(
+            y_low) + ", upper y pixel index: " + str(y_high) + ", lower ap coordinate: " + str(
+            alignment_points.y_locations[
+                quality_areas.qa_ap_index_y_lows[index_y]]) + ", upper ap coordinate: " + str(
+            alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y] - 1]))
     print("")
     print("Distribution of alignment point indices among quality areas in x direction:")
     for index_x, x_low in enumerate(quality_areas.x_lows):
         x_high = quality_areas.x_highs[index_x]
-        print("QA x index: " + str(index_x) + ", Lower x pixel: " + str(x_low) +
-              ", upper x pixel index: " + str(x_high) + ", lower ap coordinate: " +
-              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_lows[index_x]]) +
-              ", upper ap coordinate: " +
-              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x]-1]))
+        print("QA x index: " + str(index_x) + ", Lower x pixel: " + str(
+            x_low) + ", upper x pixel index: " + str(x_high) + ", lower ap coordinate: " + str(
+            alignment_points.x_locations[
+                quality_areas.qa_ap_index_x_lows[index_x]]) + ", upper ap coordinate: " + str(
+            alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x] - 1]))
     print("")
 
     # For each quality area rank the frames according to the local contrast.
@@ -316,6 +335,15 @@ if __name__ == "__main__":
     print('Elapsed time in quality area creation and frame ranking: {}'.format(end - start))
     print("Number of frames to be stacked for each quality area: " + str(quality_areas.stack_size))
 
+    # Allocate StackFrames object.
     stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, quality_areas)
 
-    stack_frames.stack_frames()
+    # Stack all frames.
+    start = time()
+    result = stack_frames.stack_frames()
+    end = time()
+    print('Elapsed time in frame stacking: {}'.format(end - start))
+    print('Elapsed time total: {}'.format(end - start_over_all))
+
+    plt.imshow(result)
+    plt.show()
