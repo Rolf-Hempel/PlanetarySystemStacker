@@ -27,6 +27,7 @@ from time import time
 import matplotlib.pyplot as plt
 from numpy import float32, int16, empty, zeros, meshgrid
 from scipy.interpolate import RegularGridInterpolator
+from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
@@ -204,11 +205,12 @@ class StackFrames(object):
         for index, frame in enumerate(self.frames.frames):
             self.add_frame_contribution(index)
 
-        # Divide the summation buffer by the number of contributing frames per quality area.
-        self.stacked_image_buffer /= self.stack_size
+        # Divide the summation buffer by the number of contributing frames per quality area, and
+        # scale entries to the interval [0., 1.].
+        self.stacked_image_buffer /= (self.stack_size*255.)
 
-        # Convert float image buffer to 16bit int.
-        self.stacked_image = self.stacked_image_buffer.astype(int16)
+        # Convert float image buffer to 16bit int (or 48bit in color mode).
+        self.stacked_image = img_as_uint(self.stacked_image_buffer)
         return self.stacked_image
 
 
@@ -218,11 +220,13 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob(
-            'Images/2012*.tif')  # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
-        #  names = glob.glob('Images/Example-3*.jpg')
+        names = glob.glob('Images/2012*.tif')
+        # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
+        # names = glob.glob('Images/Example-3*.jpg')
     else:
-        names = 'Videos/short_video.avi'
+        # file = 'short_video'
+        file = 'Moon_Tile-024_043939'
+        names = 'Videos/' + file + '.avi'
     print(names)
 
     start_over_all = time()
@@ -345,5 +349,9 @@ if __name__ == "__main__":
     print('Elapsed time in frame stacking: {}'.format(end - start))
     print('Elapsed time total: {}'.format(end - start_over_all))
 
-    plt.imshow(result)
+    # Save the stacked image as 16bit int (color or mono).
+    frames.save_image('Images/' + file + '_stacked.tiff', result)
+
+    # Convert to 8bit and show in Window.
+    plt.imshow(img_as_ubyte(result))
     plt.show()

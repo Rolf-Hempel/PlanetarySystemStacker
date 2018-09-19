@@ -142,6 +142,17 @@ class Frames(object):
         im2_offset = ImageChops.offset(pil_image, xoffset=shift_x, yoffset=shift_y)
         self.frames[index] = array(im2_offset)
 
+    def save_image(self, filename, image):
+        """
+        Save an image to a file.
+
+        :param filename: Name of the file where the image is to be written
+        :param image: ndarray object containing the image data
+        :return: -
+        """
+
+        cv2.imwrite(filename, image)
+
 
 if __name__ == "__main__":
 
