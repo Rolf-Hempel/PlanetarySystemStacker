@@ -23,12 +23,16 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 import glob
 from time import time
 
+import matplotlib.pyplot as plt
+from skimage import img_as_ubyte
+
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
 from frames import Frames
 from quality_areas import QualityAreas
 from rank_frames import RankFrames
+from stack_frames import StackFrames
 
 if __name__ == "__main__":
     """
@@ -41,18 +45,19 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob(
-            'Images/2012*.tif')
+        names = glob.glob('Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        names = 'Videos/short_video.avi'
+        # file = 'short_video'
+        file = 'Moon_Tile-024_043939'
+        names = 'Videos/' + file + '.avi'
     print(names)
 
+    start_over_all = time()
     # Get configuration parameters.
     configuration = Configuration()
     try:
-        # In creating the Frames object the images are read from the specified file(s).
         frames = Frames(names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
@@ -67,10 +72,10 @@ if __name__ == "__main__":
     end = time()
     print('Elapsed time in ranking images: {}'.format(end - start))
     print("Index of maximum: " + str(rank_frames.frame_ranks_max_index))
-    print("Frame scores: " + str(rank_frames.frame_ranks))
-    print("Frame scores (sorted): " + str(
-        [rank_frames.frame_ranks[i] for i in rank_frames.quality_sorted_indices]))
-    print("Sorted index list: " + str(rank_frames.quality_sorted_indices))
+    # print("Frame scores: " + str(rank_frames.frame_ranks))
+    # print("Frame scores (sorted): " + str(
+    #     [rank_frames.frame_ranks[i] for i in rank_frames.quality_sorted_indices]))
+    # print("Sorted index list: " + str(rank_frames.quality_sorted_indices))
 
     # Initialize the frame alignment object.
     align_frames = AlignFrames(frames, rank_frames, configuration)
@@ -99,7 +104,7 @@ if __name__ == "__main__":
     align_frames.align_frames()
     end = time()
     print('Elapsed time in aligning all frames: {}'.format(end - start))
-    print("Frame shifts: " + str(align_frames.frame_shifts))
+    # print("Frame shifts: " + str(align_frames.frame_shifts))
     print("Intersection: " + str(align_frames.intersection_shape))
 
     # Initialize the AlignmentPoints object. This includes the computation of the average frame
@@ -121,7 +126,8 @@ if __name__ == "__main__":
     alignment_points.create_alignment_boxes(step_size, box_size)
     end = time()
     print('Elapsed time in alignment box creation: {}'.format(end - start))
-    print("Number of alignment boxes created: " + str(len(alignment_points.alignment_boxes)))
+    print("Number of alignment boxes created: " + str(
+        len(alignment_points.alignment_boxes) * len(alignment_points.alignment_boxes[0])))
 
     # An alignment box is selected as an alignment point if it satisfies certain conditions
     # regarding local contrast etc.
@@ -138,13 +144,6 @@ if __name__ == "__main__":
     print('Elapsed time in alignment point selection: {}'.format(end - start))
     print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
 
-    # For all frames: Compute the local shifts for all alignment points (to be used for de-warping).
-    start = time()
-    for frame_index in range(frames.number):
-        alignment_points.compute_alignment_point_shifts(frame_index)
-    end = time()
-    print("Elapsed time in computing point shifts for all frames: " + str(end - start))
-
     # Create a regular grid of quality areas. The fractional sizes of the areas in x and y,
     # as compared to the full frame, are specified in the configuration object.
     start = time()
@@ -158,3 +157,21 @@ if __name__ == "__main__":
     end = time()
     print('Elapsed time in quality area creation and frame ranking: {}'.format(end - start))
     print("Number of frames to be stacked for each quality area: " + str(quality_areas.stack_size))
+
+    # Allocate StackFrames object.
+    stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, quality_areas)
+
+    # Stack all frames.
+    start = time()
+    result = stack_frames.stack_frames()
+    end = time()
+    print('Elapsed time in frame stacking: {}'.format(end - start))
+    print('Elapsed time total: {}'.format(end - start_over_all))
+
+    # Save the stacked image as 16bit int (color or mono).
+    frames.save_image('Images/' + file + '_stacked.tiff', result)
+
+    # Convert to 8bit and show in Window.
+    plt.imshow(img_as_ubyte(result))
+    plt.show()
+

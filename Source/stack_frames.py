@@ -172,7 +172,7 @@ class StackFrames(object):
                     quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
 
                 # Do the same for x shifts.
-                data_x = x_coords + dx - alignment_points.x_shifts[
+                data_x = x_coords + dx - self.alignment_points.x_shifts[
                                          self.quality_areas.qa_ap_index_y_lows[index_y]:
                                          self.quality_areas.qa_ap_index_y_highs[index_y],
                                          self.quality_areas.qa_ap_index_x_lows[index_x]:
