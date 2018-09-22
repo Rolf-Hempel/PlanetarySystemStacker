@@ -219,7 +219,7 @@ class QualityAreas(object):
         For each quality area, rank all frames by their local image quality. For quality areas
         containing at least one alignment point, use their "local contrast" as the ranking
         criterion. For areas which do not contain any alignment point, copy the frame ranks from the
-        nearest quality are with alignment points.
+        nearest quality area with alignment points.
 
         The rationale for this differentiation is that areas without alignment points are either
         empty space or very smooth surface sections where the contrast measurement does not make

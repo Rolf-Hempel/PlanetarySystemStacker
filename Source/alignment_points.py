@@ -417,8 +417,7 @@ class AlignmentPoints(object):
             raise NotSupportedError("The point shift computation method " +
                                     self.configuration.alignment_point_method + " is not implemented")
 
-        # Copy pixel shift values into the shift arrays, and append them to the point_shifts
-        # list.
+        # Copy pixel shift values into the shift arrays.
         self.y_shifts[j][i] = shift_pixel[0]
         self.x_shifts[j][i] = shift_pixel[1]
 
@@ -444,7 +443,6 @@ class AlignmentPoints(object):
             i_ap = self.alignment_points[ap['alignment_point_index']][1]
             self.y_shifts[j][i] += ap['weight'] * self.y_shifts[j_ap][i_ap]
             self.x_shifts[j][i] += ap['weight'] * self.x_shifts[j_ap][i_ap]
-        pass
 
     def search_local_match(self, reference_box, frame, y_low, y_high, x_low, x_high, search_width):
         """

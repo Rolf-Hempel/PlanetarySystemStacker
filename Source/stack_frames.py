@@ -165,6 +165,7 @@ class StackFrames(object):
                 interpolator_y = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
                                                          data_y, bounds_error=False,
+                                                         method='linear',
                                                          fill_value=None)
 
                 # Interpolate y shifts for all points within the quality area.
@@ -182,6 +183,7 @@ class StackFrames(object):
                 interpolator_x = RegularGridInterpolator((quality_area['interpolation_coords_y'],
                                                           quality_area['interpolation_coords_x']),
                                                          data_x, bounds_error=False,
+                                                         method='linear',
                                                          fill_value=None)
 
                 # Interpolate x shifts for all points within the quality area.
