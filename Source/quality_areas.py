@@ -441,14 +441,14 @@ if __name__ == "__main__":
                ", lower ap coordinate: " +
                str(alignment_points.y_locations[quality_areas.qa_ap_index_y_lows[index_y]]) +
                ", upper ap coordinate: " +
-               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y]]))
+               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y]-1]))
     for index_x, x_low in enumerate(quality_areas.x_lows):
         x_high = quality_areas.x_highs[index_x]
         print("Lower x pixel: " + str(x_low) + ", upper x pixel index: " + str(x_high) +
               ", lower ap coordinate: " +
               str(alignment_points.x_locations[quality_areas.qa_ap_index_x_lows[index_x]]) +
               ", upper ap coordinate: " +
-              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x]]))
+              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x]-1]))
     print("")
 
 

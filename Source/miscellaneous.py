@@ -156,6 +156,8 @@ class Miscellaneous(object):
         :return: -
         """
 
+        shape_y, shape_x = frame.shape[0:2]
+
         if color == 'white':
             rgb = [255, 255, 255]
         elif color == 'red':
@@ -164,12 +166,20 @@ class Miscellaneous(object):
             rgb = [0, 255, 0]
         elif color == 'blue':
             rgb = [0, 0, 255]
+        elif color == 'cyan':
+            rgb = [0, 255, 255]
         else:
             rgb = [255, 255, 255]
-        for y in range(y_center - cross_half_len, y_center + cross_half_len + 1):
-            frame[y, x_center] = rgb
-        for x in range(x_center - cross_half_len, x_center + cross_half_len + 1):
-            frame[y_center, x] = rgb
+
+        # Be sure not to draw beyond frame boundaries.
+        if 0 <= x_center < shape_x:
+            for y in range(y_center - cross_half_len, y_center + cross_half_len + 1):
+                if 0 <= y < shape_y:
+                    frame[y, x_center] = rgb
+        if 0 <= y_center < shape_y:
+            for x in range(x_center - cross_half_len, x_center + cross_half_len + 1):
+                if 0 <= x < shape_x:
+                    frame[y_center, x] = rgb
 
 
     @staticmethod
