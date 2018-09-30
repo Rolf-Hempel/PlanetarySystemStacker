@@ -25,13 +25,14 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint16, array, matmul
+from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint16, array, matmul, \
+    square
 from numpy.linalg import solve
 from skimage.feature import register_translation
 
 from align_frames import AlignFrames
 from configuration import Configuration
-from exceptions import WrongOrderingError, NotSupportedError
+from exceptions import WrongOrderingError, NotSupportedError, DivideByZeroError
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -71,6 +72,9 @@ class AlignmentPoints(object):
         self.y_shifts = None
         self.x_shifts = None
         self.ap_mask = None
+        self.deviations = zeros(
+            (2 * self.configuration.alignment_point_search_width + 1,
+             2 * self.configuration.alignment_point_search_width + 1))
 
         # Compute the number of frames to be used for creating the mean frame.
         self.average_frame_number = max(
@@ -474,7 +478,8 @@ class AlignmentPoints(object):
                                                   self.frames.frames_mono[frame_index],
                                                   y_low + dy, y_high + dy, x_low + dx,
                                                   x_high + dx,
-                                                  self.configuration.alignment_point_search_width)
+                                                  self.configuration.alignment_point_search_width,
+                                                  sub_pixel=self.configuration.alignment_sub_pixel)
         else:
             raise NotSupportedError("The point shift computation method " +
                                     self.configuration.alignment_point_method + " is not implemented")
@@ -537,7 +542,8 @@ class AlignmentPoints(object):
         self.y_shifts[j][i] = self.y_shifts[j_copy][i_copy]
         self.x_shifts[j][i] = self.x_shifts[j_copy][i_copy]
 
-    def search_local_match(self, reference_box, frame, y_low, y_high, x_low, x_high, search_width):
+    def search_local_match(self, reference_box, frame, y_low, y_high, x_low, x_high, search_width,
+                           sub_pixel=True):
         """
         Try shifts in y, x between the box around the alignment point in the mean frame and the
         corresponding box in the given frame. Start with shifts [0, 0] and move out in a circular
@@ -554,6 +560,7 @@ class AlignmentPoints(object):
         :param x_low: Lower x coordinate limit
         :param x_high: Upper x coordinate limit
         :param search_width: maximum radius of the search spiral
+        :param sub_pixel: If True, compute local shifts with sub-pixel accuracy
         :return: Local shift in the form [shift_y, shift_x], or [0, 0] if no optimum could be found.
         """
 
@@ -580,8 +587,11 @@ class AlignmentPoints(object):
             for (dx, dy) in circle_r:
                 deviation = abs(
                     reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
+                # deviation = square(
+                #     reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
                 if deviation < deviation_min_r:
                     deviation_min_r, dy_min_r, dx_min_r = deviation, dy, dx
+                self.deviations[dy + search_width, dx + search_width] = deviation
 
             # Store the optimal value for radius "r".
             dev.append(deviation_min_r)
@@ -589,6 +599,21 @@ class AlignmentPoints(object):
             # If for the current radius there is no improvement compared to the previous radius,
             # the optimum is reached.
             if deviation_min_r >= deviation_min:
+
+                # For sub-pixel accuracy, find local minimum of fitting paraboloid.
+                if sub_pixel:
+                    try:
+                        y_correction, x_correction = self.sub_pixel_solve(self.deviations[
+                            dy_min + search_width - 1: dy_min + search_width + 2,
+                            dx_min + search_width - 1: dx_min + search_width + 2])
+                    except DivideByZeroError as ex:
+                        print (ex.message)
+                        x_correction = y_correction = 0.
+
+                    # Add the sub-pixel correction to the local shift.
+                    dy_min += y_correction
+                    dx_min += x_correction
+
                 return [dy_min, dx_min]
 
             # Otherwise, update the current optimum and continue.
@@ -630,8 +655,16 @@ class AlignmentPoints(object):
 
         # The corrected pixel values of the minimum result from setting the first derivatives of
         # the fitting funtion in y and x direction to zero, and solving for y and x.
-        y_correction = (2. * a_f * e_f - c_f * d_f) / (c_f ** 2 - 4. * a_f * b_f)
-        x_correction = (-2. * b_f * y_correction - e_f) / c_f
+        denominator_y = c_f ** 2 - 4. * a_f * b_f
+        if abs(denominator_y) > 1.e-10 and abs(a_f) > 1.e-10:
+            y_correction = (2. * a_f * e_f - c_f * d_f) / denominator_y
+            x_correction = (- c_f * y_correction - d_f) / (2. * a_f)
+        elif abs(denominator_y) > 1.e-10 and abs(c_f) > 1.e-10:
+            y_correction = (2. * a_f * e_f - c_f * d_f) / denominator_y
+            x_correction = (-2. * b_f * y_correction - e_f) / c_f
+        else:
+            raise DivideByZeroError("Sub-pixel shift cannot be computed, set to zero")
+
         return y_correction, x_correction
 
     def ap_mask_initialize(self):
