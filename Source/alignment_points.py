@@ -25,7 +25,8 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint16
+from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint16, array, matmul
+from numpy.linalg import solve
 from skimage.feature import register_translation
 
 from align_frames import AlignFrames
@@ -586,7 +587,7 @@ class AlignmentPoints(object):
             dev.append(deviation_min_r)
 
             # If for the current radius there is no improvement compared to the previous radius,
-            # the optimum if reached.
+            # the optimum is reached.
             if deviation_min_r >= deviation_min:
                 return [dy_min, dx_min]
 
@@ -599,6 +600,39 @@ class AlignmentPoints(object):
 
         # If within the maximum search radius no optimum could be found, return [0, 0].
         return [0, 0]
+
+    def sub_pixel_solve(self, function_values):
+        """
+        Compute the sub-pixel correction for method "search_local_match".
+
+        :param function_values: Matching differences at (3 x 3) pixels around the minimum found
+        :return: Corrections in y and x to the center position for local minimum
+        """
+
+        # If the functions are not yet reduced to 1D, do it now.
+        function_values_1d = function_values.reshape((9,))
+
+        # There are nine equations for six unknowns. Use normal equations to solve for optimum.
+        a_transpose = array(
+            [[1., 0., 1., 1., 0., 1., 1., 0., 1.], [1., 1., 1., 0., 0., 0., 1., 1., 1.],
+             [1., -0., -1., -0., 0., 0., -1., 0., 1.], [-1., 0., 1., -1., 0., 1., -1., 0., 1.],
+             [-1., -1., -1., 0., 0., 0., 1., 1., 1.], [1., 1., 1., 1., 1., 1., 1., 1., 1.]])
+        a_transpose_a = array(
+            [[6., 4., 0., 0., 0., 6.], [4., 6., 0., 0., 0., 6.], [0., 0., 4., 0., 0., 0.],
+             [0., 0., 0., 6., 0., 0.], [0., 0., 0., 0., 6., 0.], [6., 6., 0., 0., 0., 9.]])
+
+        # Right hand side is "a transposed times input vector".
+        rhs = matmul(a_transpose, function_values_1d)
+
+        # Solve for parameters of the fitting function
+        # f = a_f * x ** 2 + b_f * y ** 2 + c_f * x * y + d_f * x + e_f * y + g_f
+        a_f, b_f, c_f, d_f, e_f, g_f = solve(a_transpose_a, rhs)
+
+        # The corrected pixel values of the minimum result from setting the first derivatives of
+        # the fitting funtion in y and x direction to zero, and solving for y and x.
+        y_correction = (2. * a_f * e_f - c_f * d_f) / (c_f ** 2 - 4. * a_f * b_f)
+        x_correction = (-2. * b_f * y_correction - e_f) / c_f
+        return y_correction, x_correction
 
     def ap_mask_initialize(self):
         """
