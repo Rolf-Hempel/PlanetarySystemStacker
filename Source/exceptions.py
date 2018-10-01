@@ -83,3 +83,13 @@ class InternalError(Error):
 
     def __init__(self, message):
         self.message = message
+
+class DivideByZeroError(Error):
+    """Exception raised if an attempt is made to divide by zero.
+
+        Attributes:
+            message -- explanation of the error
+        """
+
+    def __init__(self, message):
+        self.message = message
