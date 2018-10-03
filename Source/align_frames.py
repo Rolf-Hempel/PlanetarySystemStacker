@@ -116,16 +116,16 @@ class AlignFrames(object):
         self.reference_window = self.frames_mono[self.frame_ranks_max_index][
                                 self.y_low_opt:self.y_high_opt, self.x_low_opt:self.x_high_opt]
         self.reference_window_shape = self.reference_window.shape
-        for index, frame in enumerate(self.frames_mono):
+        for idx, frame in enumerate(self.frames_mono):
 
             # For the sharpest frame the displacement is 0 because it is used as the reference.
-            if index == self.frame_ranks_max_index:
+            if idx == self.frame_ranks_max_index:
                 self.frame_shifts.append([0, 0])
 
             # For all other frames: Cut out the alignment patch and compute its translation
             # relative to the reference.
             else:
-                frame_window = self.frames_mono[index][self.y_low_opt:self.y_high_opt,
+                frame_window = self.frames_mono[idx][self.y_low_opt:self.y_high_opt,
                                self.x_low_opt:self.x_high_opt]
                 self.frame_shifts.append(
                     Miscellaneous.translation(self.reference_window, frame_window,
@@ -165,11 +165,11 @@ class AlignFrames(object):
              self.intersection_shape[1][1] - self.intersection_shape[1][0]])
 
         # For each frame, cut out the intersection area and copy it to the buffer.
-        for index, frame in enumerate(frames):
-            buffer[index, :, :] = frame[self.intersection_shape[0][0] - shifts[index][0]:
-                                        self.intersection_shape[0][1] - shifts[index][0],
-                                  self.intersection_shape[1][0] - shifts[index][1]:
-                                  self.intersection_shape[1][1] - shifts[index][1]]
+        for idx, frame in enumerate(frames):
+            buffer[idx, :, :] = frame[self.intersection_shape[0][0] - shifts[idx][0]:
+                                        self.intersection_shape[0][1] - shifts[idx][0],
+                                  self.intersection_shape[1][0] - shifts[idx][1]:
+                                  self.intersection_shape[1][1] - shifts[idx][1]]
         # Compute the mean frame by averaging over the first index.
         self.mean_frame = mean(buffer, axis=0)
         return self.mean_frame

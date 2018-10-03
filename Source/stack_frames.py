@@ -288,8 +288,8 @@ class StackFrames(object):
         """
 
         # Add the contributions of all frames to the summation buffer.
-        for index, frame in enumerate(self.frames.frames):
-            self.add_frame_contribution(index)
+        for idx, frame in enumerate(self.frames.frames):
+            self.add_frame_contribution(idx)
 
         # Divide the summation buffer by the number of contributing frames per quality area, and
         # scale entries to the interval [0., 1.].
