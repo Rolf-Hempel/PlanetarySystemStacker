@@ -49,8 +49,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        # file = 'short_video'
-        file = 'Moon_Tile-024_043939'
+        file = 'short_video'
+        # file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -58,7 +58,7 @@ if __name__ == "__main__":
     # Get configuration parameters.
     configuration = Configuration()
     try:
-        frames = Frames(names, type=type)
+        frames = Frames(names, type=type, convert_to_grayscale=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:

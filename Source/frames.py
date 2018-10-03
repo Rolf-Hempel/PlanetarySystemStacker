@@ -25,7 +25,7 @@ import glob
 import cv2
 import matplotlib.pyplot as plt
 from PIL import ImageChops, Image
-from numpy import array
+from numpy import array, dot
 from scipy import misc
 
 from exceptions import TypeError, ShapeError, ArgumentError
@@ -37,19 +37,24 @@ class Frames(object):
 
     """
 
-    def __init__(self, names, type='video'):
+    def __init__(self, names, type='video', convert_to_grayscale=False):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
 
         :param names: In case "video": name of the video file. In case "image": list of names for
                       all images.
-        :param type: Either "video" or "image"
+        :param type: Either "video" or "image".
+        :param convert_to_grayscale: If "True", convert frames to grayscale if they are RGB.
         """
 
         if type == 'image':
-            # Use scipy.misc to read in image files.
-            self.frames = [misc.imread(path) for path in names]
+            # Use scipy.misc to read in image files. If "convert_to_grayscale" is True, convert
+            # pixel values to 32bit floats.
+            if convert_to_grayscale:
+                self.frames = [misc.imread(path, mode='F') for path in names]
+            else:
+                self.frames = [misc.imread(path) for path in names]
             self.number = len(names)
             self.shape = self.frames[0].shape
 
@@ -68,7 +73,10 @@ class Frames(object):
             for frame_index in range(self.number):
                 ret, frame = cap.read()
                 if ret:
-                    self.frames.append(frame)
+                    if convert_to_grayscale:
+                        self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
+                    else:
+                        self.frames.append(frame)
                 else:
                     raise IOError("Error in reading video frame")
             cap.release()
@@ -100,7 +108,7 @@ class Frames(object):
         """
 
         if not self.color:
-            raise ShapeError("Cannot extract green channel from monochrome image")
+            raise ShapeError("Cannot extract color channel from monochrome image")
         colors = ['red', 'green', 'blue']
         if not color in colors:
             raise ArgumentError("Invalid color selected for channel extraction")
@@ -164,7 +172,7 @@ if __name__ == "__main__":
     else:
         names = 'Videos/short_video.avi'
     try:
-        frames = Frames(names, type=type)
+        frames = Frames(names, type=type, convert_to_grayscale=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
@@ -175,13 +183,14 @@ if __name__ == "__main__":
     frames.shift_frame_with_wraparound(0, 100, -200)
 
     # Extract the green channel of the RGB image.
-    try:
-        image_green = frames.extract_channel(0, 'green')
-    except ArgumentError as e:
-        print("Error: " + e.message)
-        exit()
-    plt.imshow(image_green, cmap='Greys_r')
-    plt.show()
+    if frames.color:
+        try:
+            image_green = frames.extract_channel(0, 'green')
+        except ArgumentError as e:
+            print("Error: " + e.message)
+            exit()
+        plt.imshow(image_green, cmap='Greys_r')
+        plt.show()
 
     # Create monochrome versions of all frames. If the original frames are monochrome, just point
     # the monochrome frame list to the original images (no deep copy!).
@@ -191,5 +200,5 @@ if __name__ == "__main__":
         print("Error: " + e.message)
         exit()
 
-    plt.imshow(frames.frames_mono[1], cmap='Greys_r')
+    plt.imshow(frames.frames_mono[0], cmap='Greys_r')
     plt.show()

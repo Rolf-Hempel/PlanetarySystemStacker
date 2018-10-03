@@ -26,7 +26,7 @@ from time import time
 
 import matplotlib.pyplot as plt
 from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint16, array, matmul, \
-    square
+    square, sqrt
 from numpy.linalg import solve
 from skimage.feature import register_translation
 
@@ -565,10 +565,9 @@ class AlignmentPoints(object):
         """
 
         # Initialize the global optimum with an impossibly large value.
-        deviation_min = 1000000
+        deviation_min = 1.e30
         dy_min = None
         dx_min = None
-        dev = []
 
         # Start with shift [0, 0] and proceed in a circular pattern.
         for r in arange(search_width + 1):
@@ -579,7 +578,7 @@ class AlignmentPoints(object):
 
             # Initialize the optimum for radius "r" to an impossibly large value,
             # and the corresponding shifts to None.
-            deviation_min_r, dy_min_r, dx_min_r = 1000000, None, None
+            deviation_min_r, dy_min_r, dx_min_r = 1.e30, None, None
 
             # Go through the circle with radius "r" and compute the difference (deviation)
             # between the shifted frame and the corresponding box in the mean frame. Find the
@@ -587,14 +586,11 @@ class AlignmentPoints(object):
             for (dx, dy) in circle_r:
                 deviation = abs(
                     reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
-                # deviation = square(
-                #     reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
+                # deviation = sqrt(square(
+                #     reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum())
                 if deviation < deviation_min_r:
                     deviation_min_r, dy_min_r, dx_min_r = deviation, dy, dx
                 self.deviations[dy + search_width, dx + search_width] = deviation
-
-            # Store the optimal value for radius "r".
-            dev.append(deviation_min_r)
 
             # If for the current radius there is no improvement compared to the previous radius,
             # the optimum is reached.

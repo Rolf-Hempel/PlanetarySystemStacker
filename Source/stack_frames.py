@@ -25,7 +25,7 @@ from cv2 import remap, INTER_LINEAR, BORDER_TRANSPARENT
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import float32, int16, empty, zeros, meshgrid
+from numpy import float32, int16, empty, zeros, meshgrid, clip
 from scipy.interpolate import RegularGridInterpolator
 from skimage import img_as_uint, img_as_ubyte
 
@@ -190,11 +190,95 @@ class StackFrames(object):
                 self.pixel_map_x[y_low:y_high, x_low:x_high] = interpolator_x(
                     quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
 
-                # De-warp the quality area window and add the result to the summation buffer.
-                self.stacked_image_buffer[y_low:y_high, x_low:x_high, :] += remap(
-                    self.frames.frames[frame_index], self.pixel_map_x[y_low:y_high, x_low:x_high],
-                    self.pixel_map_y[y_low:y_high, x_low:x_high], INTER_LINEAR, None,
-                    BORDER_TRANSPARENT)
+                # There are two variants for remapping: An own (slow) implementation with
+                # sub-pixel accuracy, and the less accurate (but fast) OpenCV method.
+                if self.configuration.stacking_own_remap_method:
+                    # De-warp the quality area window and add the result to the summation buffer.
+                    self.remap(self.frames.frames[frame_index], self.pixel_map_y, self.pixel_map_x,
+                               y_low, y_high, x_low, x_high)
+                else:
+                    if self.frames.color:
+                        self.stacked_image_buffer[y_low:y_high, x_low:x_high, :] += remap(
+                            self.frames.frames[frame_index],
+                            self.pixel_map_x[y_low:y_high, x_low:x_high],
+                            self.pixel_map_y[y_low:y_high, x_low:x_high], INTER_LINEAR, None,
+                            BORDER_TRANSPARENT)
+                    else:
+                        self.stacked_image_buffer[y_low:y_high, x_low:x_high] += remap(
+                            self.frames.frames[frame_index],
+                            self.pixel_map_x[y_low:y_high, x_low:x_high],
+                            self.pixel_map_y[y_low:y_high, x_low:x_high], INTER_LINEAR, None,
+                            BORDER_TRANSPARENT)
+
+    def remap(self, frame, pixel_map_y, pixel_map_x, y_low, y_high, x_low, x_high):
+        """
+        This is an alternative routine to the OpenCV.remap. It works directly on the image buffer.
+        Interpolation is linear with sub-pixel accuracy. Execution is slow because the computation
+        is done in a double-nested loop. Stacking is restricted to a (quality) window.
+
+        :param frame: frame to be stacked
+        :param pixel_map_y: For every pixel this array points to the y location from where the
+                            pixel is to be interpolated.
+        :param pixel_map_x: For every pixel this array points to the x location from where the
+                            pixel is to be interpolated.
+        :param y_low: Lower y index of the quality window on which this method operates
+        :param y_high: Upper y index of the quality window on which this method operates
+        :param x_low: Lower x index of the quality window on which this method operates
+        :param x_high: Upper x index of the quality window on which this method operates
+        :return: -
+        """
+
+        # Restrict pixel map coordinates to within the frame intersection area.
+        clip_y_low = 0.
+        clip_y_high = self.align_frames.intersection_shape[0][1] - 1.01
+        pixel_map_y[y_low:y_high, x_low:x_high] = clip(pixel_map_y[y_low:y_high, x_low:x_high],
+                                                       clip_y_low, clip_y_high)
+        clip_x_low = 0.
+        clip_x_high = self.align_frames.intersection_shape[1][1] - 1.01
+        pixel_map_x[y_low:y_high, x_low:x_high] = clip(pixel_map_x[y_low:y_high, x_low:x_high],
+                                                       clip_x_low, clip_x_high)
+
+        # If frames are in color, stack all three color channels using the same mapping.
+        if self.frames.color:
+
+            # The double loop is extremely slow. It should be replaced with a C routine or at least
+            # with Numpy expressions.
+            for j in range(y_low, y_high):
+                for i in range(x_low, x_high):
+
+                    # Prepare for sub-pixel interpolation. The integer coordinates point to the
+                    # upper left corner of the interpolation square. The fractions point to the
+                    # location within the square from where the pixel value is to be interpolated.
+                    pixel_j = int(pixel_map_y[j, i])
+                    fraction_j = pixel_map_y[j, i] % 1.
+                    one_minus_fraction_j = 1. - fraction_j
+                    pixel_i = int(pixel_map_x[j, i])
+                    fraction_i = pixel_map_x[j, i] % 1.
+                    one_minus_fraction_i = 1. - fraction_i
+
+                    # Do the interpolation. The weights are computed as the surface areas covered by
+                    # the four quadrants in the interpolation square.
+                    self.stacked_image_buffer[j, i, :] += \
+                        frame[pixel_j, pixel_i, :] * one_minus_fraction_j * one_minus_fraction_i + \
+                        frame[pixel_j, pixel_i + 1, :] * one_minus_fraction_j * fraction_i + \
+                        frame[pixel_j + 1, pixel_i, :] * fraction_j * one_minus_fraction_i + \
+                        frame[pixel_j + 1, pixel_i + 1, :] * fraction_j * fraction_i
+
+        # The same for monochrome mode.
+        else:
+            for j in range(y_low, y_high):
+                for i in range(x_low, x_high):
+                    pixel_j = int(pixel_map_y[j, i])
+                    fraction_j = pixel_map_y[j, i] % 1.
+                    one_minus_fraction_j = 1. - fraction_j
+                    pixel_i = int(pixel_map_x[j, i])
+                    fraction_i = pixel_map_x[j, i] % 1.
+                    one_minus_fraction_i = 1. - fraction_i
+                    self.stacked_image_buffer[j, i] += \
+                        frame[pixel_j, pixel_i] * one_minus_fraction_j * one_minus_fraction_i + \
+                        frame[pixel_j, pixel_i + 1] * one_minus_fraction_j * fraction_i + \
+                        frame[pixel_j + 1, pixel_i] * fraction_j * one_minus_fraction_i + \
+                        frame[pixel_j + 1, pixel_i + 1] * fraction_j * fraction_i
 
     def stack_frames(self):
         """
