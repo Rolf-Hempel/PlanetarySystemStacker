@@ -52,8 +52,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        file = 'short_video'
-        # file = 'Moon_Tile-024_043939'
+        # file = 'short_video'
+        file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     # Read the frames.
     my_timer.create('Read all frames')
     try:
-        frames = Frames(names, type=type, convert_to_grayscale=False)
+        frames = Frames(names, type=type, convert_to_grayscale=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
@@ -90,8 +90,8 @@ if __name__ == "__main__":
         configuration.alignment_rectangle_scale_factor)
     my_timer.stop('Select optimal alignment patch')
 
-    print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
-        x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
+    print("optimal alignment rectangle, y_low: " + str(y_low_opt) + ", y_high: " +
+          str(y_high_opt), + ", x_low: " + str(x_low_opt) + ", x_high: " + str(x_high_opt))
 
     # Align all frames globally relative to the frame with the highest score.
     my_timer.create('Global frame alignment')

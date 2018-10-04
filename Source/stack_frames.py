@@ -300,20 +300,34 @@ class StackFrames(object):
 
         # The same for monochrome mode.
         else:
-            self.pixel_j = pixel_map_y[y_low:y_high, x_low:x_high].astype(np.int32)
-            self.fraction_j = pixel_map_y[y_low:y_high, x_low:x_high] - self.pixel_j
-            self.one_minus_fraction_j = 1. - self.fraction_j
-            self.pixel_i = pixel_map_x[y_low:y_high, x_low:x_high].astype(np.int32)
-            self.fraction_i = pixel_map_x[y_low:y_high, x_low:x_high] - self.pixel_i
-            self.one_minus_fraction_i = 1. - self.fraction_i
-            self.stacked_image_buffer[y_low:y_high, x_low:x_high] += \
-                frame[self.pixel_j, self.pixel_i] * \
-                    self.one_minus_fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j, self.pixel_i + 1] * \
-                    self.one_minus_fraction_j * self.fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i] * \
-                    self.fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i + 1] * self.fraction_j * self.fraction_i
+            # self.pixel_j = pixel_map_y[y_low:y_high, x_low:x_high].astype(np.int32)
+            # self.fraction_j = pixel_map_y[y_low:y_high, x_low:x_high] - self.pixel_j
+            # self.one_minus_fraction_j = 1. - self.fraction_j
+            # self.pixel_i = pixel_map_x[y_low:y_high, x_low:x_high].astype(np.int32)
+            # self.fraction_i = pixel_map_x[y_low:y_high, x_low:x_high] - self.pixel_i
+            # self.one_minus_fraction_i = 1. - self.fraction_i
+            # self.stacked_image_buffer[y_low:y_high, x_low:x_high] += \
+            #     frame[self.pixel_j, self.pixel_i] * \
+            #         self.one_minus_fraction_j * self.one_minus_fraction_i + \
+            #     frame[self.pixel_j, self.pixel_i + 1] * \
+            #         self.one_minus_fraction_j * self.fraction_i + \
+            #     frame[self.pixel_j + 1, self.pixel_i] * \
+            #         self.fraction_j * self.one_minus_fraction_i + \
+            #     frame[self.pixel_j + 1, self.pixel_i + 1] * self.fraction_j * self.fraction_i
+
+            for j in range(y_low, y_high):
+                for i in range(x_low, x_high):
+                    pixel_j = int(pixel_map_y[j, i])
+                    fraction_j = pixel_map_y[j, i] % 1.
+                    one_minus_fraction_j = 1. - fraction_j
+                    pixel_i = int(pixel_map_x[j, i])
+                    fraction_i = pixel_map_x[j, i] % 1.
+                    one_minus_fraction_i = 1. - fraction_i
+                    self.stacked_image_buffer[j, i] += \
+                        frame[pixel_j, pixel_i] * one_minus_fraction_j * one_minus_fraction_i + \
+                        frame[pixel_j, pixel_i + 1] * one_minus_fraction_j * fraction_i + \
+                        frame[pixel_j + 1, pixel_i] * fraction_j * one_minus_fraction_i + \
+                        frame[pixel_j + 1, pixel_i + 1] * fraction_j * fraction_i
 
     def stack_frames(self):
         """
