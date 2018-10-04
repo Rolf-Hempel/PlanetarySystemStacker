@@ -25,7 +25,8 @@ from cv2 import remap, INTER_LINEAR, BORDER_TRANSPARENT
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import float32, int16, empty, zeros, meshgrid, clip
+import numpy as np
+# from numpy import float32, int16, int32, empty, zeros, meshgrid, clip
 from scipy.interpolate import RegularGridInterpolator
 from skimage import img_as_uint, img_as_ubyte
 
@@ -76,34 +77,36 @@ class StackFrames(object):
         self.my_timer.create('StackFrames initialization')
         self.alignment_points.ap_mask_initialize()
 
+        # Allocate work space for image buffer and the image converted for output.
+        # [dim_y, dim_x] is the size of the intersection of all frames.
+        dim_y = self.align_frames.intersection_shape[0][1] - \
+                self.align_frames.intersection_shape[0][0]
+        dim_x = self.align_frames.intersection_shape[1][1] - \
+                self.align_frames.intersection_shape[1][0]
+
         # The arrays for the stacked image and the intermediate buffer need to accommodate three
         # color channels in the case of color images.
         if self.frames.color:
-            self.stacked_image_buffer = empty([self.align_frames.intersection_shape[0][1] -
-                                               self.align_frames.intersection_shape[0][0],
-                                               self.align_frames.intersection_shape[1][1] -
-                                               self.align_frames.intersection_shape[1][0], 3],
-                                              dtype=float32)
-            self.stacked_image = empty([self.align_frames.intersection_shape[0][1] -
-                                        self.align_frames.intersection_shape[0][0],
-                                        self.align_frames.intersection_shape[1][1] -
-                                        self.align_frames.intersection_shape[1][0], 3], dtype=int16)
+            self.stacked_image_buffer = np.empty([dim_y, dim_x, 3], dtype=np.float32)
+            self.stacked_image = np.empty([dim_y, dim_x, 3], dtype=np.int16)
         else:
-            self.stacked_image_buffer = zeros([self.align_frames.intersection_shape[0][1] -
-                                               self.align_frames.intersection_shape[0][0],
-                                               self.align_frames.intersection_shape[1][1] -
-                                               self.align_frames.intersection_shape[1][0]],
-                                              dtype=float32)
-            self.stacked_image = zeros([self.align_frames.intersection_shape[0][1] -
-                                        self.align_frames.intersection_shape[0][0],
-                                        self.align_frames.intersection_shape[1][1] -
-                                        self.align_frames.intersection_shape[1][0]], dtype=int16)
+            self.stacked_image_buffer = np.zeros([dim_y, dim_x], dtype=np.float32)
+            self.stacked_image = np.zeros([dim_y, dim_x], dtype=np.int16)
+
+        # Allocate space for pixel values used in remapping. Subpixel values are split into integer
+        # and fractional parts.
+        # self.pixel_j = np.empty([dim_y, dim_x], dtype=np.int32)
+        # self.fraction_j = np.empty([dim_y, dim_x], dtype=np.float32)
+        # self.one_minus_fraction_j = np.empty([dim_y, dim_x], dtype=np.float32)
+        # self.pixel_i = np.empty([dim_y, dim_x], dtype=np.int32)
+        # self.fraction_i = np.empty([dim_y, dim_x], dtype=np.float32)
+        # self.one_minus_fraction_i = np.empty([dim_y, dim_x], dtype=np.float32)
 
         # Initialize arrays used to store y and x shift values for each frame pixel.
-        self.pixel_map_y = empty([
+        self.pixel_map_y = np.empty([
             self.align_frames.intersection_shape[0][1] - self.align_frames.intersection_shape[0][0],
             self.align_frames.intersection_shape[1][1] - self.align_frames.intersection_shape[1][
-                0]], dtype=float32)
+                0]], dtype=np.float32)
         self.pixel_map_x = self.pixel_map_y.copy()
         self.my_timer.stop('StackFrames initialization')
 
@@ -160,7 +163,7 @@ class StackFrames(object):
 
                 # Set the y and x coordinates at the alignment box locations within the window.
                 self.my_timer.start('Stacking: AP interpolation')
-                x_coords, y_coords = meshgrid(self.alignment_points.x_locations[
+                x_coords, y_coords = np.meshgrid(self.alignment_points.x_locations[
                                               self.quality_areas.qa_ap_index_x_lows[index_x]:
                                               self.quality_areas.qa_ap_index_x_highs[index_x]],
                                               self.alignment_points.y_locations[
@@ -248,54 +251,69 @@ class StackFrames(object):
         # Restrict pixel map coordinates to within the frame intersection area.
         clip_y_low = 0.
         clip_y_high = self.align_frames.intersection_shape[0][1] - 1.01
-        pixel_map_y[y_low:y_high, x_low:x_high] = clip(pixel_map_y[y_low:y_high, x_low:x_high],
+        pixel_map_y[y_low:y_high, x_low:x_high] = np.clip(pixel_map_y[y_low:y_high, x_low:x_high],
                                                        clip_y_low, clip_y_high)
         clip_x_low = 0.
         clip_x_high = self.align_frames.intersection_shape[1][1] - 1.01
-        pixel_map_x[y_low:y_high, x_low:x_high] = clip(pixel_map_x[y_low:y_high, x_low:x_high],
+        pixel_map_x[y_low:y_high, x_low:x_high] = np.clip(pixel_map_x[y_low:y_high, x_low:x_high],
                                                        clip_x_low, clip_x_high)
 
         # If frames are in color, stack all three color channels using the same mapping.
         if self.frames.color:
 
-            # The double loop is extremely slow. It should be replaced with a C routine or at least
-            # with Numpy expressions.
-            for j in range(y_low, y_high):
-                for i in range(x_low, x_high):
+            # Prepare for sub-pixel interpolation. The integer coordinates point to the
+            # upper left corner of the interpolation square. The fractions point to the
+            # location within the square from where the pixel value is to be interpolated.
+            self.pixel_j = pixel_map_y[y_low:y_high, x_low:x_high].astype(np.int32)
+            self.fraction_j = pixel_map_y[y_low:y_high, x_low:x_high] - self.pixel_j
+            self.one_minus_fraction_j = 1. - self.fraction_j
+            self.pixel_i = pixel_map_x[y_low:y_high, x_low:x_high].astype(np.int32)
+            self.fraction_i = pixel_map_x[y_low:y_high, x_low:x_high] - self.pixel_i
+            self.one_minus_fraction_i = 1. - self.fraction_i
 
-                    # Prepare for sub-pixel interpolation. The integer coordinates point to the
-                    # upper left corner of the interpolation square. The fractions point to the
-                    # location within the square from where the pixel value is to be interpolated.
-                    pixel_j = int(pixel_map_y[j, i])
-                    fraction_j = pixel_map_y[j, i] % 1.
-                    one_minus_fraction_j = 1. - fraction_j
-                    pixel_i = int(pixel_map_x[j, i])
-                    fraction_i = pixel_map_x[j, i] % 1.
-                    one_minus_fraction_i = 1. - fraction_i
-
-                    # Do the interpolation. The weights are computed as the surface areas covered by
-                    # the four quadrants in the interpolation square.
-                    self.stacked_image_buffer[j, i, :] += \
-                        frame[pixel_j, pixel_i, :] * one_minus_fraction_j * one_minus_fraction_i + \
-                        frame[pixel_j, pixel_i + 1, :] * one_minus_fraction_j * fraction_i + \
-                        frame[pixel_j + 1, pixel_i, :] * fraction_j * one_minus_fraction_i + \
-                        frame[pixel_j + 1, pixel_i + 1, :] * fraction_j * fraction_i
+            # Do the interpolation. The weights are computed as the surface areas covered by
+            # the four quadrants in the interpolation square.
+            self.stacked_image_buffer[y_low:y_high, x_low:x_high, 0] += \
+                frame[self.pixel_j, self.pixel_i, 0] * \
+                self.one_minus_fraction_j * self.one_minus_fraction_i + \
+                frame[self.pixel_j, self.pixel_i + 1, 0] * \
+                self.one_minus_fraction_j * self.fraction_i + \
+                frame[self.pixel_j + 1, self.pixel_i, 0] * \
+                self.fraction_j * self.one_minus_fraction_i + \
+                frame[self.pixel_j + 1, self.pixel_i + 1, 0] * self.fraction_j * self.fraction_i
+            self.stacked_image_buffer[y_low:y_high, x_low:x_high, 1] += \
+                frame[self.pixel_j, self.pixel_i, 1] * \
+                self.one_minus_fraction_j * self.one_minus_fraction_i + \
+                frame[self.pixel_j, self.pixel_i + 1, 1] * \
+                self.one_minus_fraction_j * self.fraction_i + \
+                frame[self.pixel_j + 1, self.pixel_i, 1] * \
+                self.fraction_j * self.one_minus_fraction_i + \
+                frame[self.pixel_j + 1, self.pixel_i + 1, 1] * self.fraction_j * self.fraction_i
+            self.stacked_image_buffer[y_low:y_high, x_low:x_high, 2] += \
+                frame[self.pixel_j, self.pixel_i, 2] * \
+                self.one_minus_fraction_j * self.one_minus_fraction_i + \
+                frame[self.pixel_j, self.pixel_i + 1, 2] * \
+                self.one_minus_fraction_j * self.fraction_i + \
+                frame[self.pixel_j + 1, self.pixel_i, 2] * \
+                self.fraction_j * self.one_minus_fraction_i + \
+                frame[self.pixel_j + 1, self.pixel_i + 1, 2] * self.fraction_j * self.fraction_i
 
         # The same for monochrome mode.
         else:
-            for j in range(y_low, y_high):
-                for i in range(x_low, x_high):
-                    pixel_j = int(pixel_map_y[j, i])
-                    fraction_j = pixel_map_y[j, i] % 1.
-                    one_minus_fraction_j = 1. - fraction_j
-                    pixel_i = int(pixel_map_x[j, i])
-                    fraction_i = pixel_map_x[j, i] % 1.
-                    one_minus_fraction_i = 1. - fraction_i
-                    self.stacked_image_buffer[j, i] += \
-                        frame[pixel_j, pixel_i] * one_minus_fraction_j * one_minus_fraction_i + \
-                        frame[pixel_j, pixel_i + 1] * one_minus_fraction_j * fraction_i + \
-                        frame[pixel_j + 1, pixel_i] * fraction_j * one_minus_fraction_i + \
-                        frame[pixel_j + 1, pixel_i + 1] * fraction_j * fraction_i
+            self.pixel_j = pixel_map_y[y_low:y_high, x_low:x_high].astype(np.int32)
+            self.fraction_j = pixel_map_y[y_low:y_high, x_low:x_high] - self.pixel_j
+            self.one_minus_fraction_j = 1. - self.fraction_j
+            self.pixel_i = pixel_map_x[y_low:y_high, x_low:x_high].astype(np.int32)
+            self.fraction_i = pixel_map_x[y_low:y_high, x_low:x_high] - self.pixel_i
+            self.one_minus_fraction_i = 1. - self.fraction_i
+            self.stacked_image_buffer[y_low:y_high, x_low:x_high] += \
+                frame[self.pixel_j, self.pixel_i] * \
+                    self.one_minus_fraction_j * self.one_minus_fraction_i + \
+                frame[self.pixel_j, self.pixel_i + 1] * \
+                    self.one_minus_fraction_j * self.fraction_i + \
+                frame[self.pixel_j + 1, self.pixel_i] * \
+                    self.fraction_j * self.one_minus_fraction_i + \
+                frame[self.pixel_j + 1, self.pixel_i + 1] * self.fraction_j * self.fraction_i
 
     def stack_frames(self):
         """

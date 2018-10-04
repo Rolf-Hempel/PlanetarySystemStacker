@@ -61,17 +61,21 @@ if __name__ == "__main__":
 
     # Get configuration parameters.
     configuration = Configuration()
+
+    # Read the frames.
+    my_timer.create('Read all frames')
     try:
-        frames = Frames(names, type=type, convert_to_grayscale=True)
+        frames = Frames(names, type=type, convert_to_grayscale=False)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
         print("Error: " + e.message)
         exit()
+    my_timer.stop('Read all frames')
 
     # Rank the frames by their overall local contrast.
-    rank_frames = RankFrames(frames, configuration)
     my_timer.create('Ranking images')
+    rank_frames = RankFrames(frames, configuration)
     rank_frames.frame_score()
     my_timer.stop('Ranking images')
     print("Index of best frame: " + str(rank_frames.frame_ranks_max_index))
@@ -157,6 +161,7 @@ if __name__ == "__main__":
     my_timer.create('Save Image')
     frames.save_image('Images/' + file + '_stacked.tiff', result)
     my_timer.stop('Save Image')
+    my_timer.stop('Execution over all')
 
     # Convert to 8bit and show in Window.
     plt.imshow(img_as_ubyte(result))
