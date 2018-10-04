@@ -123,7 +123,6 @@ class AlignmentPoints(object):
 
         # Set the last location to the last pixel.
         locations.append(num_pixels - 1)
-        print ("ap locations: " + str(locations))
         return locations
 
     def create_alignment_boxes(self, step_size, box_size):

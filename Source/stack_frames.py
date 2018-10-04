@@ -44,7 +44,8 @@ class StackFrames(object):
 
     """
 
-    def __init__(self, configuration, frames, align_frames, alignment_points, quality_areas):
+    def __init__(self, configuration, frames, align_frames, alignment_points, quality_areas,
+                 my_timer):
         """
         Initialze the StackFrames object. In particular, allocate empty numpy arrays used in the
         stacking process for buffering, pixel shifts in y and x, and the final stacked image. The
@@ -55,6 +56,7 @@ class StackFrames(object):
         :param align_frames: AlignFrames object with global shift information for all frames
         :param alignment_points: AlignmentPoints object with information of all alignment points
         :param quality_areas: QualityAreas object with information on all quality areas
+        :param my_timer: Timer object for accumulating times spent in specific code sections
         """
 
         self.configuration = configuration
@@ -63,9 +65,15 @@ class StackFrames(object):
         self.alignment_points = alignment_points
         self.quality_areas = quality_areas
         self.stack_size = quality_areas.stack_size
+        self.my_timer = my_timer
+        self.my_timer.create('Stacking: AP initialization')
+        self.my_timer.create('Stacking: compute AP shifts')
+        self.my_timer.create('Stacking: AP interpolation')
+        self.my_timer.create('Stacking: remapping and adding')
 
         # Create a mask array which specifies the alignment box locations where shifts are to be
         # computed.
+        self.my_timer.create('StackFrames initialization')
         self.alignment_points.ap_mask_initialize()
 
         # The arrays for the stacked image and the intermediate buffer need to accommodate three
@@ -97,6 +105,7 @@ class StackFrames(object):
             self.align_frames.intersection_shape[1][1] - self.align_frames.intersection_shape[1][
                 0]], dtype=float32)
         self.pixel_map_x = self.pixel_map_y.copy()
+        self.my_timer.stop('StackFrames initialization')
 
     def add_frame_contribution(self, frame_index):
         """
@@ -115,6 +124,7 @@ class StackFrames(object):
 
         # If this frame is used in at least one quality area, prepare mask for shift computation.
         if self.frames.used_quality_areas[frame_index]:
+            self.my_timer.start('Stacking: AP initialization')
             for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
                 self.alignment_points.ap_mask_set(self.quality_areas.qa_ap_index_y_lows[index_y],
                                                   self.quality_areas.qa_ap_index_y_highs[index_y],
@@ -126,9 +136,12 @@ class StackFrames(object):
                  self.align_frames.frame_shifts[frame_index][0]
             dx = self.align_frames.intersection_shape[1][0] - \
                  self.align_frames.frame_shifts[frame_index][1]
+            self.my_timer.stop('Stacking: AP initialization')
 
             # Compute the shifts in y and x for all mask locations.
+            self.my_timer.start('Stacking: compute AP shifts')
             self.alignment_points.compute_alignment_point_shifts(frame_index, use_ap_mask=True)
+            self.my_timer.stop('Stacking: compute AP shifts')
 
             # For each quality area used for this frame, compute its contribution to the stacked
             # image. First, interpolate y and x shifts between alignment boxes.
@@ -146,6 +159,7 @@ class StackFrames(object):
                 # "remap".
 
                 # Set the y and x coordinates at the alignment box locations within the window.
+                self.my_timer.start('Stacking: AP interpolation')
                 x_coords, y_coords = meshgrid(self.alignment_points.x_locations[
                                               self.quality_areas.qa_ap_index_x_lows[index_x]:
                                               self.quality_areas.qa_ap_index_x_highs[index_x]],
@@ -189,9 +203,11 @@ class StackFrames(object):
                 # Interpolate x shifts for all points within the quality area.
                 self.pixel_map_x[y_low:y_high, x_low:x_high] = interpolator_x(
                     quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
+                self.my_timer.stop('Stacking: AP interpolation')
 
                 # There are two variants for remapping: An own (slow) implementation with
                 # sub-pixel accuracy, and the less accurate (but fast) OpenCV method.
+                self.my_timer.start('Stacking: remapping and adding')
                 if self.configuration.stacking_own_remap_method:
                     # De-warp the quality area window and add the result to the summation buffer.
                     self.remap(self.frames.frames[frame_index], self.pixel_map_y, self.pixel_map_x,
@@ -209,6 +225,7 @@ class StackFrames(object):
                             self.pixel_map_x[y_low:y_high, x_low:x_high],
                             self.pixel_map_y[y_low:y_high, x_low:x_high], INTER_LINEAR, None,
                             BORDER_TRANSPARENT)
+                self.my_timer.stop('Stacking: remapping and adding')
 
     def remap(self, frame, pixel_map_y, pixel_map_x, y_low, y_high, x_low, x_high):
         """
