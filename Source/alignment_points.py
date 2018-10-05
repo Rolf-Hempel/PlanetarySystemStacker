@@ -230,7 +230,7 @@ class AlignmentPoints(object):
         :return: -
         """
 
-        if self.alignment_boxes == None:
+        if self.alignment_boxes is None:
             raise WrongOrderingError(
                 "Attempt to select alignment points before alignment boxes are created")
 

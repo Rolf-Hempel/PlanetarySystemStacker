@@ -104,7 +104,7 @@ class AlignFrames(object):
         :return: -
         """
 
-        if self.x_low_opt == None:
+        if self.x_low_opt is None:
             raise WrongOrderingError(
                 "Method 'align_frames' is called before 'select_alignment_rect'")
 
@@ -152,7 +152,7 @@ class AlignFrames(object):
         :return: The averaged frame
         """
 
-        if self.intersection_shape == None:
+        if self.intersection_shape is None:
             raise WrongOrderingError("Method 'average_frames' is called before 'align_frames'")
 
         # "number_frames" are to be averaged.
