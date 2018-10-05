@@ -91,7 +91,7 @@ if __name__ == "__main__":
     my_timer.stop('Select optimal alignment patch')
 
     print("optimal alignment rectangle, y_low: " + str(y_low_opt) + ", y_high: " +
-          str(y_high_opt), + ", x_low: " + str(x_low_opt) + ", x_high: " + str(x_high_opt))
+          str(y_high_opt) + ", x_low: " + str(x_low_opt) + ", x_high: " + str(x_high_opt))
 
     # Align all frames globally relative to the frame with the highest score.
     my_timer.create('Global frame alignment')
