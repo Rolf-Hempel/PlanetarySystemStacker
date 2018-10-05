@@ -250,11 +250,11 @@ class StackFrames(object):
 
         # Restrict pixel map coordinates to within the frame intersection area.
         clip_y_low = 0.
-        clip_y_high = self.align_frames.intersection_shape[0][1] - 1.01
+        clip_y_high = self.frames.shape[0] - 1.01
         pixel_map_y[y_low:y_high, x_low:x_high] = np.clip(pixel_map_y[y_low:y_high, x_low:x_high],
                                                        clip_y_low, clip_y_high)
         clip_x_low = 0.
-        clip_x_high = self.align_frames.intersection_shape[1][1] - 1.01
+        clip_x_high = self.frames.shape[1] - 1.01
         pixel_map_x[y_low:y_high, x_low:x_high] = np.clip(pixel_map_x[y_low:y_high, x_low:x_high],
                                                        clip_x_low, clip_x_high)
 

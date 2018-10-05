@@ -39,4 +39,4 @@ class Configuration(object):
         self.quality_area_number_x = 6
         self.quality_area_pixel_stride = 2
         self.quality_area_frame_percent = 10.
-        self.stacking_own_remap_method = False
+        self.stacking_own_remap_method = True
