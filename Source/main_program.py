@@ -52,8 +52,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        file = 'short_video'
-        # file = 'Moon_Tile-024_043939'
+        # file = 'short_video'
+        file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     # Read the frames.
     my_timer.create('Read all frames')
     try:
-        frames = Frames(names, type=type, convert_to_grayscale=False)
+        frames = Frames(names, type=type, convert_to_grayscale=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
@@ -141,7 +141,7 @@ if __name__ == "__main__":
     # out the image.
     reference_frame_with_alignment_points = alignment_points.show_alignment_box_types()
     frames.save_image('Images/reference_frame_with_alignment_points.jpg',
-                      reference_frame_with_alignment_points)
+                      reference_frame_with_alignment_points, color=True)
 
     # Create a regular grid of quality areas. The fractional sizes of the areas in x and y,
     # as compared to the full frame, are specified in the configuration object.
