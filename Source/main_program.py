@@ -52,8 +52,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        # file = 'short_video'
-        file = 'Moon_Tile-024_043939'
+        file = 'short_video'
+        # file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     # Read the frames.
     my_timer.create('Read all frames')
     try:
-        frames = Frames(names, type=type, convert_to_grayscale=True)
+        frames = Frames(names, type=type, convert_to_grayscale=False)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
@@ -137,6 +137,12 @@ if __name__ == "__main__":
     my_timer.stop('Select alignment points')
     print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
 
+    # Insert color-coded crosses at alignment box locations in the reference frame and write
+    # out the image.
+    reference_frame_with_alignment_points = alignment_points.show_alignment_box_types()
+    frames.save_image('Images/reference_frame_with_alignment_points.jpg',
+                      reference_frame_with_alignment_points)
+
     # Create a regular grid of quality areas. The fractional sizes of the areas in x and y,
     # as compared to the full frame, are specified in the configuration object.
     my_timer.create('Create quality areas and rank frames')
@@ -159,7 +165,7 @@ if __name__ == "__main__":
 
     # Save the stacked image as 16bit int (color or mono).
     my_timer.create('Save Image')
-    frames.save_image('Images/' + file + '_stacked.tiff', result)
+    frames.save_image('Images/' + file + '_stacked.tiff', result, color=frames.color)
     my_timer.stop('Save Image')
     my_timer.stop('Execution over all')
 

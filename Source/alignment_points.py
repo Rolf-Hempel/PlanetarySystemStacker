@@ -696,6 +696,40 @@ class AlignmentPoints(object):
 
         self.ap_mask[:, :] = False
 
+    def show_alignment_box_types(self):
+        """
+        Create an RGB version of the reference frame and insert color-coded crosses at all alignment
+        box locations. Color codes are:
+        - Red: alignment point
+        - green: alignment point neighbor
+        - white: boundary point
+        - blue: point in structureless area
+
+        :return: RGB image with color-coded alignment boxes.
+        """
+
+        # Expand the monochrome reference frame to RGB
+        reference_frame_with_alignment_points = stack(
+            (self.align_frames.mean_frame.astype(uint16),) * 3, -1)
+
+        # For all alignment box insert a color-coded cross.
+        cross_half_len = 5
+        for alignment_box_row in (self.alignment_boxes):
+            for alignment_box in (alignment_box_row):
+                y_center = alignment_box['coordinates'][2]
+                x_center = alignment_box['coordinates'][3]
+                if alignment_box['type'] == 'alignment point':
+                    color_cross = 'red'
+                elif alignment_box['type'] == 'alignment point neighbor':
+                    color_cross = 'green'
+                elif alignment_box['type'] == 'boundary point':
+                    color_cross = 'white'
+                else:
+                    color_cross = 'blue'
+                Miscellaneous.insert_cross(reference_frame_with_alignment_points, y_center,
+                                           x_center, cross_half_len, color_cross)
+        return reference_frame_with_alignment_points
+
 
 if __name__ == "__main__":
     # Images can either be extracted from a video file or a batch of single photographs. Select

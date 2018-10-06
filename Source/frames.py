@@ -22,6 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import glob
 
+from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 from PIL import ImageChops, Image
@@ -66,7 +67,8 @@ class Frames(object):
                     raise ShapeError("Mixing grayscale and color images not supported")
 
         elif type == 'video':
-            # In case "video", use OpenCV to capture frames from video file.
+            # In case "video", use OpenCV to capture frames from video file. Revert the implicit
+            # conversion from RGB to BGR in OpenCV input.
             cap = cv2.VideoCapture(names)
             self.number = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.frames = []
@@ -76,7 +78,7 @@ class Frames(object):
                     if convert_to_grayscale:
                         self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
                     else:
-                        self.frames.append(frame)
+                        self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 else:
                     raise IOError("Error in reading video frame")
             cap.release()
@@ -150,16 +152,43 @@ class Frames(object):
         im2_offset = ImageChops.offset(pil_image, xoffset=shift_x, yoffset=shift_y)
         self.frames[index] = array(im2_offset)
 
-    def save_image(self, filename, image):
+    def save_image(self, filename, image, color=False):
         """
         Save an image to a file.
 
         :param filename: Name of the file where the image is to be written
         :param image: ndarray object containing the image data
+        :param color: If True, a three channel RGB image is to be saved. Otherwise, monochrome.
         :return: -
         """
 
-        cv2.imwrite(filename, image)
+        # If a file or directory with the given name already exists, append the word "_file".
+        if Path(filename).is_dir():
+            while True:
+                filename += '_file'
+                if not Path(filename).exists():
+                    break
+            filename += '.jpg'
+        # If it is a file, try to append "_copy.tiff" to its basename. If it still exists, repeat.
+        elif Path(filename).is_file():
+            suffix = Path(filename).suffix
+            while True:
+                p = Path(filename)
+                filename = Path.joinpath(p.parents[0], p.stem + '_copy' + suffix)
+                if not Path(filename).exists():
+                    break
+        else:
+            # If the file name is new and has no suffix, add ".tiff".
+            suffix = Path(filename).suffix
+            if not suffix:
+                filename += '.tiff'
+
+        # Write the image to the file. Before writing, convert the internal RGB representation into
+        # the BGR representation assumed by OpenCV.
+        if color:
+            cv2.imwrite(str(filename), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+        else:
+            cv2.imwrite(str(filename), image)
 
 
 if __name__ == "__main__":
