@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import glob
+from math import ceil
 
 import matplotlib.pyplot as plt
 from numpy import empty, mean, arange
@@ -92,7 +93,7 @@ class AlignFrames(object):
                     self.frames_mono[self.frame_ranks_max_index][y_low:y_high, x_low:x_high])
                 if new_quality > quality:
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
-                    x_low, x_high, y_low, y_high)
+                        x_low, x_high, y_low, y_high)
                     quality = new_quality
         return (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt)
 
@@ -135,7 +136,7 @@ class AlignFrames(object):
         # [x_low, x_high]]
         self.intersection_shape = [[max(b[0] for b in self.frame_shifts),
                                     min(b[0] for b in self.frame_shifts) + self.shape[0]],
-                                    [max(b[1] for b in self.frame_shifts),
+                                   [max(b[1] for b in self.frame_shifts),
                                     min(b[1] for b in self.frame_shifts) + self.shape[1]]]
         self.intersection_number_pixels = (self.intersection_shape[0][1] -
                                            self.intersection_shape[0][0]) * \
@@ -167,9 +168,9 @@ class AlignFrames(object):
         # For each frame, cut out the intersection area and copy it to the buffer.
         for idx, frame in enumerate(frames):
             buffer[idx, :, :] = frame[self.intersection_shape[0][0] - shifts[idx][0]:
-                                        self.intersection_shape[0][1] - shifts[idx][0],
-                                  self.intersection_shape[1][0] - shifts[idx][1]:
-                                  self.intersection_shape[1][1] - shifts[idx][1]]
+                                      self.intersection_shape[0][1] - shifts[idx][0],
+                                self.intersection_shape[1][0] - shifts[idx][1]:
+                                self.intersection_shape[1][1] - shifts[idx][1]]
         # Compute the mean frame by averaging over the first index.
         self.mean_frame = mean(buffer, axis=0)
         return self.mean_frame
@@ -184,7 +185,9 @@ if __name__ == "__main__":
             'Images/2012*.tif')  # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')  # names
         #  = glob.glob('Images/Example-3*.jpg')
     else:
-        names = 'Videos/short_video.avi'
+        # file = 'short_video'
+        file = 'Moon_Tile-024_043939'
+        names = 'Videos/' + file + '.avi'
     print(names)
 
     # Get configuration parameters.
@@ -225,6 +228,13 @@ if __name__ == "__main__":
     print("Intersection: " + str(align_frames.intersection_shape))
 
     # Compute the reference frame by averaging the best frames.
-    average = align_frames.average_frame(align_frames.frames_mono, align_frames.frame_shifts)
+    average_frame_number = max(
+        ceil(frames.number * configuration.average_frame_percent / 100.), 1)
+    average = align_frames.average_frame([frames.frames_mono[i] for i in
+                                          rank_frames.quality_sorted_indices[
+                                          :average_frame_number]],
+                                         [align_frames.frame_shifts[i] for i in
+                                          rank_frames.quality_sorted_indices[
+                                          :average_frame_number]])
     plt.imshow(average, cmap='Greys_r')
     plt.show()
