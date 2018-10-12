@@ -21,7 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import glob
-from time import time
+import os
 
 import matplotlib.pyplot as plt
 from skimage import img_as_ubyte
@@ -52,8 +52,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        # file = 'short_video'
-        file = 'Moon_Tile-024_043939'
+        file = 'short_video'
+        # file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     # Read the frames.
     my_timer.create('Read all frames')
     try:
-        frames = Frames(names, type=type, convert_to_grayscale=True)
+        frames = Frames(names, type=type, convert_to_grayscale=False)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
@@ -139,7 +139,7 @@ if __name__ == "__main__":
 
     # Insert color-coded crosses at alignment box locations in the reference frame and write
     # out the image.
-    reference_frame_with_alignment_points = alignment_points.show_alignment_box_types()
+    reference_frame_with_alignment_points = alignment_points.show_alignment_box_types(align_frames.mean_frame)
     frames.save_image('Images/reference_frame_with_alignment_points.jpg',
                       reference_frame_with_alignment_points, color=True)
 
@@ -161,7 +161,11 @@ if __name__ == "__main__":
                                my_timer)
 
     # Stack all frames.
-    result = stack_frames.stack_frames()
+    output_stacking_buffer = True
+    if output_stacking_buffer:
+        for file in os.listdir('QA_videos'):
+            os.unlink('QA_videos/' + file)
+    result = stack_frames.stack_frames(output_stacking_buffer=output_stacking_buffer)
 
     # Save the stacked image as 16bit int (color or mono).
     my_timer.create('Save Image')

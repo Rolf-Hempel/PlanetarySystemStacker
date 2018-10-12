@@ -134,6 +134,10 @@ class QualityAreas(object):
                 quality_area['interpolation_points'] = vector_field.reshape(
                     (y_high - y_low) * (x_high - x_low), 2)
 
+                # Initialize a counter used in stacking. It counts the contributions to this
+                # quality area while looping over the video frames.
+                quality_area['stacking_buffer_counter'] = 0
+
                 quality_area_row.append(quality_area)
             self.quality_areas.append(quality_area_row)
 

@@ -26,6 +26,7 @@ from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 from PIL import ImageChops, Image
+from skimage import img_as_ubyte
 from numpy import array, dot
 from scipy import misc
 
@@ -189,6 +190,35 @@ class Frames(object):
             cv2.imwrite(str(filename), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
         else:
             cv2.imwrite(str(filename), image)
+
+    def write_video(self, name, buffer, y_low, y_high, x_low, x_high, fps):
+        """
+        For each quality area write a video with all frame contributions, annotated with color-coded
+        crosses at alignment box locations.
+
+        :param name: File name of the video output
+        :param buffer: Buffer with frame contributions (size is frame intersection)
+        :param y_low: Lower y index bound of quality area in buffer
+        :param y_high: Upper y index bound of quality area in buffer
+        :param x_low: Lower x index bound of quality area in buffer
+        :param x_high: Upper x index bound of quality area in buffer
+        :param fps: Frames per second of video
+        :return: -
+        """
+
+        # Compute video frame size.
+        frame_height = y_high - y_low
+        frame_width = x_high - x_low
+
+        # Define the codec and create VideoWriter object
+        fourcc = cv2.VideoWriter_fourcc('D', 'I', 'V', 'X')
+        out = cv2.VideoWriter(name, fourcc, fps, (frame_width, frame_height))
+
+        # For each frame in the buffer: cut out quality area and convert to BGR (to adapt to
+        # OpenCV color scheme).
+        for frame in buffer:
+            out.write(cv2.cvtColor(frame[y_low:y_high, x_low:x_high, :], cv2.COLOR_RGB2BGR))
+        out.release()
 
 
 if __name__ == "__main__":

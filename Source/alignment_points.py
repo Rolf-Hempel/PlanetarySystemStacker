@@ -25,7 +25,7 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint16, array, matmul, \
+from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint8, uint16, array, matmul, \
     square, sqrt
 from numpy.linalg import solve
 from skimage.feature import register_translation
@@ -696,21 +696,23 @@ class AlignmentPoints(object):
 
         self.ap_mask[:, :] = False
 
-    def show_alignment_box_types(self):
+    def show_alignment_box_types(self, image):
         """
-        Create an RGB version of the reference frame and insert color-coded crosses at all alignment
-        box locations. Color codes are:
+        Create an RGB version of a monochrome image and insert color-coded crosses at all alignment
+        box locations. If the image is RGB, use it as is. Color codes are:
         - Red: alignment point
         - green: alignment point neighbor
         - white: boundary point
         - blue: point in structureless area
 
-        :return: RGB image with color-coded alignment boxes.
+        :return: 8-bit RGB image with color-coded alignment boxes.
         """
 
-        # Expand the monochrome reference frame to RGB
-        reference_frame_with_alignment_points = stack(
-            (self.align_frames.mean_frame.astype(uint16),) * 3, -1)
+        if len(image.shape) == 3:
+            color_image = image.astype(uint8)
+        else:
+            # Expand the monochrome reference frame to RGB
+            color_image = stack((image.astype(uint8),) * 3, -1)
 
         # For all alignment box insert a color-coded cross.
         cross_half_len = 5
@@ -726,9 +728,9 @@ class AlignmentPoints(object):
                     color_cross = 'white'
                 else:
                     color_cross = 'blue'
-                Miscellaneous.insert_cross(reference_frame_with_alignment_points, y_center,
+                Miscellaneous.insert_cross(color_image, y_center,
                                            x_center, cross_half_len, color_cross)
-        return reference_frame_with_alignment_points
+        return color_image
 
 
 if __name__ == "__main__":

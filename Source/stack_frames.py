@@ -26,7 +26,6 @@ from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-# from numpy import float32, int16, int32, empty, zeros, meshgrid, clip
 from scipy.interpolate import RegularGridInterpolator
 from skimage import img_as_uint, img_as_ubyte
 
@@ -87,10 +86,10 @@ class StackFrames(object):
         # The arrays for the stacked image and the intermediate buffer need to accommodate three
         # color channels in the case of color images.
         if self.frames.color:
-            self.stacked_image_buffer = np.empty([dim_y, dim_x, 3], dtype=np.float32)
+            self.stacked_image_buffer = np.empty([self.stack_size, dim_y, dim_x, 3], dtype=np.float32)
             self.stacked_image = np.empty([dim_y, dim_x, 3], dtype=np.int16)
         else:
-            self.stacked_image_buffer = np.zeros([dim_y, dim_x], dtype=np.float32)
+            self.stacked_image_buffer = np.zeros([self.stack_size, dim_y, dim_x], dtype=np.float32)
             self.stacked_image = np.zeros([dim_y, dim_x], dtype=np.int16)
 
         # Allocate space for pixel values used in remapping. Subpixel values are split into integer
@@ -208,33 +207,37 @@ class StackFrames(object):
                     quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
                 self.my_timer.stop('Stacking: AP interpolation')
 
+                # Look up and increment the stacking buffer counter for this quality area.
+                buffer_counter = quality_area['stacking_buffer_counter']
+                quality_area['stacking_buffer_counter'] += 1
+
                 # There are two variants for remapping: An own (slow) implementation with
                 # sub-pixel accuracy, and the less accurate (but fast) OpenCV method.
                 self.my_timer.start('Stacking: remapping and adding')
                 if self.configuration.stacking_own_remap_method:
-                    # De-warp the quality area window and add the result to the summation buffer.
+                    # De-warp the quality area window and store the result in the stacking buffer.
                     self.remap(self.frames.frames[frame_index], self.pixel_map_y, self.pixel_map_x,
-                               y_low, y_high, x_low, x_high)
+                               y_low, y_high, x_low, x_high, buffer_counter)
                 else:
                     if self.frames.color:
-                        self.stacked_image_buffer[y_low:y_high, x_low:x_high, :] += remap(
-                            self.frames.frames[frame_index],
+                        self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high, :] =\
+                            remap(self.frames.frames[frame_index],
                             self.pixel_map_x[y_low:y_high, x_low:x_high],
                             self.pixel_map_y[y_low:y_high, x_low:x_high], INTER_LINEAR, None,
                             BORDER_TRANSPARENT)
                     else:
-                        self.stacked_image_buffer[y_low:y_high, x_low:x_high] += remap(
-                            self.frames.frames[frame_index],
+                        self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high] =\
+                            remap(self.frames.frames[frame_index],
                             self.pixel_map_x[y_low:y_high, x_low:x_high],
                             self.pixel_map_y[y_low:y_high, x_low:x_high], INTER_LINEAR, None,
                             BORDER_TRANSPARENT)
                 self.my_timer.stop('Stacking: remapping and adding')
 
-    def remap(self, frame, pixel_map_y, pixel_map_x, y_low, y_high, x_low, x_high):
+    def remap(self, frame, pixel_map_y, pixel_map_x, y_low, y_high, x_low, x_high, buffer_counter):
         """
         This is an alternative routine to the OpenCV.remap. It works directly on the image buffer.
-        Interpolation is linear with sub-pixel accuracy. Execution is slow because the computation
-        is done in a double-nested loop. Stacking is restricted to a (quality) window.
+        Interpolation is linear with sub-pixel accuracy. Stacking is restricted to a (quality)
+        window.
 
         :param frame: frame to be stacked
         :param pixel_map_y: For every pixel this array points to the y location from where the
@@ -245,6 +248,7 @@ class StackFrames(object):
         :param y_high: Upper y index of the quality window on which this method operates
         :param x_low: Lower x index of the quality window on which this method operates
         :param x_high: Upper x index of the quality window on which this method operates
+        :param buffer_counter: Index of the next free stacking buffer for this quality area
         :return: -
         """
 
@@ -258,22 +262,21 @@ class StackFrames(object):
         pixel_map_x[y_low:y_high, x_low:x_high] = np.clip(pixel_map_x[y_low:y_high, x_low:x_high],
                                                        clip_x_low, clip_x_high)
 
+        # Prepare for sub-pixel interpolation. The integer coordinates point to the
+        # upper left corner of the interpolation square. The fractions point to the
+        # location within the square from where the pixel value is to be interpolated.
+        self.pixel_j = pixel_map_y[y_low:y_high, x_low:x_high].astype(np.int32)
+        self.fraction_j = pixel_map_y[y_low:y_high, x_low:x_high] - self.pixel_j
+        self.one_minus_fraction_j = 1. - self.fraction_j
+        self.pixel_i = pixel_map_x[y_low:y_high, x_low:x_high].astype(np.int32)
+        self.fraction_i = pixel_map_x[y_low:y_high, x_low:x_high] - self.pixel_i
+        self.one_minus_fraction_i = 1. - self.fraction_i
+
         # If frames are in color, stack all three color channels using the same mapping.
         if self.frames.color:
-
-            # Prepare for sub-pixel interpolation. The integer coordinates point to the
-            # upper left corner of the interpolation square. The fractions point to the
-            # location within the square from where the pixel value is to be interpolated.
-            self.pixel_j = pixel_map_y[y_low:y_high, x_low:x_high].astype(np.int32)
-            self.fraction_j = pixel_map_y[y_low:y_high, x_low:x_high] - self.pixel_j
-            self.one_minus_fraction_j = 1. - self.fraction_j
-            self.pixel_i = pixel_map_x[y_low:y_high, x_low:x_high].astype(np.int32)
-            self.fraction_i = pixel_map_x[y_low:y_high, x_low:x_high] - self.pixel_i
-            self.one_minus_fraction_i = 1. - self.fraction_i
-
             # Do the interpolation. The weights are computed as the surface areas covered by
             # the four quadrants in the interpolation square.
-            self.stacked_image_buffer[y_low:y_high, x_low:x_high, 0] += \
+            self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high, 0] = \
                 frame[self.pixel_j, self.pixel_i, 0] * \
                 self.one_minus_fraction_j * self.one_minus_fraction_i + \
                 frame[self.pixel_j, self.pixel_i + 1, 0] * \
@@ -281,7 +284,7 @@ class StackFrames(object):
                 frame[self.pixel_j + 1, self.pixel_i, 0] * \
                 self.fraction_j * self.one_minus_fraction_i + \
                 frame[self.pixel_j + 1, self.pixel_i + 1, 0] * self.fraction_j * self.fraction_i
-            self.stacked_image_buffer[y_low:y_high, x_low:x_high, 1] += \
+            self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high, 1] = \
                 frame[self.pixel_j, self.pixel_i, 1] * \
                 self.one_minus_fraction_j * self.one_minus_fraction_i + \
                 frame[self.pixel_j, self.pixel_i + 1, 1] * \
@@ -289,7 +292,7 @@ class StackFrames(object):
                 frame[self.pixel_j + 1, self.pixel_i, 1] * \
                 self.fraction_j * self.one_minus_fraction_i + \
                 frame[self.pixel_j + 1, self.pixel_i + 1, 1] * self.fraction_j * self.fraction_i
-            self.stacked_image_buffer[y_low:y_high, x_low:x_high, 2] += \
+            self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high, 2] = \
                 frame[self.pixel_j, self.pixel_i, 2] * \
                 self.one_minus_fraction_j * self.one_minus_fraction_i + \
                 frame[self.pixel_j, self.pixel_i + 1, 2] * \
@@ -300,13 +303,7 @@ class StackFrames(object):
 
         # The same for monochrome mode.
         else:
-            self.pixel_j = pixel_map_y[y_low:y_high, x_low:x_high].astype(np.int32)
-            self.fraction_j = pixel_map_y[y_low:y_high, x_low:x_high] - self.pixel_j
-            self.one_minus_fraction_j = 1. - self.fraction_j
-            self.pixel_i = pixel_map_x[y_low:y_high, x_low:x_high].astype(np.int32)
-            self.fraction_i = pixel_map_x[y_low:y_high, x_low:x_high] - self.pixel_i
-            self.one_minus_fraction_i = 1. - self.fraction_i
-            self.stacked_image_buffer[y_low:y_high, x_low:x_high] += \
+            self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high] = \
                 frame[self.pixel_j, self.pixel_i] * \
                     self.one_minus_fraction_j * self.one_minus_fraction_i + \
                 frame[self.pixel_j, self.pixel_i + 1] * \
@@ -315,23 +312,42 @@ class StackFrames(object):
                     self.fraction_j * self.one_minus_fraction_i + \
                 frame[self.pixel_j + 1, self.pixel_i + 1] * self.fraction_j * self.fraction_i
 
-    def stack_frames(self):
+    def stack_frames(self, output_stacking_buffer=False):
         """
         Combine the sharp areas of all frames into a single stacked image.
 
         :return: -
         """
 
-        # Add the contributions of all frames to the summation buffer.
+        # Compute the contributions of all frames and store them in the summation buffer.
         for idx, frame in enumerate(self.frames.frames):
             self.add_frame_contribution(idx)
 
-        # Divide the summation buffer by the number of contributing frames per quality area, and
-        # scale entries to the interval [0., 1.].
-        self.stacked_image_buffer /= (self.stack_size*255.)
+        # Accumulate the single frame contributions, divide the summation buffer by the number of
+        # contributing frames per quality area, and scale entries to the interval [0., 1.].
+        # Finally, convert the float image buffer to 16bit int (or 48bit in color mode).
+        self.stacked_image = img_as_uint(np.sum(self.stacked_image_buffer, axis=0) / (
+                self.stack_size * 255.))
 
-        # Convert float image buffer to 16bit int (or 48bit in color mode).
-        self.stacked_image = img_as_uint(self.stacked_image_buffer)
+        # Create a colored uint8 version of stacked image buffers and insert colored crosses at
+        # alignment box locations.
+        annotated_buffers = []
+        for buffer in self.stacked_image_buffer:
+            annotated_buffers.append(self.alignment_points.show_alignment_box_types(buffer))
+
+        # For each quality area create a video with all single frame contributions.
+        if output_stacking_buffer:
+            fps = 2
+            for index_y, quality_area_row in enumerate(self.quality_areas.quality_areas):
+                for index_x, quality_area in enumerate(quality_area_row):
+                    # Extract index bounds in y and x for this quality area. Interpolations and stacking
+                    # are restricted to this index range.
+                    y_low, y_high, x_low, x_high = quality_area['coordinates'][0:4]
+                    self.frames.write_video(
+                        'QA_videos/quality_area_video_(' + str(index_y) + ',' + str(
+                            index_x) + ').avi',
+                        annotated_buffers, y_low, y_high, x_low, x_high, fps)
+
         return self.stacked_image
 
 
