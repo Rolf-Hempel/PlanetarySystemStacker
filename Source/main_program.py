@@ -22,6 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import glob
 import os
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 from skimage import img_as_ubyte
@@ -52,9 +53,9 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        file = 'short_video'
-        # file = 'Moon_Tile-024_043939'
-        names = 'Videos/' + file + '.avi'
+        input_file = 'short_video'
+        # input_file = 'Moon_Tile-024_043939'
+        names = 'Videos/' + input_file + '.avi'
     print(names)
 
     my_timer.create('Execution over all')
@@ -139,7 +140,13 @@ if __name__ == "__main__":
 
     # Insert color-coded crosses at alignment box locations in the reference frame and write
     # out the image.
-    reference_frame_with_alignment_points = alignment_points.show_alignment_box_types(align_frames.mean_frame)
+    output_file = Path('Images/reference_frame_with_alignment_points.jpg')
+    try:
+        output_file.unlink()
+    except:
+        pass
+    reference_frame_with_alignment_points = alignment_points.show_alignment_box_types(
+        align_frames.mean_frame)
     frames.save_image('Images/reference_frame_with_alignment_points.jpg',
                       reference_frame_with_alignment_points, color=True)
 
@@ -169,7 +176,12 @@ if __name__ == "__main__":
 
     # Save the stacked image as 16bit int (color or mono).
     my_timer.create('Save Image')
-    frames.save_image('Images/' + file + '_stacked.tiff', result, color=frames.color)
+    output_file = Path('Images/' + input_file + '_stacked.tiff')
+    try:
+        output_file.unlink()
+    except:
+        pass
+    frames.save_image(output_file, result, color=frames.color)
     my_timer.stop('Save Image')
     my_timer.stop('Execution over all')
 
