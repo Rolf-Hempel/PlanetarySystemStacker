@@ -382,8 +382,11 @@ class AlignmentPoints(object):
                     # The mask is "True": Compute the shift vector.
                     if self.ap_mask[j][i]:
                         self.compute_shift_alignment_point(frame_index, j, i,
-                            alignment_box['coordinates'][4], alignment_box['coordinates'][5],
-                            alignment_box['coordinates'][6], alignment_box['coordinates'][7])
+                                                           alignment_box['coordinates'][4],
+                                                           alignment_box['coordinates'][5],
+                                                           alignment_box['coordinates'][6],
+                                                           alignment_box['coordinates'][7],
+                                                           de_warp=self.configuration.alignment_de_warp)
 
             # Now compute shifts at alignment point neighbors.
             for alignment_box_row in (self.alignment_boxes[1:-1]):
@@ -426,13 +429,15 @@ class AlignmentPoints(object):
 
             # For each alignment point, compute the shift for the given frame index.
             for [j, i, y_center, x_center, y_low, y_high, x_low, x_high] in ap_list:
-                self.compute_shift_alignment_point(frame_index, j, i, y_low, y_high, x_low, x_high)
+                self.compute_shift_alignment_point(frame_index, j, i, y_low, y_high, x_low, x_high,
+                                                   de_warp=self.configuration.alignment_de_warp)
 
             # For each alignment point neighbor, compute the shifts for the given frame index.
             for [j, i, contributing_alignment_points] in ap_neighbor_list:
                 self.compute_shift_neighbor_point(j, i, contributing_alignment_points)
 
-    def compute_shift_alignment_point(self, frame_index, j, i, y_low, y_high, x_low, x_high):
+    def compute_shift_alignment_point(self, frame_index, j, i, y_low, y_high, x_low, x_high,
+                                      de_warp=True):
         """
         Compute the pixel shift vector at a given alignment point. The resulting shifts in y and x
         direction are assigned to the corresponding entries in arrays self.y_shifts and
@@ -445,6 +450,8 @@ class AlignmentPoints(object):
         :param y_high: Upper y pixel index bound of alignment box
         :param x_low: Lower x pixel index bound of alignment box
         :param x_high: Upper x pixel index bound of alignment box
+        :param de_warp: If True, individual shifts are measured for alignment points.
+                        If False, only a constant frame translation is applied before stacking.
         :return: -
         """
 
@@ -456,36 +463,41 @@ class AlignmentPoints(object):
         dx = self.align_frames.intersection_shape[1][0] - \
              self.align_frames.frame_shifts[frame_index][1]
 
-        # Cut out the alignment box from the given frame. Take into account the offsets
-        # explained above.
-        box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy,
-                       x_low + dx:x_high + dx]
+        if de_warp:
+            # Cut out the alignment box from the given frame. Take into account the offsets
+            # explained above.
+            box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy,
+                           x_low + dx:x_high + dx]
 
-        # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
-        if self.configuration.alignment_point_method == 'Subpixel':
-            shift_pixel, error, diffphase = register_translation(
-                self.alignment_boxes[j][i]['box'], box_in_frame, 10, space='real')
+            # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
+            if self.configuration.alignment_point_method == 'Subpixel':
+                shift_pixel, error, diffphase = register_translation(
+                    self.alignment_boxes[j][i]['box'], box_in_frame, 10, space='real')
 
-        # Use a simple phase shift computation (contained in module "miscellaneous").
-        elif self.configuration.alignment_point_method == 'CrossCorrelation':
-            shift_pixel = Miscellaneous.translation(self.alignment_boxes[j][i]['box'],
-                                                    box_in_frame, box_in_frame.shape)
+            # Use a simple phase shift computation (contained in module "miscellaneous").
+            elif self.configuration.alignment_point_method == 'CrossCorrelation':
+                shift_pixel = Miscellaneous.translation(self.alignment_boxes[j][i]['box'],
+                                                        box_in_frame, box_in_frame.shape)
 
-        # Use a local search (see method "search_local_match" below.
-        elif self.configuration.alignment_point_method == 'LocalSearch':
-            shift_pixel = self.search_local_match(self.alignment_boxes[j][i]['box'],
-                                                  self.frames.frames_mono[frame_index],
-                                                  y_low + dy, y_high + dy, x_low + dx,
-                                                  x_high + dx,
-                                                  self.configuration.alignment_point_search_width,
-                                                  sub_pixel=self.configuration.alignment_sub_pixel)
+            # Use a local search (see method "search_local_match" below.
+            elif self.configuration.alignment_point_method == 'LocalSearch':
+                shift_pixel = self.search_local_match(self.alignment_boxes[j][i]['box'],
+                                                      self.frames.frames_mono[frame_index],
+                                                      y_low + dy, y_high + dy, x_low + dx,
+                                                      x_high + dx,
+                                                      self.configuration.alignment_point_search_width,
+                                                      sub_pixel=self.configuration.alignment_sub_pixel)
+            else:
+                raise NotSupportedError("The point shift computation method " +
+                                        self.configuration.alignment_point_method + " is not implemented")
+
+            # Copy pixel shift values into the shift arrays.
+            self.y_shifts[j][i] = shift_pixel[0]
+            self.x_shifts[j][i] = shift_pixel[1]
         else:
-            raise NotSupportedError("The point shift computation method " +
-                                    self.configuration.alignment_point_method + " is not implemented")
-
-        # Copy pixel shift values into the shift arrays.
-        self.y_shifts[j][i] = shift_pixel[0]
-        self.x_shifts[j][i] = shift_pixel[1]
+            # If no de-warping is computed, just apply the constant translation.
+            self.y_shifts[j][i] = dy
+            self.x_shifts[j][i] = dx
 
     def compute_shift_neighbor_point(self, j, i, contributing_alignment_points):
         """
