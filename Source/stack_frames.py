@@ -329,14 +329,15 @@ class StackFrames(object):
         self.stacked_image = img_as_uint(np.sum(self.stacked_image_buffer, axis=0) / (
                 self.stack_size * 255.))
 
-        # Create a colored uint8 version of stacked image buffers and insert colored crosses at
-        # alignment box locations.
-        annotated_buffers = []
-        for buffer in self.stacked_image_buffer:
-            annotated_buffers.append(self.alignment_points.show_alignment_box_types(buffer))
-
         # For each quality area create a video with all single frame contributions.
         if output_stacking_buffer:
+            self.my_timer.create('Stacking: QA video output')
+            # Create a colored uint8 version of stacked image buffers and insert colored crosses at
+            # alignment box locations.
+            annotated_buffers = []
+            for buffer in self.stacked_image_buffer:
+                annotated_buffers.append(self.alignment_points.show_alignment_box_types(buffer))
+
             fps = 2
             for index_y, quality_area_row in enumerate(self.quality_areas.quality_areas):
                 for index_x, quality_area in enumerate(quality_area_row):
@@ -347,6 +348,7 @@ class StackFrames(object):
                         'QA_videos/quality_area_video_(' + str(index_y) + ',' + str(
                             index_x) + ').avi',
                         annotated_buffers, y_low, y_high, x_low, x_high, fps)
+            self.my_timer.stop('Stacking: QA video output')
 
         return self.stacked_image
 

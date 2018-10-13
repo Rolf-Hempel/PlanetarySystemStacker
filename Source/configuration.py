@@ -28,8 +28,8 @@ class Configuration(object):
         self.average_frame_percent = 5.
         self.alignment_de_warp= True
         self.alignment_sub_pixel = True
-        self.alignment_box_step_size = 15
-        self.alignment_box_size = 40
+        self.alignment_box_step_size = 50
+        self.alignment_box_size = 60
         self.alignment_box_max_neighbor_distance = 1
         self.alignment_point_structure_threshold = 0.1
         self.alignment_point_brightness_threshold = 10
@@ -40,4 +40,4 @@ class Configuration(object):
         self.quality_area_number_x = 6
         self.quality_area_pixel_stride = 2
         self.quality_area_frame_percent = 10.
-        self.stacking_own_remap_method = False
+        self.stacking_own_remap_method = True
