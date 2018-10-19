@@ -137,11 +137,9 @@ def read_header(ser_file):
     with open(ser_file, 'rb') as fid:
         content = fid.read(178)
 
-    header = dict(zip(KEYS, struct.unpack('<14s 7i 40s 40s 40s 2q', content)))
-
-    for key, value in header.items():
-        if isinstance(value, bytes):
-            header[key] = value.decode('latin-1')
+    header = {key: value.decode('latin-1') if isinstance(value, bytes) else
+              value for key, value in zip(KEYS, struct.unpack(
+                      '<14s 7i 40s 40s 40s 2q', content))}
 
     header['ColorID_Decoded'] = ColorID[header['ColorID']]
 
@@ -237,13 +235,11 @@ def read_trailer(ser_file, header=None):
         content = fid.read()
 
     if content:
-        trailer = [datetime.datetime(1, 1, 1) + datetime.timedelta(
+        return [datetime.datetime(1, 1, 1) + datetime.timedelta(
             microseconds=value // 10) for value in
             struct.unpack('<{0}Q'.format(header['FrameCount']), content)]
     else:
-        trailer = None
-
-    return trailer
+        return None
 
 
 if __name__ == "__main__":
