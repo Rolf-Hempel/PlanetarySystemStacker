@@ -150,7 +150,7 @@ def read_header(ser_file):
     else:
         header['NumberOfPlanes'] = 3
 
-    if header['PixelDepthPerPlane'] < 9:
+    if header['PixelDepthPerPlane'] <= 8:
         header['BytesPerPixel'] = header['NumberOfPlanes']
         if header['ColorID'] < 100:
             header['PixelDataOrganization'] = 'M'
@@ -194,7 +194,7 @@ def read_image_data(ser_file, header=None):
     if header is None:
         header = read_header(ser_file)
 
-    if header['PixelDepthPerPlane'] < 9:
+    if header['PixelDepthPerPlane'] <= 8:
         PixelDepthPerPlane = np.uint8
     else:
         PixelDepthPerPlane = np.uint16
