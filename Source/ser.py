@@ -195,7 +195,11 @@ def read_image_data(ser_file, header=None):
     if header['PixelDepthPerPlane'] <= 8:
         PixelDepthPerPlane = np.uint8
     else:
-        PixelDepthPerPlane = np.uint16
+        # In my case this is opposite to SER format description version 3
+        if not header['LittleEndian']:
+            PixelDepthPerPlane = np.dtype(np.uint16).newbyteorder('<')
+        else:
+            PixelDepthPerPlane = np.dtype(np.uint16).newbyteorder('>')
 
     AMOUNT = header['FrameCount'] * header['ImageWidth'] * \
         header['ImageHeight'] * header['BytesPerPixel']
@@ -247,9 +251,12 @@ if __name__ == "__main__":
     import matplotlib.pyplot as plt
     import ser
 
-    FILE = r'Videos\Ser_8bit_mono.ser'
+    #FILE = r'Videos\Ser_8bit_mono.ser'
+    FILE = r'Videos\SER_16bit_MONO.ser'
 
     iErr, header, image_data, trailer = ser.load(FILE)
 
     if iErr == 0:
+        for key, value in header.items():
+            print(key, value)
         plt.imshow(image_data[1,:,:], cmap='gray')
