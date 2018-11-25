@@ -159,11 +159,19 @@ class StackFrames(object):
 
                 if self.configuration.stacking_use_optical_flow:
                     self.my_timer.start('Stacking: compute optical flow')
+                    y_low_overlap = max(y_low - self.configuration.stacking_optical_flow_overlap, 0)
+                    y_high_overlap = min(y_high + self.configuration.stacking_optical_flow_overlap,
+                                         self.align_frames.mean_frame.shape[0])
+                    x_low_overlap = max(x_low - self.configuration.stacking_optical_flow_overlap, 0)
+                    x_high_overlap = min(x_high + self.configuration.stacking_optical_flow_overlap,
+                                         self.align_frames.mean_frame.shape[1])
                     if self.configuration.use_gaussian_filter:
                         flow = calcOpticalFlowFarneback(
-                                        self.align_frames.mean_frame[y_low:y_high, x_low:x_high],
+                                        self.align_frames.mean_frame[y_low_overlap:y_high_overlap,
+                                        x_low_overlap:x_high_overlap],
                                         self.frames.frames_mono[frame_index]
-                                        [y_low + dy:y_high + dy, x_low + dx:x_high + dx],
+                                        [y_low_overlap + dy:y_high_overlap + dy,
+                                        x_low_overlap + dx:x_high_overlap + dx],
                                         flow=None,
                                         pyr_scale=self.configuration.pyramid_scale,
                                         levels=self.configuration.levels,
@@ -174,9 +182,11 @@ class StackFrames(object):
                                         flags=OPTFLOW_FARNEBACK_GAUSSIAN)
                     else:
                         flow = calcOpticalFlowFarneback(
-                                        self.align_frames.mean_frame[y_low:y_high, x_low:x_high],
+                                        self.align_frames.mean_frame[y_low_overlap:y_high_overlap,
+                                        x_low_overlap:x_high_overlap],
                                         self.frames.frames_mono[frame_index]
-                                        [y_low + dy:y_high + dy, x_low + dx:x_high + dx],
+                                        [y_low_overlap + dy:y_high_overlap + dy,
+                                        x_low_overlap + dx:x_high_overlap + dx],
                                         flow=None,
                                         pyr_scale=self.configuration.pyramid_scale,
                                         levels=self.configuration.levels,
@@ -185,8 +195,14 @@ class StackFrames(object):
                                         poly_n=self.configuration.poly_n,
                                         poly_sigma=self.configuration.poly_sigma, flags=0)
 
-                    self.pixel_map_x[y_low:y_high, x_low:x_high] = flow[:, :, 0]
-                    self.pixel_map_y[y_low:y_high, x_low:x_high] = flow[:, :, 1]
+                    self.pixel_map_x[y_low:y_high, x_low:x_high] = flow[
+                                               y_low - y_low_overlap:y_high - y_low_overlap,
+                                               x_low - x_low_overlap:x_high - x_low_overlap,
+                                               0]
+                    self.pixel_map_y[y_low:y_high, x_low:x_high] = flow[
+                                               y_low - y_low_overlap:y_high - y_low_overlap,
+                                               x_low - x_low_overlap:x_high - x_low_overlap,
+                                               1]
                     # The flow field so far contains the displacements only. The remap function
                     # requires absolute pixel coordinates. Therefore, add the (y, x) pixel
                     # coordinates to each point of the flow field.

@@ -44,17 +44,23 @@ class Configuration(object):
 
         # Parameters used for optical flow:
         self.stacking_use_optical_flow = True
+
+        self.stacking_optical_flow_overlap = 10
+
         # Image scale (<1) to build pyramids for each image; pyr_scale=0.5 means a classical
         # pyramid, where each next layer is half as large as the previous one.
         self.pyramid_scale = 0.5  # between 0.1 and 0.9
         # Number of pyramid layers including the initial image; levels=1 means that no extra layers
         # are created and only the original images are used.
-        self.levels = 3  # between 1 and 10
+        self.levels = 1  # between 1 and 10
         # Averaging window size; larger values increase the algorithm robustness to image noise and
         # give more chances for fast motion detection, but yield more blurred motion field.
-        self.winsize = 25  # between 5 and 40
+        self.winsize = 15  # between 5 and 40
+        # If optical flow is used, the flow field must be computed on a slightly larger area than
+        # the quality areas to avoid artifacts on quality area boundaries.
+        self.stacking_optical_flow_overlap = self.winsize
         # Number of iterations the algorithm does at each pyramid level.
-        self.iterations = 3  # between 1 and 10
+        self.iterations = 1  # between 1 and 10
         # Size of the pixel neighborhood used to find polynomial expansion in each pixel; larger
         # values mean that the image will be approximated with smoother surfaces, yielding more
         # robust algorithm and a more blurred motion field, typically poly_n =5 or 7.
@@ -67,4 +73,4 @@ class Configuration(object):
         # of the same size for optical flow estimation; usually, this option gives a more accurate
         # flow than with a box filter, at the cost of lower speed; normally, winsize for a Gaussian
         # window should be set to a larger value to achieve the same level of robustness.
-        self.use_gaussian_filter = False  # either True or False
+        self.use_gaussian_filter = True  # either True or False
