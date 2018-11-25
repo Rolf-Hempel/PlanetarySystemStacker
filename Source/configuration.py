@@ -58,7 +58,7 @@ class Configuration(object):
         self.winsize = 15  # between 5 and 40
         # If optical flow is used, the flow field must be computed on a slightly larger area than
         # the quality areas to avoid artifacts on quality area boundaries.
-        self.stacking_optical_flow_overlap = self.winsize
+        self.stacking_optical_flow_overlap = 10
         # Number of iterations the algorithm does at each pyramid level.
         self.iterations = 1  # between 1 and 10
         # Size of the pixel neighborhood used to find polynomial expansion in each pixel; larger
