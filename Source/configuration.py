@@ -41,3 +41,30 @@ class Configuration(object):
         self.quality_area_pixel_stride = 2
         self.quality_area_frame_percent = 10.
         self.stacking_own_remap_method = True
+
+        # Parameters used for optical flow:
+        self.stacking_use_optical_flow = True
+        # Image scale (<1) to build pyramids for each image; pyr_scale=0.5 means a classical
+        # pyramid, where each next layer is half as large as the previous one.
+        self.pyramid_scale = 0.5  # between 0.1 and 0.9
+        # Number of pyramid layers including the initial image; levels=1 means that no extra layers
+        # are created and only the original images are used.
+        self.levels = 3  # between 1 and 10
+        # Averaging window size; larger values increase the algorithm robustness to image noise and
+        # give more chances for fast motion detection, but yield more blurred motion field.
+        self.winsize = 25  # between 5 and 40
+        # Number of iterations the algorithm does at each pyramid level.
+        self.iterations = 3  # between 1 and 10
+        # Size of the pixel neighborhood used to find polynomial expansion in each pixel; larger
+        # values mean that the image will be approximated with smoother surfaces, yielding more
+        # robust algorithm and a more blurred motion field, typically poly_n =5 or 7.
+        self.poly_n = 5  # between 3 and 10
+        # Standard deviation of the Gaussian that is used to smooth derivatives used as a basis
+        # for the polynomial expansion; for a neighborhood size of 5, you can choose 1.1; for a size
+        # of 7, a good value would be 1.5.
+        self.poly_sigma = 1.1  # between 1. and 2.
+        # Select if the Gaussian winsize * winsize filter should be used instead of a box filter
+        # of the same size for optical flow estimation; usually, this option gives a more accurate
+        # flow than with a box filter, at the cost of lower speed; normally, winsize for a Gaussian
+        # window should be set to a larger value to achieve the same level of robustness.
+        self.use_gaussian_filter = False  # either True or False

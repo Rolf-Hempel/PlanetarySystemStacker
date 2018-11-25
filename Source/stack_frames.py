@@ -21,7 +21,8 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import glob
-from cv2 import remap, INTER_LINEAR, BORDER_TRANSPARENT
+from cv2 import remap, calcOpticalFlowFarneback, INTER_LINEAR, BORDER_TRANSPARENT,\
+    OPTFLOW_FARNEBACK_GAUSSIAN
 from time import time
 
 import matplotlib.pyplot as plt
@@ -69,6 +70,7 @@ class StackFrames(object):
         self.my_timer.create('Stacking: AP initialization')
         self.my_timer.create('Stacking: compute AP shifts')
         self.my_timer.create('Stacking: AP interpolation')
+        self.my_timer.create('Stacking: compute optical flow')
         self.my_timer.create('Stacking: remapping and adding')
 
         # Create a mask array which specifies the alignment box locations where shifts are to be
@@ -126,24 +128,25 @@ class StackFrames(object):
 
         # If this frame is used in at least one quality area, prepare mask for shift computation.
         if self.frames.used_quality_areas[frame_index]:
-            self.my_timer.start('Stacking: AP initialization')
-            for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
-                self.alignment_points.ap_mask_set(self.quality_areas.qa_ap_index_y_lows[index_y],
-                                                  self.quality_areas.qa_ap_index_y_highs[index_y],
-                                                  self.quality_areas.qa_ap_index_x_lows[index_x],
-                                                  self.quality_areas.qa_ap_index_x_highs[index_x])
-
             # Compute global offsets of current frame relative to intersection frame.
             dy = self.align_frames.intersection_shape[0][0] - \
                  self.align_frames.frame_shifts[frame_index][0]
             dx = self.align_frames.intersection_shape[1][0] - \
                  self.align_frames.frame_shifts[frame_index][1]
-            self.my_timer.stop('Stacking: AP initialization')
 
-            # Compute the shifts in y and x for all mask locations.
-            self.my_timer.start('Stacking: compute AP shifts')
-            self.alignment_points.compute_alignment_point_shifts(frame_index, use_ap_mask=True)
-            self.my_timer.stop('Stacking: compute AP shifts')
+            if not self.configuration.stacking_use_optical_flow:
+                self.my_timer.start('Stacking: AP initialization')
+                for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
+                    self.alignment_points.ap_mask_set(self.quality_areas.qa_ap_index_y_lows[index_y],
+                                                      self.quality_areas.qa_ap_index_y_highs[index_y],
+                                                      self.quality_areas.qa_ap_index_x_lows[index_x],
+                                                      self.quality_areas.qa_ap_index_x_highs[index_x])
+                self.my_timer.stop('Stacking: AP initialization')
+
+                # Compute the shifts in y and x for all mask locations.
+                self.my_timer.start('Stacking: compute AP shifts')
+                self.alignment_points.compute_alignment_point_shifts(frame_index, use_ap_mask=True)
+                self.my_timer.stop('Stacking: compute AP shifts')
 
             # For each quality area used for this frame, compute its contribution to the stacked
             # image. First, interpolate y and x shifts between alignment boxes.
@@ -154,58 +157,96 @@ class StackFrames(object):
                 # are restricted to this index range.
                 y_low, y_high, x_low, x_high = quality_area['coordinates'][0:4]
 
-                # Cut out the 2D window with y shift values for all alignment boxes used by this
-                # quality area. Combine global offsets with local shifts, and add the y coordinates
-                # at the alignment box positions. As the result, "data_y" (and "data_x", below,
-                # respectively) contain the mapping coordinates as required by the OpenCV function
-                # "remap".
+                if self.configuration.stacking_use_optical_flow:
+                    self.my_timer.start('Stacking: compute optical flow')
+                    if self.configuration.use_gaussian_filter:
+                        flow = calcOpticalFlowFarneback(
+                                        self.align_frames.mean_frame[y_low:y_high, x_low:x_high],
+                                        self.frames.frames_mono[frame_index]
+                                        [y_low + dy:y_high + dy, x_low + dx:x_high + dx],
+                                        flow=None,
+                                        pyr_scale=self.configuration.pyramid_scale,
+                                        levels=self.configuration.levels,
+                                        winsize=self.configuration.winsize,
+                                        iterations=self.configuration.iterations,
+                                        poly_n=self.configuration.poly_n,
+                                        poly_sigma=self.configuration.poly_sigma,
+                                        flags=OPTFLOW_FARNEBACK_GAUSSIAN)
+                    else:
+                        flow = calcOpticalFlowFarneback(
+                                        self.align_frames.mean_frame[y_low:y_high, x_low:x_high],
+                                        self.frames.frames_mono[frame_index]
+                                        [y_low + dy:y_high + dy, x_low + dx:x_high + dx],
+                                        flow=None,
+                                        pyr_scale=self.configuration.pyramid_scale,
+                                        levels=self.configuration.levels,
+                                        winsize=self.configuration.winsize,
+                                        iterations=self.configuration.iterations,
+                                        poly_n=self.configuration.poly_n,
+                                        poly_sigma=self.configuration.poly_sigma, flags=0)
 
-                # Set the y and x coordinates at the alignment box locations within the window.
-                self.my_timer.start('Stacking: AP interpolation')
-                x_coords, y_coords = np.meshgrid(self.alignment_points.x_locations[
-                                              self.quality_areas.qa_ap_index_x_lows[index_x]:
-                                              self.quality_areas.qa_ap_index_x_highs[index_x]],
-                                              self.alignment_points.y_locations[
-                                              self.quality_areas.qa_ap_index_y_lows[index_y]:
-                                              self.quality_areas.qa_ap_index_y_highs[index_y]],
-                                              sparse=True)
+                    self.pixel_map_x[y_low:y_high, x_low:x_high] = flow[:, :, 0]
+                    self.pixel_map_y[y_low:y_high, x_low:x_high] = flow[:, :, 1]
+                    # The flow field so far contains the displacements only. The remap function
+                    # requires absolute pixel coordinates. Therefore, add the (y, x) pixel
+                    # coordinates to each point of the flow field.
+                    self.pixel_map_x[y_low:y_high, x_low:x_high] += np.arange(x_low, x_high) + dx
+                    self.pixel_map_y[y_low:y_high, x_low:x_high] += np.arange(y_low, y_high)[:,
+                                                                    np.newaxis] + dy
+                    self.my_timer.stop('Stacking: compute optical flow')
+                else:
+                    # Cut out the 2D window with y shift values for all alignment boxes used by this
+                    # quality area. Combine global offsets with local shifts, and add the y coordinates
+                    # at the alignment box positions. As the result, "data_y" (and "data_x", below,
+                    # respectively) contain the mapping coordinates as required by the OpenCV function
+                    # "remap".
 
-                # Compute the y mapping coordinates at alignment box positions.
-                data_y = y_coords + dy - self.alignment_points.y_shifts[
-                                         self.quality_areas.qa_ap_index_y_lows[index_y]:
-                                         self.quality_areas.qa_ap_index_y_highs[index_y],
-                                         self.quality_areas.qa_ap_index_x_lows[index_x]:
-                                         self.quality_areas.qa_ap_index_x_highs[index_x]]
+                    # Set the y and x coordinates at the alignment box locations within the window.
+                    self.my_timer.start('Stacking: AP interpolation')
+                    x_coords, y_coords = np.meshgrid(self.alignment_points.x_locations[
+                                                  self.quality_areas.qa_ap_index_x_lows[index_x]:
+                                                  self.quality_areas.qa_ap_index_x_highs[index_x]],
+                                                  self.alignment_points.y_locations[
+                                                  self.quality_areas.qa_ap_index_y_lows[index_y]:
+                                                  self.quality_areas.qa_ap_index_y_highs[index_y]],
+                                                  sparse=True)
 
-                # Build the linear interpolation operator.
-                interpolator_y = RegularGridInterpolator((quality_area['interpolation_coords_y'],
-                                                          quality_area['interpolation_coords_x']),
-                                                         data_y, bounds_error=False,
-                                                         method='linear',
-                                                         fill_value=None)
+                    # Compute the y mapping coordinates at alignment box positions.
+                    data_y = y_coords + dy - self.alignment_points.y_shifts[
+                                             self.quality_areas.qa_ap_index_y_lows[index_y]:
+                                             self.quality_areas.qa_ap_index_y_highs[index_y],
+                                             self.quality_areas.qa_ap_index_x_lows[index_x]:
+                                             self.quality_areas.qa_ap_index_x_highs[index_x]]
 
-                # Interpolate y shifts for all points within the quality area.
-                self.pixel_map_y[y_low:y_high, x_low:x_high] = interpolator_y(
-                    quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
+                    # Build the linear interpolation operator.
+                    interpolator_y = RegularGridInterpolator((quality_area['interpolation_coords_y'],
+                                                              quality_area['interpolation_coords_x']),
+                                                             data_y, bounds_error=False,
+                                                             method='linear',
+                                                             fill_value=None)
 
-                # Do the same for x shifts.
-                data_x = x_coords + dx - self.alignment_points.x_shifts[
-                                         self.quality_areas.qa_ap_index_y_lows[index_y]:
-                                         self.quality_areas.qa_ap_index_y_highs[index_y],
-                                         self.quality_areas.qa_ap_index_x_lows[index_x]:
-                                         self.quality_areas.qa_ap_index_x_highs[index_x]]
+                    # Interpolate y shifts for all points within the quality area.
+                    self.pixel_map_y[y_low:y_high, x_low:x_high] = interpolator_y(
+                        quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
 
-                # Build the linear interpolation operator.
-                interpolator_x = RegularGridInterpolator((quality_area['interpolation_coords_y'],
-                                                          quality_area['interpolation_coords_x']),
-                                                         data_x, bounds_error=False,
-                                                         method='linear',
-                                                         fill_value=None)
+                    # Do the same for x shifts.
+                    data_x = x_coords + dx - self.alignment_points.x_shifts[
+                                             self.quality_areas.qa_ap_index_y_lows[index_y]:
+                                             self.quality_areas.qa_ap_index_y_highs[index_y],
+                                             self.quality_areas.qa_ap_index_x_lows[index_x]:
+                                             self.quality_areas.qa_ap_index_x_highs[index_x]]
 
-                # Interpolate x shifts for all points within the quality area.
-                self.pixel_map_x[y_low:y_high, x_low:x_high] = interpolator_x(
-                    quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
-                self.my_timer.stop('Stacking: AP interpolation')
+                    # Build the linear interpolation operator.
+                    interpolator_x = RegularGridInterpolator((quality_area['interpolation_coords_y'],
+                                                              quality_area['interpolation_coords_x']),
+                                                             data_x, bounds_error=False,
+                                                             method='linear',
+                                                             fill_value=None)
+
+                    # Interpolate x shifts for all points within the quality area.
+                    self.pixel_map_x[y_low:y_high, x_low:x_high] = interpolator_x(
+                        quality_area['interpolation_points']).reshape(y_high - y_low, x_high - x_low)
+                    self.my_timer.stop('Stacking: AP interpolation')
 
                 # Look up and increment the stacking buffer counter for this quality area.
                 buffer_counter = quality_area['stacking_buffer_counter']
@@ -235,7 +276,7 @@ class StackFrames(object):
 
     def remap(self, frame, pixel_map_y, pixel_map_x, y_low, y_high, x_low, x_high, buffer_counter):
         """
-        This is an alternative routine to the OpenCV.remap. It works directly on the image buffer.
+        This is an alternative routine to OpenCV.remap. It works directly on the image buffer.
         Interpolation is linear with sub-pixel accuracy. Stacking is restricted to a (quality)
         window.
 
