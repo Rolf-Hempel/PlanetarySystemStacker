@@ -25,13 +25,11 @@ __author_email__ = 'm.powalko@gmail.com'
 __version__ = '1.0'
 
 import os
+import cv2
 import struct
 import datetime
 import numpy as np
 
-
-# TODO Support of ColorID different than MONO
-# TODO Support of debayer via OpenCV
 
 def load(ser_file):
     '''
@@ -136,11 +134,22 @@ def read_header(ser_file):
     with open(ser_file, 'rb') as fid:
         content = fid.read(178)
 
-    header = {key: value.decode('latin-1') if isinstance(value, bytes) else
+    header = {key: value.decode('latin1') if isinstance(value, bytes) else
               value for key, value in zip(KEYS, struct.unpack(
                       '<14s 7i 40s 40s 40s 2q', content))}
 
-    header['ColorID_Decoded'] = ColorID[header['ColorID']]
+    if header['ColorID'] == 8:
+        header['DebayerPattern'] = cv2.COLOR_BayerRG2BGR
+    elif header['ColorID'] == 9:
+        header['DebayerPattern'] = cv2.COLOR_BayerGR2BGR
+    elif header['ColorID'] == 10:
+        header['DebayerPattern'] = cv2.COLOR_BayerGB2BGR
+    elif header['ColorID'] == 11:
+        header['DebayerPattern'] = cv2.COLOR_BayerBG2BGR
+    else:
+        header['DebayerPattern'] = None
+
+    header['ColorIDDecoded'] = ColorID[header['ColorID']]
 
     if header['ColorID'] < 100:
         header['NumberOfPlanes'] = 1
@@ -173,7 +182,7 @@ def read_header(ser_file):
     if 'fps=' in header['Telescope']:
         header['FPS'] = float(header['Telescope'].split('fps=')[1].split('gain')[0])
         header['Gain'] = int(header['Telescope'].split('gain=')[1].split('exp')[0])
-        header['Exposure [ms]'] = float(header['Telescope'].split('exp=')[1])
+        header['Exposure [ms]'] = float(header['Telescope'].split('exp=')[1].split('\x00')[0])
 
     return header
 
@@ -255,10 +264,16 @@ if __name__ == "__main__":
 
     #FILE = r'Videos\Ser_8bit_mono.ser'
     FILE = r'Videos\SER_16bit_MONO.ser'
+    #FILE = r'C:\Temp\Mars_150414_002445_OSC_F0001-0500.ser'
 
     iErr, header, image_data, trailer = ser.load(FILE)
 
     if iErr == 0:
         for key, value in header.items():
             print(key, value)
-        plt.imshow(image_data[1,:,:], cmap='gray')
+        FRAME_RAW = image_data[1,:,:]
+        if header['DebayerPattern'] is None:
+            plt.imshow(FRAME_RAW, cmap='gray')
+        else:
+            FRAME_COLOR = cv2.cvtColor(FRAME_RAW, header['DebayerPattern'])
+            plt.imshow(FRAME_COLOR)
