@@ -170,6 +170,11 @@ def read_header(ser_file):
     header['DateTime_UTC_Decoded'] = datetime.datetime(1, 1, 1) + \
         datetime.timedelta(microseconds=header['DateTime_UTC'] // 10)
 
+    if 'fps=' in header['Telescope']:
+        header['FPS'] = float(header['Telescope'].split('fps=')[1].split('gain')[0])
+        header['Gain'] = int(header['Telescope'].split('gain=')[1].split('exp')[0])
+        header['Exposure [ms]'] = float(header['Telescope'].split('exp=')[1])
+
     return header
 
 
