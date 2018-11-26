@@ -30,7 +30,6 @@ import datetime
 import numpy as np
 
 
-# TODO Support of 16bit MONO
 # TODO Support of ColorID different than MONO
 # TODO Support of debayer via OpenCV
 
@@ -195,11 +194,9 @@ def read_image_data(ser_file, header=None):
     if header['PixelDepthPerPlane'] <= 8:
         PixelDepthPerPlane = np.uint8
     else:
-        # In my case this is opposite to SER format description version 3
-        if not header['LittleEndian']:
-            PixelDepthPerPlane = np.dtype(np.uint16).newbyteorder('<')
-        else:
-            PixelDepthPerPlane = np.dtype(np.uint16).newbyteorder('>')
+        # FireCapture uses "LittleEndian".
+        # Until FireCatpure 2.7 this flag was not set properly.
+        PixelDepthPerPlane = np.dtype(np.uint16).newbyteorder('<')
 
     AMOUNT = header['FrameCount'] * header['ImageWidth'] * \
         header['ImageHeight'] * header['BytesPerPixel']
