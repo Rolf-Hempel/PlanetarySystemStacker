@@ -760,7 +760,7 @@ if __name__ == "__main__":
     # Get configuration parameters.
     configuration = Configuration()
     try:
-        frames = Frames(names, type=type)
+        frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:

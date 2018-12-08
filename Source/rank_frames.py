@@ -95,13 +95,14 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        names = 'Videos/short_video.avi'
+        # names = 'Videos/short_video.avi'
+        names = 'Videos/Moon_Tile-024_043939.avi'
     print(names)
 
     # Get configuration parameters.
     configuration = Configuration()
     try:
-        frames = Frames(names, type=type)
+        frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
@@ -113,6 +114,10 @@ if __name__ == "__main__":
     start = time()
     rank_frames.frame_score()
     end = time()
-    for index, frame_rank in enumerate(rank_frames.frame_ranks):
-        print("Frame rank for no. " + str(index) + ": " + str(frame_rank))
+    # for rank, index in enumerate(rank_frames.quality_sorted_indices):
+    #     frame_quality = rank_frames.frame_ranks[index]
+    #     print("Rank: " + str(rank) + ", Frame no. " + str(index) + ", quality: " + str(frame_quality))
+    for index, frame_quality in enumerate(rank_frames.frame_ranks):
+        rank = rank_frames.quality_sorted_indices.index(index)
+        print("Frame no. " + str(index) + ", Rank: " + str(rank) + ", quality: " + str(frame_quality))
     print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))

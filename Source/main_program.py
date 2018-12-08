@@ -67,7 +67,7 @@ if __name__ == "__main__":
     # Read the frames.
     my_timer.create('Read all frames')
     try:
-        frames = Frames(names, type=type, convert_to_grayscale=True)
+        frames = Frames(configuration, names, type=type, convert_to_grayscale=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
@@ -169,7 +169,7 @@ if __name__ == "__main__":
                                my_timer)
 
     # Stack all frames.
-    output_stacking_buffer = True
+    output_stacking_buffer = False
     if output_stacking_buffer:
         for file in os.listdir('QA_videos'):
             os.unlink('QA_videos/' + file)

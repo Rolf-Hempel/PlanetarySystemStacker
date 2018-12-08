@@ -31,6 +31,7 @@ from numpy import array, dot
 from scipy import misc
 
 from exceptions import TypeError, ShapeError, ArgumentError
+from configuration import Configuration
 
 
 class Frames(object):
@@ -39,16 +40,19 @@ class Frames(object):
 
     """
 
-    def __init__(self, names, type='video', convert_to_grayscale=False):
+    def __init__(self, configuration, names, type='video', convert_to_grayscale=False):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
 
+        :param configuration: Configuration object with parameters
         :param names: In case "video": name of the video file. In case "image": list of names for
                       all images.
         :param type: Either "video" or "image".
         :param convert_to_grayscale: If "True", convert frames to grayscale if they are RGB.
         """
+
+        self.configuration = configuration
 
         if type == 'image':
             # Use scipy.misc to read in image files. If "convert_to_grayscale" is True, convert
@@ -133,9 +137,18 @@ class Frames(object):
             colors = ['red', 'green', 'blue']
             if not color in colors:
                 raise ArgumentError("Invalid color selected for channel extraction")
-            self.frames_mono = [frame[:, :, colors.index(color)] for frame in self.frames]
+            self.frames_mono = [cv2.GaussianBlur(frame[:, :, colors.index(color)], (
+                self.configuration.alignment_gauss_width, self.configuration.alignment_gauss_width),
+                                                 0) for frame in self.frames]
         else:
-            self.frames_mono = self.frames
+            self.frames_mono = [cv2.GaussianBlur(frame, (
+                self.configuration.alignment_gauss_width, self.configuration.alignment_gauss_width),
+                                                 0) for frame in self.frames]
+
+        # new_mono = []
+        # for frame in self.frames_mono:
+        #     new_mono.append(cv2.GaussianBlur(frame, (3, 3), 0))
+        # self.frames_mono = new_mono
 
     def shift_frame_with_wraparound(self, index, shift_x, shift_y):
         """
@@ -230,8 +243,12 @@ if __name__ == "__main__":
         names = glob.glob('Images/2012_*.tif')
     else:
         names = 'Videos/short_video.avi'
+
+    # Get configuration parameters.
+    configuration = Configuration()
+
     try:
-        frames = Frames(names, type=type, convert_to_grayscale=True)
+        frames = Frames(configuration, names, type=type, convert_to_grayscale=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:

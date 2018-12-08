@@ -27,13 +27,14 @@ class Configuration(object):
         self.alignment_rectangle_scale_factor = 5
         self.average_frame_percent = 5.
         self.alignment_de_warp= True
-        self.alignment_sub_pixel = True
+        self.alignment_sub_pixel = False
         self.alignment_box_step_size = 50
-        self.alignment_box_size = 60
+        self.alignment_box_size = 40
+        self.alignment_gauss_width = 5
         self.alignment_box_max_neighbor_distance = 1
-        self.alignment_point_structure_threshold = 0.1
+        self.alignment_point_structure_threshold = 0.05
         self.alignment_point_brightness_threshold = 10
-        self.alignment_point_contrast_threshold = 15
+        self.alignment_point_contrast_threshold = 5
         self.alignment_point_method = 'LocalSearch'
         self.alignment_point_search_width = 20
         self.quality_area_number_y = 5
@@ -43,9 +44,7 @@ class Configuration(object):
         self.stacking_own_remap_method = True
 
         # Parameters used for optical flow:
-        self.stacking_use_optical_flow = True
-
-        self.stacking_optical_flow_overlap = 10
+        self.stacking_use_optical_flow = False
 
         # Image scale (<1) to build pyramids for each image; pyr_scale=0.5 means a classical
         # pyramid, where each next layer is half as large as the previous one.
@@ -58,7 +57,7 @@ class Configuration(object):
         self.winsize = 15  # between 5 and 40
         # If optical flow is used, the flow field must be computed on a slightly larger area than
         # the quality areas to avoid artifacts on quality area boundaries.
-        self.stacking_optical_flow_overlap = 10
+        self.stacking_optical_flow_overlap = 3
         # Number of iterations the algorithm does at each pyramid level.
         self.iterations = 1  # between 1 and 10
         # Size of the pixel neighborhood used to find polynomial expansion in each pixel; larger
