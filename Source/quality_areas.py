@@ -64,95 +64,177 @@ class QualityAreas(object):
         mean_frame = self.align_frames.mean_frame
         mean_frame_shape = mean_frame.shape
 
-        # Compute the size of the quality areas in y and x directions.
-        self.quality_area_size_y = int(
-            mean_frame_shape[0] / self.configuration.quality_area_number_y)
-        self.quality_area_size_x = int(
-            mean_frame_shape[1] / self.configuration.quality_area_number_x)
-
-        # Compute the pixel coordinate bounds of the quality areas, first in y direction.
-        self.y_lows = arange(0, mean_frame_shape[0] - self.quality_area_size_y + 1,
-                             self.quality_area_size_y)
-        self.y_highs = self.y_lows + self.quality_area_size_y
-
-        # Because in the general case the frame cannot be divided evenly, extend the last patch
-        # to extend up do the frame border.
-        self.y_highs[-1] = mean_frame_shape[0]
-        self.y_dim = len(self.y_lows)
-
-        # Repeat the same for the x pixel coordinate.
-        self.x_lows = arange(0, mean_frame_shape[1] - self.quality_area_size_x + 1,
-                             self.quality_area_size_x)
-        self.x_highs = self.x_lows + self.quality_area_size_x
-        self.x_highs[-1] = mean_frame_shape[1]
-        self.x_dim = len(self.x_lows)
-
-        # Distribute alignment box coordinates among the quality areas in y and x directions.
-        self.qa_ap_index_y_lows, self.qa_ap_index_y_highs = \
-            self.ap_index_bounds(self.y_lows, self.y_highs, self.alignment_points.y_locations)
-        self.qa_ap_index_x_lows, self.qa_ap_index_x_highs = \
-            self.ap_index_bounds(self.x_lows, self.x_highs, self.alignment_points.x_locations)
-
         # Initialize the list of quality areas.
         self.quality_areas = []
 
-        # Cycle through all quality areas, row by row.
-        for index_y, y_low in enumerate(self.y_lows):
-            y_high = self.y_highs[index_y]
-            quality_area_row = []
-            for index_x, x_low in enumerate(self.x_lows):
+        if self.configuration.stacking_rigid_ap_shift:
+            # If rigid stacking is selected, the number of quality areas matches the number of
+            # internal alignment points. Therefore, the quality area numbers specified in the
+            # configuration object are changed to the number of internal alignment points per
+            # coordinate direction.
 
-                # For each quality area, store coordinate bounds and empty lists for alignment
-                # points and frame qualities in a dictionary. The dictionaries are stored in a a 2D
-                # list structure (row-wise).
-                x_high = self.x_highs[index_x]
-                quality_area = {}
-                quality_area['coordinates'] = [y_low, y_high, x_low, x_high]
-                quality_area['alignment_point_indices'] = []
-                quality_area['frame_qualities'] = []
+            self.configuration.quality_area_number_y = len(
+                self.alignment_points.alignment_boxes) - 2
+            self.configuration.quality_area_number_x = len(
+                self.alignment_points.alignment_boxes[0]) - 2
 
-                # Prepare for the interpolation of shift vectors, to be re-used for all frames
-                # in the stacking process. First, create y and x coordinate vectors for alignment
-                # boxes used by the quality area.
-                quality_area['interpolation_coords_y'] = self.alignment_points.y_locations[
-                                                         self.qa_ap_index_y_lows[index_y]:
-                                                         self.qa_ap_index_y_highs[index_y]]
-                quality_area['interpolation_coords_x'] = self.alignment_points.x_locations[
-                                                         self.qa_ap_index_x_lows[index_x]:
-                                                         self.qa_ap_index_x_highs[index_x]]
+            # Compute the lower and upper pixel coordinate bounds for each quality area. Their
+            # boundaries are midway between alignment points.
+            self.y_lows, self.y_highs = self.ap_area_bounds(alignment_points.y_locations,
+                                                            self.align_frames.mean_frame.shape[0])
+            self.y_dim = len(self.y_lows)
+            self.x_lows, self.x_highs = self.ap_area_bounds(alignment_points.x_locations,
+                                                            self.align_frames.mean_frame.shape[1])
+            self.x_dim = len(self.x_lows)
 
-                # For every quality area, create a numpy array which for every point contains a
-                # 2D vector with pixel coordinates. The array is used for interpolating shift
-                # vectors.
-                vector_field = empty((y_high-y_low, x_high-x_low, 2), dtype=float32)
-                for j in range(y_high-y_low):
-                    for i in range(x_high-x_low):
-                        vector_field[j, i, 0] = float(j + y_low)
-                        vector_field[j, i, 1] = float(i + x_low)
+            # Cycle through all quality areas, row by row.
+            for index_y, y_low in enumerate(self.y_lows):
+                y_high = self.y_highs[index_y]
+                quality_area_row = []
+                for index_x, x_low in enumerate(self.x_lows):
+                    # For each quality area, store coordinate bounds and an empty list for frame
+                    # qualities in a dictionary. The dictionaries are stored in a a 2D list
+                    # structure (row-wise).
+                    x_high = self.x_highs[index_x]
+                    quality_area = {}
+                    quality_area['coordinates'] = [y_low, y_high, x_low, x_high]
+                    quality_area['frame_qualities'] = []
 
-                # Reshape the interpolation point field to a linear array of (y,x) vectors.
-                quality_area['interpolation_points'] = vector_field.reshape(
-                    (y_high - y_low) * (x_high - x_low), 2)
+                    # The quality area contains a single alignment box only. If it is an alignment
+                    # point, store its index as a single element list. Otherwise set the list to
+                    # None. In stacking, a shift is computed in the first case, and no shift is
+                    # applied in the second case.
+                    alignment_point_index = \
+                        self.alignment_points.alignment_boxes[index_y + 1][index_x + 1][
+                            'alignment_point_index']
+                    if alignment_point_index is not None:
+                        quality_area['alignment_point_indices'] = [alignment_point_index]
+                    else:
+                        quality_area['alignment_point_indices'] = None
 
-                # Initialize a counter used in stacking. It counts the contributions to this
-                # quality area while looping over the video frames.
-                quality_area['stacking_buffer_counter'] = 0
+                    # Initialize a counter used in stacking. It counts the contributions to this
+                    # quality area while looping over the video frames.
+                    quality_area['stacking_buffer_counter'] = 0
 
-                quality_area_row.append(quality_area)
-            self.quality_areas.append(quality_area_row)
+                    quality_area_row.append(quality_area)
+                self.quality_areas.append(quality_area_row)
+        else:
+            # Compute the size of the quality areas in y and x directions.
+            self.quality_area_size_y = int(
+                mean_frame_shape[0] / self.configuration.quality_area_number_y)
+            self.quality_area_size_x = int(
+                mean_frame_shape[1] / self.configuration.quality_area_number_x)
 
-        # Cycle through all alignment points. For each point append its index to the alignment
-        # point list of the quality area which contains the point.
-        for point_index, [j, i, y_center, x_center, y_low, y_high, x_low, x_high] in enumerate(
-                self.alignment_points.alignment_points):
-            y_index = min(int(y_center / self.quality_area_size_y), self.y_dim - 1)
-            x_index = min(int(x_center / self.quality_area_size_x), self.x_dim - 1)
-            self.quality_areas[y_index][x_index]['alignment_point_indices'].append(point_index)
+            # Compute the pixel coordinate bounds of the quality areas, first in y direction.
+            self.y_lows = arange(0, mean_frame_shape[0] - self.quality_area_size_y + 1,
+                                 self.quality_area_size_y)
+            self.y_highs = self.y_lows + self.quality_area_size_y
+
+            # Because in the general case the frame cannot be divided evenly, extend the last patch
+            # to extend up do the frame border.
+            self.y_highs[-1] = mean_frame_shape[0]
+            self.y_dim = len(self.y_lows)
+
+            # Repeat the same for the x pixel coordinate.
+            self.x_lows = arange(0, mean_frame_shape[1] - self.quality_area_size_x + 1,
+                                 self.quality_area_size_x)
+            self.x_highs = self.x_lows + self.quality_area_size_x
+            self.x_highs[-1] = mean_frame_shape[1]
+            self.x_dim = len(self.x_lows)
+
+            # Distribute alignment box coordinates among the quality areas in y and x directions.
+            self.qa_ap_index_y_lows, self.qa_ap_index_y_highs = \
+                self.ap_index_bounds(self.y_lows, self.y_highs, self.alignment_points.y_locations)
+            self.qa_ap_index_x_lows, self.qa_ap_index_x_highs = \
+                self.ap_index_bounds(self.x_lows, self.x_highs, self.alignment_points.x_locations)
+
+            # Cycle through all quality areas, row by row.
+            for index_y, y_low in enumerate(self.y_lows):
+                y_high = self.y_highs[index_y]
+                quality_area_row = []
+                for index_x, x_low in enumerate(self.x_lows):
+
+                    # For each quality area, store coordinate bounds and empty lists for alignment
+                    # points and frame qualities in a dictionary. The dictionaries are stored in a
+                    # 2D list structure (row-wise).
+                    x_high = self.x_highs[index_x]
+                    quality_area = {}
+                    quality_area['coordinates'] = [y_low, y_high, x_low, x_high]
+                    quality_area['alignment_point_indices'] = []
+                    quality_area['frame_qualities'] = []
+
+                    # Prepare for the interpolation of shift vectors, to be re-used for all frames
+                    # in the stacking process. First, create y and x coordinate vectors for
+                    # alignment boxes used by the quality area.
+                    quality_area['interpolation_coords_y'] = self.alignment_points.y_locations[
+                                                             self.qa_ap_index_y_lows[index_y]:
+                                                             self.qa_ap_index_y_highs[index_y]]
+                    quality_area['interpolation_coords_x'] = self.alignment_points.x_locations[
+                                                             self.qa_ap_index_x_lows[index_x]:
+                                                             self.qa_ap_index_x_highs[index_x]]
+
+                    # For every quality area, create a numpy array which for every point contains a
+                    # 2D vector with pixel coordinates. The array is used for interpolating shift
+                    # vectors.
+                    vector_field = empty((y_high - y_low, x_high - x_low, 2), dtype=float32)
+                    for j in range(y_high - y_low):
+                        for i in range(x_high - x_low):
+                            vector_field[j, i, 0] = float(j + y_low)
+                            vector_field[j, i, 1] = float(i + x_low)
+
+                    # Reshape the interpolation point field to a linear array of (y,x) vectors.
+                    quality_area['interpolation_points'] = vector_field.reshape(
+                        (y_high - y_low) * (x_high - x_low), 2)
+
+                    # Initialize a counter used in stacking. It counts the contributions to this
+                    # quality area while looping over the video frames.
+                    quality_area['stacking_buffer_counter'] = 0
+
+                    quality_area_row.append(quality_area)
+                self.quality_areas.append(quality_area_row)
+
+            # Cycle through all alignment points. For each point append its index to the alignment
+            # point list of the quality area which contains the point.
+            for point_index, [j, i, y_center, x_center, y_low, y_high, x_low, x_high] in enumerate(
+                    self.alignment_points.alignment_points):
+                y_index = min(int(y_center / self.quality_area_size_y), self.y_dim - 1)
+                x_index = min(int(x_center / self.quality_area_size_x), self.x_dim - 1)
+                self.quality_areas[y_index][x_index]['alignment_point_indices'].append(point_index)
+
+    def ap_area_bounds(self, point_locations, frame_bound):
+        """
+        Compute lower and upper bounds for quality areas used in rigid de-warping. In rigid
+        de-warping, each inner alignment point defines a quality area. The quality area
+        around an alignment point extends halfway to each neighboring AP. This method computes the
+        bounds for one coordinate direction.
+
+        Note that the number of quality areas is two less than the number of alignment points in
+        the given coordinate direction.
+
+        :param point_locations: Pixel coordinates of the APs in the given coordinate direction.
+        :param frame_bound: Frame size (in pixels) in the given coordinate direction
+        :return: Two lists (lower_bounds, upper_bounds) with the lower abd upper pixel coordinate
+                 bounds for each quality area in the given coordinate direction.
+        """
+
+        # Treat the special case of the first point which lies on the lower frame edge.
+        ap_area_lower_bounds = [0]
+        ap_area_upper_bounds = []
+
+        # Treat all other points. Note that the index of the upper bounds is one behind.
+        for index in range(2, len(point_locations) - 1):
+            mid_point = int((point_locations[index - 1] + point_locations[index]) / 2.)
+            ap_area_lower_bounds.append(mid_point)
+            ap_area_upper_bounds.append(mid_point)
+
+        # Set the upper bound for the last point to the frame boundary.
+        ap_area_upper_bounds.append(frame_bound)
+        return ap_area_lower_bounds, ap_area_upper_bounds
 
     def ap_index_bounds(self, qa_lows, qa_highs, ap_coordinates):
         """
         Distribute alignment boxes in one coordinate direction (y or x) among the quality area
-        bounds. Treat the special case that the first quality area does not contain an any
+        bounds. Treat the special case that the first quality area does not contain any
         box in this direction. In this case select the first two boxes beyond the quality area,
         to enable linear interpolation into the first quality area. The same is done for the last
         quality area.
@@ -233,7 +315,7 @@ class QualityAreas(object):
         """
 
         # Cycle through all frames. Use the monochrome image for frame ranking.
-        for frame in self.frames.frames_mono:
+        for frame in self.frames.frames_mono_blurred:
             # Cycle through all quality areas:
             for index_y, quality_area_row in enumerate(self.quality_areas):
                 for index_x, quality_area in enumerate(quality_area_row):
@@ -243,7 +325,7 @@ class QualityAreas(object):
                         [y_low, y_high, x_low, x_high] = quality_area['coordinates']
                         quality_area['frame_qualities'].append(
                             Miscellaneous.local_contrast(frame[y_low:y_high, x_low:x_high],
-                                                         self.configuration.quality_area_pixel_stride))
+                                                    self.configuration.quality_area_pixel_stride))
 
         # For quality areas with alignment points, sort the computed quality ranks in descending
         # order.
@@ -321,6 +403,7 @@ class QualityAreas(object):
                         self.frames.used_quality_areas[frame_index].append([index_y, index_x])
                     else:
                         self.frames.used_quality_areas[frame_index] = [[index_y, index_x]]
+
 
 if __name__ == "__main__":
 
@@ -407,7 +490,9 @@ if __name__ == "__main__":
     alignment_points.create_alignment_boxes(step_size, box_size)
     end = time()
     print('Elapsed time in alignment box creation: {}'.format(end - start))
-    print("Number of alignment boxes created: " + str(len(alignment_points.alignment_boxes)))
+    print("Number of alignment boxes created: " + str(
+        len(alignment_points.alignment_boxes)) + " rows, each with " + str(
+        len(alignment_points.alignment_boxes[0])) + " boxes.")
 
     # An alignment box is selected as an alignment point if it satisfies certain conditions
     # regarding local contrast etc.
@@ -425,36 +510,45 @@ if __name__ == "__main__":
     print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
 
     # For all frames: Compute the local shifts for all alignment points (to be used for de-warping).
-    for frame_index in range(frames.number):
-        start = time()
-        alignment_points.compute_alignment_point_shifts(frame_index)
-        end = time()
-        print("Elapsed time in computing point shifts for frame number " + str(
-            frame_index) + ": " + str(end - start))
+    # for frame_index in range(frames.number):
+    #     start = time()
+    #     alignment_points.compute_alignment_point_shifts(frame_index)
+    #     end = time()
+    #     print("Elapsed time in computing point shifts for frame number " + str(
+    #         frame_index) + ": " + str(end - start))
 
     # Create a regular grid of quality areas. The fractional sizes of the areas in x and y,
     # as compared to the full frame, are specified in the configuration object.
     start = time()
     quality_areas = QualityAreas(configuration, frames, align_frames, alignment_points)
 
-    print ("")
-    print ("Distribution of alignment point indices among quality areas in y direction:")
-    for index_y, y_low in enumerate(quality_areas.y_lows):
-        y_high = quality_areas.y_highs[index_y]
-        print ("Lower y pixel: " + str(y_low) + ", upper y pixel index: " + str(y_high) +
-               ", lower ap coordinate: " +
-               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_lows[index_y]]) +
-               ", upper ap coordinate: " +
-               str(alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y]-1]))
-    for index_x, x_low in enumerate(quality_areas.x_lows):
-        x_high = quality_areas.x_highs[index_x]
-        print("Lower x pixel: " + str(x_low) + ", upper x pixel index: " + str(x_high) +
-              ", lower ap coordinate: " +
-              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_lows[index_x]]) +
-              ", upper ap coordinate: " +
-              str(alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x]-1]))
-    print("")
+    lower_bounds, upper_bounds = quality_areas.ap_area_bounds(alignment_points.y_locations,
+                                                              align_frames.mean_frame.shape[0])
+    print("AP y index, AP y coordinate, AP y lower area bound, AP y upper area bound")
+    print(str(lower_bounds))
+    print(str(upper_bounds))
+    for index, location in enumerate(alignment_points.y_locations[1:-1]):
+        print(str(index) + ", AP y:" + str(location) + ", QA low y:" + str(lower_bounds[index]) +
+              ", QA high y:" + str(upper_bounds[index]))
 
+    print("")
+    if not configuration.stacking_rigid_ap_shift:
+        print("Distribution of alignment point indices among quality areas in y direction:")
+        for index_y, y_low in enumerate(quality_areas.y_lows):
+            y_high = quality_areas.y_highs[index_y]
+            print("Lower y pixel: " + str(y_low) + ", upper y pixel index: " + str(y_high) +
+                  ", lower ap coordinate: " +
+                  str(alignment_points.y_locations[quality_areas.qa_ap_index_y_lows[index_y]]) +
+                  ", upper ap coordinate: " +
+                  str(alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y] - 1]))
+        for index_x, x_low in enumerate(quality_areas.x_lows):
+            x_high = quality_areas.x_highs[index_x]
+            print("Lower x pixel: " + str(x_low) + ", upper x pixel index: " + str(x_high) +
+                  ", lower ap coordinate: " +
+                  str(alignment_points.x_locations[quality_areas.qa_ap_index_x_lows[index_x]]) +
+                  ", upper ap coordinate: " +
+                  str(alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x] - 1]))
+        print("")
 
     # For each quality area rank the frames according to the local contrast.
     quality_areas.select_best_frames()
@@ -464,7 +558,6 @@ if __name__ == "__main__":
     end = time()
     print('Elapsed time in quality area creation and frame ranking: {}'.format(end - start))
     print("Number of frames to be stacked for each quality area: " + str(quality_areas.stack_size))
-
 
     alignment_points.ap_mask_initialize()
     alignment_points.ap_mask_set(6, 8, 9, 11)

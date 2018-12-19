@@ -25,8 +25,8 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint8, uint16, array, matmul, \
-    square, sqrt
+from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint8, uint16, array, \
+    matmul
 from numpy.linalg import solve
 from skimage.feature import register_translation
 
@@ -169,7 +169,8 @@ class AlignmentPoints(object):
 
                 # Check if the location is on the boundary. Initialize box dictionary. Most entries
                 # do not make sense for boundary pooints.
-                if j==0 or j==self.y_locations_number-1 or i==0 or i==self.x_locations_number-1:
+                if j == 0 or j == self.y_locations_number - 1 or \
+                        i == 0 or i == self.x_locations_number - 1:
                     alignment_box = {}
                     alignment_box['type'] = 'boundary point'
                     alignment_box['box'] = None
@@ -269,17 +270,17 @@ class AlignmentPoints(object):
                     weight_sum = 0.
 
                     # Limit the radius of the search circle according to a configuration parameter.
-                    for r in arange(1, self.configuration.alignment_box_max_neighbor_distance+1):
+                    for r in arange(1, self.configuration.alignment_box_max_neighbor_distance + 1):
                         circle = Miscellaneous.circle_around(i_center, j_center, r)
                         for (i, j) in circle:
-                            if 1 <= i < self.x_locations_number-1 and 1 <= j < \
-                                    self.y_locations_number-1 and \
+                            if 1 <= i < self.x_locations_number - 1 and 1 <= j < \
+                                    self.y_locations_number - 1 and \
                                     self.alignment_boxes[j][i]['type'] == 'alignment point':
                                 # Alignment point found. Compute its distance and weight,
                                 # and add it to the list.
                                 contributing_alignment_point = {}
                                 contributing_alignment_point['alignment_point_index'] = \
-                                self.alignment_boxes[j][i]['alignment_point_index']
+                                    self.alignment_boxes[j][i]['alignment_point_index']
                                 contributing_alignment_point['weight'] = 1. / hypot(i - i_center,
                                                                                     j - j_center)
                                 weight_sum += contributing_alignment_point['weight']
@@ -364,10 +365,11 @@ class AlignmentPoints(object):
                     j = alignment_box['coordinates'][0]
                     i = alignment_box['coordinates'][1]
                     # If not an alignment point neighbor, go to the next box.
-                    if alignment_box['type'] != 'alignment point neighbor' or not self.ap_mask[j][i]:
+                    if alignment_box['type'] != 'alignment point neighbor' or not self.ap_mask[j][
+                        i]:
                         continue
                     for ap in self.alignment_point_neighbors[alignment_box[
-                                                            'alignment_point_neighbor_index']][2]:
+                        'alignment_point_neighbor_index']][2]:
                         self.ap_mask[self.alignment_points[ap['alignment_point_index']][0],
                                      self.alignment_points[ap['alignment_point_index']][1]] = True
 
@@ -464,32 +466,36 @@ class AlignmentPoints(object):
              self.align_frames.frame_shifts[frame_index][1]
 
         if de_warp:
-            # Cut out the alignment box from the given frame. Take into account the offsets
-            # explained above.
-            box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy,
-                           x_low + dx:x_high + dx]
-
             # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
             if self.configuration.alignment_point_method == 'Subpixel':
+                # Cut out the alignment box from the given frame. Take into account the offsets
+                # explained above.
+                box_in_frame = self.frames.frames_mono_blurred[frame_index][y_low + dy:y_high + dy,
+                               x_low + dx:x_high + dx]
                 shift_pixel, error, diffphase = register_translation(
                     self.alignment_boxes[j][i]['box'], box_in_frame, 10, space='real')
 
             # Use a simple phase shift computation (contained in module "miscellaneous").
             elif self.configuration.alignment_point_method == 'CrossCorrelation':
+                # Cut out the alignment box from the given frame. Take into account the offsets
+                # explained above.
+                box_in_frame = self.frames.frames_mono_blurred[frame_index][y_low + dy:y_high + dy,
+                               x_low + dx:x_high + dx]
                 shift_pixel = Miscellaneous.translation(self.alignment_boxes[j][i]['box'],
                                                         box_in_frame, box_in_frame.shape)
 
             # Use a local search (see method "search_local_match" below.
             elif self.configuration.alignment_point_method == 'LocalSearch':
                 shift_pixel = self.search_local_match(self.alignment_boxes[j][i]['box'],
-                                                      self.frames.frames_mono[frame_index],
+                                                      self.frames.frames_mono_blurred[frame_index],
                                                       y_low + dy, y_high + dy, x_low + dx,
                                                       x_high + dx,
                                                       self.configuration.alignment_point_search_width,
                                                       sub_pixel=self.configuration.alignment_sub_pixel)
             else:
                 raise NotSupportedError("The point shift computation method " +
-                                        self.configuration.alignment_point_method + " is not implemented")
+                                        self.configuration.alignment_point_method +
+                                        " is not implemented")
 
             # Copy pixel shift values into the shift arrays.
             self.y_shifts[j][i] = shift_pixel[0]
@@ -532,20 +538,20 @@ class AlignmentPoints(object):
         """
 
         # Upper boundary
-        if j==0:
+        if j == 0:
             j_copy = 1
         # Lower boundary
-        elif j== self.y_locations_number-1:
-            j_copy = self.y_locations_number-2
+        elif j == self.y_locations_number - 1:
+            j_copy = self.y_locations_number - 2
         else:
             j_copy = j
 
         # Left boundary
-        if i==0:
+        if i == 0:
             i_copy = 1
         # Right boundary
-        elif i== self.x_locations_number-1:
-            i_copy = self.x_locations_number-2
+        elif i == self.x_locations_number - 1:
+            i_copy = self.x_locations_number - 2
         else:
             i_copy = i
 
@@ -611,24 +617,25 @@ class AlignmentPoints(object):
                 if sub_pixel:
                     try:
                         y_correction, x_correction = self.sub_pixel_solve(self.deviations[
-                            dy_min + search_width - 1: dy_min + search_width + 2,
-                            dx_min + search_width - 1: dx_min + search_width + 2])
+                                              dy_min + search_width - 1: dy_min + search_width + 2,
+                                              dx_min + search_width - 1: dx_min + search_width + 2])
                     except DivideByZeroError as ex:
-                        print (ex.message)
+                        print(ex.message)
                         x_correction = y_correction = 0.
 
-                    # Add the sub-pixel correction to the local shift.
-                    dy_min += y_correction
-                    dx_min += x_correction
+                    # Add the sub-pixel correction to the local shift. If the correction is above
+                    # one pixel, something went wrong.
+                    if abs(y_correction) < 1. and abs(x_correction) < 1.:
+                        dy_min += y_correction
+                        dx_min += x_correction
+                    # else:
+                    #     print ("y_correction: " + str(y_correction) + ", x_correction: " + str(x_correction))
 
                 return [dy_min, dx_min]
 
             # Otherwise, update the current optimum and continue.
             else:
                 deviation_min, dy_min, dx_min = deviation_min_r, dy_min_r, dx_min_r
-        # print("search local match unsuccessful: y_low: " + str(y_low) + ", x_low: " + str(x_low))
-        # print("search local match unsuccessful: y: " + str((y_high + y_low) / 2.) + ",
-        #       x: " + str((x_high + x_low) / 2.))
 
         # If within the maximum search radius no optimum could be found, return [0, 0].
         return [0, 0]
@@ -696,7 +703,7 @@ class AlignmentPoints(object):
         :return: -
         """
 
-        self.ap_mask[j_ap_low:j_ap_high+1, i_ap_low:i_ap_high+1] = True
+        self.ap_mask[j_ap_low:j_ap_high + 1, i_ap_low:i_ap_high + 1] = True
 
     def ap_mask_reset(self):
         """
@@ -859,7 +866,7 @@ if __name__ == "__main__":
             # if alignment_points.alignment_boxes[j][i]['type'] == 'alignment point' or \
             #         alignment_points.alignment_boxes[j][i]['type'] == 'alignment point neighbor':
             Miscellaneous.insert_cross(reference_frame_with_alignment_points, y_center,
-                                           x_center, cross_half_len, 'white')
+                                       x_center, cross_half_len, 'white')
     end = time()
     print('Elapsed time in drawing alignment points: {}'.format(end - start))
     plt.imshow(reference_frame_with_alignment_points)
@@ -938,7 +945,7 @@ if __name__ == "__main__":
                         # Display in the middle the globally shifted selected frame with a centered
                         # red cross. First, produce a three channel RGB object from the mono
                         # channel.
-                        box_in_frame = stack((frames.frames_mono[frame_index],) * 3, -1)[
+                        box_in_frame = stack((frames.frames_mono_blurred[frame_index],) * 3, -1)[
                                        y_center - box_size_half + dy:y_center + box_size_half + dy,
                                        x_center - box_size_half + dx:x_center + box_size_half + dx]
                         Miscellaneous.insert_cross(box_in_frame, box_size_half, box_size_half,
@@ -969,7 +976,8 @@ if __name__ == "__main__":
 
                         # Again, create an RGB image from the mono channel, and insert either a
                         # green or red cross.
-                        box_in_frame_shifted = stack((frames.frames_mono[frame_index],) * 3, -1)[
+                        box_in_frame_shifted = stack((frames.frames_mono_blurred[frame_index],)
+                                                     * 3, -1)[
                                                y_center - box_size_half + dy -
                                                point_dy_int:y_center + box_size_half + dy -
                                                             point_dy_int,

@@ -51,7 +51,7 @@ class AlignFrames(object):
         :param configuration: Configuration object with parameters
         """
 
-        self.frames_mono = frames.frames_mono
+        self.frames_mono_blurred = frames.frames_mono_blurred
         self.number = frames.number
         self.shape = frames.shape
         self.frame_shifts = None
@@ -90,7 +90,8 @@ class AlignFrames(object):
             for y_low in arange(0, dim_y - rect_y + 1, rect_y):
                 y_high = y_low + rect_y
                 new_quality = Miscellaneous.quality_measure(
-                    self.frames_mono[self.frame_ranks_max_index][y_low:y_high, x_low:x_high])
+                    self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
+                    x_low:x_high])
                 if new_quality > quality:
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
                         x_low, x_high, y_low, y_high)
@@ -114,10 +115,10 @@ class AlignFrames(object):
 
         # From the sharpest frame cut out the alignment rectangle. The shifts of all other frames
         #  will be computed relativ to this patch.
-        self.reference_window = self.frames_mono[self.frame_ranks_max_index][
+        self.reference_window = self.frames_mono_blurred[self.frame_ranks_max_index][
                                 self.y_low_opt:self.y_high_opt, self.x_low_opt:self.x_high_opt]
         self.reference_window_shape = self.reference_window.shape
-        for idx, frame in enumerate(self.frames_mono):
+        for idx, frame in enumerate(self.frames_mono_blurred):
 
             # For the sharpest frame the displacement is 0 because it is used as the reference.
             if idx == self.frame_ranks_max_index:
@@ -126,7 +127,7 @@ class AlignFrames(object):
             # For all other frames: Cut out the alignment patch and compute its translation
             # relative to the reference.
             else:
-                frame_window = self.frames_mono[idx][self.y_low_opt:self.y_high_opt,
+                frame_window = self.frames_mono_blurred[idx][self.y_low_opt:self.y_high_opt,
                                self.x_low_opt:self.x_high_opt]
                 self.frame_shifts.append(
                     Miscellaneous.translation(self.reference_window, frame_window,
@@ -194,11 +195,11 @@ if __name__ == "__main__":
     configuration = Configuration()
     try:
         # In creating the Frames object the images are read from the specified file(s).
-        frames = Frames(names, type=type)
+        frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
-        print("Error: " + e.message)
+        print("Error: " + str(e))
         exit()
 
     # Rank the frames by their overall local contrast.

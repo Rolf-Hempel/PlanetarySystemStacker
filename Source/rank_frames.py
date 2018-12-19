@@ -53,7 +53,7 @@ class RankFrames(object):
         # selected via a configuration parameter. Add a list of monochrome images for all frames to
         # the "Frames" object.
         frames.add_monochrome(self.configuration.mono_channel)
-        self.frames_mono = frames.frames_mono
+        self.frames_mono_blurred = frames.frames_mono_blurred
         self.quality_sorted_indices = None
         self.frame_ranks = []
         self.frame_ranks_max_index = None
@@ -67,12 +67,11 @@ class RankFrames(object):
         """
 
         # For all frames compute the quality with method "local_contrast" in module "miscellaneous".
-        for frame in self.frames_mono:
+        for frame in self.frames_mono_blurred:
             self.frame_ranks.append(Miscellaneous.local_contrast(frame,
-                self.configuration.frame_score_pixel_stride))
+                                                    self.configuration.frame_score_pixel_stride))
             # Ten times slower but twice as good:
             # self.frame_ranks.append(Miscellaneous.local_contrast_sobel(frame))
-
 
         # Sort the frame indices in descending order of quality.
         self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),
@@ -119,5 +118,6 @@ if __name__ == "__main__":
     #     print("Rank: " + str(rank) + ", Frame no. " + str(index) + ", quality: " + str(frame_quality))
     for index, frame_quality in enumerate(rank_frames.frame_ranks):
         rank = rank_frames.quality_sorted_indices.index(index)
-        print("Frame no. " + str(index) + ", Rank: " + str(rank) + ", quality: " + str(frame_quality))
+        print("Frame no. " + str(index) + ", Rank: " + str(rank) + ", quality: " +
+              str(frame_quality))
     print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))

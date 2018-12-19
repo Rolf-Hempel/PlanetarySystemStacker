@@ -21,17 +21,16 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import glob
-
 from pathlib import Path
+
 import cv2
 import matplotlib.pyplot as plt
 from PIL import ImageChops, Image
-from skimage import img_as_ubyte
-from numpy import array, dot
+from numpy import array
 from scipy import misc
 
-from exceptions import TypeError, ShapeError, ArgumentError
 from configuration import Configuration
+from exceptions import TypeError, ShapeError, ArgumentError
 
 
 class Frames(object):
@@ -99,8 +98,9 @@ class Frames(object):
         else:
             raise ShapeError("Image shape not supported")
 
-        # Initialize list of monochrome frames.
+        # Initialize lists of monochrome frames (with and without Gaussian blur).
         self.frames_mono = None
+        self.frames_mono_blurred = None
 
         # Initialize the list with used quality areas for every frame.
         self.used_quality_areas = [0 for i in range(self.number)]
@@ -127,7 +127,8 @@ class Frames(object):
         """
         Same as method "extract_channel", but for all frames. Add a list of monochrome frames
         "self.frames_mono". If the original frames are monochrome, just point the monochrome frame
-        list to the original images (no deep copy!).
+        list to the original images (no deep copy!). Also, add a blurred version of the frame list
+        (using a Gaussian filter) "self.frames_mono_blurred".
 
         :param color: Either "red" or "green" or "blue"
         :return: -
@@ -137,18 +138,13 @@ class Frames(object):
             colors = ['red', 'green', 'blue']
             if not color in colors:
                 raise ArgumentError("Invalid color selected for channel extraction")
-            self.frames_mono = [cv2.GaussianBlur(frame[:, :, colors.index(color)], (
-                self.configuration.alignment_gauss_width, self.configuration.alignment_gauss_width),
-                                                 0) for frame in self.frames]
+            self.frames_mono = [frame[:, :, colors.index(color)] for frame in self.frames]
         else:
-            self.frames_mono = [cv2.GaussianBlur(frame, (
-                self.configuration.alignment_gauss_width, self.configuration.alignment_gauss_width),
-                                                 0) for frame in self.frames]
+            self.frames_mono = self.frames
 
-        # new_mono = []
-        # for frame in self.frames_mono:
-        #     new_mono.append(cv2.GaussianBlur(frame, (3, 3), 0))
-        # self.frames_mono = new_mono
+        self.frames_mono_blurred = [cv2.GaussianBlur(frame, (
+            self.configuration.alignment_gauss_width, self.configuration.alignment_gauss_width),
+                                                     0) for frame in self.frames_mono]
 
     def shift_frame_with_wraparound(self, index, shift_x, shift_y):
         """

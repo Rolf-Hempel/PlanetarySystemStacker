@@ -53,9 +53,9 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        # input_file = 'short_video'
+        input_file = 'short_video'
         # input_file = 'another_short_video'
-        input_file = 'Moon_Tile-024_043939'
+        # input_file = 'Moon_Tile-024_043939'
         names = 'Videos/' + input_file + '.avi'
     print(names)
 
@@ -101,9 +101,9 @@ if __name__ == "__main__":
     my_timer.stop('Global frame alignment')
 
     print("Intersection, y_low: " + str(align_frames.intersection_shape[0][0]) + ", y_high: "
-            + str(align_frames.intersection_shape[0][1]) + ", x_low: "\
-            + str(align_frames.intersection_shape[1][0]) + ", x_high: "\
-            + str(align_frames.intersection_shape[1][1]))
+          + str(align_frames.intersection_shape[0][1]) + ", x_low: " \
+          + str(align_frames.intersection_shape[1][0]) + ", x_high: " \
+          + str(align_frames.intersection_shape[1][1]))
 
     # Initialize the AlignmentPoints object. This includes the computation of the average frame
     # against which the alignment point shifts are measured.
@@ -169,11 +169,14 @@ if __name__ == "__main__":
                                my_timer)
 
     # Stack all frames.
-    output_stacking_buffer = False
+    output_stacking_buffer = True
+    # qa_list = None
+    qa_list = [(6, 5), (4, 11), (0, 7)]
     if output_stacking_buffer:
         for file in os.listdir('QA_videos'):
             os.unlink('QA_videos/' + file)
-    result = stack_frames.stack_frames(output_stacking_buffer=output_stacking_buffer)
+    result = stack_frames.stack_frames(output_stacking_buffer=output_stacking_buffer,
+                                       qa_list=qa_list)
 
     # Save the stacked image as 16bit int (color or mono).
     my_timer.create('Save Image')

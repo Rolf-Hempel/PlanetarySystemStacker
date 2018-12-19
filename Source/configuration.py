@@ -30,7 +30,7 @@ class Configuration(object):
         self.alignment_sub_pixel = False
         self.alignment_box_step_size = 50
         self.alignment_box_size = 40
-        self.alignment_gauss_width = 5
+        self.alignment_gauss_width = 3
         self.alignment_box_max_neighbor_distance = 1
         self.alignment_point_structure_threshold = 0.05
         self.alignment_point_brightness_threshold = 10
@@ -42,6 +42,7 @@ class Configuration(object):
         self.quality_area_pixel_stride = 2
         self.quality_area_frame_percent = 10.
         self.stacking_own_remap_method = True
+        self.stacking_rigid_ap_shift = False
 
         # Parameters used for optical flow:
         self.stacking_use_optical_flow = False
