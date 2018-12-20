@@ -28,7 +28,7 @@ from numpy import empty, mean, arange, stack
 import cv2
 
 from configuration import Configuration
-from exceptions import WrongOrderingError
+from exceptions import WrongOrderingError, NotSupportedError, InternalError
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -115,6 +115,10 @@ class AlignFrames(object):
         # Initialize a list which for each frame contains the shifts in y and x directions.
         self.frame_shifts = []
 
+        # Initialize two variables which keep the shift values of the previous step as the starting
+        # point for the next step. This reduces the search radius if frames are drifting.
+        dy_min_cum = dx_min_cum = 0
+
         # From the sharpest frame cut out the alignment rectangle. The shifts of all other frames
         #  will be computed relativ to this patch.
         self.reference_window = self.frames_mono_blurred[self.frame_ranks_max_index][
@@ -129,11 +133,34 @@ class AlignFrames(object):
             # For all other frames: Cut out the alignment patch and compute its translation
             # relative to the reference.
             else:
+                frame = self.frames_mono_blurred[idx]
                 frame_window = self.frames_mono_blurred[idx][self.y_low_opt:self.y_high_opt,
                                self.x_low_opt:self.x_high_opt]
-                self.frame_shifts.append(
-                    Miscellaneous.translation(self.reference_window, frame_window,
-                                              self.reference_window_shape))
+                if configuration.alignment_method == "Translation":
+                    self.frame_shifts.append(
+                        Miscellaneous.translation(self.reference_window, frame_window,
+                                                  self.reference_window_shape))
+                elif configuration.alignment_method == "LocalSearch":
+                    # Spiral out from the shift position of the previous frame and search for the
+                    # local optimum.
+                    [dy_min, dx_min], dev_r = Miscellaneous.search_local_match(
+                        self.reference_window, frame, self.y_low_opt - dy_min_cum,
+                                                      self.y_high_opt - dy_min_cum,
+                                                      self.x_low_opt - dx_min_cum,
+                                                      self.x_high_opt - dx_min_cum,
+                        self.configuration.alignment_point_search_width,
+                        sub_pixel=False)
+                    # Update the cumulative shift values to be used as starting point for the
+                    # next frame.
+                    dy_min_cum += dy_min
+                    dx_min_cum += dx_min
+                    self.frame_shifts.append([dy_min_cum, dx_min_cum])
+                    if len(dev_r) > 2 and dy_min == 0 and dx_min == 0:
+                        raise InternalError("No valid shift computed for frame " + str(idx) +
+                                            ", minima with increasing search radius: " + str(dev_r))
+                else:
+                    raise NotSupportedError(
+                        "Frame alignment method " + configuration.alignment_method + " not supported")
 
         # Compute the shape of the area contained in all frames in the form [[y_low, y_high],
         # [x_low, x_high]]
@@ -217,8 +244,8 @@ if __name__ == "__main__":
         #  = glob.glob('Images/Example-3*.jpg')
     else:
         # file = 'short_video'
-        file = 'another_short_video'
-        # file = 'Moon_Tile-024_043939'
+        # file = 'another_short_video'
+        file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -243,8 +270,13 @@ if __name__ == "__main__":
     # Select the local rectangular patch in the image where the L gradient is highest in both x
     # and y direction. The scale factor specifies how much smaller the patch is compared to the
     # whole image frame.
-    (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
-        configuration.alignment_rectangle_scale_factor)
+    # (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
+    #     configuration.alignment_rectangle_scale_factor)
+
+    # Alternative: Set the alignment rectangle by hand.
+    (align_frames.x_low_opt, align_frames.x_high_opt, align_frames.y_low_opt,
+     align_frames.y_high_opt) = (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = (
+    650, 950, 550, 750)
 
     print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
         x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
@@ -255,7 +287,14 @@ if __name__ == "__main__":
     plt.show()
 
     # Align all frames globally relative to the frame with the highest score.
-    align_frames.align_frames()
+    try:
+        align_frames.align_frames()
+    except NotSupportedError as e:
+        print ("Error: " + e.message)
+        exit()
+    except InternalError as e:
+        print ("Warning: " + e.message)
+
     print("Frame shifts: " + str(align_frames.frame_shifts))
     print("Intersection: " + str(align_frames.intersection_shape))
 
