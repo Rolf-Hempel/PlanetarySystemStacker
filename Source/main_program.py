@@ -53,9 +53,9 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        input_file = 'short_video'
+        # input_file = 'short_video'
         # input_file = 'another_short_video'
-        # input_file = 'Moon_Tile-024_043939'
+        input_file = 'Moon_Tile-024_043939'
         names = 'Videos/' + input_file + '.avi'
     print(names)
 
@@ -171,7 +171,8 @@ if __name__ == "__main__":
     # Stack all frames.
     output_stacking_buffer = True
     # qa_list = None
-    qa_list = [(6, 5), (4, 11), (0, 7)]
+    # qa_list = [(4, 7), (3, 6), (3, 7), (3, 8), (4, 6), (4, 8), (5, 6), (5, 7), (5, 8)]
+    qa_list = [(3, 21), (1, 0), (2, 21)]
     if output_stacking_buffer:
         for file in os.listdir('QA_videos'):
             os.unlink('QA_videos/' + file)

@@ -24,7 +24,8 @@ import glob
 from math import ceil
 
 import matplotlib.pyplot as plt
-from numpy import empty, mean, arange
+from numpy import empty, mean, arange, stack
+import cv2
 
 from configuration import Configuration
 from exceptions import WrongOrderingError
@@ -51,6 +52,7 @@ class AlignFrames(object):
         :param configuration: Configuration object with parameters
         """
 
+        self.frames_mono = frames.frames_mono
         self.frames_mono_blurred = frames.frames_mono_blurred
         self.number = frames.number
         self.shape = frames.shape
@@ -89,9 +91,9 @@ class AlignFrames(object):
             x_high = x_low + rect_x
             for y_low in arange(0, dim_y - rect_y + 1, rect_y):
                 y_high = y_low + rect_y
-                new_quality = Miscellaneous.quality_measure(
+                new_quality = Miscellaneous.local_contrast(
                     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
-                    x_low:x_high])
+                    x_low:x_high], self.configuration.quality_area_pixel_stride)
                 if new_quality > quality:
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
                         x_low, x_high, y_low, y_high)
@@ -176,6 +178,34 @@ class AlignFrames(object):
         self.mean_frame = mean(buffer, axis=0)
         return self.mean_frame
 
+    def stabilized_video(self, name, fps):
+        """
+        Write out a stabilized videos. For all frames the part common to all frames is extracted
+        and written into a video file.
+
+        :param name: File name of the video output
+        :param fps: Frames per second of video
+        :return: -
+        """
+
+        # Compute video frame size.
+        frame_height = self.intersection_shape[0][1] - self.intersection_shape[0][0]
+        frame_width = self.intersection_shape[1][1] - self.intersection_shape[1][0]
+
+        # Define the codec and create VideoWriter object
+        fourcc = cv2.VideoWriter_fourcc('D', 'I', 'V', 'X')
+        out = cv2.VideoWriter(name, fourcc, fps, (frame_width, frame_height))
+
+        # For each frame: Convert the mono frame to three-channel color mode, and cut out the
+        # shifted part common to all frames.
+        for idx, frame_mono in enumerate(self.frames_mono):
+            out.write(stack((frame_mono,) * 3, -1)[
+                                        self.intersection_shape[0][0] - self.frame_shifts[idx][0]:
+                                        self.intersection_shape[0][1] - self.frame_shifts[idx][0],
+                                        self.intersection_shape[1][0] - self.frame_shifts[idx][1]:
+                                        self.intersection_shape[1][1] - self.frame_shifts[idx][1]])
+        out.release()
+
 
 if __name__ == "__main__":
     # Images can either be extracted from a video file or a batch of single photographs. Select
@@ -187,7 +217,8 @@ if __name__ == "__main__":
         #  = glob.glob('Images/Example-3*.jpg')
     else:
         # file = 'short_video'
-        file = 'Moon_Tile-024_043939'
+        file = 'another_short_video'
+        # file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -217,7 +248,7 @@ if __name__ == "__main__":
 
     print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
         x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
-    frame = align_frames.frames_mono[align_frames.frame_ranks_max_index].copy()
+    frame = align_frames.frames_mono_blurred[align_frames.frame_ranks_max_index].copy()
     frame[y_low_opt, x_low_opt:x_high_opt] = frame[y_high_opt - 1, x_low_opt:x_high_opt] = 255
     frame[y_low_opt:y_high_opt, x_low_opt] = frame[y_low_opt:y_high_opt, x_high_opt - 1] = 255
     plt.imshow(frame, cmap='Greys_r')
@@ -239,3 +270,5 @@ if __name__ == "__main__":
                                           :average_frame_number]])
     plt.imshow(average, cmap='Greys_r')
     plt.show()
+
+    align_frames.stabilized_video('Videos/stabilized_video.avi', 5)
