@@ -176,7 +176,7 @@ if __name__ == "__main__":
                                my_timer)
 
     # Stack all frames.
-    output_stacking_buffer = True
+    output_stacking_buffer = False
     # qa_list = None
     # qa_list = [(4, 7), (3, 6), (3, 7), (3, 8), (4, 6), (4, 8), (5, 6), (5, 7), (5, 8)]
     qa_list = [(3, 21), (1, 0), (2, 21)]

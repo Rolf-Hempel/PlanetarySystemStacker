@@ -80,15 +80,32 @@ class Miscellaneous(object):
 
 
     @staticmethod
-    def local_contrast_sobel(frame):
+    def local_contrast_laplace(frame, stride):
+        """
+        Measure the amount of structure in a rectangular frame in both coordinate directions and
+        return the minimum value. The discrete variance of the Laplacian is computed.
+
+        :param frame: 2D image
+        :param stride: Factor for down-sampling
+        :return: Measure for amount of local structure in the image (scalar)
+        """
+
+        sharpness = cv2.Laplacian(frame[::stride, ::stride], cv2.CV_32F).var()
+        # sharpness = sum(laplace(frame[::stride, ::stride])**2)
+        return sharpness
+
+
+    @staticmethod
+    def local_contrast_sobel(frame, stride):
         """
         Compute a measure for local contrast in an image using the Sobel method.
 
         :param frame: 2D image
+        :param stride: Factor for down-sampling
         :return: Overall sharpness measure (scalar)
         """
 
-        frame_int32 = frame.astype('int32')
+        frame_int32 = frame[::stride, ::stride].astype('int32')
         dx = sobel(frame_int32, 0)  # vertical derivative
         dy = sobel(frame_int32, 1)  # horizontal derivative
         mag = hypot(dx, dy)  # magnitude

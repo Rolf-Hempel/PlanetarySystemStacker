@@ -24,15 +24,16 @@ class Configuration(object):
     def __init__(self):
         self.mono_channel = 'green'
         self.frame_score_pixel_stride = 2
+        self.frame_score_method = "Laplace"
         self.alignment_method = "LocalSearch"
-        self.alignment_rectangle_scale_factor = 7
-        self.alignment_border_width = 20
+        self.alignment_rectangle_scale_factor = 3
+        self.alignment_border_width = 30
         self.average_frame_percent = 5.
         self.alignment_de_warp= True
         self.alignment_sub_pixel = True
         self.alignment_box_step_size = 50
         self.alignment_box_size = 40
-        self.alignment_gauss_width = 5
+        self.alignment_gauss_width = 7
         self.alignment_box_max_neighbor_distance = 1
         self.alignment_point_structure_threshold = 0.05
         self.alignment_point_brightness_threshold = 10

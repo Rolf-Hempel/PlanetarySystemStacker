@@ -26,6 +26,7 @@ from time import time
 from configuration import Configuration
 from frames import Frames
 from miscellaneous import Miscellaneous
+from exceptions import NotSupportedError
 
 
 class RankFrames(object):
@@ -53,6 +54,7 @@ class RankFrames(object):
         # selected via a configuration parameter. Add a list of monochrome images for all frames to
         # the "Frames" object.
         frames.add_monochrome(self.configuration.mono_channel)
+        self.frames_mono = frames.frames_mono
         self.frames_mono_blurred = frames.frames_mono_blurred
         self.quality_sorted_indices = None
         self.frame_ranks = []
@@ -66,12 +68,19 @@ class RankFrames(object):
         :return: -
         """
 
-        # For all frames compute the quality with method "local_contrast" in module "miscellaneous".
+        if self.configuration.frame_score_method == "xy gradient":
+            method = Miscellaneous.local_contrast
+        elif self.configuration.frame_score_method == "Laplace":
+            method = Miscellaneous.local_contrast_laplace
+        elif self.configuration.frame_score_method == "Sobel":
+            method = Miscellaneous.local_contrast_sobel
+        else:
+            raise NotSupportedError("Ranking method " + self.configuration.frame_score_method +
+                                    " not supported")
+
+        # For all frames compute the quality with the selected method.
         for frame in self.frames_mono_blurred:
-            self.frame_ranks.append(Miscellaneous.local_contrast(frame,
-                                                    self.configuration.frame_score_pixel_stride))
-            # Ten times slower but twice as good:
-            # self.frame_ranks.append(Miscellaneous.local_contrast_sobel(frame))
+            self.frame_ranks.append(method(frame, self.configuration.frame_score_pixel_stride))
 
         # Sort the frame indices in descending order of quality.
         self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),
@@ -89,10 +98,10 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob(
-            'Images/2012*.tif')
+        # names = glob.glob('Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
+        names = glob.glob('Images/Mond_*.jpg')
     else:
         # names = 'Videos/short_video.avi'
         names = 'Videos/Moon_Tile-024_043939.avi'
@@ -120,4 +129,4 @@ if __name__ == "__main__":
         rank = rank_frames.quality_sorted_indices.index(index)
         print("Frame no. " + str(index) + ", Rank: " + str(rank) + ", quality: " +
               str(frame_quality))
-    print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
+    print('Elapsed time in ranking frames: {}'.format(end - start))
