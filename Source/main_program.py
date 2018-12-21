@@ -30,12 +30,12 @@ from skimage import img_as_ubyte
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
+from exceptions import NotSupportedError, InternalError
 from frames import Frames
 from quality_areas import QualityAreas
 from rank_frames import RankFrames
 from stack_frames import StackFrames
 from timer import timer
-from exceptions import NotSupportedError, InternalError
 
 if __name__ == "__main__":
     """

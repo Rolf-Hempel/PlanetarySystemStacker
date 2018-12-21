@@ -157,11 +157,9 @@ class AlignFrames(object):
                     # local optimum.
                     [dy_min, dx_min], dev_r = Miscellaneous.search_local_match(
                         self.reference_window, frame, self.y_low_opt - dy_min_cum,
-                                                      self.y_high_opt - dy_min_cum,
-                                                      self.x_low_opt - dx_min_cum,
-                                                      self.x_high_opt - dx_min_cum,
-                        self.configuration.alignment_point_search_width,
-                        sub_pixel=False)
+                        self.y_high_opt - dy_min_cum, self.x_low_opt - dx_min_cum,
+                        self.x_high_opt - dx_min_cum,
+                        self.configuration.alignment_point_search_width, sub_pixel=False)
                     # Update the cumulative shift values to be used as starting point for the
                     # next frame.
                     dy_min_cum += dy_min
@@ -172,7 +170,8 @@ class AlignFrames(object):
                         self.dev_r_list.append(dev_r)
                 else:
                     raise NotSupportedError(
-                        "Frame alignment method " + configuration.alignment_method + " not supported")
+                        "Frame alignment method " + configuration.alignment_method +
+                        " not supported")
 
         # Compute the shape of the area contained in all frames in the form [[y_low, y_high],
         # [x_low, x_high]]
@@ -240,14 +239,18 @@ class AlignFrames(object):
         frame_indices = []
 
         if stabilized:
-            # For each frame: cut out the shifted window with the intersection of all frames. Append it
-            # to the list, and add its index to the list of index strings.
+            # For each frame: cut out the shifted window with the intersection of all frames.
+            # Append it to the list, and add its index to the list of index strings.
             for idx, frame_mono in enumerate(self.frames_mono):
                 frames_mono_stabilized.append(frame_mono[
-                                            self.intersection_shape[0][0] - self.frame_shifts[idx][0]:
-                                            self.intersection_shape[0][1] - self.frame_shifts[idx][0],
-                                            self.intersection_shape[1][0] - self.frame_shifts[idx][1]:
-                                            self.intersection_shape[1][1] - self.frame_shifts[idx][1]])
+                                              self.intersection_shape[0][0] -
+                                              self.frame_shifts[idx][0]:
+                                              self.intersection_shape[0][1] -
+                                              self.frame_shifts[idx][0],
+                                              self.intersection_shape[1][0] -
+                                              self.frame_shifts[idx][1]:
+                                              self.intersection_shape[1][1] -
+                                              self.frame_shifts[idx][1]])
                 frame_indices.append(str(idx))
             Miscellaneous.write_video('Videos/stabilized_video_with_frame_numbers.avi',
                                       frames_mono_stabilized, frame_indices, 5)
@@ -256,7 +259,7 @@ class AlignFrames(object):
             for idx in range(len(self.frames_mono)):
                 frame_indices.append(str(idx))
             Miscellaneous.write_video('Videos/video_with_frame_numbers.avi', self.frames_mono,
-                                  frame_indices, 5)
+                                      frame_indices, 5)
 
 
 if __name__ == "__main__":
@@ -265,8 +268,9 @@ if __name__ == "__main__":
     type = 'video'
     if type == 'image':
         names = glob.glob(
-            'Images/2012*.tif')  # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')  # names
-        #  = glob.glob('Images/Example-3*.jpg')
+            'Images/2012*.tif')
+        # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
+        # names = glob.glob('Images/Example-3*.jpg')
     else:
         # file = 'short_video'
         file = 'another_short_video'
@@ -315,14 +319,14 @@ if __name__ == "__main__":
     try:
         align_frames.align_frames()
     except NotSupportedError as e:
-        print ("Error: " + e.message)
+        print("Error: " + e.message)
         exit()
     except InternalError as e:
-        print ("Warning: " + e.message)
+        print("Warning: " + e.message)
         for index, frame_number in enumerate(align_frames.failed_index_list):
-            print ("Shift computation failed for frame " +
-                   str(align_frames.failed_index_list[index]) + ", minima list: " +
-                   str(align_frames.dev_r_list[index]))
+            print("Shift computation failed for frame " +
+                  str(align_frames.failed_index_list[index]) + ", minima list: " +
+                  str(align_frames.dev_r_list[index]))
 
     print("Frame shifts: " + str(align_frames.frame_shifts))
     print("Intersection: " + str(align_frames.intersection_shape))

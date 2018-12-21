@@ -22,7 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import cv2
 import os
-from numpy import sqrt, average, diff, sum, hypot, arange, zeros, unravel_index, argmax, array,\
+from numpy import sqrt, average, diff, sum, hypot, arange, zeros, unravel_index, argmax, array, \
     matmul, stack
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
@@ -59,7 +59,6 @@ class Miscellaneous(object):
         sharpness = min(sharpness_x, sharpness_y)
         return sharpness
 
-
     @staticmethod
     def quality_measure_alternative(frame, black_threshold=40.):
         """
@@ -78,7 +77,6 @@ class Miscellaneous(object):
                 frame[1:-1, :] > black_threshold)))
         return min(sum_horizontal, sum_vertical)
 
-
     @staticmethod
     def local_contrast_laplace(frame, stride):
         """
@@ -93,7 +91,6 @@ class Miscellaneous(object):
         sharpness = cv2.Laplacian(frame[::stride, ::stride], cv2.CV_32F).var()
         # sharpness = sum(laplace(frame[::stride, ::stride])**2)
         return sharpness
-
 
     @staticmethod
     def local_contrast_sobel(frame, stride):
@@ -111,7 +108,6 @@ class Miscellaneous(object):
         mag = hypot(dx, dy)  # magnitude
         sharpness = sum(mag)
         return sharpness
-
 
     @staticmethod
     def local_contrast(frame, stride):
@@ -131,7 +127,6 @@ class Miscellaneous(object):
         dnorm = sqrt(dx ** 2 + dy ** 2)
         sharpness = average(dnorm)
         return sharpness
-
 
     @staticmethod
     def translation(frame_0, frame_1, shape):
@@ -163,7 +158,6 @@ class Miscellaneous(object):
             tx -= shape[1]
 
         return [ty, tx]
-
 
     @staticmethod
     def search_local_match(reference_box, frame, y_low, y_high, x_low, x_high, search_width,
@@ -234,8 +228,8 @@ class Miscellaneous(object):
                 if sub_pixel:
                     try:
                         y_correction, x_correction = Miscellaneous.sub_pixel_solve(deviations[
-                                              dy_min + search_width - 1: dy_min + search_width + 2,
-                                              dx_min + search_width - 1: dx_min + search_width + 2])
+                               dy_min + search_width - 1: dy_min + search_width + 2,
+                               dx_min + search_width - 1: dx_min + search_width + 2])
                     except DivideByZeroError as ex:
                         print(ex.message)
                         x_correction = y_correction = 0.
@@ -246,7 +240,8 @@ class Miscellaneous(object):
                         dy_min += y_correction
                         dx_min += x_correction
                     # else:
-                    #     print ("y_correction: " + str(y_correction) + ", x_correction: " + str(x_correction))
+                    #     print ("y_correction: " + str(y_correction) + ", x_correction: " +
+                    #           str(x_correction))
 
                 return [dy_min, dx_min], dev_r
 
@@ -256,7 +251,6 @@ class Miscellaneous(object):
 
         # If within the maximum search radius no optimum could be found, return [0, 0].
         return [0, 0], dev_r
-
 
     @staticmethod
     def sub_pixel_solve(function_values):
@@ -300,7 +294,6 @@ class Miscellaneous(object):
 
         return y_correction, x_correction
 
-
     @staticmethod
     def insert_cross(frame, y_center, x_center, cross_half_len, color):
         """
@@ -338,7 +331,6 @@ class Miscellaneous(object):
             for x in range(x_center - cross_half_len, x_center + cross_half_len + 1):
                 if 0 <= x < shape_x:
                     frame[y_center, x] = rgb
-
 
     @staticmethod
     def circle_around(x, y, r):
