@@ -20,7 +20,10 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-from numpy import sqrt, average, diff, sum, hypot, arange, zeros, unravel_index, argmax, array, matmul
+import cv2
+import os
+from numpy import sqrt, average, diff, sum, hypot, arange, zeros, unravel_index, argmax, array,\
+    matmul, stack
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
@@ -351,3 +354,55 @@ class Miscellaneous(object):
         while j > y - r:
             j -= 1
             yield (i, j)
+
+    @staticmethod
+    def write_video(name, frame_list, annotations, fps):
+        """
+        Create a video file from a list of frames.
+
+        :param name: File name of the video output
+        :param frame_list: List of frames to be written
+        :param annotations: List of text strings to be written into the corresponding frame
+        :param fps: Frames per second of video
+        :return: -
+        """
+
+        # Delete the output file if it exists.
+        try:
+            os.unlink(name)
+        except:
+            pass
+
+        # Compute video frame size.
+        frame_height = frame_list[0].shape[0]
+        frame_width = frame_list[0].shape[1]
+
+        # Define the codec and create VideoWriter object
+        fourcc = cv2.VideoWriter_fourcc('D', 'I', 'V', 'X')
+        out = cv2.VideoWriter(name, fourcc, fps, (frame_width, frame_height))
+
+        # Define font for annotations.
+        font = cv2.FONT_HERSHEY_SIMPLEX
+        bottomLeftCornerOfText = (20, 50)
+        fontScale = 1
+        fontColor = (255, 255, 255)
+        fontThickness = 1
+        lineType = cv2.LINE_AA
+
+        # For each frame: If monochrome, convert it to three-channel color mode. insert annotation
+        # and write the frame.
+        for index, frame in enumerate(frame_list):
+            # If
+            if len(frame.shape) == 2:
+                rgb_frame = stack((frame,) * 3, -1)
+            else:
+                rgb_frame = frame
+            cv2.putText(rgb_frame, annotations[index],
+                        bottomLeftCornerOfText,
+                        font,
+                        fontScale,
+                        fontColor,
+                        fontThickness,
+                        lineType)
+            out.write(rgb_frame)
+        out.release()

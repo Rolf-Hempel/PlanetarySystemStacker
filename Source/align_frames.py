@@ -63,6 +63,8 @@ class AlignFrames(object):
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
         self.frame_ranks_max_index = rank_frames.frame_ranks_max_index
         self.x_low_opt = self.x_high_opt = self.y_low_opt = self.y_high_opt = None
+        self.dev_r_list = None
+        self.failed_index_list = None
 
     def select_alignment_rect(self, scale_factor):
         """
@@ -78,22 +80,28 @@ class AlignFrames(object):
 
         dim_y, dim_x = self.shape[0:2]
 
-        # Compute the extensions of the alignment rectangle in y and x directions.
-        rect_y = int(self.shape[0] / scale_factor)
-        rect_x = int(self.shape[1] / scale_factor)
+        # Compute the extensions of the alignment rectangle in y and x directions. Take into account
+        # a border and the search radius for frame shifts.
+        border_width = self.configuration.alignment_border_width + \
+                       self.configuration.alignment_point_search_width
+        rect_y = int((self.shape[0] - 2 * border_width) / scale_factor)
+        rect_x = int((self.shape[1] - 2 * border_width) / scale_factor)
 
         # Initialize the quality measure of the optimal location to an impossible value (<0).
         quality = -1.
 
         # Compute for all locations in the frame the "quality measure" and find the place with
         # the maximum value.
-        for x_low in arange(0, dim_x - rect_x + 1, rect_x):
+        for x_low in arange(border_width, dim_x - rect_x - border_width + 1, rect_x):
             x_high = x_low + rect_x
-            for y_low in arange(0, dim_y - rect_y + 1, rect_y):
+            for y_low in arange(border_width, dim_y - rect_y - border_width + 1, rect_y):
                 y_high = y_low + rect_y
-                new_quality = Miscellaneous.local_contrast(
+                # new_quality = Miscellaneous.local_contrast(
+                #     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
+                #     x_low:x_high], self.configuration.quality_area_pixel_stride)
+                new_quality = Miscellaneous.quality_measure_alternative(
                     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
-                    x_low:x_high], self.configuration.quality_area_pixel_stride)
+                    x_low:x_high])
                 if new_quality > quality:
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
                         x_low, x_high, y_low, y_high)
@@ -114,6 +122,10 @@ class AlignFrames(object):
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
         self.frame_shifts = []
+
+        # Initialize lists with info on failed frames.
+        self.dev_r_list = []
+        self.failed_index_list = []
 
         # Initialize two variables which keep the shift values of the previous step as the starting
         # point for the next step. This reduces the search radius if frames are drifting.
@@ -136,11 +148,11 @@ class AlignFrames(object):
                 frame = self.frames_mono_blurred[idx]
                 frame_window = self.frames_mono_blurred[idx][self.y_low_opt:self.y_high_opt,
                                self.x_low_opt:self.x_high_opt]
-                if configuration.alignment_method == "Translation":
+                if self.configuration.alignment_method == "Translation":
                     self.frame_shifts.append(
                         Miscellaneous.translation(self.reference_window, frame_window,
                                                   self.reference_window_shape))
-                elif configuration.alignment_method == "LocalSearch":
+                elif self.configuration.alignment_method == "LocalSearch":
                     # Spiral out from the shift position of the previous frame and search for the
                     # local optimum.
                     [dy_min, dx_min], dev_r = Miscellaneous.search_local_match(
@@ -156,8 +168,8 @@ class AlignFrames(object):
                     dx_min_cum += dx_min
                     self.frame_shifts.append([dy_min_cum, dx_min_cum])
                     if len(dev_r) > 2 and dy_min == 0 and dx_min == 0:
-                        raise InternalError("No valid shift computed for frame " + str(idx) +
-                                            ", minima with increasing search radius: " + str(dev_r))
+                        self.failed_index_list.append(idx)
+                        self.dev_r_list.append(dev_r)
                 else:
                     raise NotSupportedError(
                         "Frame alignment method " + configuration.alignment_method + " not supported")
@@ -172,6 +184,9 @@ class AlignFrames(object):
                                            self.intersection_shape[0][0]) * \
                                           (self.intersection_shape[1][1] -
                                            self.intersection_shape[1][0])
+        if len(self.failed_index_list) > 0:
+            raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
+                                " frames: " + str(self.failed_index_list))
 
     def average_frame(self, frames, shifts):
         """
@@ -205,13 +220,14 @@ class AlignFrames(object):
         self.mean_frame = mean(buffer, axis=0)
         return self.mean_frame
 
-    def stabilized_video(self, name, fps):
+    def write_stabilized_video(self, name, fps, stabilized=True):
         """
         Write out a stabilized videos. For all frames the part common to all frames is extracted
         and written into a video file.
 
         :param name: File name of the video output
         :param fps: Frames per second of video
+        :param stabilized: if False, switch off image stabilization. Write original frames.
         :return: -
         """
 
@@ -219,19 +235,28 @@ class AlignFrames(object):
         frame_height = self.intersection_shape[0][1] - self.intersection_shape[0][0]
         frame_width = self.intersection_shape[1][1] - self.intersection_shape[1][0]
 
-        # Define the codec and create VideoWriter object
-        fourcc = cv2.VideoWriter_fourcc('D', 'I', 'V', 'X')
-        out = cv2.VideoWriter(name, fourcc, fps, (frame_width, frame_height))
+        # Initialize lists of stabilized frames and index strings.
+        frames_mono_stabilized = []
+        frame_indices = []
 
-        # For each frame: Convert the mono frame to three-channel color mode, and cut out the
-        # shifted part common to all frames.
-        for idx, frame_mono in enumerate(self.frames_mono):
-            out.write(stack((frame_mono,) * 3, -1)[
-                                        self.intersection_shape[0][0] - self.frame_shifts[idx][0]:
-                                        self.intersection_shape[0][1] - self.frame_shifts[idx][0],
-                                        self.intersection_shape[1][0] - self.frame_shifts[idx][1]:
-                                        self.intersection_shape[1][1] - self.frame_shifts[idx][1]])
-        out.release()
+        if stabilized:
+            # For each frame: cut out the shifted window with the intersection of all frames. Append it
+            # to the list, and add its index to the list of index strings.
+            for idx, frame_mono in enumerate(self.frames_mono):
+                frames_mono_stabilized.append(frame_mono[
+                                            self.intersection_shape[0][0] - self.frame_shifts[idx][0]:
+                                            self.intersection_shape[0][1] - self.frame_shifts[idx][0],
+                                            self.intersection_shape[1][0] - self.frame_shifts[idx][1]:
+                                            self.intersection_shape[1][1] - self.frame_shifts[idx][1]])
+                frame_indices.append(str(idx))
+            Miscellaneous.write_video('Videos/stabilized_video_with_frame_numbers.avi',
+                                      frames_mono_stabilized, frame_indices, 5)
+        else:
+            # Write the original frames (not stabilized) with index number insertions.
+            for idx in range(len(self.frames_mono)):
+                frame_indices.append(str(idx))
+            Miscellaneous.write_video('Videos/video_with_frame_numbers.avi', self.frames_mono,
+                                  frame_indices, 5)
 
 
 if __name__ == "__main__":
@@ -244,8 +269,8 @@ if __name__ == "__main__":
         #  = glob.glob('Images/Example-3*.jpg')
     else:
         # file = 'short_video'
-        # file = 'another_short_video'
-        file = 'Moon_Tile-024_043939'
+        file = 'another_short_video'
+        # file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -270,13 +295,13 @@ if __name__ == "__main__":
     # Select the local rectangular patch in the image where the L gradient is highest in both x
     # and y direction. The scale factor specifies how much smaller the patch is compared to the
     # whole image frame.
-    # (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
-    #     configuration.alignment_rectangle_scale_factor)
+    (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
+        configuration.alignment_rectangle_scale_factor)
 
     # Alternative: Set the alignment rectangle by hand.
-    (align_frames.x_low_opt, align_frames.x_high_opt, align_frames.y_low_opt,
-     align_frames.y_high_opt) = (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = (
-    650, 950, 550, 750)
+    # (align_frames.x_low_opt, align_frames.x_high_opt, align_frames.y_low_opt,
+    #  align_frames.y_high_opt) = (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = (
+    # 650, 950, 550, 750)
 
     print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
         x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
@@ -294,6 +319,10 @@ if __name__ == "__main__":
         exit()
     except InternalError as e:
         print ("Warning: " + e.message)
+        for index, frame_number in enumerate(align_frames.failed_index_list):
+            print ("Shift computation failed for frame " +
+                   str(align_frames.failed_index_list[index]) + ", minima list: " +
+                   str(align_frames.dev_r_list[index]))
 
     print("Frame shifts: " + str(align_frames.frame_shifts))
     print("Intersection: " + str(align_frames.intersection_shape))
@@ -310,4 +339,5 @@ if __name__ == "__main__":
     plt.imshow(average, cmap='Greys_r')
     plt.show()
 
-    align_frames.stabilized_video('Videos/stabilized_video.avi', 5)
+    # Write video with stabilized frames, annotated with their frame indices.
+    align_frames.write_stabilized_video('Videos/stabilized_video.avi', 5, stabilized=True)

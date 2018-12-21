@@ -25,7 +25,8 @@ class Configuration(object):
         self.mono_channel = 'green'
         self.frame_score_pixel_stride = 2
         self.alignment_method = "LocalSearch"
-        self.alignment_rectangle_scale_factor = 5
+        self.alignment_rectangle_scale_factor = 7
+        self.alignment_border_width = 20
         self.average_frame_percent = 5.
         self.alignment_de_warp= True
         self.alignment_sub_pixel = True

@@ -35,6 +35,7 @@ from quality_areas import QualityAreas
 from rank_frames import RankFrames
 from stack_frames import StackFrames
 from timer import timer
+from exceptions import NotSupportedError, InternalError
 
 if __name__ == "__main__":
     """
@@ -97,7 +98,13 @@ if __name__ == "__main__":
 
     # Align all frames globally relative to the frame with the highest score.
     my_timer.create('Global frame alignment')
-    align_frames.align_frames()
+    try:
+        align_frames.align_frames()
+    except NotSupportedError as e:
+        print("Error: " + e.message)
+        exit()
+    except InternalError as e:
+        print("Warning: " + e.message)
     my_timer.stop('Global frame alignment')
 
     print("Intersection, y_low: " + str(align_frames.intersection_shape[0][0]) + ", y_high: "
@@ -143,7 +150,7 @@ if __name__ == "__main__":
     # out the image.
     output_file = Path('Images/reference_frame_with_alignment_points.jpg')
     try:
-        output_file.unlink()
+        os.unlink(output_file)
     except:
         pass
     reference_frame_with_alignment_points = alignment_points.show_alignment_box_types(
@@ -183,7 +190,7 @@ if __name__ == "__main__":
     my_timer.create('Save Image')
     output_file = Path('Images/' + input_file + '_stacked.tiff')
     try:
-        output_file.unlink()
+        os.unlink(output_file)
     except:
         pass
     frames.save_image(output_file, result, color=frames.color)
