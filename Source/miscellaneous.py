@@ -375,9 +375,8 @@ class Miscellaneous(object):
         # Initialize list of minimum deviations for each search radius and field of deviations.
         dev_r = []
 
-        # Start with shift [0, 0] and proceed in a circular pattern.
+        # Compare frame_window with a stack of shifted reference frame windows stored for radius r.
         for r in arange(search_width_plus_1):
-            # frame_window_stack[radius_start[r]:radius_start[r+1], :, :] = frame_window
             temp_vec = abs(
                 reference_stack[radius_start[r]:radius_start[r + 1], :, :] - frame_window).sum(
                 axis=(1, 2))
