@@ -23,7 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 import cv2
 import os
 from numpy import sqrt, average, diff, sum, hypot, arange, zeros, unravel_index, argmax, array, \
-    matmul, stack, empty, sin, uint8
+    matmul, stack, empty, sin, min, argmin
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
@@ -178,7 +178,7 @@ class Miscellaneous(object):
         :param y_high: Upper y coordinate limit
         :param x_low: Lower x coordinate limit
         :param x_high: Upper x coordinate limit
-        :param search_width: maximum radius of the search spiral
+        :param search_width: Maximum radius of the search spiral
         :param sub_pixel: If True, compute local shifts with sub-pixel accuracy
         :return: ([shift_y, shift_x], [min_r]) with:
                    shift_y, shift_x: shift values of minimum or [0, 0] if no optimum could be found.
@@ -297,28 +297,76 @@ class Miscellaneous(object):
 
     @staticmethod
     def search_local_match_init(reference_frame, y_low, y_high, x_low, x_high, search_width):
+        """
+        As an alternative to the method "search_local_match" above there is a split version
+        consisting of this initialization method and the execution method. For a given alignment
+        point the initialization has to be called once only. The data structures allocated during
+        initialization are re-used with each frame for which the shift against the reference frame
+        is to be computed. The individual frame shift is computed with the execution method below.
+
+        The split version can be better suited for execution on a graphic accelerator. The biggest
+        part of the data does not change between frame executions, so it has to be copied to the
+        graphics memory only once. The executions for individual frames only need little additional
+        data, and they can be performed in parallel.
+
+        The split version is not available with subpixel accuracy.
+
+        :param reference_frame: Reference frame, against which the current frame shift is to be
+                                computed (note: The full frame, not the alignment box)
+        :param y_low: Lower y coordinate limit of alignment box in reference frame
+        :param y_high: Upper y coordinate limit of alignment box in reference frame
+        :param x_low: Lower x coordinate limit of alignment box in reference frame
+        :param x_high: Upper x coordinate limit of alignment box in reference frame
+        :param search_width: Maximum radius of the search spiral
+        :return: (reference_stack, displacements,  radius_start) witn
+                  reference_stack: Stack of shifted reference frame alignment boxes
+                  displacements: List of [dy, dx] displacements for all stack elements
+                  radius_start: Start indices into "reference_stack" and "displacements" for each
+                                radius (from 0 to search_width)
+        """
         # Compute the maximal number of shifts to be tested.
         search_dim = (2*search_width+1)**2
 
+        # Allocate permanent data structures.
         window_height = y_high - y_low
         window_width = x_high - x_low
-        reference_stack = empty([window_height, window_width, search_dim], dtype=reference_frame.dtype)
+        reference_stack = empty([search_dim, window_height, window_width],
+                                dtype=reference_frame.dtype)
         displacements = []
         radius_start = [0]
+
+        # Create the reference_stack containing shifted windows into the reference frame.
         index = 0
-        for r in range(search_width+1):
+        for r in range(search_width + 1):
             # Create an enumerator which produces shift values [dy, dx] in a circular pattern
             # with radius "r".
             circle_r = Miscellaneous.circle_around(0, 0, r)
             for (dx, dy) in circle_r:
-                reference_stack[:,:,index] = reference_frame[y_low + dy:y_high + dy, x_low + dx:x_high + dx]
+                reference_stack[index, :, :] = reference_frame[y_low + dy:y_high + dy,
+                                               x_low + dx:x_high + dx]
                 displacements.append([dy, dx])
                 index += 1
             radius_start.append(index)
-        return (reference_stack, displacements,  radius_start)
+        return (reference_stack, displacements, radius_start)
 
     @staticmethod
     def search_local_match_execute(frame_window, reference_stack, displacements, radius_start):
+        """
+        The "execute" method of the split version of "search_local_match". This method is executed
+        for each frame, potentially in parallel for all frames.
+
+        :param frame_window: Window into the current frame of the same shape as specified for the
+                             reference window in the init method. Be careful: the current frame and
+                             the reference frame have different shapes.
+        :param reference_stack: Permanent object allocated by init routing (see above)
+        :param displacements: Permanent object allocated by init routing (see above)
+        :param radius_start: Permanent object allocated by init routing (see above)
+        :return: ([shift_y, shift_x], [min_r]) with:
+                   shift_y, shift_x: shift values of minimum or [0, 0] if no optimum could be found.
+                   [dev_r]: list of minimum deviations for radius r=0 ... r_max, where r_max is the
+                            widest search radius tested.
+        """
+
         search_width_plus_1 = len(radius_start)
         # Initialize the global optimum with an impossibly large value.
         deviation_min = 1.e30
@@ -329,12 +377,22 @@ class Miscellaneous(object):
 
         # Start with shift [0, 0] and proceed in a circular pattern.
         for r in arange(search_width_plus_1):
-            deviation_min_r, index_min_r = 1.e30, None
-            for index in arange(radius_start[r], radius_start[r+1]):
-                deviation = abs(reference_stack[:,:,index] - frame_window).sum()
-                if deviation < deviation_min_r:
-                    deviation_min_r = deviation
-                    index_min_r = index
+            # frame_window_stack[radius_start[r]:radius_start[r+1], :, :] = frame_window
+            temp_vec = abs(
+                reference_stack[radius_start[r]:radius_start[r + 1], :, :] - frame_window).sum(
+                axis=(1, 2))
+            deviation_min_r = min(temp_vec)
+            index_min_r = argmin(temp_vec) + radius_start[r]
+
+            # The same in loop notation:
+            #
+            # deviation_min_r, index_min_r = 1.e30, None
+            # for index in arange(radius_start[r], radius_start[r+1]):
+            #     deviation = abs(reference_stack[index, :,:] - frame_window).sum()
+            #     if deviation < deviation_min_r:
+            #         deviation_min_r = deviation
+            #         index_min_r = index
+                    
             # Append the minimal deviation for radius r to list of minima.
             dev_r.append(deviation_min_r)
 
@@ -345,6 +403,7 @@ class Miscellaneous(object):
             else:
                 deviation_min = deviation_min_r
                 index_min = index_min_r
+
         # If within the maximum search radius no optimum could be found, return [0, 0].
         return [0, 0], dev_r
 
@@ -498,8 +557,8 @@ if __name__ == "__main__":
                     reference_x_low:reference_x_low + window_width]
 
     # Set the true displacement vector to be checked against the result of the search function.
-    displacement_y = 3
-    displacement_x = 2
+    displacement_y = 12
+    displacement_x = -13
 
     # The start point for the local search is offset from the true matching point.
     y_low = reference_y_low + displacement_y
@@ -521,6 +580,9 @@ if __name__ == "__main__":
     print("True displacements: " + str([displacement_y, displacement_x]) + ", computed: " + str(
         [dy, dx]) + ", execution time (s): " + str((end - start) / rep_count))
 
+    # Now test the alternative method in comparison to the straight-forward one. First,
+    # compute the reference frame box stack. The initialization has to be performed only once for
+    # each alignment point. It can be reused for all frames containing the AP.
     start = time()
     for iter in range(rep_count):
         reference_stack, displacements, radius_start = \
@@ -530,10 +592,12 @@ if __name__ == "__main__":
     end = time()
     print("Match initialization time (s): " + str((end - start) / rep_count))
 
+    # Compute the displacement. The result should be the same as above.
     start = time()
     for iter in range(rep_count):
         [dy, dx], dev_r = Miscellaneous.search_local_match_execute(
-            frame[y_low:y_high, x_low:x_high], reference_stack, displacements, radius_start)
+            frame[y_low:y_high, x_low:x_high], reference_stack, displacements,
+            radius_start)
     end = time()
     print("Match execution, true displacements: " + str(
         [displacement_y, displacement_x]) + ", computed: " + str(
