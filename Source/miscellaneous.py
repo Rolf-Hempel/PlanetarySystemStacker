@@ -23,7 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 import cv2
 import os
 from numpy import sqrt, average, diff, sum, hypot, arange, zeros, unravel_index, argmax, array, \
-    matmul, stack, empty, sin
+    matmul, stack, empty, sin, uint8
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
@@ -296,6 +296,59 @@ class Miscellaneous(object):
         return y_correction, x_correction
 
     @staticmethod
+    def search_local_match_init(reference_frame, y_low, y_high, x_low, x_high, search_width):
+        # Compute the maximal number of shifts to be tested.
+        search_dim = (2*search_width+1)**2
+
+        window_height = y_high - y_low
+        window_width = x_high - x_low
+        reference_stack = empty([window_height, window_width, search_dim], dtype=reference_frame.dtype)
+        displacements = []
+        radius_start = [0]
+        index = 0
+        for r in range(search_width+1):
+            # Create an enumerator which produces shift values [dy, dx] in a circular pattern
+            # with radius "r".
+            circle_r = Miscellaneous.circle_around(0, 0, r)
+            for (dx, dy) in circle_r:
+                reference_stack[:,:,index] = reference_frame[y_low + dy:y_high + dy, x_low + dx:x_high + dx]
+                displacements.append([dy, dx])
+                index += 1
+            radius_start.append(index)
+        return (reference_stack, displacements,  radius_start)
+
+    @staticmethod
+    def search_local_match_execute(frame_window, reference_stack, displacements, radius_start):
+        search_width_plus_1 = len(radius_start)
+        # Initialize the global optimum with an impossibly large value.
+        deviation_min = 1.e30
+        index_min = None
+
+        # Initialize list of minimum deviations for each search radius and field of deviations.
+        dev_r = []
+
+        # Start with shift [0, 0] and proceed in a circular pattern.
+        for r in arange(search_width_plus_1):
+            deviation_min_r, index_min_r = 1.e30, None
+            for index in arange(radius_start[r], radius_start[r+1]):
+                deviation = abs(reference_stack[:,:,index] - frame_window).sum()
+                if deviation < deviation_min_r:
+                    deviation_min_r = deviation
+                    index_min_r = index
+            # Append the minimal deviation for radius r to list of minima.
+            dev_r.append(deviation_min_r)
+
+            if deviation_min_r >= deviation_min:
+                return displacements[index_min], dev_r
+
+            # Otherwise, update the current optimum and continue.
+            else:
+                deviation_min = deviation_min_r
+                index_min = index_min_r
+        # If within the maximum search radius no optimum could be found, return [0, 0].
+        return [0, 0], dev_r
+
+    @staticmethod
     def insert_cross(frame, y_center, x_center, cross_half_len, color):
         """
         Insert a colored cross into an image at a given location.
@@ -445,8 +498,8 @@ if __name__ == "__main__":
                     reference_x_low:reference_x_low + window_width]
 
     # Set the true displacement vector to be checked against the result of the search function.
-    displacement_y = 6
-    displacement_x = -5
+    displacement_y = 3
+    displacement_x = 2
 
     # The start point for the local search is offset from the true matching point.
     y_low = reference_y_low + displacement_y
@@ -465,6 +518,23 @@ if __name__ == "__main__":
                                                            x_low, x_high, search_width,
                                                            sub_pixel=False)
     end = time()
-
     print("True displacements: " + str([displacement_y, displacement_x]) + ", computed: " + str(
-        [dy, dx]) + ", execution time (s): " + str((end-start)/rep_count))
+        [dy, dx]) + ", execution time (s): " + str((end - start) / rep_count))
+
+    start = time()
+    for iter in range(rep_count):
+        reference_stack, displacements, radius_start = \
+            Miscellaneous.search_local_match_init(frame, reference_y_low,
+                                                  reference_y_low + window_height, reference_x_low,
+                                                  reference_x_low + window_width, search_width)
+    end = time()
+    print("Match initialization time (s): " + str((end - start) / rep_count))
+
+    start = time()
+    for iter in range(rep_count):
+        [dy, dx], dev_r = Miscellaneous.search_local_match_execute(
+            frame[y_low:y_high, x_low:x_high], reference_stack, displacements, radius_start)
+    end = time()
+    print("Match execution, true displacements: " + str(
+        [displacement_y, displacement_x]) + ", computed: " + str(
+        [dy, dx]) + ", execution time (s): " + str((end - start) / rep_count))

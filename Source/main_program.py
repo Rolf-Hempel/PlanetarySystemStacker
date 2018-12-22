@@ -55,8 +55,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Example-3*.jpg')
     else:
         # input_file = 'short_video'
-        # input_file = 'another_short_video'
-        input_file = 'Moon_Tile-024_043939'
+        input_file = 'another_short_video'
+        # input_file = 'Moon_Tile-024_043939'
         names = 'Videos/' + input_file + '.avi'
     print(names)
 
