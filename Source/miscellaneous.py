@@ -23,10 +23,11 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 import cv2
 import os
 from numpy import sqrt, average, diff, sum, hypot, arange, zeros, unravel_index, argmax, array, \
-    matmul, stack
+    matmul, stack, empty, sin
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
+from time import time
 
 from exceptions import DivideByZeroError
 
@@ -415,3 +416,55 @@ class Miscellaneous(object):
                         lineType)
             out.write(rgb_frame)
         out.release()
+
+
+if __name__ == "__main__":
+
+    # Test program for routine search_local_match
+
+    # Set the size of the image frame.
+    frame_height = 960
+    frame_width = 1280
+
+    # Initialize the frame with a wave-like pattern in x and y directions.
+    x_max = 30.
+    x_vec = arange(0., x_max, x_max / frame_width)
+    y_max = 25.
+    y_vec = arange(0., y_max, y_max / frame_height)
+    frame = empty((frame_height, frame_width))
+    for y_j, y in enumerate(y_vec):
+        for x_i, x in enumerate(x_vec):
+            frame[y_j, x_i] = sin(y) * sin(x)
+
+    # Set the size and location of the reference frame window and cut it out from the frame.
+    window_height = 40
+    window_width = 50
+    reference_y_low = 400
+    reference_x_low = 500
+    reference_box = frame[reference_y_low:reference_y_low + window_height,
+                    reference_x_low:reference_x_low + window_width]
+
+    # Set the true displacement vector to be checked against the result of the search function.
+    displacement_y = 6
+    displacement_x = -5
+
+    # The start point for the local search is offset from the true matching point.
+    y_low = reference_y_low + displacement_y
+    y_high = y_low + window_height
+    x_low = reference_x_low + displacement_x
+    x_high = x_low + window_width
+
+    # Set the radius of the search area.
+    search_width = 20
+
+    # compute the displacement vector, and print a comparison of the true and computed values.
+    start = time()
+    rep_count = 100
+    for iter in range(rep_count):
+        [dy, dx], dev_r = Miscellaneous.search_local_match(reference_box, frame, y_low, y_high, x_low,
+                                                       x_high, search_width,
+                                                       sub_pixel=False)
+    end = time()
+
+    print("True displacements: " + str([displacement_y, displacement_x]) + ", computed: " + str(
+        [dy, dx]) + ", execution time (s): " + str((end-start)/rep_count))
