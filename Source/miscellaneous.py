@@ -461,9 +461,9 @@ if __name__ == "__main__":
     start = time()
     rep_count = 100
     for iter in range(rep_count):
-        [dy, dx], dev_r = Miscellaneous.search_local_match(reference_box, frame, y_low, y_high, x_low,
-                                                       x_high, search_width,
-                                                       sub_pixel=False)
+        [dy, dx], dev_r = Miscellaneous.search_local_match(reference_box, frame, y_low, y_high,
+                                                           x_low, x_high, search_width,
+                                                           sub_pixel=False)
     end = time()
 
     print("True displacements: " + str([displacement_y, displacement_x]) + ", computed: " + str(
