@@ -25,7 +25,7 @@ class Configuration(object):
         self.mono_channel = 'green'
         self.frame_score_pixel_stride = 2
         self.frame_score_method = "Laplace"
-        self.alignment_method = "LocalSearch"
+        self.frame_alignment_method = "SteepestDescent"
         self.alignment_rectangle_scale_factor = 3
         self.alignment_border_width = 6
         self.frame_alignment_sampling_stride = 2
@@ -39,9 +39,9 @@ class Configuration(object):
         self.alignment_point_structure_threshold = 0.05
         self.alignment_point_brightness_threshold = 10
         self.alignment_point_contrast_threshold = 5
-        self.alignment_point_method = 'LocalSearch'
+        self.alignment_point_method = 'SteepestDescent'
         self.alignment_point_search_width = 20
-        self.alignment_point_sampling_stride = 2
+        self.alignment_point_sampling_stride = 1
         self.quality_area_number_y = 5
         self.quality_area_number_x = 6
         self.quality_area_pixel_stride = 2

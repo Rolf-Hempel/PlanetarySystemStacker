@@ -417,6 +417,88 @@ class Miscellaneous(object):
         return [0, 0], dev_r
 
     @staticmethod
+    def search_local_match_gradient(reference_box, frame, y_low, y_high, x_low, x_high, search_width,
+                           sampling_stride):
+        """
+        Try shifts in y, x between the box around the alignment point in the mean frame and the
+        corresponding box in the given frame. Start with shifts [0, 0] and move out in steps until
+        a local optimum is reached. In each step try all positions with distance 1 in y and/or x
+        from the optimum found in the previous step (steepest descent). The global frame shift is
+        accounted for beforehand already.
+
+        :param reference_box: Image box around alignment point in mean frame.
+        :param frame: Given frame for which the local shift at the alignment point is to be
+                      computed.
+        :param y_low: Lower y coordinate limit of box in given frame, taking into account the
+                      global shift and the different sizes of the mean frame and the original
+                      frames.
+        :param y_high: Upper y coordinate limit
+        :param x_low: Lower x coordinate limit
+        :param x_high: Upper x coordinate limit
+        :param search_width: Maximum distance in y and x from origin of the search area
+        :param sampling_stride: Stride in both coordinate directions used in computing deviations
+        :return: ([shift_y, shift_x], [min_r]) with:
+                   shift_y, shift_x: shift values of minimum or [0, 0] if no optimum could be found.
+                   [dev_r]: list of minimum deviations for all steps until a local minimum is found.
+        """
+
+        # Initialize the global optimum with an impossibly large value.
+        deviation_min = 1.e30
+        dy_min = 0
+        dx_min = 0
+
+        # Initialize list of minimum deviations for each search radius and field of deviations.
+        dev_r = []
+        deviations = np.zeros((2 * search_width + 1, 2 * search_width + 1))
+
+        # Start with shift [0, 0]. Stop when a circle with radius 1 around the current optimum
+        # reaches beyond the search area.
+        while max(abs(dy_min), abs(dx_min)) < search_width-1:
+
+            # Create an enumerator which produces shift values [dy, dx] in a circular pattern
+            # with radius 1 around the current optimum [dy_min, dx_min].
+            circle_1 = Miscellaneous.circle_around(dx_min, dy_min, 1)
+
+            # Initialize the optimum for the new circle to an impossibly large value,
+            # and the corresponding shifts to None.
+            deviation_min_1, dy_min_1, dx_min_1 = 1.e30, None, None
+
+            # Go through the circle with radius 1 and compute the difference (deviation)
+            # between the shifted frame and the corresponding box in the mean frame. Find the
+            # minimum "deviation_min_1".
+            if sampling_stride != 1:
+                for (dx, dy) in circle_1:
+                    deviation = abs(
+                        reference_box[::sampling_stride, ::sampling_stride] - frame[
+                                      y_low - dy:y_high - dy:sampling_stride,
+                                      x_low - dx:x_high - dx:sampling_stride]).sum()
+                    if deviation < deviation_min_1:
+                        deviation_min_1, dy_min_1, dx_min_1 = deviation, dy, dx
+                    deviations[dy + search_width, dx + search_width] = deviation
+            else:
+                for (dx, dy) in circle_1:
+                    deviation = abs(
+                        reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
+                    if deviation < deviation_min_1:
+                        deviation_min_1, dy_min_1, dx_min_1 = deviation, dy, dx
+                    deviations[dy + search_width, dx + search_width] = deviation
+
+            # Append the minimal deviation found in this step to list of minima.
+            dev_r.append(deviation_min_1)
+
+            # If for the current center the match is better than for all neighboring points, a
+            # local optimum is found.
+            if deviation_min_1 >= deviation_min:
+                return [dy_min, dx_min], dev_r
+
+            # Otherwise, update the current optimum and continue.
+            else:
+                deviation_min, dy_min, dx_min = deviation_min_1, dy_min_1, dx_min_1
+
+        # If within the maximum search radius no optimum could be found, return [0, 0].
+        return [0, 0], dev_r
+
+    @staticmethod
     def insert_cross(frame, y_center, x_center, cross_half_len, color):
         """
         Insert a colored cross into an image at a given location.
@@ -566,8 +648,8 @@ if __name__ == "__main__":
                     reference_x_low:reference_x_low + window_width]
 
     # Set the true displacement vector to be checked against the result of the search function.
-    displacement_y = 12
-    displacement_x = -13
+    displacement_y = 1
+    displacement_x = -2
 
     # The start point for the local search is offset from the true matching point.
     y_low = reference_y_low + displacement_y
@@ -579,7 +661,8 @@ if __name__ == "__main__":
     search_width = 20
     sampling_stride = 1
 
-    # compute the displacement vector, and print a comparison of the true and computed values.
+    # First try the standard method "search_local_match". Compute the displacement vector, and
+    # print a comparison of the true and computed values.
     start = time()
     rep_count = 100
     for iter in range(rep_count):
@@ -587,8 +670,19 @@ if __name__ == "__main__":
                                                            x_low, x_high, search_width,
                                                            sampling_stride, sub_pixel=False)
     end = time()
-    print("True displacements: " + str([displacement_y, displacement_x]) + ", computed: " + str(
-        [dy, dx]) + ", execution time (s): " + str((end - start) / rep_count))
+    print("Standard method, true displacements: " + str([displacement_y, displacement_x]) +
+          ", computed: " + str([dy, dx]) + ", execution time (s): " + str((end - start) / rep_count))
+
+    # As a comparison, do the same using the steepest descent method.
+    start = time()
+    for iter in range(rep_count):
+        [dy, dx], dev_r = Miscellaneous.search_local_match_gradient(reference_box, frame,
+                                                                    y_low, y_high,
+                                                                    x_low, x_high, search_width,
+                                                                    sampling_stride)
+    end = time()
+    print("steepest descent, true displacements: " + str([displacement_y, displacement_x]) +
+          ", computed: " + str([dy, dx]) + ", execution time (s): " + str((end - start) / rep_count))
 
     # Now test the alternative method in comparison to the straight-forward one. First,
     # compute the reference frame box stack. The initialization has to be performed only once for

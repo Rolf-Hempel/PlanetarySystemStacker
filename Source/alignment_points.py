@@ -485,7 +485,7 @@ class AlignmentPoints(object):
                                                         box_in_frame, box_in_frame.shape)
 
             # Use a local search (see method "search_local_match" below.
-            elif self.configuration.alignment_point_method == 'LocalSearch':
+            elif self.configuration.alignment_point_method == 'RadialSearch':
                 shift_pixel, dev_r = Miscellaneous.search_local_match(
                     self.alignment_boxes[j][i]['box'],
                     self.frames.frames_mono_blurred[frame_index],
@@ -493,6 +493,15 @@ class AlignmentPoints(object):
                     self.configuration.alignment_point_search_width,
                     self.configuration.alignment_point_sampling_stride,
                     sub_pixel=self.configuration.alignment_sub_pixel)
+
+            # Use the steepest descent search method.
+            elif self.configuration.alignment_point_method == 'SteepestDescent':
+                shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(
+                    self.alignment_boxes[j][i]['box'],
+                    self.frames.frames_mono_blurred[frame_index],
+                    y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                    self.configuration.alignment_point_search_width,
+                    self.configuration.alignment_point_sampling_stride)
             else:
                 raise NotSupportedError("The point shift computation method " +
                                         self.configuration.alignment_point_method +

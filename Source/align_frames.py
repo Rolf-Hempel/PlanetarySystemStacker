@@ -148,11 +148,12 @@ class AlignFrames(object):
                 frame = self.frames_mono_blurred[idx]
                 frame_window = self.frames_mono_blurred[idx][self.y_low_opt:self.y_high_opt,
                                self.x_low_opt:self.x_high_opt]
-                if self.configuration.alignment_method == "Translation":
+                if self.configuration.frame_alignment_method == "Translation":
                     self.frame_shifts.append(
                         Miscellaneous.translation(self.reference_window, frame_window,
                                                   self.reference_window_shape))
-                elif self.configuration.alignment_method == "LocalSearch":
+                    continue
+                elif self.configuration.frame_alignment_method == "RadialSearch":
                     # Spiral out from the shift position of the previous frame and search for the
                     # local optimum.
                     [dy_min, dx_min], dev_r = Miscellaneous.search_local_match(
@@ -162,62 +163,74 @@ class AlignFrames(object):
                                                       self.x_high_opt - dx_min_cum,
                         self.configuration.alignment_point_search_width,
                         self.configuration.frame_alignment_sampling_stride, sub_pixel=False)
-                    # Update the cumulative shift values to be used as starting point for the
-                    # next frame.
-                    dy_min_cum += dy_min
-                    dx_min_cum += dx_min
-                    self.frame_shifts.append([dy_min_cum, dx_min_cum])
-                    if len(dev_r) > 2 and dy_min == 0 and dx_min == 0:
-                        self.failed_index_list.append(idx)
-                        self.dev_r_list.append(dev_r)
-
-                    # If the alignment window gets too close to a frame edge, move it away from
-                    # that edge by half the border width.
-                    new_reference_window = False
-                    # Start with the lower y edge.
-                    if self.y_low_opt - dy_min_cum < \
-                            self.configuration.alignment_point_search_width + \
-                            self.configuration.alignment_border_width / 2:
-                        self.y_low_opt += ceil(self.configuration.alignment_border_width / 2.)
-                        self.y_high_opt += ceil(self.configuration.alignment_border_width / 2.)
-                        new_reference_window = True
-                    # Now the upper y edge.
-                    elif self.y_high_opt - dy_min_cum > self.shape[
-                        0] - self.configuration.alignment_point_search_width - \
-                            self.configuration.alignment_border_width / 2:
-                        self.y_low_opt -= ceil(self.configuration.alignment_border_width / 2.)
-                        self.y_high_opt -= ceil(self.configuration.alignment_border_width / 2.)
-                        new_reference_window = True
-                    # Now the lower x edge.
-                    if self.x_low_opt - dx_min_cum < \
-                            self.configuration.alignment_point_search_width + \
-                            self.configuration.alignment_border_width / 2:
-                        self.x_low_opt += ceil(self.configuration.alignment_border_width / 2.)
-                        self.x_high_opt += ceil(self.configuration.alignment_border_width / 2.)
-                        new_reference_window = True
-                    # Now the upper x edge.
-                    elif self.x_high_opt - dx_min_cum > self.shape[
-                        1] - self.configuration.alignment_point_search_width - \
-                            self.configuration.alignment_border_width / 2:
-                        self.x_low_opt -= ceil(self.configuration.alignment_border_width / 2.)
-                        self.x_high_opt -= ceil(self.configuration.alignment_border_width / 2.)
-                        new_reference_window = True
-                    # If the window was moved, update the "reference_window".
-                    if new_reference_window:
-                        print("New alignment rectangle, frame: " + str(idx) + ", x_low: " + str(
-                            self.x_low_opt) + ", x_high: " + str(
-                            self.x_high_opt) + ", y_low: " + str(
-                            self.y_low_opt) + ", y_high: " + str(
-                            self.y_high_opt))
-                        self.reference_window = self.frames_mono_blurred[
-                                                    self.frame_ranks_max_index][
-                                                    self.y_low_opt:self.y_high_opt,
-                                                    self.x_low_opt:self.x_high_opt]
-
+                elif self.configuration.frame_alignment_method == "SteepestDescent":
+                    # Spiral out from the shift position of the previous frame and search for the
+                    # local optimum.
+                    [dy_min, dx_min], dev_r = Miscellaneous.search_local_match_gradient(
+                        self.reference_window, frame, self.y_low_opt - dy_min_cum,
+                                                      self.y_high_opt - dy_min_cum,
+                                                      self.x_low_opt - dx_min_cum,
+                                                      self.x_high_opt - dx_min_cum,
+                        self.configuration.alignment_point_search_width,
+                        self.configuration.frame_alignment_sampling_stride)
                 else:
                     raise NotSupportedError(
                         "Frame alignment method " + configuration.alignment_method +
                         " not supported")
+
+                # Update the cumulative shift values to be used as starting point for the
+                # next frame.
+                dy_min_cum += dy_min
+                dx_min_cum += dx_min
+                self.frame_shifts.append([dy_min_cum, dx_min_cum])
+                if len(dev_r) > 2 and dy_min == 0 and dx_min == 0:
+                    self.failed_index_list.append(idx)
+                    self.dev_r_list.append(dev_r)
+
+                # If the alignment window gets too close to a frame edge, move it away from
+                # that edge by half the border width.
+                new_reference_window = False
+                # Start with the lower y edge.
+                if self.y_low_opt - dy_min_cum < \
+                        self.configuration.alignment_point_search_width + \
+                        self.configuration.alignment_border_width / 2:
+                    self.y_low_opt += ceil(self.configuration.alignment_border_width / 2.)
+                    self.y_high_opt += ceil(self.configuration.alignment_border_width / 2.)
+                    new_reference_window = True
+                # Now the upper y edge.
+                elif self.y_high_opt - dy_min_cum > self.shape[
+                    0] - self.configuration.alignment_point_search_width - \
+                        self.configuration.alignment_border_width / 2:
+                    self.y_low_opt -= ceil(self.configuration.alignment_border_width / 2.)
+                    self.y_high_opt -= ceil(self.configuration.alignment_border_width / 2.)
+                    new_reference_window = True
+                # Now the lower x edge.
+                if self.x_low_opt - dx_min_cum < \
+                        self.configuration.alignment_point_search_width + \
+                        self.configuration.alignment_border_width / 2:
+                    self.x_low_opt += ceil(self.configuration.alignment_border_width / 2.)
+                    self.x_high_opt += ceil(self.configuration.alignment_border_width / 2.)
+                    new_reference_window = True
+                # Now the upper x edge.
+                elif self.x_high_opt - dx_min_cum > self.shape[
+                    1] - self.configuration.alignment_point_search_width - \
+                        self.configuration.alignment_border_width / 2:
+                    self.x_low_opt -= ceil(self.configuration.alignment_border_width / 2.)
+                    self.x_high_opt -= ceil(self.configuration.alignment_border_width / 2.)
+                    new_reference_window = True
+                # If the window was moved, update the "reference_window".
+                if new_reference_window:
+                    # print("New alignment rectangle, frame: " + str(idx) + ", x_low: " + str(
+                    #     self.x_low_opt) + ", x_high: " + str(
+                    #     self.x_high_opt) + ", y_low: " + str(
+                    #     self.y_low_opt) + ", y_high: " + str(
+                    #     self.y_high_opt))
+                    self.reference_window = self.frames_mono_blurred[
+                                                self.frame_ranks_max_index][
+                                                self.y_low_opt:self.y_high_opt,
+                                                self.x_low_opt:self.x_high_opt]
+
+
 
         # Compute the shape of the area contained in all frames in the form [[y_low, y_high],
         # [x_low, x_high]]
