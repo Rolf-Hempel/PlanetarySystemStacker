@@ -20,6 +20,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
+import ctypes
 import glob
 import os
 from pathlib import Path
@@ -43,6 +44,15 @@ if __name__ == "__main__":
     graphical unser interface. It is not used in production runs.
     
     """
+
+    mkl_rt = ctypes.CDLL('mkl_rt.dll')
+    mkl_get_max_threads = mkl_rt.mkl_get_max_threads
+
+    def mkl_set_num_threads(cores):
+        mkl_rt.mkl_set_num_threads(ctypes.byref(ctypes.c_int(cores)))
+
+    mkl_set_num_threads(2)
+    print ("Number of threads used by mkl: " + str(mkl_get_max_threads()))
 
     # Initalize the timer object used to measure execution times of program sections.
     my_timer = timer()
