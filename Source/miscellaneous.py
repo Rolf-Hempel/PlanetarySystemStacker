@@ -22,8 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import cv2
 import os
-from numpy import sqrt, average, diff, sum, hypot, arange, zeros, unravel_index, argmax, array, \
-    matmul, stack, empty, sin, min, argmin
+import numpy as np
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
@@ -49,12 +48,12 @@ class Miscellaneous(object):
         """
 
         # Compute for each point the local gradient in both coordinate directions.
-        dx = diff(frame)[:, :]
-        dy = diff(frame, axis=0)[:, :]
+        dx = np.diff(frame)[:, :]
+        dy = np.diff(frame, axis=0)[:, :]
 
         # Compute the sharpness per coordinate direction as the 2-norm of point values.
-        sharpness_x = average(sqrt(dx ** 2))
-        sharpness_y = average(sqrt(dy ** 2))
+        sharpness_x = np.average(np.sqrt(dx ** 2))
+        sharpness_y = np.average(np.sqrt(dy ** 2))
 
         # Return the sharpness in the direction where it is minimal.
         sharpness = min(sharpness_x, sharpness_y)
@@ -106,7 +105,7 @@ class Miscellaneous(object):
         frame_int32 = frame[::stride, ::stride].astype('int32')
         dx = sobel(frame_int32, 0)  # vertical derivative
         dy = sobel(frame_int32, 1)  # horizontal derivative
-        mag = hypot(dx, dy)  # magnitude
+        mag = np.hypot(dx, dy)  # magnitude
         sharpness = sum(mag)
         return sharpness
 
@@ -123,10 +122,10 @@ class Miscellaneous(object):
         frame_strided = frame[::stride, ::stride]
 
         # Remove a row or column, respectively, to make the dx and dy arrays of the same shape.
-        dx = diff(frame_strided)[1:, :]  # remove the first row
-        dy = diff(frame_strided, axis=0)[:, 1:]  # remove the first column
-        dnorm = sqrt(dx ** 2 + dy ** 2)
-        sharpness = average(dnorm)
+        dx = np.diff(frame_strided)[1:, :]  # remove the first row
+        dy = np.diff(frame_strided, axis=0)[:, 1:]  # remove the first column
+        dnorm = np.sqrt(dx ** 2 + dy ** 2)
+        sharpness = np.average(dnorm)
         return sharpness
 
     @staticmethod
@@ -150,7 +149,7 @@ class Miscellaneous(object):
         ir = abs(ifft2((f0 * f1.conjugate()) / (abs(f0) * abs(f1))))
 
         # Compute the pixel coordinates of the image maximum.
-        ty, tx = unravel_index(argmax(ir), shape)
+        ty, tx = np.unravel_index(np.argmax(ir), shape)
 
         # Bring the shift values as close as possible to the coordinate origin.
         if ty > shape[0] // 2:
@@ -162,7 +161,7 @@ class Miscellaneous(object):
 
     @staticmethod
     def search_local_match(reference_box, frame, y_low, y_high, x_low, x_high, search_width,
-                           sub_pixel=True):
+                           sampling_stride, sub_pixel=True):
         """
         Try shifts in y, x between the box around the alignment point in the mean frame and the
         corresponding box in the given frame. Start with shifts [0, 0] and move out in a circular
@@ -179,6 +178,7 @@ class Miscellaneous(object):
         :param x_low: Lower x coordinate limit
         :param x_high: Upper x coordinate limit
         :param search_width: Maximum radius of the search spiral
+        :param sampling_stride: Stride in both coordinate directions used in computing deviations
         :param sub_pixel: If True, compute local shifts with sub-pixel accuracy
         :return: ([shift_y, shift_x], [min_r]) with:
                    shift_y, shift_x: shift values of minimum or [0, 0] if no optimum could be found.
@@ -193,10 +193,10 @@ class Miscellaneous(object):
 
         # Initialize list of minimum deviations for each search radius and field of deviations.
         dev_r = []
-        deviations = zeros((2 * search_width + 1, 2 * search_width + 1))
+        deviations = np.zeros((2 * search_width + 1, 2 * search_width + 1))
 
         # Start with shift [0, 0] and proceed in a circular pattern.
-        for r in arange(search_width + 1):
+        for r in np.arange(search_width + 1):
 
             # Create an enumerator which produces shift values [dy, dx] in a circular pattern
             # with radius "r".
@@ -209,14 +209,24 @@ class Miscellaneous(object):
             # Go through the circle with radius "r" and compute the difference (deviation)
             # between the shifted frame and the corresponding box in the mean frame. Find the
             # minimum "deviation_min_r" for radius "r".
-            for (dx, dy) in circle_r:
-                deviation = abs(
-                    reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
-                # deviation = sqrt(square(
-                #     reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum())
-                if deviation < deviation_min_r:
-                    deviation_min_r, dy_min_r, dx_min_r = deviation, dy, dx
-                deviations[dy + search_width, dx + search_width] = deviation
+            if sampling_stride != 1:
+                for (dx, dy) in circle_r:
+                    deviation = abs(
+                        reference_box[::sampling_stride, ::sampling_stride] - frame[
+                                      y_low - dy:y_high - dy:sampling_stride,
+                                      x_low - dx:x_high - dx:sampling_stride]).sum()
+                    # deviation = sqrt(square(
+                    #     reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum())
+                    if deviation < deviation_min_r:
+                        deviation_min_r, dy_min_r, dx_min_r = deviation, dy, dx
+                    deviations[dy + search_width, dx + search_width] = deviation
+            else:
+                for (dx, dy) in circle_r:
+                    deviation = abs(
+                        reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
+                    if deviation < deviation_min_r:
+                        deviation_min_r, dy_min_r, dx_min_r = deviation, dy, dx
+                    deviations[dy + search_width, dx + search_width] = deviation
 
             # Append the minimal deviation for radius r to list of minima.
             dev_r.append(deviation_min_r)
@@ -266,16 +276,16 @@ class Miscellaneous(object):
         function_values_1d = function_values.reshape((9,))
 
         # There are nine equations for six unknowns. Use normal equations to solve for optimum.
-        a_transpose = array(
+        a_transpose = np.array(
             [[1., 0., 1., 1., 0., 1., 1., 0., 1.], [1., 1., 1., 0., 0., 0., 1., 1., 1.],
              [1., -0., -1., -0., 0., 0., -1., 0., 1.], [-1., 0., 1., -1., 0., 1., -1., 0., 1.],
              [-1., -1., -1., 0., 0., 0., 1., 1., 1.], [1., 1., 1., 1., 1., 1., 1., 1., 1.]])
-        a_transpose_a = array(
+        a_transpose_a = np.array(
             [[6., 4., 0., 0., 0., 6.], [4., 6., 0., 0., 0., 6.], [0., 0., 4., 0., 0., 0.],
              [0., 0., 0., 6., 0., 0.], [0., 0., 0., 0., 6., 0.], [6., 6., 0., 0., 0., 9.]])
 
         # Right hand side is "a transposed times input vector".
-        rhs = matmul(a_transpose, function_values_1d)
+        rhs = np.matmul(a_transpose, function_values_1d)
 
         # Solve for parameters of the fitting function
         # f = a_f * x ** 2 + b_f * y ** 2 + c_f * x * y + d_f * x + e_f * y + g_f
@@ -330,7 +340,7 @@ class Miscellaneous(object):
         # Allocate permanent data structures.
         window_height = y_high - y_low
         window_width = x_high - x_low
-        reference_stack = empty([search_dim, window_height, window_width],
+        reference_stack = np.empty([search_dim, window_height, window_width],
                                 dtype=reference_frame.dtype)
         displacements = []
         radius_start = [0]
@@ -376,12 +386,12 @@ class Miscellaneous(object):
         dev_r = []
 
         # Compare frame_window with a stack of shifted reference frame windows stored for radius r.
-        for r in arange(search_width_plus_1):
+        for r in np.arange(search_width_plus_1):
             temp_vec = abs(
                 reference_stack[radius_start[r]:radius_start[r + 1], :, :] - frame_window).sum(
                 axis=(1, 2))
-            deviation_min_r = min(temp_vec)
-            index_min_r = argmin(temp_vec) + radius_start[r]
+            deviation_min_r = np.min(temp_vec)
+            index_min_r = np.argmin(temp_vec) + radius_start[r]
 
             # The same in loop notation:
             #
@@ -515,7 +525,7 @@ class Miscellaneous(object):
         for index, frame in enumerate(frame_list):
             # If
             if len(frame.shape) == 2:
-                rgb_frame = stack((frame,) * 3, -1)
+                rgb_frame = np.stack((frame,) * 3, -1)
             else:
                 rgb_frame = frame
             cv2.putText(rgb_frame, annotations[index],
@@ -539,13 +549,13 @@ if __name__ == "__main__":
 
     # Initialize the frame with a wave-like pattern in x and y directions.
     x_max = 30.
-    x_vec = arange(0., x_max, x_max / frame_width)
+    x_vec = np.arange(0., x_max, x_max / frame_width)
     y_max = 25.
-    y_vec = arange(0., y_max, y_max / frame_height)
-    frame = empty((frame_height, frame_width))
+    y_vec = np.arange(0., y_max, y_max / frame_height)
+    frame = np.empty((frame_height, frame_width))
     for y_j, y in enumerate(y_vec):
         for x_i, x in enumerate(x_vec):
-            frame[y_j, x_i] = sin(y) * sin(x)
+            frame[y_j, x_i] = np.sin(y) * np.sin(x)
 
     # Set the size and location of the reference frame window and cut it out from the frame.
     window_height = 40
@@ -567,6 +577,7 @@ if __name__ == "__main__":
 
     # Set the radius of the search area.
     search_width = 20
+    sampling_stride = 1
 
     # compute the displacement vector, and print a comparison of the true and computed values.
     start = time()
@@ -574,7 +585,7 @@ if __name__ == "__main__":
     for iter in range(rep_count):
         [dy, dx], dev_r = Miscellaneous.search_local_match(reference_box, frame, y_low, y_high,
                                                            x_low, x_high, search_width,
-                                                           sub_pixel=False)
+                                                           sampling_stride, sub_pixel=False)
     end = time()
     print("True displacements: " + str([displacement_y, displacement_x]) + ", computed: " + str(
         [dy, dx]) + ", execution time (s): " + str((end - start) / rep_count))

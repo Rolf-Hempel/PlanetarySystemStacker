@@ -486,12 +486,13 @@ class AlignmentPoints(object):
 
             # Use a local search (see method "search_local_match" below.
             elif self.configuration.alignment_point_method == 'LocalSearch':
-                shift_pixel, dev_r = Miscellaneous.search_local_match(self.alignment_boxes[j][i]['box'],
-                                                      self.frames.frames_mono_blurred[frame_index],
-                                                      y_low + dy, y_high + dy, x_low + dx,
-                                                      x_high + dx,
-                                                      self.configuration.alignment_point_search_width,
-                                                      sub_pixel=self.configuration.alignment_sub_pixel)
+                shift_pixel, dev_r = Miscellaneous.search_local_match(
+                    self.alignment_boxes[j][i]['box'],
+                    self.frames.frames_mono_blurred[frame_index],
+                    y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                    self.configuration.alignment_point_search_width,
+                    self.configuration.alignment_point_sampling_stride,
+                    sub_pixel=self.configuration.alignment_sub_pixel)
             else:
                 raise NotSupportedError("The point shift computation method " +
                                         self.configuration.alignment_point_method +

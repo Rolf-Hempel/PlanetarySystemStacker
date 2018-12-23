@@ -28,6 +28,7 @@ class Configuration(object):
         self.alignment_method = "LocalSearch"
         self.alignment_rectangle_scale_factor = 3
         self.alignment_border_width = 30
+        self.frame_alignment_sampling_stride = 2
         self.average_frame_percent = 5.
         self.alignment_de_warp= True
         self.alignment_sub_pixel = True
@@ -40,6 +41,7 @@ class Configuration(object):
         self.alignment_point_contrast_threshold = 5
         self.alignment_point_method = 'LocalSearch'
         self.alignment_point_search_width = 20
+        self.alignment_point_sampling_stride = 2
         self.quality_area_number_y = 5
         self.quality_area_number_x = 6
         self.quality_area_pixel_stride = 2
