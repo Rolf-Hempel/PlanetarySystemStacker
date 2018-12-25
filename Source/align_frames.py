@@ -220,11 +220,6 @@ class AlignFrames(object):
                     new_reference_window = True
                 # If the window was moved, update the "reference_window".
                 if new_reference_window:
-                    # print("New alignment rectangle, frame: " + str(idx) + ", x_low: " + str(
-                    #     self.x_low_opt) + ", x_high: " + str(
-                    #     self.x_high_opt) + ", y_low: " + str(
-                    #     self.y_low_opt) + ", y_high: " + str(
-                    #     self.y_high_opt))
                     self.reference_window = self.frames_mono_blurred[
                                                 self.frame_ranks_max_index][
                                                 self.y_low_opt:self.y_high_opt,
@@ -238,10 +233,10 @@ class AlignFrames(object):
                                     min(b[0] for b in self.frame_shifts) + self.shape[0]],
                                    [max(b[1] for b in self.frame_shifts),
                                     min(b[1] for b in self.frame_shifts) + self.shape[1]]]
-        self.intersection_number_pixels = (self.intersection_shape[0][1] -
-                                           self.intersection_shape[0][0]) * \
-                                          (self.intersection_shape[1][1] -
-                                           self.intersection_shape[1][0])
+        # self.intersection_number_pixels = (self.intersection_shape[0][1] -
+        #                                    self.intersection_shape[0][0]) * \
+        #                                   (self.intersection_shape[1][1] -
+        #                                    self.intersection_shape[1][0])
         if len(self.failed_index_list) > 0:
             raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
                                 " frames: " + str(self.failed_index_list))
@@ -330,8 +325,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Example-3*.jpg')
     else:
         # file = 'short_video'
-        # file = 'another_short_video'
-        file = 'Moon_Tile-024_043939'
+        file = 'another_short_video'
+        # file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)
 

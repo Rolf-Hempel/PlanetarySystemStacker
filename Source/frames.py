@@ -102,30 +102,12 @@ class Frames(object):
         self.frames_mono = None
         self.frames_mono_blurred = None
 
-        # Initialize the list with used quality areas for every frame.
-        self.used_quality_areas = [0 for i in range(self.number)]
-
-    def extract_channel(self, index, color):
-        """
-        Extract a color channel from an RGB frame.
-
-        :param index: Frame index
-        :param color: Either "red" or "green" or "blue"
-        :return: 2D array with the selected color channel of the frame with index "index"
-        """
-
-        if not self.color:
-            raise ShapeError("Cannot extract color channel from monochrome image")
-        colors = ['red', 'green', 'blue']
-        if not color in colors:
-            raise ArgumentError("Invalid color selected for channel extraction")
-
-        # Collapse the 3D array by the color dimension.
-        return self.frames[index][:, :, colors.index(color)]
+        # Initialize the list with used alignment points for every frame.
+        self.used_alignment_points = [0 for i in range(self.number)]
 
     def add_monochrome(self, color):
         """
-        Same as method "extract_channel", but for all frames. Add a list of monochrome frames
+        Create monochrome versions of all frames. Add a list of monochrome frames
         "self.frames_mono". If the original frames are monochrome, just point the monochrome frame
         list to the original images (no deep copy!). Also, add a blurred version of the frame list
         (using a Gaussian filter) "self.frames_mono_blurred".
@@ -148,22 +130,6 @@ class Frames(object):
         self.frames_mono_blurred = [cv2.GaussianBlur(frame, (
             self.configuration.alignment_gauss_width, self.configuration.alignment_gauss_width),
                                                      0) for frame in self.frames_mono]
-
-    def shift_frame_with_wraparound(self, index, shift_x, shift_y):
-        """
-        This is an experimental method, not used in the current Code. It shifts a frame in y and
-        x directions with wrap-around in both directions. The result is stored at the original
-        location!
-
-        :param index: Frame index
-        :param shift_x: Shift in x (pixels)
-        :param shift_y: Shift in y (pixels)
-        :return: -
-        """
-
-        pil_image = Image.fromarray(self.frames[index])
-        im2_offset = ImageChops.offset(pil_image, xoffset=shift_x, yoffset=shift_y)
-        self.frames[index] = array(im2_offset)
 
     def save_image(self, filename, image, color=False):
         """
@@ -203,35 +169,6 @@ class Frames(object):
         else:
             cv2.imwrite(str(filename), image)
 
-    def write_video(self, name, buffer, y_low, y_high, x_low, x_high, fps):
-        """
-        For each quality area write a video with all frame contributions, annotated with color-coded
-        crosses at alignment box locations.
-
-        :param name: File name of the video output
-        :param buffer: Buffer with frame contributions (size is frame intersection)
-        :param y_low: Lower y index bound of quality area in buffer
-        :param y_high: Upper y index bound of quality area in buffer
-        :param x_low: Lower x index bound of quality area in buffer
-        :param x_high: Upper x index bound of quality area in buffer
-        :param fps: Frames per second of video
-        :return: -
-        """
-
-        # Compute video frame size.
-        frame_height = y_high - y_low
-        frame_width = x_high - x_low
-
-        # Define the codec and create VideoWriter object
-        fourcc = cv2.VideoWriter_fourcc('D', 'I', 'V', 'X')
-        out = cv2.VideoWriter(name, fourcc, fps, (frame_width, frame_height))
-
-        # For each frame in the buffer: cut out quality area and convert to BGR (to adapt to
-        # OpenCV color scheme).
-        for frame in buffer:
-            out.write(cv2.cvtColor(frame[y_low:y_high, x_low:x_high, :], cv2.COLOR_RGB2BGR))
-        out.release()
-
 
 if __name__ == "__main__":
 
@@ -253,19 +190,6 @@ if __name__ == "__main__":
     except Exception as e:
         print("Error: " + e.message)
         exit()
-
-    # Test the "shift with wraparound" method (not used in actual application).
-    frames.shift_frame_with_wraparound(0, 100, -200)
-
-    # Extract the green channel of the RGB image.
-    if frames.color:
-        try:
-            image_green = frames.extract_channel(0, 'green')
-        except ArgumentError as e:
-            print("Error: " + e.message)
-            exit()
-        plt.imshow(image_green, cmap='Greys_r')
-        plt.show()
 
     # Create monochrome versions of all frames. If the original frames are monochrome, just point
     # the monochrome frame list to the original images (no deep copy!).
