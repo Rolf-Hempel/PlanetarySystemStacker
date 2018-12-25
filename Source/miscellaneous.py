@@ -442,8 +442,13 @@ class Miscellaneous(object):
                    [dev_r]: list of minimum deviations for all steps until a local minimum is found.
         """
 
-        # Initialize the global optimum with an impossibly large value.
-        deviation_min = 1.e30
+        # Initialize the global optimum with the value at dy=dx=0.
+        if sampling_stride != 1:
+            deviation_min = abs(reference_box[::sampling_stride, ::sampling_stride] - frame[
+                                          y_low:y_high:sampling_stride,
+                                          x_low:x_high:sampling_stride]).sum()
+        else:
+            deviation_min = abs(reference_box - frame[y_low:y_high, x_low:x_high]).sum()
         dy_min = 0
         dx_min = 0
 
