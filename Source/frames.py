@@ -139,8 +139,7 @@ class Frames(object):
             if not color in colors:
                 raise ArgumentError("Invalid color selected for channel extraction")
             elif color == 'panchromatic':
-                one_third = 1./3.
-                self.frames_mono = [(frame.sum(axis=2)*one_third).astype(uint8) for frame in self.frames]
+                self.frames_mono = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in self.frames]
             else:
                 self.frames_mono = [frame[:, :, colors.index(color)] for frame in self.frames]
         else:
