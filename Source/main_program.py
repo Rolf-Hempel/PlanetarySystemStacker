@@ -122,13 +122,17 @@ if __name__ == "__main__":
           + str(align_frames.intersection_shape[1][0]) + ", x_high: " \
           + str(align_frames.intersection_shape[1][1]))
 
-    # Initialize the AlignmentPoints object. This includes the computation of the average frame
-    # against which the alignment point shifts are measured.
+    # Compute the average frame.
     my_timer.create('Compute reference frame')
-    alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
+    average = align_frames.average_frame()
     my_timer.stop('Compute reference frame')
     print("Average frame computed from the best " + str(
-        alignment_points.average_frame_number) + " frames.")
+        align_frames.average_frame_number) + " frames.")
+
+    # Initialize the AlignmentPoints object.
+    my_timer.create('Initialize alignment point object')
+    alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
+    my_timer.stop('Initialize alignment point object')
 
     # Create a regular grid with small boxes. A subset of those boxes will be selected as
     # alignment points.

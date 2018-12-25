@@ -241,26 +241,26 @@ class AlignFrames(object):
             raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
                                 " frames: " + str(self.failed_index_list))
 
-    def average_frame(self, frames, shifts):
+    def average_frame(self):
         """
-        Compute an averaged frame from a list of (monochrome) frames along with their
-        corresponding shift values.
+        Compute an averaged frame from the best (monochrome) frames.
 
-        :param frames: List of frames to be averaged
-        :param shifts: List of shifts for all frames. Each shift is given as [shift_y, shift_x].
         :return: The averaged frame
         """
 
         if self.intersection_shape == None:
             raise WrongOrderingError("Method 'average_frames' is called before 'align_frames'")
 
-        # "number_frames" are to be averaged.
-        number_frames = len(frames)
+        self.average_frame_number = max(
+            ceil(self.number * self.configuration.average_frame_percent / 100.), 1)
+        frames = [self.frames_mono[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
+
+        shifts = [self.frame_shifts[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
 
         # Create an empty numpy buffer. The first dimension is the frame index, the second and
         # third dimenstions are the y and x coordinates.
         buffer = empty(
-            [number_frames, self.intersection_shape[0][1] - self.intersection_shape[0][0],
+            [self.average_frame_number, self.intersection_shape[0][1] - self.intersection_shape[0][0],
              self.intersection_shape[1][1] - self.intersection_shape[1][0]])
 
         # For each frame, cut out the intersection area and copy it to the buffer.
@@ -384,14 +384,7 @@ if __name__ == "__main__":
     print("Intersection: " + str(align_frames.intersection_shape))
 
     # Compute the reference frame by averaging the best frames.
-    average_frame_number = max(
-        ceil(frames.number * configuration.average_frame_percent / 100.), 1)
-    average = align_frames.average_frame([frames.frames_mono[i] for i in
-                                          rank_frames.quality_sorted_indices[
-                                          :average_frame_number]],
-                                         [align_frames.frame_shifts[i] for i in
-                                          rank_frames.quality_sorted_indices[
-                                          :average_frame_number]])
+    average = align_frames.average_frame()
     plt.imshow(average, cmap='Greys_r')
     plt.show()
 

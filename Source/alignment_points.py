@@ -76,19 +76,6 @@ class AlignmentPoints(object):
             (2 * self.configuration.alignment_point_search_width + 1,
              2 * self.configuration.alignment_point_search_width + 1))
 
-        # Compute the number of frames to be used for creating the mean frame.
-        self.average_frame_number = max(
-            ceil(frames.number * configuration.average_frame_percent / 100.), 1)
-
-        # Call method "average_frame" of the AlignFrames object to compute the mean frame. Use
-        # the best frames according to their ranks.
-        self.align_frames.average_frame([self.frames.frames_mono[i] for i in
-                                         self.rank_frames.quality_sorted_indices[
-                                         :self.average_frame_number]],
-                                        [self.align_frames.frame_shifts[i] for i in
-                                         self.rank_frames.quality_sorted_indices[
-                                         :self.average_frame_number]])
-
     def ap_locations(self, num_pixels, box_size, search_width, step_size):
         """
         Compute optimal alignment box coordinates in one coordinate direction. Include boundary
@@ -704,14 +691,18 @@ if __name__ == "__main__":
     print("Frame shifts: " + str(align_frames.frame_shifts))
     print("Intersection: " + str(align_frames.intersection_shape))
 
+    start = time()
+    # Compute the reference frame by averaging the best frames.
+    average = align_frames.average_frame()
+
     # Initialize the AlignmentPoints object. This includes the computation of the average frame
     # against which the alignment point shifts are measured.
-    start = time()
+
     alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
     end = time()
     print('Elapsed time in computing average frame: {}'.format(end - start))
     print("Average frame computed from the best " + str(
-        alignment_points.average_frame_number) + " frames.")
+        align_frames.average_frame_number) + " frames.")
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()
 

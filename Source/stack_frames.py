@@ -596,14 +596,18 @@ if __name__ == "__main__":
     print('Elapsed time in aligning all frames: {}'.format(end - start))
     print("Intersection: " + str(align_frames.intersection_shape))
 
+    start = time()
+    # Compute the reference frame by averaging the best frames.
+    average = align_frames.average_frame()
+
     # Initialize the AlignmentPoints object. This includes the computation of the average frame
     # against which the alignment point shifts are measured.
-    start = time()
+
     alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
     end = time()
     print('Elapsed time in computing average frame: {}'.format(end - start))
     print("Average frame computed from the best " + str(
-        alignment_points.average_frame_number) + " frames.")
+        align_frames.average_frame_number) + " frames.")
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()
 
