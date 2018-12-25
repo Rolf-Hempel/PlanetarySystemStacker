@@ -175,7 +175,7 @@ class AlignFrames(object):
                         self.configuration.frame_alignment_sampling_stride)
                 else:
                     raise NotSupportedError(
-                        "Frame alignment method " + configuration.alignment_method +
+                        "Frame alignment method " + configuration.frame_alignment_method +
                         " not supported")
 
                 # Update the cumulative shift values to be used as starting point for the
