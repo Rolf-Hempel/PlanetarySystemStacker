@@ -22,7 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 class Configuration(object):
     def __init__(self):
-        self.mono_channel = 'green'
+        self.mono_channel = 'panchromatic'
         self.frame_score_pixel_stride = 2
         self.frame_score_method = "Laplace"
         self.frame_alignment_method = "SteepestDescent"

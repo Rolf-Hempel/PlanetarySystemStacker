@@ -103,8 +103,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Example-3*.jpg')
         names = glob.glob('Images/Mond_*.jpg')
     else:
-        # names = 'Videos/short_video.avi'
-        names = 'Videos/Moon_Tile-024_043939.avi'
+        names = 'Videos/short_video.avi'
+        # names = 'Videos/Moon_Tile-024_043939.avi'
     print(names)
 
     # Get configuration parameters.
@@ -118,7 +118,11 @@ if __name__ == "__main__":
         exit()
 
     # Rank the frames by their overall local contrast.
+    start = time()
     rank_frames = RankFrames(frames, configuration)
+    end = time()
+    print('Elapsed time in computing monochromatic images and blurring them: {}'.format(end - start))
+
     start = time()
     rank_frames.frame_score()
     end = time()

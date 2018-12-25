@@ -26,7 +26,7 @@ from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 from PIL import ImageChops, Image
-from numpy import array
+from numpy import array, uint8
 from scipy import misc
 
 from configuration import Configuration
@@ -135,10 +135,14 @@ class Frames(object):
         """
 
         if self.color:
-            colors = ['red', 'green', 'blue']
+            colors = ['red', 'green', 'blue', 'panchromatic']
             if not color in colors:
                 raise ArgumentError("Invalid color selected for channel extraction")
-            self.frames_mono = [frame[:, :, colors.index(color)] for frame in self.frames]
+            elif color == 'panchromatic':
+                one_third = 1./3.
+                self.frames_mono = [(frame.sum(axis=2)*one_third).astype(uint8) for frame in self.frames]
+            else:
+                self.frames_mono = [frame[:, :, colors.index(color)] for frame in self.frames]
         else:
             self.frames_mono = self.frames
 
