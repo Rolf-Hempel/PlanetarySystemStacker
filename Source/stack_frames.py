@@ -98,16 +98,6 @@ class StackFrames(object):
             self.stacked_image_buffer = np.zeros([self.stack_size, dim_y, dim_x], dtype=np.float32)
             self.stacked_image = np.zeros([dim_y, dim_x], dtype=np.int16)
 
-        # Initialize arrays used to store y and x shift values for each frame pixel. Not used for
-        # rigid stacking.
-        if not self.configuration.stacking_rigid_ap_shift:
-            self.pixel_map_y = np.empty([
-                self.align_frames.intersection_shape[0][1] -
-                self.align_frames.intersection_shape[0][0],
-                self.align_frames.intersection_shape[1][1] -
-                self.align_frames.intersection_shape[1][
-                    0]], dtype=np.float32)
-            self.pixel_map_x = self.pixel_map_y.copy()
         self.my_timer.stop('StackFrames initialization')
 
     def add_frame_contribution_rigid(self, frame_index):

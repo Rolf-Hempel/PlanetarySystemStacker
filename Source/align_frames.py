@@ -65,6 +65,7 @@ class AlignFrames(object):
         self.x_low_opt = self.x_high_opt = self.y_low_opt = self.y_high_opt = None
         self.dev_r_list = None
         self.failed_index_list = None
+        self.dy = self.dx = None
 
     def select_alignment_rect(self, scale_factor):
         """
@@ -122,6 +123,10 @@ class AlignFrames(object):
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
         self.frame_shifts = []
+        # Initialize lists which for each frame give the dy and dx displacements between the
+        # reference frame and current frame.
+        self.dy = []
+        self.dx = []
 
         # Initialize lists with info on failed frames.
         self.dev_r_list = []
@@ -225,18 +230,18 @@ class AlignFrames(object):
                                                 self.y_low_opt:self.y_high_opt,
                                                 self.x_low_opt:self.x_high_opt]
 
-
-
         # Compute the shape of the area contained in all frames in the form [[y_low, y_high],
         # [x_low, x_high]]
         self.intersection_shape = [[max(b[0] for b in self.frame_shifts),
                                     min(b[0] for b in self.frame_shifts) + self.shape[0]],
                                    [max(b[1] for b in self.frame_shifts),
                                     min(b[1] for b in self.frame_shifts) + self.shape[1]]]
-        # self.intersection_number_pixels = (self.intersection_shape[0][1] -
-        #                                    self.intersection_shape[0][0]) * \
-        #                                   (self.intersection_shape[1][1] -
-        #                                    self.intersection_shape[1][0])
+
+        # Compute global offsets of current frame relative to intersection frame.
+        for idx in range(len(self.frames_mono_blurred)):
+            self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
+            self.dy.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
+
         if len(self.failed_index_list) > 0:
             raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
                                 " frames: " + str(self.failed_index_list))

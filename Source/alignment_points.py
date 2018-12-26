@@ -235,10 +235,8 @@ class AlignmentPoints(object):
         # The offsets dy and dx are caused by two effects: First, the mean frame is smaller
         # than the original frames. It only contains their intersection. And second, because the
         # given frame is globally shifted as compared to the mean frame.
-        dy = self.align_frames.intersection_shape[0][0] - \
-             self.align_frames.frame_shifts[frame_index][0]
-        dx = self.align_frames.intersection_shape[1][0] - \
-             self.align_frames.frame_shifts[frame_index][1]
+        dy = self.align_frames.dy[frame_index]
+        dx = self.align_frames.dx[frame_index]
 
         if self.configuration.alignment_points_dewarp:
             # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
