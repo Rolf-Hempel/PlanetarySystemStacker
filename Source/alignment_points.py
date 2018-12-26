@@ -197,7 +197,7 @@ class AlignmentPoints(object):
                 self.alignment_points.remove(alignment_point)
                 self.alignment_points_dropped.append(alignment_point)
 
-    def compute_shift_alignment_point(self, frame_index, alignment_point_index, de_warp=True):
+    def compute_shift_alignment_point(self, frame_index, alignment_point_index):
         """
         Compute the [y, x] pixel shift vector at a given alignment point relative to the mean frame.
         Four different methods can be used to compute the shift values:
@@ -222,8 +222,6 @@ class AlignmentPoints(object):
 
         :param frame_index: Index of the selected frame in the list of frames
         :param alignment_point_index: Index of the selected alignment point
-        :param de_warp: If True, individual shifts are measured for alignment points.
-                        If False, only a constant frame translation is applied before stacking.
         :return: Local shift vector [dy, dx]
         """
 
@@ -242,7 +240,7 @@ class AlignmentPoints(object):
         dx = self.align_frames.intersection_shape[1][0] - \
              self.align_frames.frame_shifts[frame_index][1]
 
-        if de_warp:
+        if self.configuration.alignment_points_dewarp:
             # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
             if self.configuration.alignment_point_method == 'Subpixel':
                 # Cut out the alignment box from the given frame. Take into account the offsets

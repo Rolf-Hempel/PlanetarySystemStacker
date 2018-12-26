@@ -35,8 +35,6 @@ class Configuration(object):
         self.align_frames_sampling_stride = 2
         self.align_frames_average_frame_percent = 5.
 
-        self.alignment_de_warp= True
-
         self.alignment_points_step_size = 60
         self.alignment_points_half_box_width = 20
         self.alignment_points_half_patch_width = 40
@@ -45,6 +43,7 @@ class Configuration(object):
         self.alignment_points_structure_threshold = 0.05
         self.alignment_points_brightness_threshold = 10
         self.alignment_points_contrast_threshold = 5
+        self.alignment_points_de_warp = True
         self.alignment_points_method = 'SteepestDescent'
         self.alignment_points_local_search_subpixel = False
 
