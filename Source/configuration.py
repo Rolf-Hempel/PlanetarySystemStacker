@@ -22,14 +22,15 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 class Configuration(object):
     def __init__(self):
-        self.mono_channel = 'panchromatic'
-        self.frame_score_pixel_stride = 2
-        self.frame_score_method = "Laplace"
-        self.frame_alignment_method = "SteepestDescent"
-        self.alignment_rectangle_scale_factor = 3
-        self.alignment_border_width = 6
-        self.frame_alignment_sampling_stride = 2
-        self.average_frame_percent = 5.
+        self.frames_mono_channel = 'panchromatic'
+        self.rank_frames_pixel_stride = 2
+        self.rank_frames_method = "Laplace"
+        self.align_frames_method = "SteepestDescent"
+        self.align_frames_rectangle_scale_factor = 3
+        self.align_frames_border_width = 6
+        self.align_frames_sampling_stride = 2
+        self.align_frames_average_frame_percent = 5.
+
         self.alignment_de_warp= True
         self.alignment_sub_pixel = True
         self.alignment_box_step_size = 50

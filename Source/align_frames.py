@@ -82,7 +82,7 @@ class AlignFrames(object):
 
         # Compute the extensions of the alignment rectangle in y and x directions. Take into account
         # a border and the search radius for frame shifts.
-        border_width = self.configuration.alignment_border_width + \
+        border_width = self.configuration.align_frames_border_width + \
                        self.configuration.alignment_point_search_width
         rect_y = int((self.shape[0] - 2 * border_width) / scale_factor)
         rect_x = int((self.shape[1] - 2 * border_width) / scale_factor)
@@ -148,12 +148,12 @@ class AlignFrames(object):
                 frame = self.frames_mono_blurred[idx]
                 frame_window = self.frames_mono_blurred[idx][self.y_low_opt:self.y_high_opt,
                                self.x_low_opt:self.x_high_opt]
-                if self.configuration.frame_alignment_method == "Translation":
+                if self.configuration.align_frames_method == "Translation":
                     self.frame_shifts.append(
                         Miscellaneous.translation(self.reference_window, frame_window,
                                                   self.reference_window_shape))
                     continue
-                elif self.configuration.frame_alignment_method == "RadialSearch":
+                elif self.configuration.align_frames_method == "RadialSearch":
                     # Spiral out from the shift position of the previous frame and search for the
                     # local optimum.
                     [dy_min, dx_min], dev_r = Miscellaneous.search_local_match(
@@ -162,8 +162,8 @@ class AlignFrames(object):
                                                       self.x_low_opt - dx_min_cum,
                                                       self.x_high_opt - dx_min_cum,
                         self.configuration.alignment_point_search_width,
-                        self.configuration.frame_alignment_sampling_stride, sub_pixel=False)
-                elif self.configuration.frame_alignment_method == "SteepestDescent":
+                        self.configuration.align_frames_sampling_stride, sub_pixel=False)
+                elif self.configuration.align_frames_method == "SteepestDescent":
                     # Spiral out from the shift position of the previous frame and search for the
                     # local optimum.
                     [dy_min, dx_min], dev_r = Miscellaneous.search_local_match_gradient(
@@ -172,10 +172,10 @@ class AlignFrames(object):
                                                       self.x_low_opt - dx_min_cum,
                                                       self.x_high_opt - dx_min_cum,
                         self.configuration.alignment_point_search_width,
-                        self.configuration.frame_alignment_sampling_stride)
+                        self.configuration.align_frames_sampling_stride)
                 else:
                     raise NotSupportedError(
-                        "Frame alignment method " + configuration.frame_alignment_method +
+                        "Frame alignment method " + configuration.align_frames_method +
                         " not supported")
 
                 # Update the cumulative shift values to be used as starting point for the
@@ -193,30 +193,30 @@ class AlignFrames(object):
                 # Start with the lower y edge.
                 if self.y_low_opt - dy_min_cum < \
                         self.configuration.alignment_point_search_width + \
-                        self.configuration.alignment_border_width / 2:
-                    self.y_low_opt += ceil(self.configuration.alignment_border_width / 2.)
-                    self.y_high_opt += ceil(self.configuration.alignment_border_width / 2.)
+                        self.configuration.align_frames_border_width / 2:
+                    self.y_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
+                    self.y_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the upper y edge.
                 elif self.y_high_opt - dy_min_cum > self.shape[
                     0] - self.configuration.alignment_point_search_width - \
-                        self.configuration.alignment_border_width / 2:
-                    self.y_low_opt -= ceil(self.configuration.alignment_border_width / 2.)
-                    self.y_high_opt -= ceil(self.configuration.alignment_border_width / 2.)
+                        self.configuration.align_frames_border_width / 2:
+                    self.y_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
+                    self.y_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the lower x edge.
                 if self.x_low_opt - dx_min_cum < \
                         self.configuration.alignment_point_search_width + \
-                        self.configuration.alignment_border_width / 2:
-                    self.x_low_opt += ceil(self.configuration.alignment_border_width / 2.)
-                    self.x_high_opt += ceil(self.configuration.alignment_border_width / 2.)
+                        self.configuration.align_frames_border_width / 2:
+                    self.x_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
+                    self.x_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the upper x edge.
                 elif self.x_high_opt - dx_min_cum > self.shape[
                     1] - self.configuration.alignment_point_search_width - \
-                        self.configuration.alignment_border_width / 2:
-                    self.x_low_opt -= ceil(self.configuration.alignment_border_width / 2.)
-                    self.x_high_opt -= ceil(self.configuration.alignment_border_width / 2.)
+                        self.configuration.align_frames_border_width / 2:
+                    self.x_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
+                    self.x_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # If the window was moved, update the "reference_window".
                 if new_reference_window:
@@ -252,7 +252,7 @@ class AlignFrames(object):
             raise WrongOrderingError("Method 'average_frames' is called before 'align_frames'")
 
         self.average_frame_number = max(
-            ceil(self.number * self.configuration.average_frame_percent / 100.), 1)
+            ceil(self.number * self.configuration.align_frames_average_frame_percent / 100.), 1)
         frames = [self.frames_mono[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
 
         shifts = [self.frame_shifts[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
@@ -352,7 +352,7 @@ if __name__ == "__main__":
     # and y direction. The scale factor specifies how much smaller the patch is compared to the
     # whole image frame.
     (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
-        configuration.alignment_rectangle_scale_factor)
+        configuration.align_frames_rectangle_scale_factor)
 
     # Alternative: Set the alignment rectangle by hand.
     # (align_frames.x_low_opt, align_frames.x_high_opt, align_frames.y_low_opt,

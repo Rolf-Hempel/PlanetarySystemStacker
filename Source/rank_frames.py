@@ -53,7 +53,7 @@ class RankFrames(object):
         # version of the frames. If the original frames are in RGB, the monochrome channel can be
         # selected via a configuration parameter. Add a list of monochrome images for all frames to
         # the "Frames" object.
-        frames.add_monochrome(self.configuration.mono_channel)
+        frames.add_monochrome(self.configuration.frames_mono_channel)
         self.frames_mono = frames.frames_mono
         self.frames_mono_blurred = frames.frames_mono_blurred
         self.quality_sorted_indices = None
@@ -68,19 +68,19 @@ class RankFrames(object):
         :return: -
         """
 
-        if self.configuration.frame_score_method == "xy gradient":
+        if self.configuration.rank_frames_method == "xy gradient":
             method = Miscellaneous.local_contrast
-        elif self.configuration.frame_score_method == "Laplace":
+        elif self.configuration.rank_frames_method == "Laplace":
             method = Miscellaneous.local_contrast_laplace
-        elif self.configuration.frame_score_method == "Sobel":
+        elif self.configuration.rank_frames_method == "Sobel":
             method = Miscellaneous.local_contrast_sobel
         else:
-            raise NotSupportedError("Ranking method " + self.configuration.frame_score_method +
+            raise NotSupportedError("Ranking method " + self.configuration.rank_frames_method +
                                     " not supported")
 
         # For all frames compute the quality with the selected method.
         for frame in self.frames_mono_blurred:
-            self.frame_ranks.append(method(frame, self.configuration.frame_score_pixel_stride))
+            self.frame_ranks.append(method(frame, self.configuration.rank_frames_pixel_stride))
 
         # Sort the frame indices in descending order of quality.
         self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),

@@ -448,7 +448,7 @@ if __name__ == "__main__":
     # and y direction. The scale factor specifies how much smaller the patch is compared to the
     # whole image frame.
     (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
-        configuration.alignment_rectangle_scale_factor)
+        configuration.align_frames_rectangle_scale_factor)
     end = time()
     print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
     print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
