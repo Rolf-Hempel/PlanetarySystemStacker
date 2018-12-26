@@ -63,6 +63,7 @@ class AlignmentPoints(object):
         self.rank_frames = rank_frames
         self.align_frames = align_frames
         self.alignment_points = None
+        self.alignment_points_dropped = None
 
     def ap_locations(self, num_pixels, half_box_width, search_width, step_size, even):
         """
@@ -284,8 +285,8 @@ class AlignmentPoints(object):
             # Return the computed shift vector.
             return shift_pixel
         else:
-            # If no de-warping is computed, just return the constant translation.
-            return [dy, dx]
+            # If no de-warping is computed, just return the zero vector.
+            return [0, 0]
 
     def show_alignment_points(self, image):
         """
@@ -412,8 +413,10 @@ if __name__ == "__main__":
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()
 
+    # Create alignment points, and show alignment point boxes and patches.
     alignment_points.create_ap_grid(average)
-
+    print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
+          ", number of dropped aps: " + str(len(alignment_points.alignment_points_dropped)))
     color_image = alignment_points.show_alignment_points(average)
 
     plt.imshow(color_image)
