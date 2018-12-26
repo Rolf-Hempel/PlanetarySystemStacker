@@ -128,7 +128,7 @@ class Frames(object):
             self.frames_mono = self.frames
 
         self.frames_mono_blurred = [cv2.GaussianBlur(frame, (
-            self.configuration.alignment_gauss_width, self.configuration.alignment_gauss_width),
+            self.configuration.frames_gauss_width, self.configuration.frames_gauss_width),
                                                      0) for frame in self.frames_mono]
 
     def save_image(self, filename, image, color=False):

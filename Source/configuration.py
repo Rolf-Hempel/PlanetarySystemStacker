@@ -23,6 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 class Configuration(object):
     def __init__(self):
         self.frames_mono_channel = 'panchromatic'
+        self.frames_gauss_width = 7
 
         self.rank_frames_pixel_stride = 2
         self.rank_frames_method = "Laplace"
@@ -35,21 +36,24 @@ class Configuration(object):
         self.align_frames_average_frame_percent = 5.
 
         self.alignment_de_warp= True
-        self.alignment_sub_pixel = True
-        self.alignment_box_step_size = 50
-        self.alignment_box_size = 40
-        self.alignment_gauss_width = 7
-        self.alignment_box_max_neighbor_distance = 1
-        self.alignment_point_structure_threshold = 0.05
-        self.alignment_point_brightness_threshold = 10
-        self.alignment_point_contrast_threshold = 5
-        self.alignment_point_method = 'SteepestDescent'
-        self.alignment_points_search_width = 20
+
+        self.alignment_points_step_size = 60
+        self.alignment_points_half_box_width = 20
+        self.alignment_points_half_patch_width = 40
+        self.alignment_points_search_width = 6
         self.alignment_points_sampling_stride = 1
+        self.alignment_points_structure_threshold = 0.05
+        self.alignment_points_brightness_threshold = 10
+        self.alignment_points_contrast_threshold = 5
+        self.alignment_points_method = 'SteepestDescent'
+        self.alignment_points_local_search_subpixel = False
+
         self.quality_area_number_y = 5
         self.quality_area_number_x = 6
         self.quality_area_pixel_stride = 2
         self.quality_area_frame_percent = 10.
+
+        self.stacking_gauss_width = 7
         self.stacking_own_remap_method = True
         self.stacking_rigid_ap_shift = True
 
