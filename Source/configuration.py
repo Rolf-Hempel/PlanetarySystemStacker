@@ -23,10 +23,13 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 class Configuration(object):
     def __init__(self):
         self.frames_mono_channel = 'panchromatic'
+
         self.rank_frames_pixel_stride = 2
         self.rank_frames_method = "Laplace"
+
         self.align_frames_method = "SteepestDescent"
         self.align_frames_rectangle_scale_factor = 3
+        self.align_frames_search_width = 20
         self.align_frames_border_width = 6
         self.align_frames_sampling_stride = 2
         self.align_frames_average_frame_percent = 5.
@@ -41,8 +44,8 @@ class Configuration(object):
         self.alignment_point_brightness_threshold = 10
         self.alignment_point_contrast_threshold = 5
         self.alignment_point_method = 'SteepestDescent'
-        self.alignment_point_search_width = 20
-        self.alignment_point_sampling_stride = 1
+        self.alignment_points_search_width = 20
+        self.alignment_points_sampling_stride = 1
         self.quality_area_number_y = 5
         self.quality_area_number_x = 6
         self.quality_area_pixel_stride = 2

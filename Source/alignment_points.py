@@ -73,40 +73,40 @@ class AlignmentPoints(object):
         self.x_shifts = None
         self.ap_mask = None
         self.deviations = zeros(
-            (2 * self.configuration.alignment_point_search_width + 1,
-             2 * self.configuration.alignment_point_search_width + 1))
+            (2 * self.configuration.alignment_points_search_width + 1,
+             2 * self.configuration.alignment_points_search_width + 1))
 
-    def ap_locations(self, num_pixels, box_size, search_width, step_size):
+    def ap_locations(self, num_pixels, patch_size, search_width, step_size):
         """
-        Compute optimal alignment box coordinates in one coordinate direction. Include boundary
-        boxes. Place boundary neighbors as close as possible to the boundary.
+        Compute optimal alignment patch coordinates in one coordinate direction. Place boundary
+        neighbors as close as possible to the boundary.
 
         :param num_pixels: Number of pixels in the given coordinate direction
-        :param box_size: Width of the alignment boxes
+        :param patch_size: Width of the alignment boxes
         :param search_width: Maximum search width for alignment point matching
         :param step_size: Distance of alignment boxes
         :return: List of bounding box coordinates in the given direction
         """
 
-        # Compute the minimum distance from the boundary for an alignment box. Take into account
-        # that in alignment point matching the box might be displaced relative to the non-warped
-        # location.
-        box_size_half_p_sw = int((box_size + 1) / 2.) + search_width
-        locations = [0]
+        # Compute the minimum distance from the boundary for an alignment point patch. Take into
+        # account that in alignment point matching the patch might be displaced relative to the
+        # non-warped location.
+        patch_size_half_p_sw = int((patch_size + 1) / 2.) + search_width
+        locations = []
 
         # The number of interior alignment boxes in general is not an integer. Round to the next
         # higher number.
         num_interior = int(
-            ceil(float(num_pixels - box_size - 2 * search_width) / float(step_size)))
+            ceil(float(num_pixels - patch_size - 2 * search_width) / float(step_size)))
 
         # Compute the interior box coordinates.
         for i in range(num_interior):
-            locations.append(box_size_half_p_sw + i * step_size)
+            locations.append(patch_size_half_p_sw + i * step_size)
 
         # If the last interior box is too far away from the boundary, add another one as close as
         # possible to the boundary.
-        if num_pixels - locations[-1] > box_size:
-            locations.append(num_pixels - box_size_half_p_sw - 1)
+        if num_pixels - locations[-1] > patch_size:
+            locations.append(num_pixels - patch_size_half_p_sw - 1)
 
         # Set the last location to the last pixel.
         locations.append(num_pixels - 1)
@@ -131,11 +131,11 @@ class AlignmentPoints(object):
         # boxes away from the frame borders enough to avoid that boxes reach beyond the frame border
         # in the search for the local displacement.
         self.y_locations = self.ap_locations(mean_frame_shape[0], box_size,
-                                             self.configuration.alignment_point_search_width,
+                                             self.configuration.alignment_points_search_width,
                                              step_size)
         self.y_locations_number = len(self.y_locations)
         self.x_locations = self.ap_locations(mean_frame_shape[1], box_size,
-                                             self.configuration.alignment_point_search_width,
+                                             self.configuration.alignment_points_search_width,
                                              step_size)
         self.x_locations_number = len(self.x_locations)
 
@@ -477,8 +477,8 @@ class AlignmentPoints(object):
                     self.alignment_boxes[j][i]['box'],
                     self.frames.frames_mono_blurred[frame_index],
                     y_low + dy, y_high + dy, x_low + dx, x_high + dx,
-                    self.configuration.alignment_point_search_width,
-                    self.configuration.alignment_point_sampling_stride,
+                    self.configuration.alignment_points_search_width,
+                    self.configuration.alignment_points_sampling_stride,
                     sub_pixel=self.configuration.alignment_sub_pixel)
 
             # Use the steepest descent search method.
@@ -487,8 +487,8 @@ class AlignmentPoints(object):
                     self.alignment_boxes[j][i]['box'],
                     self.frames.frames_mono_blurred[frame_index],
                     y_low + dy, y_high + dy, x_low + dx, x_high + dx,
-                    self.configuration.alignment_point_search_width,
-                    self.configuration.alignment_point_sampling_stride)
+                    self.configuration.alignment_points_search_width,
+                    self.configuration.alignment_points_sampling_stride)
             else:
                 raise NotSupportedError("The point shift computation method " +
                                         self.configuration.alignment_point_method +

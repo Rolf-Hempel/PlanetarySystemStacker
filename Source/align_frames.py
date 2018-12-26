@@ -83,7 +83,7 @@ class AlignFrames(object):
         # Compute the extensions of the alignment rectangle in y and x directions. Take into account
         # a border and the search radius for frame shifts.
         border_width = self.configuration.align_frames_border_width + \
-                       self.configuration.alignment_point_search_width
+                       self.configuration.align_frames_search_width
         rect_y = int((self.shape[0] - 2 * border_width) / scale_factor)
         rect_x = int((self.shape[1] - 2 * border_width) / scale_factor)
 
@@ -161,7 +161,7 @@ class AlignFrames(object):
                                                       self.y_high_opt - dy_min_cum,
                                                       self.x_low_opt - dx_min_cum,
                                                       self.x_high_opt - dx_min_cum,
-                        self.configuration.alignment_point_search_width,
+                        self.configuration.align_frames_search_width,
                         self.configuration.align_frames_sampling_stride, sub_pixel=False)
                 elif self.configuration.align_frames_method == "SteepestDescent":
                     # Spiral out from the shift position of the previous frame and search for the
@@ -171,7 +171,7 @@ class AlignFrames(object):
                                                       self.y_high_opt - dy_min_cum,
                                                       self.x_low_opt - dx_min_cum,
                                                       self.x_high_opt - dx_min_cum,
-                        self.configuration.alignment_point_search_width,
+                        self.configuration.align_frames_search_width,
                         self.configuration.align_frames_sampling_stride)
                 else:
                     raise NotSupportedError(
@@ -192,28 +192,28 @@ class AlignFrames(object):
                 new_reference_window = False
                 # Start with the lower y edge.
                 if self.y_low_opt - dy_min_cum < \
-                        self.configuration.alignment_point_search_width + \
+                        self.configuration.align_frames_search_width + \
                         self.configuration.align_frames_border_width / 2:
                     self.y_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     self.y_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the upper y edge.
                 elif self.y_high_opt - dy_min_cum > self.shape[
-                    0] - self.configuration.alignment_point_search_width - \
+                    0] - self.configuration.align_frames_search_width - \
                         self.configuration.align_frames_border_width / 2:
                     self.y_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
                     self.y_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the lower x edge.
                 if self.x_low_opt - dx_min_cum < \
-                        self.configuration.alignment_point_search_width + \
+                        self.configuration.align_frames_search_width + \
                         self.configuration.align_frames_border_width / 2:
                     self.x_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     self.x_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the upper x edge.
                 elif self.x_high_opt - dx_min_cum > self.shape[
-                    1] - self.configuration.alignment_point_search_width - \
+                    1] - self.configuration.align_frames_search_width - \
                         self.configuration.align_frames_border_width / 2:
                     self.x_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
                     self.x_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
