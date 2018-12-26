@@ -511,9 +511,9 @@ class AlignmentPoints(object):
             self.y_shifts[j][i] = shift_pixel[0]
             self.x_shifts[j][i] = shift_pixel[1]
         else:
-            # If no de-warping is computed, just apply the constant translation.
-            self.y_shifts[j][i] = dy
-            self.x_shifts[j][i] = dx
+            # If no de-warping is computed, set shift vector to zero.
+            self.y_shifts[j][i] = 0
+            self.x_shifts[j][i] = 0
 
     def compute_shift_neighbor_point(self, j, i, contributing_alignment_points):
         """
