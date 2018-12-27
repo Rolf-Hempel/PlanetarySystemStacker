@@ -205,6 +205,9 @@ class AlignmentPoints(object):
         :return: -
         """
 
+        # Compute the stack size from the given percentage. Take at least one frame.
+        self.stack_size = max(int(ceil(
+                self.frames.number * self.configuration.alignment_points_frame_percent / 100.)), 1)
         # Select the ranking method.
         if self.configuration.alignment_points_rank_method == "xy gradient":
             method = Miscellaneous.local_contrast
@@ -241,7 +244,9 @@ class AlignmentPoints(object):
             alignment_point['best_frame_indices'] = [b[0] for b in sorted(
                 enumerate(alignment_point['frame_qualities']), key=lambda i: i[1],
                 reverse=True)]
-            pass
+            # Truncate the list to the number of frames to be stacked for each alignmeent point.
+            alignment_point['best_frame_indices'] = alignment_point['best_frame_indices'][
+                                                    :self.stack_size]
 
     def compute_shift_alignment_point(self, frame_index, alignment_point_index):
         """

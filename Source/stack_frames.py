@@ -67,8 +67,7 @@ class StackFrames(object):
         self.frames = frames
         self.align_frames = align_frames
         self.alignment_points = alignment_points
-        self.quality_areas = quality_areas
-        self.stack_size = quality_areas.stack_size
+        self.stack_size = alignment_points.stack_size
         self.my_timer = my_timer
         self.my_timer.create('Stacking: AP initialization')
         self.my_timer.create('Stacking: compute AP shifts')

@@ -42,17 +42,13 @@ class Configuration(object):
         self.alignment_points_structure_threshold = 0.05
         self.alignment_points_brightness_threshold = 10
         self.alignment_points_contrast_threshold = 5
+        self.alignment_points_frame_percent = 10.
         self.alignment_points_rank_method = "Laplace"
         self.alignment_points_rank_pixel_stride = 2
         self.alignment_points_de_warp = True
         self.alignment_points_method = 'SteepestDescent'
         self.alignment_points_sampling_stride = 1
         self.alignment_points_local_search_subpixel = False
-
-        self.quality_area_number_y = 5
-        self.quality_area_number_x = 6
-        self.quality_area_pixel_stride = 2
-        self.quality_area_frame_percent = 10.
 
         self.stacking_gauss_width = 7
         self.stacking_own_remap_method = True
