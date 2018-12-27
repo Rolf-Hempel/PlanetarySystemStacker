@@ -114,7 +114,7 @@ class Frames(object):
         list to the original images (no deep copy!). Also, add a blurred version of the frame list
         (using a Gaussian filter) "self.frames_mono_blurred".
 
-        :param color: Either "red" or "green" or "blue"
+        :param color: Either "red" or "green", "blue", or "panchromatic"
         :return: -
         """
 
