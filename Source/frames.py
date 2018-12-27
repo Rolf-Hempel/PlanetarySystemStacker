@@ -102,8 +102,10 @@ class Frames(object):
         self.frames_mono = None
         self.frames_mono_blurred = None
 
-        # Initialize the list with used alignment points for every frame.
-        self.used_alignment_points = [0 for i in range(self.number)]
+        # For every frame initialize the list with used alignment points.
+        self.used_alignment_points = []
+        for frame_index in range(self.number):
+            self.used_alignment_points.append([])
 
     def add_monochrome(self, color):
         """

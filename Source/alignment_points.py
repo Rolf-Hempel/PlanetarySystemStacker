@@ -26,7 +26,7 @@ from time import time
 
 import matplotlib.pyplot as plt
 from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint8, uint16, array, \
-    matmul
+    matmul, empty
 from numpy.linalg import solve
 from skimage.feature import register_translation
 
@@ -64,6 +64,8 @@ class AlignmentPoints(object):
         self.align_frames = align_frames
         self.alignment_points = None
         self.alignment_points_dropped = None
+
+        self.stack_size = None
 
     def ap_locations(self, num_pixels, half_box_width, search_width, step_size, even):
         """
@@ -163,10 +165,21 @@ class AlignmentPoints(object):
                 alignment_point['box_y_high'] = y + half_box_width
                 alignment_point['box_x_low'] = x - half_box_width
                 alignment_point['box_x_high'] = x + half_box_width
-                alignment_point['patch_y_low'] = y - half_patch_width
-                alignment_point['patch_y_high'] = y + half_patch_width
-                alignment_point['patch_x_low'] = x - half_patch_width
-                alignment_point['patch_x_high'] = x + half_patch_width
+                alignment_point['patch_y_low'] = max(0, y - half_patch_width)
+                alignment_point['patch_y_high'] = min(num_pixels_y, y + half_patch_width)
+                alignment_point['patch_x_low'] = max(0, x - half_patch_width)
+                alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
+                # Allocate space for the stacking buffer.
+                if self.frames.color:
+                    alignment_point['stacking_buffer'] = empty(
+                        [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
+                         alignment_point['patch_x_high'] - alignment_point['patch_x_low'], 3],
+                        dtype=float32)
+                else:
+                    alignment_point['stacking_buffer'] = empty(
+                        [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
+                         alignment_point['patch_x_high'] - alignment_point['patch_x_low']],
+                        dtype=float32)
 
                 # Compute structure and brightness information for the alignment box.
                 box = mean_frame[alignment_point['box_y_low']:alignment_point['box_y_high'],
@@ -232,21 +245,22 @@ class AlignmentPoints(object):
                 x_low = max(0, alignment_point['patch_x_low'] + self.align_frames.dx[frame_index])
                 x_high = min(self.frames.shape[1],
                              alignment_point['patch_x_high'] + self.align_frames.dx[frame_index])
-                # Divide the quality measure by the number of points. Due to frame shifting this
-                # number may be different for different frames.
+                # Compute the frame quality and append it to the list for this alignment point.
                 alignment_point['frame_qualities'].append(
                     method(frame[y_low:y_high, x_low:x_high],
-                           self.configuration.alignment_points_rank_pixel_stride) / (
-                                (y_high - y_low) * (x_high - x_low)))
+                           self.configuration.alignment_points_rank_pixel_stride))
 
         # For each alignment point sort the computed quality ranks in descending order.
-        for alignment_point in self.alignment_points:
+        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
             alignment_point['best_frame_indices'] = [b[0] for b in sorted(
                 enumerate(alignment_point['frame_qualities']), key=lambda i: i[1],
                 reverse=True)]
             # Truncate the list to the number of frames to be stacked for each alignmeent point.
             alignment_point['best_frame_indices'] = alignment_point['best_frame_indices'][
                                                     :self.stack_size]
+            # Add this alignment point to the AP lists of those frames where the AP is to be used.
+            for frame_index in alignment_point['best_frame_indices']:
+                self.frames.used_alignment_points[frame_index].append(alignment_point_index)
 
     def compute_shift_alignment_point(self, frame_index, alignment_point_index):
         """

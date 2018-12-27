@@ -48,18 +48,16 @@ class StackFrames(object):
 
     """
 
-    def __init__(self, configuration, frames, align_frames, alignment_points, quality_areas,
-                 my_timer):
+    def __init__(self, configuration, frames, align_frames, alignment_points, my_timer):
         """
         Initialze the StackFrames object. In particular, allocate empty numpy arrays used in the
-        stacking process for buffering, pixel shifts in y and x, and the final stacked image. The
-        size of all those objects in y and x directions is equal to the intersection of all frames.
+        stacking process for buffering and the final stacked image. The size of all those objects
+         in y and x directions is equal to the intersection of all frames.
 
         :param configuration: Configuration object with parameters
         :param frames: Frames object with all video frames
         :param align_frames: AlignFrames object with global shift information for all frames
         :param alignment_points: AlignmentPoints object with information of all alignment points
-        :param quality_areas: QualityAreas object with information on all quality areas
         :param my_timer: Timer object for accumulating times spent in specific code sections
         """
 
@@ -67,18 +65,10 @@ class StackFrames(object):
         self.frames = frames
         self.align_frames = align_frames
         self.alignment_points = alignment_points
-        self.stack_size = alignment_points.stack_size
         self.my_timer = my_timer
         self.my_timer.create('Stacking: AP initialization')
         self.my_timer.create('Stacking: compute AP shifts')
-        self.my_timer.create('Stacking: AP interpolation')
-        self.my_timer.create('Stacking: compute optical flow')
         self.my_timer.create('Stacking: remapping and adding')
-
-        # Create a mask array which specifies the alignment box locations where shifts are to be
-        # computed.
-        self.my_timer.create('StackFrames initialization')
-        self.alignment_points.ap_mask_initialize()
 
         # Allocate work space for image buffer and the image converted for output.
         # [dim_y, dim_x] is the size of the intersection of all frames.
@@ -87,137 +77,110 @@ class StackFrames(object):
         dim_x = self.align_frames.intersection_shape[1][1] - \
                 self.align_frames.intersection_shape[1][0]
 
-        # The arrays for the stacked image and the intermediate buffer need to accommodate three
+        # The arrays for the stacked image and the summation buffer need to accommodate three
         # color channels in the case of color images.
         if self.frames.color:
-            self.stacked_image_buffer = np.empty([self.stack_size, dim_y, dim_x, 3],
-                                                 dtype=np.float32)
+            self.stacked_image_buffer = np.empty([dim_y, dim_x, 3], dtype=np.float32)
             self.stacked_image = np.empty([dim_y, dim_x, 3], dtype=np.int16)
         else:
-            self.stacked_image_buffer = np.zeros([self.stack_size, dim_y, dim_x], dtype=np.float32)
+            self.stacked_image_buffer = np.zeros([dim_y, dim_x], dtype=np.float32)
             self.stacked_image = np.zeros([dim_y, dim_x], dtype=np.int16)
 
-        self.my_timer.stop('StackFrames initialization')
+        self.my_timer.stop('Stacking: AP initialization')
 
-    def add_frame_contribution_rigid(self, frame_index):
+    def stack_frames(self):
         """
-        For a given frame compute the contributions of all quality areas which have been marked for
-        stacking. For each quality area, compute the warp shift at the quality area center (i.e.
-        the central alignment point). The contribution of the quality area to the frame stack is
-        computed as a rigid translation of the frame window by the constant shift.
+        Compute the shifted contributions of all frames to all alignment points and add them to the
+        appropriate alignment point stacking buffers.
 
-        If the quality area does not contain an alignment point, set the warp shift to zero.
-
-        :param frame_index: Index of the current frame
         :return: -
         """
 
-        # If this frame is used in at least one quality area, prepare mask for shift computation.
-        if self.frames.used_quality_areas[frame_index]:
-            # Compute global offsets of current frame relative to intersection frame.
-            dy = self.align_frames.intersection_shape[0][0] - \
-                 self.align_frames.frame_shifts[frame_index][0]
-            dx = self.align_frames.intersection_shape[1][0] - \
-                 self.align_frames.frame_shifts[frame_index][1]
+        # Go through the list of all frames.
+        for frame_index, frame in enumerate(self.frames.frames):
 
-            # For each quality area used for this frame, compute its contribution to the stacked
-            # image. First, interpolate y and x shifts between alignment boxes.
-            for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
+            # Look up the constant shifts of the given frame with respect to the mean frame.
+            dy = self.align_frames.dy[frame_index]
+            dx = self.align_frames.dx[frame_index]
+
+            # Go through all alignment points for which this frame was found to be among the best.
+            for alignment_point_index in self.frames.used_alignment_points[frame_index]:
+                alignment_point = self.alignment_points.alignment_points[alignment_point_index]
+
+                # Compute the local warp shift for this frame.
                 self.my_timer.start('Stacking: compute AP shifts')
-                quality_area = self.quality_areas.quality_areas[index_y][index_x]
+                [shift_y, shift_x] = self.alignment_points.compute_shift_alignment_point(
+                    frame_index, alignment_point_index)
 
-                # Extract index bounds in y and x for this quality area. Interpolations and stacking
-                # are restricted to this index range.
-                y_low, y_high, x_low, x_high = quality_area['coordinates'][0:4]
-
-                # Compute the shift for alignment point in quality area (if there is one).
-                self.alignment_point_index_list = quality_area['alignment_point_indices']
-
-                if self.alignment_point_index_list is None:
-                    # There is no alignment point in this quality area. Set warp shift to zero, i.e.
-                    # apply the global frame shift only.
-                    shift_y = dy
-                    shift_x = dx
-
-                elif len(self.alignment_point_index_list) == 1:
-
-                    alignment_point_list = [
-                        self.alignment_points.alignment_points[self.alignment_point_index_list[0]]]
-
-                    # For debugging only: Initialize shift fields to None. Remove after testing!!
-                    self.alignment_points.y_shifts[:][:] = None
-                    self.alignment_points.x_shifts[:][:] = None
-
-                    # There is one internal alignment point. Compute its shift.
-                    self.alignment_points.compute_alignment_point_shifts(frame_index,
-                                                        alignment_point_list=alignment_point_list)
-                    # Shifts are stored at alignment box locations. Get them from there. Note that
-                    # alignment box indices include boundary points.
-                    shift_y = int(
-                        round(dy - self.alignment_points.y_shifts[index_y + 1][index_x + 1]))
-                    shift_x = int(
-                        round(dx - self.alignment_points.x_shifts[index_y + 1][index_x + 1]))
-                else:
-                    raise InternalError("More than one alignment point in rigid stacking")
+                # The total shift consists of three components: different coordinate origins for
+                # current frame and mean frame, global shift of current frame, and the local warp
+                # shift at this alignment point. The first two components are accounted for by dy,
+                # dx.
+                total_shift_y = int(round(dy - shift_y))
+                total_shift_x = int(round(dx - shift_x))
                 self.my_timer.stop('Stacking: compute AP shifts')
 
-                # Look up and increment the stacking buffer counter for this quality area.
+                # Add the shifted alignment point patch to the AP's stacking buffer.
                 self.my_timer.start('Stacking: remapping and adding')
-                buffer_counter = quality_area['stacking_buffer_counter']
-                quality_area['stacking_buffer_counter'] += 1
-
-                # Copy the shifted QA window to stacking buffer.
-                self.remap_rigid(self.frames.frames[frame_index], shift_y, shift_x,
-                                 y_low, y_high, x_low, x_high, buffer_counter)
+                self.remap_rigid(frame, alignment_point['stacking_buffer'],
+                                 total_shift_y, total_shift_x,
+                                 alignment_point['patch_y_low'], alignment_point['patch_y_high'],
+                                 alignment_point['patch_x_low'], alignment_point['patch_x_high'])
                 self.my_timer.stop('Stacking: remapping and adding')
 
-    def remap_rigid(self, frame, shift_y, shift_x, y_low, y_high, x_low, x_high, buffer_counter):
+        # Divide the buffers by the number of frame contributions.
+        for alignment_point in self.alignment_points.alignment_points:
+            alignment_point['stacking_buffer'] /= float(self.alignment_points.stack_size)
+
+
+    def remap_rigid(self, frame, buffer, shift_y, shift_x, y_low, y_high, x_low, x_high):
         """
-        This is a simple variant where the quality area window is copied from the given frame with
-        a constant shift in x and y directions.
+        The alignment point patch is taken from the given frame with a constant shift in x and y
+        directions. The shifted patch is then added to the given alignment point buffer.
 
         :param frame: frame to be stacked
+        :param buffer: Stacking buffer of the corresponding alignment point
         :param shift_y: Constant shift in y direction between frame stack and current frame
         :param shift_x: Constant shift in x direction between frame stack and current frame
         :param y_low: Lower y index of the quality window on which this method operates
         :param y_high: Upper y index of the quality window on which this method operates
         :param x_low: Lower x index of the quality window on which this method operates
         :param x_high: Upper x index of the quality window on which this method operates
-        :param buffer_counter: Index of the next free stacking buffer for this quality area
         :return: -
         """
 
+        # Compute index bounds for "source" patch in current frame, and for summation buffer
+        # ("target"). Because of local warp effects, the indexing may reach beyond frame borders.
+        # In this case reduce the copy area.
         frame_size_y = frame.shape[0]
         y_low_source = y_low + shift_y
         y_high_source = y_high + shift_y
-        y_low_target = y_low
-        y_high_target = y_high
+        y_low_target = 0
         # If the shift reaches beyond the frame, reduce the copy area.
         if y_low_source < 0:
             y_low_target = -y_low_source
             y_low_source = 0
         if y_high_source > frame_size_y:
             y_high_source = frame_size_y
-            y_high_target = y_low_target + (y_high_source - y_low_source)
+        y_high_target = y_high_source - y_low_source
 
         frame_size_x = frame.shape[1]
         x_low_source = x_low + shift_x
         x_high_source = x_high + shift_x
-        x_low_target = x_low
-        x_high_target = x_high
+        x_low_target = 0
         # If the shift reaches beyond the frame, reduce the copy area.
         if x_low_source < 0:
             x_low_target = -x_low_source
             x_low_source = 0
         if x_high_source > frame_size_x:
             x_high_source = frame_size_x
-            x_high_target = x_low_target + (x_high_source - x_low_source)
+        x_high_target = x_high_source - x_low_source
 
-        # If frames are in color, stack all three color channels using the same mapping.
+        # If frames are in color, stack all three color channels using the same mapping. Add the
+        # frame contribution to the stacking buffer.
         if self.frames.color:
-            # Copy the contribution from the shifted window in this frame to the stacking buffer.
-            self.stacked_image_buffer[buffer_counter, y_low_target:y_high_target,
-            x_low_target:x_high_target, :] = \
+            # Add the contribution from the shifted window in this frame to the stacking buffer.
+            buffer[y_low_target:y_high_target, x_low_target:x_high_target, :] += \
                 frame[y_low_source:y_high_source, x_low_source:x_high_source, :]
 
         # The same for monochrome mode.
@@ -225,301 +188,14 @@ class StackFrames(object):
             if x_high_source - x_low_source != x_high_target - x_low_target or \
                     y_high_source - y_low_source != y_high_target - y_low_target:
                 print("")
-            self.stacked_image_buffer[buffer_counter, y_low_target:y_high_target,
-            x_low_target:x_high_target] = \
+            buffer[y_low_target:y_high_target, x_low_target:x_high_target] += \
                 frame[y_low_source:y_high_source, x_low_source:x_high_source]
 
-    def add_frame_contribution_interpolate(self, frame_index):
-        """
-        For a given frame de-warp those quality areas which have been marked for stacking.
-        To this end, first interpolate the shift vectors between the alignment box positions, then
-        use the remap function of OpenCV to de-warp the frame. Finally, add the processed
-        parts of this frame to the contributions by the other frames to produce the stacked image.
+    def merge_alignment_point_buffers(self):
+        # To be done: merge the overlapping alignment point patch buffers to the stacked image
+        # buffer.
+        pass
 
-        :param frame_index: Index of the current frame
-        :return: -
-        """
-
-        # Because the areas selected for stacking are different for every frame, first reset the
-        # alignment point mask.
-        self.alignment_points.ap_mask_reset()
-
-        # If this frame is used in at least one quality area, prepare mask for shift computation.
-        if self.frames.used_quality_areas[frame_index]:
-            # Compute global offsets of current frame relative to intersection frame.
-            dy = self.align_frames.intersection_shape[0][0] - \
-                 self.align_frames.frame_shifts[frame_index][0]
-            dx = self.align_frames.intersection_shape[1][0] - \
-                 self.align_frames.frame_shifts[frame_index][1]
-
-            # If "optical flow" is used to compute the de-warping, no alignment points are needed.
-            # In this case skip the computation of alignment point shifts.
-            if not self.configuration.stacking_use_optical_flow:
-                self.my_timer.start('Stacking: AP initialization')
-                for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
-                    self.alignment_points.ap_mask_set(
-                        self.quality_areas.qa_ap_index_y_lows[index_y],
-                        self.quality_areas.qa_ap_index_y_highs[index_y],
-                        self.quality_areas.qa_ap_index_x_lows[index_x],
-                        self.quality_areas.qa_ap_index_x_highs[index_x])
-                self.my_timer.stop('Stacking: AP initialization')
-
-                # Compute the shifts in y and x for all mask locations.
-                self.my_timer.start('Stacking: compute AP shifts')
-                self.alignment_points.compute_alignment_point_shifts(frame_index, use_ap_mask=True)
-                self.my_timer.stop('Stacking: compute AP shifts')
-
-            # For each quality area used for this frame, compute its contribution to the stacked
-            # image. First, interpolate y and x shifts between alignment boxes.
-            for [index_y, index_x] in self.frames.used_quality_areas[frame_index]:
-                quality_area = self.quality_areas.quality_areas[index_y][index_x]
-
-                # Extract index bounds in y and x for this quality area. Interpolations and stacking
-                # are restricted to this index range.
-                y_low, y_high, x_low, x_high = quality_area['coordinates'][0:4]
-
-                # Use "optical flow" to compute the de-warping. The flow field "flow" contains
-                # pixel-wise displacements.
-                if self.configuration.stacking_use_optical_flow:
-                    self.my_timer.start('Stacking: compute optical flow')
-
-                    # Compute the flow field with some overlap.
-                    y_low_overlap = max(y_low - self.configuration.stacking_optical_flow_overlap, 0)
-                    y_high_overlap = min(y_high + self.configuration.stacking_optical_flow_overlap,
-                                         self.align_frames.mean_frame.shape[0])
-                    x_low_overlap = max(x_low - self.configuration.stacking_optical_flow_overlap, 0)
-                    x_high_overlap = min(x_high + self.configuration.stacking_optical_flow_overlap,
-                                         self.align_frames.mean_frame.shape[1])
-                    if self.configuration.use_gaussian_filter:
-                        gaussian_filter_flag = OPTFLOW_FARNEBACK_GAUSSIAN
-                    else:
-                        gaussian_filter_flag = 0
-                    flow = calcOpticalFlowFarneback(
-                        self.align_frames.mean_frame[y_low_overlap:y_high_overlap,
-                        x_low_overlap:x_high_overlap],
-                        self.frames.frames_mono[frame_index]
-                        [y_low_overlap + dy:y_high_overlap + dy,
-                        x_low_overlap + dx:x_high_overlap + dx],
-                        flow=None,
-                        pyr_scale=self.configuration.pyramid_scale,
-                        levels=self.configuration.levels,
-                        winsize=self.configuration.winsize,
-                        iterations=self.configuration.iterations,
-                        poly_n=self.configuration.poly_n,
-                        poly_sigma=self.configuration.poly_sigma,
-                        flags=gaussian_filter_flag)
-
-                    # the "flow" field only covers the quality area (with overlap). Copy the
-                    # displacements to the pixel_map window of this quality area. Discard the
-                    # shifts in the overlap areas.
-                    self.pixel_map_x[y_low:y_high, x_low:x_high] = flow[
-                                                       y_low - y_low_overlap:y_high - y_low_overlap,
-                                                       x_low - x_low_overlap:x_high - x_low_overlap,
-                                                       0]
-                    self.pixel_map_y[y_low:y_high, x_low:x_high] = flow[
-                                                       y_low - y_low_overlap:y_high - y_low_overlap,
-                                                       x_low - x_low_overlap:x_high - x_low_overlap,
-                                                       1]
-                    # The flow field so far contains the displacements only. The remap function
-                    # requires absolute pixel coordinates. Therefore, add the (y, x) pixel
-                    # coordinates to each point of the flow field. Also, add the global offsets
-                    # (dy, dx)of this frame relative to the intersection frame.
-                    self.pixel_map_x[y_low:y_high, x_low:x_high] += np.arange(x_low, x_high) + dx
-                    self.pixel_map_y[y_low:y_high, x_low:x_high] += np.arange(y_low, y_high)[:,
-                                                                    np.newaxis] + dy
-                    self.my_timer.stop('Stacking: compute optical flow')
-
-                # Compute the de-warping by interpolating shifts between alignment points.
-                else:
-                    # Cut out the 2D window with y shift values for all alignment boxes used by this
-                    # quality area. Combine global offsets with local shifts, and add the y
-                    # coordinates at the alignment box positions. As the result, "data_y" (and
-                    # "data_x", below, respectively) contain the mapping coordinates as required by
-                    # the OpenCV function "remap".
-
-                    # Set the y and x coordinates at the alignment box locations within the window.
-                    self.my_timer.start('Stacking: AP interpolation')
-                    x_coords, y_coords = np.meshgrid(self.alignment_points.x_locations[
-                                                     self.quality_areas.qa_ap_index_x_lows[index_x]:
-                                                     self.quality_areas.qa_ap_index_x_highs[
-                                                         index_x]],
-                                                     self.alignment_points.y_locations[
-                                                     self.quality_areas.qa_ap_index_y_lows[index_y]:
-                                                     self.quality_areas.qa_ap_index_y_highs[
-                                                         index_y]],
-                                                     sparse=True)
-
-                    # Compute the y mapping coordinates at alignment box positions.
-                    data_y = y_coords + dy - self.alignment_points.y_shifts[
-                                             self.quality_areas.qa_ap_index_y_lows[index_y]:
-                                             self.quality_areas.qa_ap_index_y_highs[index_y],
-                                             self.quality_areas.qa_ap_index_x_lows[index_x]:
-                                             self.quality_areas.qa_ap_index_x_highs[index_x]]
-
-                    # Build the linear interpolation operator.
-                    interpolator_y = RegularGridInterpolator(
-                        (quality_area['interpolation_coords_y'],
-                         quality_area['interpolation_coords_x']),
-                        data_y, bounds_error=False,
-                        method='linear',
-                        fill_value=None)
-
-                    # Interpolate y shifts for all points within the quality area.
-                    self.pixel_map_y[y_low:y_high, x_low:x_high] = interpolator_y(
-                        quality_area['interpolation_points']).reshape(y_high - y_low,
-                                                                      x_high - x_low)
-
-                    # Do the same for x shifts.
-                    data_x = x_coords + dx - self.alignment_points.x_shifts[
-                                             self.quality_areas.qa_ap_index_y_lows[index_y]:
-                                             self.quality_areas.qa_ap_index_y_highs[index_y],
-                                             self.quality_areas.qa_ap_index_x_lows[index_x]:
-                                             self.quality_areas.qa_ap_index_x_highs[index_x]]
-
-                    # Build the linear interpolation operator.
-                    interpolator_x = RegularGridInterpolator(
-                        (quality_area['interpolation_coords_y'],
-                         quality_area['interpolation_coords_x']),
-                        data_x, bounds_error=False,
-                        method='linear',
-                        fill_value=None)
-
-                    # Interpolate x shifts for all points within the quality area.
-                    self.pixel_map_x[y_low:y_high, x_low:x_high] = interpolator_x(
-                        quality_area['interpolation_points']).reshape(y_high - y_low,
-                                                                      x_high - x_low)
-                    self.my_timer.stop('Stacking: AP interpolation')
-
-                # Look up and increment the stacking buffer counter for this quality area.
-                buffer_counter = quality_area['stacking_buffer_counter']
-                quality_area['stacking_buffer_counter'] += 1
-
-                # There are two variants for remapping: An own (slow) implementation with
-                # sub-pixel accuracy, and the less accurate (but fast) OpenCV method.
-                self.my_timer.start('Stacking: remapping and adding')
-                if self.configuration.stacking_own_remap_method:
-                    # De-warp the quality area window and store the result in the stacking buffer.
-                    self.remap(self.frames.frames[frame_index], self.pixel_map_y, self.pixel_map_x,
-                               y_low, y_high, x_low, x_high, buffer_counter)
-                else:
-                    if self.frames.color:
-                        self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high, :] = \
-                            remap(self.frames.frames[frame_index],
-                                  self.pixel_map_x[y_low:y_high, x_low:x_high],
-                                  self.pixel_map_y[y_low:y_high, x_low:x_high], INTER_LINEAR, None,
-                                  BORDER_TRANSPARENT)
-                    else:
-                        self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high] = \
-                            remap(self.frames.frames[frame_index],
-                                  self.pixel_map_x[y_low:y_high, x_low:x_high],
-                                  self.pixel_map_y[y_low:y_high, x_low:x_high], INTER_LINEAR, None,
-                                  BORDER_TRANSPARENT)
-                self.my_timer.stop('Stacking: remapping and adding')
-
-    def remap(self, frame, pixel_map_y, pixel_map_x, y_low, y_high, x_low, x_high, buffer_counter):
-        """
-        This is an alternative routine to OpenCV.remap. It works directly on the image buffer.
-        Interpolation is linear with sub-pixel accuracy. Stacking is restricted to a (quality)
-        window.
-
-        :param frame: frame to be stacked
-        :param pixel_map_y: For every pixel this array points to the y location from where the
-                            pixel is to be interpolated.
-        :param pixel_map_x: For every pixel this array points to the x location from where the
-                            pixel is to be interpolated.
-        :param y_low: Lower y index of the quality window on which this method operates
-        :param y_high: Upper y index of the quality window on which this method operates
-        :param x_low: Lower x index of the quality window on which this method operates
-        :param x_high: Upper x index of the quality window on which this method operates
-        :param buffer_counter: Index of the next free stacking buffer for this quality area
-        :return: -
-        """
-
-        # Restrict pixel map coordinates to within the frame intersection area.
-        clip_y_low = 0.
-        clip_y_high = self.frames.shape[0] - 1.01
-        pixel_map_y[y_low:y_high, x_low:x_high] = np.clip(pixel_map_y[y_low:y_high, x_low:x_high],
-                                                          clip_y_low, clip_y_high)
-        clip_x_low = 0.
-        clip_x_high = self.frames.shape[1] - 1.01
-        pixel_map_x[y_low:y_high, x_low:x_high] = np.clip(pixel_map_x[y_low:y_high, x_low:x_high],
-                                                          clip_x_low, clip_x_high)
-
-        # Prepare for sub-pixel interpolation. The integer coordinates point to the
-        # upper left corner of the interpolation square. The fractions point to the
-        # location within the square from where the pixel value is to be interpolated.
-        self.pixel_j = pixel_map_y[y_low:y_high, x_low:x_high].astype(np.int32)
-        self.fraction_j = pixel_map_y[y_low:y_high, x_low:x_high] - self.pixel_j
-        self.one_minus_fraction_j = 1. - self.fraction_j
-        self.pixel_i = pixel_map_x[y_low:y_high, x_low:x_high].astype(np.int32)
-        self.fraction_i = pixel_map_x[y_low:y_high, x_low:x_high] - self.pixel_i
-        self.one_minus_fraction_i = 1. - self.fraction_i
-
-        # If frames are in color, stack all three color channels using the same mapping.
-        if self.frames.color:
-            # Do the interpolation. The weights are computed as the surface areas covered by
-            # the four quadrants in the interpolation square.
-            self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high, 0] = \
-                frame[self.pixel_j, self.pixel_i, 0] * \
-                self.one_minus_fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j, self.pixel_i + 1, 0] * \
-                self.one_minus_fraction_j * self.fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i, 0] * \
-                self.fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i + 1, 0] * self.fraction_j * self.fraction_i
-            self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high, 1] = \
-                frame[self.pixel_j, self.pixel_i, 1] * \
-                self.one_minus_fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j, self.pixel_i + 1, 1] * \
-                self.one_minus_fraction_j * self.fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i, 1] * \
-                self.fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i + 1, 1] * self.fraction_j * self.fraction_i
-            self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high, 2] = \
-                frame[self.pixel_j, self.pixel_i, 2] * \
-                self.one_minus_fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j, self.pixel_i + 1, 2] * \
-                self.one_minus_fraction_j * self.fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i, 2] * \
-                self.fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i + 1, 2] * self.fraction_j * self.fraction_i
-
-        # The same for monochrome mode.
-        else:
-            self.stacked_image_buffer[buffer_counter, y_low:y_high, x_low:x_high] = \
-                frame[self.pixel_j, self.pixel_i] * \
-                self.one_minus_fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j, self.pixel_i + 1] * \
-                self.one_minus_fraction_j * self.fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i] * \
-                self.fraction_j * self.one_minus_fraction_i + \
-                frame[self.pixel_j + 1, self.pixel_i + 1] * self.fraction_j * self.fraction_i
-
-    def stack_frames(self, output_stacking_buffer=False, qa_list=None):
-        """
-        Combine the sharp areas of all frames into a single stacked image.
-
-        :param output_stacking_buffer: If this optional argument is set to "True", video files
-                                       which show all frame contributions of a quality area are
-                                       produced for selected quality areas. Colored crosses are
-                                       inserted at AP locations.
-        :param qa_list: List of tuples (index_y, index_x). Each tuple specifies a quality area
-                        location for which a video is to be produced. If "None", videos are
-                        produced for all qa locations.
-        :return: -
-        """
-
-        # Compute the contributions of all frames and store them in the summation buffer.
-        for idx, frame in enumerate(self.frames.frames):
-            if self.configuration.stacking_rigid_ap_shift:
-                # Rigid stacking: use simplified stacking routine.
-                self.add_frame_contribution_rigid(idx)
-            else:
-                # Use the general stacking routine based on bilinear interpolation.
-                self.add_frame_contribution_interpolate(idx)
-
-        # Accumulate the single frame contributions, divide the summation buffer by the number of
-        # contributing frames per quality area, and scale entries to the interval [0., 1.].
         # Finally, convert the float image buffer to 16bit int (or 48bit in color mode).
         self.stacked_image = img_as_uint(np.sum(self.stacked_image_buffer, axis=0) / (
                 self.stack_size * 255.))
