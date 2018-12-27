@@ -21,22 +21,16 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import glob
-import os
-from cv2 import remap, calcOpticalFlowFarneback, INTER_LINEAR, BORDER_TRANSPARENT, \
-    OPTFLOW_FARNEBACK_GAUSSIAN
-from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy.interpolate import RegularGridInterpolator
 from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
-from exceptions import InternalError
+from exceptions import InternalError, NotSupportedError
 from frames import Frames
-from quality_areas import QualityAreas
 from rank_frames import RankFrames
 from timer import timer
 
@@ -136,7 +130,6 @@ class StackFrames(object):
         for alignment_point in self.alignment_points.alignment_points:
             alignment_point['stacking_buffer'] /= float(self.alignment_points.stack_size)
 
-
     def remap_rigid(self, frame, buffer, shift_y, shift_x, y_low, y_high, x_low, x_high):
         """
         The alignment point patch is taken from the given frame with a constant shift in x and y
@@ -232,14 +225,14 @@ class StackFrames(object):
         else:
             self.stacked_image_buffer /= self.single_frame_contributions
 
-        # Finally, convert the float image buffer to 16bit int (or 48bit in color mode).
+        # Scale the image buffer such that entries are in the interval [0., 1.]. Then convert the
+        # float image buffer to 16bit int (or 48bit in color mode).
         self.stacked_image = img_as_uint(self.stacked_image_buffer / float(255))
 
         return self.stacked_image
 
 
 if __name__ == "__main__":
-
     # Initalize the timer object used to measure execution times of program sections.
     my_timer = timer()
 
@@ -251,15 +244,15 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        file = 'short_video'
-        # file = 'Moon_Tile-024_043939'
-        names = 'Videos/' + file + '.avi'
+        names = 'Videos/short_video.avi'
     print(names)
 
     my_timer.create('Execution over all')
-    start_over_all = time()
+
     # Get configuration parameters.
     configuration = Configuration()
+
+    my_timer.create('Read all frames')
     try:
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
@@ -267,134 +260,100 @@ if __name__ == "__main__":
     except Exception as e:
         print("Error: " + e.message)
         exit()
+    my_timer.stop('Read all frames')
 
     # Rank the frames by their overall local contrast.
+    my_timer.create('Ranking images')
     rank_frames = RankFrames(frames, configuration)
-    start = time()
     rank_frames.frame_score()
-    end = time()
-    print('Elapsed time in ranking images: {}'.format(end - start))
+    my_timer.stop('Ranking images')
+
     print("Index of maximum: " + str(rank_frames.frame_ranks_max_index))
+    print("Frame scores: " + str(rank_frames.frame_ranks))
+    print("Frame scores (sorted): " + str(
+        [rank_frames.frame_ranks[i] for i in rank_frames.quality_sorted_indices]))
+    print("Sorted index list: " + str(rank_frames.quality_sorted_indices))
 
     # Initialize the frame alignment object.
+    my_timer.create('Select optimal alignment patch')
     align_frames = AlignFrames(frames, rank_frames, configuration)
-    start = time()
     # Select the local rectangular patch in the image where the L gradient is highest in both x
     # and y direction. The scale factor specifies how much smaller the patch is compared to the
     # whole image frame.
     (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
         configuration.align_frames_rectangle_scale_factor)
-    end = time()
-    print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
+    my_timer.stop('Select optimal alignment patch')
     print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
         x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
+    reference_frame_with_alignment_points = align_frames.frames_mono[
+        align_frames.frame_ranks_max_index].copy()
+    reference_frame_with_alignment_points[y_low_opt,
+    x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
+                            x_low_opt:x_high_opt] = 255
+    reference_frame_with_alignment_points[y_low_opt:y_high_opt,
+    x_low_opt] = reference_frame_with_alignment_points[y_low_opt:y_high_opt, x_high_opt - 1] = 255
+    # plt.imshow(reference_frame_with_alignment_points, cmap='Greys_r')
+    # plt.show()
 
     # Align all frames globally relative to the frame with the highest score.
-    start = time()
-    align_frames.align_frames()
-    end = time()
-    print('Elapsed time in aligning all frames: {}'.format(end - start))
+    my_timer.create('Global frame alignment')
+    try:
+        align_frames.align_frames()
+    except NotSupportedError as e:
+        print("Error: " + e.message)
+        exit()
+    except InternalError as e:
+        print("Warning: " + e.message)
+    my_timer.stop('Global frame alignment')
+
+    # print("Frame shifts: " + str(align_frames.frame_shifts))
     print("Intersection: " + str(align_frames.intersection_shape))
 
-    start = time()
     # Compute the reference frame by averaging the best frames.
+    my_timer.create('Compute reference frame')
     average = align_frames.average_frame()
-
-    # Initialize the AlignmentPoints object. This includes the computation of the average frame
-    # against which the alignment point shifts are measured.
-
-    alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
-    end = time()
-    print('Elapsed time in computing average frame: {}'.format(end - start))
+    my_timer.stop('Compute reference frame')
     print("Average frame computed from the best " + str(
         align_frames.average_frame_number) + " frames.")
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()
 
-    # Create a regular grid with small boxes. A subset of those boxes will be selected as
-    # alignment points.
-    step_size = configuration.alignment_box_step_size
-    box_size = configuration.alignment_box_size
-    start = time()
-    alignment_points.create_alignment_boxes(step_size, box_size)
-    end = time()
-    print('Elapsed time in alignment box creation: {}'.format(end - start))
-    print("Number of alignment boxes created: " + str(
-        len(alignment_points.alignment_boxes) * len(alignment_points.alignment_boxes[0])))
+    # Initialize the AlignmentPoints object. This includes the computation of the average frame
+    # against which the alignment point shifts are measured.
+    my_timer.create('Initialize alignment point object')
+    alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
+    my_timer.stop('Initialize alignment point object')
 
-    # An alignment box is selected as an alignment point if it satisfies certain conditions
-    # regarding local contrast etc.
-    structure_threshold = configuration.alignment_point_structure_threshold
-    brightness_threshold = configuration.alignment_point_brightness_threshold
-    contrast_threshold = configuration.alignment_point_contrast_threshold
-    print("Selection of alignment points, structure threshold: " + str(
-        structure_threshold) + ", brightness threshold: " + str(
-        brightness_threshold) + ", contrast threshold: " + str(contrast_threshold))
-    start = time()
-    alignment_points.select_alignment_points(structure_threshold, brightness_threshold,
-                                             contrast_threshold)
-    end = time()
-    print('Elapsed time in alignment point selection: {}'.format(end - start))
-    print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
+    # Create alignment points, and show alignment point boxes and patches.
+    my_timer.create('Create alignment points')
+    alignment_points.create_ap_grid(average)
+    my_timer.stop('Create alignment points')
+    print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
+          ", number of dropped aps: " + str(len(alignment_points.alignment_points_dropped)))
+    color_image = alignment_points.show_alignment_points(average)
 
-    # Create a regular grid of quality areas. The fractional sizes of the areas in x and y,
-    # as compared to the full frame, are specified in the configuration object.
-    start = time()
-    quality_areas = QualityAreas(configuration, frames, align_frames, alignment_points)
+    plt.imshow(color_image)
+    plt.show()
 
-    print("")
-    if not configuration.stacking_rigid_ap_shift:
-        print("Distribution of alignment point indices among quality areas in y direction:")
-        for index_y, y_low in enumerate(quality_areas.y_lows):
-            y_high = quality_areas.y_highs[index_y]
-            print("QA y index: " + str(index_y) + ", Lower y pixel: " + str(
-                y_low) + ", upper y pixel index: " + str(y_high) + ", lower ap coordinate: " + str(
-                alignment_points.y_locations[
-                    quality_areas.qa_ap_index_y_lows[index_y]]) + ", upper ap coordinate: " + str(
-                alignment_points.y_locations[quality_areas.qa_ap_index_y_highs[index_y] - 1]))
-        print("")
-        print("Distribution of alignment point indices among quality areas in x direction:")
-        for index_x, x_low in enumerate(quality_areas.x_lows):
-            x_high = quality_areas.x_highs[index_x]
-            print("QA x index: " + str(index_x) + ", Lower x pixel: " + str(
-                x_low) + ", upper x pixel index: " + str(x_high) + ", lower ap coordinate: " + str(
-                alignment_points.x_locations[
-                    quality_areas.qa_ap_index_x_lows[index_x]]) + ", upper ap coordinate: " + str(
-                alignment_points.x_locations[quality_areas.qa_ap_index_x_highs[index_x] - 1]))
-        print("")
-
-    # For each quality area rank the frames according to the local contrast.
-    quality_areas.select_best_frames()
-
-    # Truncate the list of frames to be stacked to the same number for each quality area.
-    quality_areas.truncate_best_frames()
-    end = time()
-    print('Elapsed time in quality area creation and frame ranking: {}'.format(end - start))
-    print("Number of frames to be stacked for each quality area: " + str(quality_areas.stack_size))
+    # For each alignment point rank frames by their quality.
+    my_timer.create('Rank frames at alignment points')
+    alignment_points.compute_frame_qualities()
+    my_timer.stop('Rank frames at alignment points')
 
     # Allocate StackFrames object.
-    stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, quality_areas,
-                               my_timer)
+    stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, my_timer)
 
     # Stack all frames.
-    start = time()
-    output_stacking_buffer = True
-    # qa_list = None
-    qa_list = [(12, 11), (10, 14), (16, 16)]
-    if output_stacking_buffer:
-        for file in os.listdir('QA_videos'):
-            os.unlink('QA_videos/' + file)
-    result = stack_frames.stack_frames(output_stacking_buffer=output_stacking_buffer,
-                                       qa_list=qa_list)
-    end = time()
-    print('Elapsed time in frame stacking: {}'.format(end - start))
-    print('Elapsed time total: {}'.format(end - start_over_all))
+    stack_frames.stack_frames()
+
+    # Merge the stacked alignment point buffers into a single image.
+    stacked_image = stack_frames.merge_alignment_point_buffers()
 
     # Save the stacked image as 16bit int (color or mono).
-    frames.save_image('Images/' + file + '_stacked.tiff', result)
+    frames.save_image('Images/example_stacked.tiff', stacked_image, color=frames.color)
 
     # Convert to 8bit and show in Window.
-    plt.imshow(img_as_ubyte(result))
+    plt.imshow(img_as_ubyte(stacked_image))
     plt.show()
 
     # Print out timer results.
