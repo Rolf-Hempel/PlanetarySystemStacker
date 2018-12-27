@@ -283,7 +283,7 @@ class AlignmentPoints(object):
         dy = self.align_frames.dy[frame_index]
         dx = self.align_frames.dx[frame_index]
 
-        if self.configuration.alignment_points_dewarp:
+        if self.configuration.alignment_points_de_warp:
             # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
             if self.configuration.alignment_point_method == 'Subpixel':
                 # Cut out the alignment box from the given frame. Take into account the offsets
