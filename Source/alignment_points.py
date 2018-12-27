@@ -197,6 +197,51 @@ class AlignmentPoints(object):
                 self.alignment_points.remove(alignment_point)
                 self.alignment_points_dropped.append(alignment_point)
 
+    def compute_frame_qualities(self):
+        """
+        For each alignment point compute a ranking of best frames. Store the list in the
+        alignment point dictionary with the key 'best_frame_indices'.
+
+        :return: -
+        """
+
+        # Select the ranking method.
+        if self.configuration.alignment_points_rank_method == "xy gradient":
+            method = Miscellaneous.local_contrast
+        elif self.configuration.alignment_points_rank_method == "Laplace":
+            method = Miscellaneous.local_contrast_laplace
+        elif self.configuration.alignment_points_rank_method == "Sobel":
+            method = Miscellaneous.local_contrast_sobel
+        else:
+            raise NotSupportedError(
+                "Ranking method " + self.configuration.alignment_points_rank_method +
+                " not supported")
+
+        # Cycle through all frames. Use the blurred monochrome image for ranking.
+        for frame_index, frame in enumerate(self.frames.frames_mono_blurred):
+            # Cycle through all alignment points:
+            for alignment_point in self.alignment_points:
+                alignment_point['frame_qualities'] = []
+                # Compute patch bounds within the current frame.
+                y_low = max(0, alignment_point['patch_y_low'] + self.align_frames.dy[frame_index])
+                y_high = min(self.frames.shape[0],
+                             alignment_point['patch_y_high'] + self.align_frames.dy[frame_index])
+                x_low = max(0, alignment_point['patch_x_low'] + self.align_frames.dx[frame_index])
+                x_high = min(self.frames.shape[1],
+                             alignment_point['patch_x_high'] + self.align_frames.dx[frame_index])
+                # Divide the quality measure by the number of points. Due to frame shifting this
+                # number may be different for different frames.
+                alignment_point['frame_qualities'].append(
+                    method(frame[y_low:y_high, x_low:x_high],
+                           self.configuration.alignment_points_rank_pixel_stride) / (
+                                (y_high - y_low) * (x_high - x_low)))
+
+        # For each alignment point sort the computed quality ranks in descending order.
+        for alignment_point in self.alignment_points:
+            alignment_point['best_frame_indices'] = [b[0] for b in sorted(
+                enumerate(alignment_point['frame_qualities']), key=lambda i: i[1],
+                reverse=True)]
+
     def compute_shift_alignment_point(self, frame_index, alignment_point_index):
         """
         Compute the [y, x] pixel shift vector at a given alignment point relative to the mean frame.
