@@ -217,11 +217,11 @@ class AlignmentPoints(object):
                 "Ranking method " + self.configuration.alignment_points_rank_method +
                 " not supported")
 
-        # Cycle through all frames. Use the blurred monochrome image for ranking.
-        for frame_index, frame in enumerate(self.frames.frames_mono_blurred):
-            # Cycle through all alignment points:
-            for alignment_point in self.alignment_points:
-                alignment_point['frame_qualities'] = []
+        # Cycle through all alignment points:
+        for alignment_point in self.alignment_points:
+            alignment_point['frame_qualities'] = []
+            # Cycle through all frames. Use the blurred monochrome image for ranking.
+            for frame_index, frame in enumerate(self.frames.frames_mono_blurred):
                 # Compute patch bounds within the current frame.
                 y_low = max(0, alignment_point['patch_y_low'] + self.align_frames.dy[frame_index])
                 y_high = min(self.frames.shape[0],
@@ -241,6 +241,7 @@ class AlignmentPoints(object):
             alignment_point['best_frame_indices'] = [b[0] for b in sorted(
                 enumerate(alignment_point['frame_qualities']), key=lambda i: i[1],
                 reverse=True)]
+            pass
 
     def compute_shift_alignment_point(self, frame_index, alignment_point_index):
         """
@@ -462,3 +463,9 @@ if __name__ == "__main__":
 
     plt.imshow(color_image)
     plt.show()
+
+    # For each alignment point rank frames by their quality.
+    start = time()
+    alignment_points.compute_frame_qualities()
+    end = time()
+    print('Elapsed time in ranking frames for every alignment point: {}'.format(end - start))

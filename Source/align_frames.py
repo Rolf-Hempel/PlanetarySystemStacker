@@ -240,7 +240,7 @@ class AlignFrames(object):
         # Compute global offsets of current frame relative to intersection frame.
         for idx in range(len(self.frames_mono_blurred)):
             self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
-            self.dy.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
+            self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
 
         if len(self.failed_index_list) > 0:
             raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
