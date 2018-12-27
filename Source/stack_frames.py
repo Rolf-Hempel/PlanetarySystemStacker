@@ -85,6 +85,10 @@ class StackFrames(object):
         else:
             self.stacked_image_buffer = np.zeros([dim_y, dim_x], dtype=np.float32)
             self.stacked_image = np.zeros([dim_y, dim_x], dtype=np.int16)
+        # Allocate a buffer which for each pixel of the image buffer counts the number of
+        # contributing alignment patch images. This buffer is used to normalize the buffer.
+        # Initialize the buffer to a small value to avoid divide by zero.
+        self.single_frame_contributions = np.full([dim_y, dim_x], 0.0001, dtype=np.float32)
 
         self.my_timer.stop('Stacking: AP initialization')
 
@@ -192,13 +196,44 @@ class StackFrames(object):
                 frame[y_low_source:y_high_source, x_low_source:x_high_source]
 
     def merge_alignment_point_buffers(self):
-        # To be done: merge the overlapping alignment point patch buffers to the stacked image
-        # buffer.
-        pass
+        """
+        Merge the summation buffers for all alignment points into the global stacking buffer. For
+        every pixel location divide the global buffer by the number of contributing image patches.
+        This results in a uniform brightness level across the whole image, even if alignment point
+        patches overlap.
+
+        :return: The final stacked image
+        """
+
+        # For each image buffer pixel count the number of image contributions.
+        single_stack_size = float(self.alignment_points.stack_size)
+        for alignment_point in self.alignment_points.alignment_points:
+            # Add the stacking buffer of the alignment point to the appropriate location of the
+            # global stacking buffer.
+            if self.frames.color:
+                self.stacked_image_buffer[
+                alignment_point['patch_y_low']:alignment_point['patch_y_high'],
+                alignment_point['patch_x_low']: alignment_point['patch_x_high'], :] += \
+                    alignment_point['stacking_buffer']
+            else:
+                self.stacked_image_buffer[
+                alignment_point['patch_y_low']:alignment_point['patch_y_high'],
+                alignment_point['patch_x_low']: alignment_point['patch_x_high']] += \
+                    alignment_point['stacking_buffer']
+
+            # For each image buffer pixel count the number of image contributions.
+            self.single_frame_contributions[
+            alignment_point['patch_y_low']:alignment_point['patch_y_high'],
+            alignment_point['patch_x_low']: alignment_point['patch_x_high']] += single_stack_size
+
+        # Divide the global stacking buffer pixel-wise by the number of image contributions.
+        if self.frames.color:
+            self.stacked_image_buffer /= self.single_frame_contributions[:, :, np.newaxis]
+        else:
+            self.stacked_image_buffer /= self.single_frame_contributions
 
         # Finally, convert the float image buffer to 16bit int (or 48bit in color mode).
-        self.stacked_image = img_as_uint(np.sum(self.stacked_image_buffer, axis=0) / (
-                self.stack_size * 255.))
+        self.stacked_image = img_as_uint(self.stacked_image_buffer / float(255))
 
         return self.stacked_image
 
