@@ -25,14 +25,12 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint8, uint16, array, \
-    matmul, empty
-from numpy.linalg import solve
+from numpy import arange, amax, stack, amin, float32, uint8, zeros
 from skimage.feature import register_translation
 
 from align_frames import AlignFrames
 from configuration import Configuration
-from exceptions import WrongOrderingError, NotSupportedError, DivideByZeroError
+from exceptions import NotSupportedError
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -171,12 +169,12 @@ class AlignmentPoints(object):
                 alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
                 # Allocate space for the stacking buffer.
                 if self.frames.color:
-                    alignment_point['stacking_buffer'] = empty(
+                    alignment_point['stacking_buffer'] = zeros(
                         [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
                          alignment_point['patch_x_high'] - alignment_point['patch_x_low'], 3],
                         dtype=float32)
                 else:
-                    alignment_point['stacking_buffer'] = empty(
+                    alignment_point['stacking_buffer'] = zeros(
                         [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
                          alignment_point['patch_x_high'] - alignment_point['patch_x_low']],
                         dtype=float32)
@@ -203,12 +201,16 @@ class AlignmentPoints(object):
         # maximum value.
         structure_max = max(
             alignment_point['structure'] for alignment_point in self.alignment_points)
-        for alignment_point in self.alignment_points:
+        alignment_points_dropped_structure = []
+        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
             alignment_point['structure'] /= structure_max
             # Remove alignment points with too little structure.
             if alignment_point['structure'] < structure_threshold:
-                self.alignment_points.remove(alignment_point)
+                alignment_points_dropped_structure.append(alignment_point_index)
                 self.alignment_points_dropped.append(alignment_point)
+
+        for alignment_point_index in alignment_points_dropped_structure:
+            del self.alignment_points[alignment_point_index]
 
     def compute_frame_qualities(self):
         """
@@ -305,7 +307,7 @@ class AlignmentPoints(object):
 
         if self.configuration.alignment_points_de_warp:
             # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
-            if self.configuration.alignment_point_method == 'Subpixel':
+            if self.configuration.alignment_points_method == 'Subpixel':
                 # Cut out the alignment box from the given frame. Take into account the offsets
                 # explained above.
                 box_in_frame = self.frames.frames_mono_blurred[frame_index][y_low + dy:y_high + dy,
@@ -314,7 +316,7 @@ class AlignmentPoints(object):
                     reference_box, box_in_frame, 10, space='real')
 
             # Use a simple phase shift computation (contained in module "miscellaneous").
-            elif self.configuration.alignment_point_method == 'CrossCorrelation':
+            elif self.configuration.alignment_points_method == 'CrossCorrelation':
                 # Cut out the alignment box from the given frame. Take into account the offsets
                 # explained above.
                 box_in_frame = self.frames.frames_mono_blurred[frame_index][y_low + dy:y_high + dy,
@@ -323,7 +325,7 @@ class AlignmentPoints(object):
                                                         box_in_frame, box_in_frame.shape)
 
             # Use a local search (see method "search_local_match" below.
-            elif self.configuration.alignment_point_method == 'RadialSearch':
+            elif self.configuration.alignment_points_method == 'RadialSearch':
                 shift_pixel, dev_r = Miscellaneous.search_local_match(
                     reference_box, self.frames.frames_mono_blurred[frame_index],
                     y_low + dy, y_high + dy, x_low + dx, x_high + dx,
@@ -332,7 +334,7 @@ class AlignmentPoints(object):
                     sub_pixel=self.configuration.alignment_points_local_search_subpixel)
 
             # Use the steepest descent search method.
-            elif self.configuration.alignment_point_method == 'SteepestDescent':
+            elif self.configuration.alignment_points_method == 'SteepestDescent':
                 shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(
                     reference_box, self.frames.frames_mono_blurred[frame_index],
                     y_low + dy, y_high + dy, x_low + dx, x_high + dx,
@@ -340,7 +342,7 @@ class AlignmentPoints(object):
                     self.configuration.alignment_points_sampling_stride)
             else:
                 raise NotSupportedError("The point shift computation method " +
-                                        self.configuration.alignment_point_method +
+                                        self.configuration.alignment_points_method +
                                         " is not implemented")
 
             # Return the computed shift vector.

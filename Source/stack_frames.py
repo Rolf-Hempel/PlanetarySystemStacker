@@ -126,10 +126,6 @@ class StackFrames(object):
                                  alignment_point['patch_x_low'], alignment_point['patch_x_high'])
                 self.my_timer.stop('Stacking: remapping and adding')
 
-        # Divide the buffers by the number of frame contributions.
-        for alignment_point in self.alignment_points.alignment_points:
-            alignment_point['stacking_buffer'] /= float(self.alignment_points.stack_size)
-
     def remap_rigid(self, frame, buffer, shift_y, shift_x, y_low, y_high, x_low, x_high):
         """
         The alignment point patch is taken from the given frame with a constant shift in x and y
@@ -159,7 +155,7 @@ class StackFrames(object):
             y_low_source = 0
         if y_high_source > frame_size_y:
             y_high_source = frame_size_y
-        y_high_target = y_high_source - y_low_source
+        y_high_target = y_low_target + y_high_source - y_low_source
 
         frame_size_x = frame.shape[1]
         x_low_source = x_low + shift_x
@@ -171,7 +167,7 @@ class StackFrames(object):
             x_low_source = 0
         if x_high_source > frame_size_x:
             x_high_source = frame_size_x
-        x_high_target = x_high_source - x_low_source
+        x_high_target = x_low_target + x_high_source - x_low_source
 
         # If frames are in color, stack all three color channels using the same mapping. Add the
         # frame contribution to the stacking buffer.
@@ -254,7 +250,7 @@ if __name__ == "__main__":
 
     my_timer.create('Read all frames')
     try:
-        frames = Frames(configuration, names, type=type)
+        frames = Frames(configuration, names, type=type, convert_to_grayscale=False)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
