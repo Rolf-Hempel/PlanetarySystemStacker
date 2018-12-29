@@ -143,7 +143,8 @@ class AlignmentPoints(object):
                                                False)
 
         self.alignment_points = []
-        self.alignment_points_dropped = []
+        self.alignment_points_dropped_dim = []
+        self.alignment_points_dropped_structure = []
 
         # Create alignment point rows, start with an even one.
         even = True
@@ -167,6 +168,9 @@ class AlignmentPoints(object):
                 alignment_point['patch_y_high'] = min(num_pixels_y, y + half_patch_width)
                 alignment_point['patch_x_low'] = max(0, x - half_patch_width)
                 alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
+                # Initialize lists with neighboring aps with low structure or low light.
+                alignment_point['low_structure_neighbors'] = []
+                alignment_point['dim_neighbors'] = []
                 # Allocate space for the stacking buffer.
                 if self.frames.color:
                     alignment_point['stacking_buffer'] = zeros(
@@ -192,7 +196,7 @@ class AlignmentPoints(object):
                     self.alignment_points.append(alignment_point)
                 else:
                     # If a point does not satisfy the conditions, add it to the dropped list.
-                    self.alignment_points_dropped.append(alignment_point)
+                    self.alignment_points_dropped_dim.append(alignment_point)
 
             # Switch between even and odd rows.
             even = not even
@@ -201,23 +205,42 @@ class AlignmentPoints(object):
         # maximum value.
         structure_max = max(
             alignment_point['structure'] for alignment_point in self.alignment_points)
-        alignment_points_dropped_structure = []
+        alignment_points_dropped_structure_indices = []
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):
             alignment_point['structure'] /= structure_max
             # Remove alignment points with too little structure.
             if alignment_point['structure'] < structure_threshold:
-                alignment_points_dropped_structure.append(alignment_point_index)
-                self.alignment_points_dropped.append(alignment_point)
+                alignment_points_dropped_structure_indices.append(alignment_point_index)
+                self.alignment_points_dropped_structure.append(alignment_point)
 
         # Remove alignment points which do not satisfy the structure condition
         alignment_points_new = []
         dropped_index = 0
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):
-            if alignment_point_index != dropped_index:
+            if alignment_point_index != alignment_points_dropped_structure_indices[dropped_index]:
                 alignment_points_new.append(alignment_point)
-            elif dropped_index < len(alignment_points_dropped_structure)-1:
+            elif dropped_index < len(alignment_points_dropped_structure_indices)-1:
                     dropped_index += 1
         self.alignment_points = alignment_points_new
+
+    def find_alignment_point_neighbors(self):
+        for ap_low_structure in self.alignment_points_dropped_structure:
+            self.find_neighbor(ap_low_structure['y'], ap_low_structure['x'], self.alignment_points)[
+                'low_structure_neighbors'].append(ap_low_structure)
+        for ap_dim in self.alignment_points_dropped_dim:
+            self.find_neighbor(ap_dim['y'], ap_dim['x'], self.alignment_points)[
+                'dim_neighbors'].append(ap_dim)
+
+    @staticmethod
+    def find_neighbor(ap_y, ap_x, alignment_points):
+        min_distance_squared = 1.e30
+        ap_neighbor = None
+        for ap in alignment_points:
+            distance_squared = (ap['y'] - ap_y) ** 2 + (ap['x'] - ap_x) ** 2
+            if distance_squared < min_distance_squared:
+                ap_neighbor = ap
+                min_distance_squared = distance_squared
+        return ap_neighbor
 
     def compute_frame_qualities(self):
         """
@@ -271,7 +294,7 @@ class AlignmentPoints(object):
             for frame_index in alignment_point['best_frame_indices']:
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)
 
-    def compute_shift_alignment_point(self, frame_index, alignment_point_index):
+    def compute_shift_alignment_point(self, frame_index, alignment_point_index, de_warp=True):
         """
         Compute the [y, x] pixel shift vector at a given alignment point relative to the mean frame.
         Four different methods can be used to compute the shift values:
@@ -296,6 +319,8 @@ class AlignmentPoints(object):
 
         :param frame_index: Index of the selected frame in the list of frames
         :param alignment_point_index: Index of the selected alignment point
+        :param de_warp: If True, include local warp shift computation. If False, only apply
+                        global frame shift.
         :return: Local shift vector [dy, dx]
         """
 
@@ -312,7 +337,7 @@ class AlignmentPoints(object):
         dy = self.align_frames.dy[frame_index]
         dx = self.align_frames.dx[frame_index]
 
-        if self.configuration.alignment_points_de_warp:
+        if de_warp:
             # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
             if self.configuration.alignment_points_method == 'Subpixel':
                 # Cut out the alignment box from the given frame. Take into account the offsets

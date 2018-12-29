@@ -65,8 +65,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Example-3*.jpg')
     else:
         # input_file = 'short_video'
-        # input_file = 'another_short_video'
-        input_file = 'Moon_Tile-024_043939'
+        input_file = 'another_short_video'
+        # input_file = 'Moon_Tile-024_043939'
         names = 'Videos/' + input_file + '.avi'
     print(names)
 
@@ -139,7 +139,10 @@ if __name__ == "__main__":
     alignment_points.create_ap_grid(average)
     my_timer.stop('Create alignment points')
     print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
-          ", number of dropped aps: " + str(len(alignment_points.alignment_points_dropped)))
+          ", aps dropped because too dim: " + str(
+        len(alignment_points.alignment_points_dropped_dim)) +
+          ", aps dropped because too little structure: " + str(
+        len(alignment_points.alignment_points_dropped_structure)))
     color_image_with_aps = alignment_points.show_alignment_points(average)
 
     # For each alignment point rank frames by their quality.

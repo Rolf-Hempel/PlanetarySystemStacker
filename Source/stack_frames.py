@@ -65,6 +65,7 @@ class StackFrames(object):
         self.alignment_points = alignment_points
         self.my_timer = my_timer
         self.my_timer.create('Stacking: AP initialization')
+        self.my_timer.create('Stacking: find neighbors of dropped APs')
         self.my_timer.create('Stacking: compute AP shifts')
         self.my_timer.create('Stacking: remapping and adding')
         self.my_timer.create('Stacking: merging AP buffers')
@@ -99,6 +100,11 @@ class StackFrames(object):
         :return: -
         """
 
+        # Find neighbors of unstructured and dim alignment points.
+        self.my_timer.start('Stacking: find neighbors of dropped APs')
+        self.alignment_points.find_alignment_point_neighbors()
+        self.my_timer.stop('Stacking: find neighbors of dropped APs')
+
         # Go through the list of all frames.
         for frame_index, frame in enumerate(self.frames.frames):
 
@@ -113,7 +119,8 @@ class StackFrames(object):
                 # Compute the local warp shift for this frame.
                 self.my_timer.start('Stacking: compute AP shifts')
                 [shift_y, shift_x] = self.alignment_points.compute_shift_alignment_point(
-                    frame_index, alignment_point_index)
+                    frame_index, alignment_point_index,
+                    de_warp=self.configuration.alignment_points_de_warp)
 
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
