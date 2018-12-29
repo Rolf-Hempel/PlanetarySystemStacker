@@ -22,8 +22,6 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import ctypes
 import glob
-import os
-from pathlib import Path
 
 import matplotlib.pyplot as plt
 from skimage import img_as_ubyte
@@ -33,7 +31,6 @@ from alignment_points import AlignmentPoints
 from configuration import Configuration
 from exceptions import NotSupportedError, InternalError
 from frames import Frames
-from quality_areas import QualityAreas
 from rank_frames import RankFrames
 from stack_frames import StackFrames
 from timer import timer
@@ -48,11 +45,13 @@ if __name__ == "__main__":
     mkl_rt = ctypes.CDLL('mkl_rt.dll')
     mkl_get_max_threads = mkl_rt.mkl_get_max_threads
 
+
     def mkl_set_num_threads(cores):
         mkl_rt.mkl_set_num_threads(ctypes.byref(ctypes.c_int(cores)))
 
+
     mkl_set_num_threads(2)
-    print ("Number of threads used by mkl: " + str(mkl_get_max_threads()))
+    print("Number of threads used by mkl: " + str(mkl_get_max_threads()))
 
     # Initalize the timer object used to measure execution times of program sections.
     my_timer = timer()
@@ -60,13 +59,14 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'video'
     if type == 'image':
+        input_file = '2012'
         names = glob.glob('Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
         # input_file = 'short_video'
-        input_file = 'another_short_video'
-        # input_file = 'Moon_Tile-024_043939'
+        # input_file = 'another_short_video'
+        input_file = 'Moon_Tile-024_043939'
         names = 'Videos/' + input_file + '.avi'
     print(names)
 
@@ -134,86 +134,45 @@ if __name__ == "__main__":
     alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
     my_timer.stop('Initialize alignment point object')
 
-    # Create a regular grid with small boxes. A subset of those boxes will be selected as
-    # alignment points.
-    step_size = configuration.alignment_box_step_size
-    box_size = configuration.alignment_box_size
-    my_timer.create('Create alignment boxes')
-    alignment_points.create_alignment_boxes(step_size, box_size)
-    my_timer.stop('Create alignment boxes')
-    print("Number of alignment boxes created: " + str(
-        len(alignment_points.alignment_boxes) * len(alignment_points.alignment_boxes[0])))
-    print("Alignment point y locations: " + str(alignment_points.y_locations))
-    print("Alignment point x locations: " + str(alignment_points.x_locations))
+    # Create alignment points, and create an image with wll alignment point boxes and patches.
+    my_timer.create('Create alignment points')
+    alignment_points.create_ap_grid(average)
+    my_timer.stop('Create alignment points')
+    print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
+          ", number of dropped aps: " + str(len(alignment_points.alignment_points_dropped)))
+    color_image_with_aps = alignment_points.show_alignment_points(average)
 
-    # An alignment box is selected as an alignment point if it satisfies certain conditions
-    # regarding local contrast etc.
-    structure_threshold = configuration.alignment_point_structure_threshold
-    brightness_threshold = configuration.alignment_point_brightness_threshold
-    contrast_threshold = configuration.alignment_point_contrast_threshold
-    print("Selection of alignment points, structure threshold: " + str(
-        structure_threshold) + ", brightness threshold: " + str(
-        brightness_threshold) + ", contrast threshold: " + str(contrast_threshold))
-    my_timer.create('Select alignment points')
-    alignment_points.select_alignment_points(structure_threshold, brightness_threshold,
-                                             contrast_threshold)
-    my_timer.stop('Select alignment points')
-    print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
-
-    # Insert color-coded crosses at alignment box locations in the reference frame and write
-    # out the image.
-    output_file = Path('Images/reference_frame_with_alignment_points.jpg')
-    try:
-        os.unlink(output_file)
-    except:
-        pass
-    reference_frame_with_alignment_points = alignment_points.show_alignment_box_types(
-        align_frames.mean_frame)
-    frames.save_image('Images/reference_frame_with_alignment_points.jpg',
-                      reference_frame_with_alignment_points, color=True)
-
-    # Create a regular grid of quality areas. The fractional sizes of the areas in x and y,
-    # as compared to the full frame, are specified in the configuration object.
-    my_timer.create('Create quality areas and rank frames')
-    quality_areas = QualityAreas(configuration, frames, align_frames, alignment_points)
-
-    # For each quality area rank the frames according to the local contrast.
-    quality_areas.select_best_frames()
-
-    # Truncate the list of frames to be stacked to the same number for each quality area.
-    quality_areas.truncate_best_frames()
-    my_timer.stop('Create quality areas and rank frames')
-    print("Number of frames to be stacked for each quality area: " + str(quality_areas.stack_size))
+    # For each alignment point rank frames by their quality.
+    my_timer.create('Rank frames at alignment points')
+    alignment_points.compute_frame_qualities()
+    my_timer.stop('Rank frames at alignment points')
 
     # Allocate StackFrames object.
-    stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, quality_areas,
-                               my_timer)
+    stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, my_timer)
 
     # Stack all frames.
-    output_stacking_buffer = False
-    # qa_list = None
-    # qa_list = [(4, 7), (3, 6), (3, 7), (3, 8), (4, 6), (4, 8), (5, 6), (5, 7), (5, 8)]
-    qa_list = [(3, 21), (1, 0), (2, 21)]
-    if output_stacking_buffer:
-        for file in os.listdir('QA_videos'):
-            os.unlink('QA_videos/' + file)
-    result = stack_frames.stack_frames(output_stacking_buffer=output_stacking_buffer,
-                                       qa_list=qa_list)
+    stack_frames.stack_frames()
+
+    # Merge the stacked alignment point buffers into a single image.
+    stacked_image = stack_frames.merge_alignment_point_buffers()
 
     # Save the stacked image as 16bit int (color or mono).
-    my_timer.create('Save Image')
-    output_file = Path('Images/' + input_file + '_stacked.tiff')
-    try:
-        os.unlink(output_file)
-    except:
-        pass
-    frames.save_image(output_file, result, color=frames.color)
-    my_timer.stop('Save Image')
-    my_timer.stop('Execution over all')
-
-    # Convert to 8bit and show in Window.
-    plt.imshow(img_as_ubyte(result))
-    plt.show()
+    my_timer.create('Saving the final image')
+    frames.save_image('Images/' + input_file + '_stacked.tiff', stacked_image, color=frames.color)
+    my_timer.stop('Saving the final image')
 
     # Print out timer results.
+    my_timer.stop('Execution over all')
     my_timer.print()
+
+    # Write the image with alignment points.
+    frames.save_image('Images/' + input_file + '_alignment_points.tiff', color_image_with_aps,
+                      color=True)
+
+    # Show alignment points and patches
+    plt.imshow(color_image_with_aps)
+    plt.show()
+
+    # Convert the stacked image to 8bit and show in Window.
+    plt.imshow(img_as_ubyte(stacked_image))
+    plt.show()

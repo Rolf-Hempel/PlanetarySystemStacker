@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import glob
+import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -55,6 +56,9 @@ class StackFrames(object):
         :param my_timer: Timer object for accumulating times spent in specific code sections
         """
 
+        # Suppress warnings about precision loss in skimage file format conversions.
+        warnings.filterwarnings("ignore", category=UserWarning)
+
         self.configuration = configuration
         self.frames = frames
         self.align_frames = align_frames
@@ -63,6 +67,7 @@ class StackFrames(object):
         self.my_timer.create('Stacking: AP initialization')
         self.my_timer.create('Stacking: compute AP shifts')
         self.my_timer.create('Stacking: remapping and adding')
+        self.my_timer.create('Stacking: merging AP buffers')
 
         # Allocate work space for image buffer and the image converted for output.
         # [dim_y, dim_x] is the size of the intersection of all frames.
@@ -194,6 +199,7 @@ class StackFrames(object):
         :return: The final stacked image
         """
 
+        self.my_timer.start('Stacking: merging AP buffers')
         # For each image buffer pixel count the number of image contributions.
         single_stack_size = float(self.alignment_points.stack_size)
         for alignment_point in self.alignment_points.alignment_points:
@@ -225,6 +231,7 @@ class StackFrames(object):
         # float image buffer to 16bit int (or 48bit in color mode).
         self.stacked_image = img_as_uint(self.stacked_image_buffer / float(255))
 
+        self.my_timer.stop('Stacking: merging AP buffers')
         return self.stacked_image
 
 
