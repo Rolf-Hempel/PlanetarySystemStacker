@@ -203,23 +203,31 @@ class StackFrames(object):
         # For each image buffer pixel count the number of image contributions.
         single_stack_size = float(self.alignment_points.stack_size)
         for alignment_point in self.alignment_points.alignment_points:
+            patch_y_low = alignment_point['patch_y_low']
+            patch_y_high = alignment_point['patch_y_high']
+            patch_x_low = alignment_point['patch_x_low']
+            patch_x_high = alignment_point['patch_x_high']
+
+            weights_yx = self.one_dim_weight(patch_y_low, patch_y_high,
+                                             alignment_point['box_y_low'],
+                                             alignment_point['box_y_high'])[:, np.newaxis] * \
+                         self.one_dim_weight(patch_x_low, patch_x_high,
+                                             alignment_point['box_x_low'],
+                                             alignment_point['box_x_high'])
             # Add the stacking buffer of the alignment point to the appropriate location of the
             # global stacking buffer.
             if self.frames.color:
-                self.stacked_image_buffer[
-                alignment_point['patch_y_low']:alignment_point['patch_y_high'],
-                alignment_point['patch_x_low']: alignment_point['patch_x_high'], :] += \
-                    alignment_point['stacking_buffer']
+                self.stacked_image_buffer[patch_y_low:patch_y_high,
+                patch_x_low: patch_x_high, :] += alignment_point['stacking_buffer'] * \
+                                                 weights_yx[:, :, np.newaxis]
             else:
                 self.stacked_image_buffer[
-                alignment_point['patch_y_low']:alignment_point['patch_y_high'],
-                alignment_point['patch_x_low']: alignment_point['patch_x_high']] += \
-                    alignment_point['stacking_buffer']
+                patch_y_low:patch_y_high,
+                patch_x_low: patch_x_high] += alignment_point['stacking_buffer'] * weights_yx
 
             # For each image buffer pixel count the number of image contributions.
-            self.single_frame_contributions[
-            alignment_point['patch_y_low']:alignment_point['patch_y_high'],
-            alignment_point['patch_x_low']: alignment_point['patch_x_high']] += single_stack_size
+            self.single_frame_contributions[patch_y_low:patch_y_high,
+                patch_x_low: patch_x_high] += single_stack_size * weights_yx
 
         # Divide the global stacking buffer pixel-wise by the number of image contributions.
         if self.frames.color:
@@ -233,6 +241,38 @@ class StackFrames(object):
 
         self.my_timer.stop('Stacking: merging AP buffers')
         return self.stacked_image
+
+    @staticmethod
+    def one_dim_weight(patch_low, patch_high, box_low, box_high):
+        """
+        Compute one-dimensional weighting ramps between box and patch borders. This function is
+        called for y and x dimensions separately.
+
+        :param patch_low: Lower index of AP patch in the given coordinate direction
+        :param patch_high: Upper index of AP patch in the given coordinate direction
+        :param box_low: Lower index of AP box in the given coordinate direction
+        :param box_high: Upper index of AP box in the given coordinate direction
+        :return: Vector with weights, starting with 0. at patch_low, ramping up to 1. at box_low,
+                 staying at 1. up to box_high, and than ramping down to 0. at patch_high.
+        """
+
+        # Compute offsets relative to patch_low.
+        patch_high_offset = patch_high - patch_low
+        box_low_offset = box_low - patch_low
+        box_high_offset = box_high - patch_low
+
+        # Allocate weights array, length given by patch size.
+        weights = np.empty((patch_high_offset,), dtype=np.float32)
+
+        # Ramping up between lower patch and box borders.
+        weights[0:box_low_offset] = np.arange(0., 1., 1. / float(box_low_offset), dtype=np.float32)
+        # Box interior
+        weights[box_low_offset:box_high_offset] = 1.
+        # Ramping up between upper box and patch borders.
+        weights[box_high_offset:patch_high_offset] = np.arange(1., 0.,
+                                                               -1. / float(patch_high - box_high),
+                                                               dtype=np.float32)
+        return weights
 
 
 if __name__ == "__main__":

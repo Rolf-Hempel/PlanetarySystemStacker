@@ -208,10 +208,8 @@ class AlignmentPoints(object):
             if alignment_point['structure'] < structure_threshold:
                 alignment_points_dropped_structure.append(alignment_point_index)
                 self.alignment_points_dropped.append(alignment_point)
-        # Remove the points with too little structure from AP list.
-        # self.alignment_points = [ap for ap in self.alignment_points if
-        #                          self.alignment_points.index(
-        #                              ap) not in alignment_points_dropped_structure]
+
+        # Remove alignment points which do not satisfy the structure condition
         alignment_points_new = []
         dropped_index = 0
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):
