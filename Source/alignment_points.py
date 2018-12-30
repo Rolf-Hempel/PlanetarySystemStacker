@@ -157,50 +157,31 @@ class AlignmentPoints(object):
 
             # For each location create an alignment point.
             for index_x, x in enumerate(ap_locations_x):
-                alignment_point = {}
-                alignment_point['y'] = y
-                alignment_point['x'] = x
-                alignment_point['box_y_low'] = y - half_box_width
-                alignment_point['box_y_high'] = y + half_box_width
-                alignment_point['box_x_low'] = x - half_box_width
-                alignment_point['box_x_high'] = x + half_box_width
-                alignment_point['patch_y_low'] = max(0, y - half_patch_width)
-                alignment_point['patch_y_high'] = min(num_pixels_y, y + half_patch_width)
                 # For odd rows: Fill the space left of the first patch and right of the last patch.
-                if even or 0 < index_x < ap_locations_x_odd_len_minus_1:
-                    alignment_point['patch_x_low'] = max(0, x - half_patch_width)
-                    alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
-                elif index_x == 0:
-                    alignment_point['patch_x_low'] = 0
-                    alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
-                elif index_x == ap_locations_x_odd_len_minus_1:
-                    alignment_point['patch_x_low'] = max(0, x - half_patch_width)
-                    alignment_point['patch_x_high'] = num_pixels_x
-                # Initialize lists with neighboring aps with low structure or low light.
-                alignment_point['low_structure_neighbors'] = []
-                alignment_point['dim_neighbors'] = []
-                # Allocate space for the stacking buffer.
-                if self.frames.color:
-                    alignment_point['stacking_buffer'] = zeros(
-                        [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
-                         alignment_point['patch_x_high'] - alignment_point['patch_x_low'], 3],
-                        dtype=float32)
+                if not even and index_x == 0:
+                    alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
+                                                               half_box_width,
+                                                               half_patch_width, num_pixels_y,
+                                                               num_pixels_x, extend_x_low=True)
+                elif not even and index_x == ap_locations_x_odd_len_minus_1:
+                    alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
+                                                               half_box_width,
+                                                               half_patch_width, num_pixels_y,
+                                                               num_pixels_x, extend_x_high=True)
                 else:
-                    alignment_point['stacking_buffer'] = zeros(
-                        [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
-                         alignment_point['patch_x_high'] - alignment_point['patch_x_low']],
-                        dtype=float32)
+                    alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
+                                                               half_box_width,
+                                                               half_patch_width, num_pixels_y,
+                                                               num_pixels_x)
 
                 # Compute structure and brightness information for the alignment box.
-                box = mean_frame[alignment_point['box_y_low']:alignment_point['box_y_high'],
-                      alignment_point['box_x_low']:alignment_point['box_x_high']]
-                alignment_point['reference_box'] = box
-                max_brightness = amax(box)
-                min_brightness = amin(box)
+                max_brightness = amax(alignment_point['reference_box'])
+                min_brightness = amin(alignment_point['reference_box'])
                 # If the alignment box satisfies the brightness conditions, add the AP to the list.
                 if max_brightness > brightness_threshold and max_brightness - \
                         min_brightness > contrast_threshold:
-                    alignment_point['structure'] = Miscellaneous.quality_measure(box)
+                    alignment_point['structure'] = Miscellaneous.quality_measure(
+                        alignment_point['reference_box'])
                     self.alignment_points.append(alignment_point)
                 else:
                     # If a point does not satisfy the conditions, add it to the dropped list.
@@ -231,6 +212,68 @@ class AlignmentPoints(object):
                 elif dropped_index < len(alignment_points_dropped_structure_indices)-1:
                         dropped_index += 1
             self.alignment_points = alignment_points_new
+
+    @staticmethod
+    def new_alignment_point(mean_frame, color, y, x, half_box_width, half_patch_width, num_pixels_y,
+                            num_pixels_x, extend_x_low=False, extend_x_high=False):
+        """
+        Create a new alignment point. This method is called in creating the initial alignment point
+        grid. Later it can be invoked by the user to add single alignment points.
+
+        :param mean_frame: Mean frame as computed by "align_frames.average_frame"
+        :param color: True, if frames are RGB color. False otherwise.
+        :param y: y coordinate of alignment point center
+        :param x: x coordinate of alignment point center
+        :param half_box_width: Half-width of the alignment boxes
+        :param half_patch_width: Half-width of the alignment patch (used in stacking)
+        :param num_pixels_y: Number of pixels in y direction
+        :param num_pixels_x: Number of pixels in x direction
+        :param extend_x_low: True, if patch is to be extended to the left frame boundary.
+                             False otherwise.
+        :param extend_x_high: True, if patch is to be extended to the right frame boundary.
+                              False otherwise.
+        :return:
+        """
+
+        alignment_point = {}
+        alignment_point['y'] = y
+        alignment_point['x'] = x
+        alignment_point['box_y_low'] = y - half_box_width
+        alignment_point['box_y_high'] = y + half_box_width
+        alignment_point['box_x_low'] = x - half_box_width
+        alignment_point['box_x_high'] = x + half_box_width
+        alignment_point['patch_y_low'] = max(0, y - half_patch_width)
+        alignment_point['patch_y_high'] = min(num_pixels_y, y + half_patch_width)
+        if extend_x_low:
+            alignment_point['patch_x_low'] = 0
+            alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
+        elif extend_x_high:
+            alignment_point['patch_x_low'] = max(0, x - half_patch_width)
+            alignment_point['patch_x_high'] = num_pixels_x
+        else:
+            alignment_point['patch_x_low'] = max(0, x - half_patch_width)
+            alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
+        # Initialize lists with neighboring aps with low structure or low light.
+        alignment_point['low_structure_neighbors'] = []
+        alignment_point['dim_neighbors'] = []
+        # Allocate space for the stacking buffer.
+        if color:
+            alignment_point['stacking_buffer'] = zeros(
+                [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
+                 alignment_point['patch_x_high'] - alignment_point['patch_x_low'], 3],
+                dtype=float32)
+        else:
+            alignment_point['stacking_buffer'] = zeros(
+                [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
+                 alignment_point['patch_x_high'] - alignment_point['patch_x_low']],
+                dtype=float32)
+
+        # Cut out the reference box from the mean frame, used in alignment.
+        box = mean_frame[alignment_point['box_y_low']:alignment_point['box_y_high'],
+              alignment_point['box_x_low']:alignment_point['box_x_high']]
+        alignment_point['reference_box'] = box
+
+        return alignment_point
 
     def find_alignment_point_neighbors(self):
         """
