@@ -24,8 +24,7 @@ import glob
 from math import ceil
 
 import matplotlib.pyplot as plt
-from numpy import empty, mean, arange, stack
-import cv2
+from numpy import empty, mean, arange
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError

@@ -25,8 +25,6 @@ from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
-from PIL import ImageChops, Image
-from numpy import array, uint8
 from scipy import misc
 
 from configuration import Configuration
