@@ -89,17 +89,20 @@ class AlignmentPoints(object):
 
         # The precise distance between alignment points will differ slightly from the specified
         # step_size. Compute the exact distance. Integer locations will be rounded later.
-        distance_corrected = float(num_pixels - 2* half_box_width - 2 * search_width) / float(num_interior_odd)
+        distance_corrected = float(num_pixels - 2 * half_box_width - 2 * search_width) / float(
+            num_interior_odd)
 
         # Compute the AP locations, separately for even and odd rows.
         if even:
             locations = []
             for i in range(num_interior_even):
-                locations.append(int(search_width+half_box_width+i*distance_corrected))
+                locations.append(int(search_width + half_box_width + i * distance_corrected))
         else:
             locations = []
             for i in range(num_interior_odd):
-                locations.append(int(search_width + half_box_width + 0.5*distance_corrected+ i * distance_corrected))
+                locations.append(int(
+                    search_width + half_box_width + 0.5 * distance_corrected +
+                    i * distance_corrected))
         return locations
 
     def create_ap_grid(self, mean_frame):
@@ -142,6 +145,8 @@ class AlignmentPoints(object):
                                                step_size, False)
         ap_locations_x_odd_len_minus_1 = len(ap_locations_x_odd) - 1
 
+        # Standard alignment points are those which are created initially with this method.
+        self.num_standard_aps = 0
         self.alignment_points = []
         self.alignment_points_dropped_dim = []
         self.alignment_points_dropped_structure = []
@@ -174,6 +179,8 @@ class AlignmentPoints(object):
                                                                half_patch_width, num_pixels_y,
                                                                num_pixels_x)
 
+                # Increase the counter of standard APs.
+                self.num_standard_aps += 1
                 # Compute structure and brightness information for the alignment box.
                 max_brightness = amax(alignment_point['reference_box'])
                 min_brightness = amin(alignment_point['reference_box'])
@@ -254,8 +261,8 @@ class AlignmentPoints(object):
             alignment_point['patch_x_low'] = max(0, x - half_patch_width)
             alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
         # Initialize lists with neighboring aps with low structure or low light.
-        alignment_point['low_structure_neighbors'] = []
-        alignment_point['dim_neighbors'] = []
+        alignment_point['low_structure_neighbors'] = None
+        alignment_point['dim_neighbors'] = None
         # Allocate space for the stacking buffer.
         if color:
             alignment_point['stacking_buffer'] = zeros(
@@ -275,6 +282,54 @@ class AlignmentPoints(object):
 
         return alignment_point
 
+    def remove_alignment_point(self, alignment_point):
+        """
+        Remove an alignment point from the current list. If it is a "standard" point allocated
+        by "create_ap_grid", the AP is transferred to the list of failed APs (too dim). This way,
+        the area covered by the AP will be filled during stacking, using the shift at some
+        neighboring point. If the AP to be removed was allocated by the user, it is just removed
+        from the list.
+
+        :param alignment_point: Alignment point object to be removed
+        :return: True, if the AP was removed successfully. False, otherwise.
+        """
+
+        # The index calculation can fail if the AP is not in the list.
+        try:
+            ap_index = self.alignment_points.index(alignment_point)
+        except:
+            return False
+
+        # Treat user-allocated APs separately. Just remove it from the list.
+        if ap_index >= self.num_standard_aps:
+            self.alignment_points = self.alignment_points[0:ap_index] +\
+                                   self.alignment_points[ap_index+1:]
+        else:
+            # For a standard AP, transfer it to the list of dropped APs and decrement the counter
+            # of standard APs.
+            self.alignment_points_dropped_dim.append(self.alignment_points.pop(ap_index))
+            self.num_standard_aps -= 1
+
+        return True
+
+    def find_alignment_points(self, y_low, y_high, x_low, x_high):
+        """
+        Find all alignment points the centers of which are within given (y, x) bounds.
+
+        :param y_low: Lower y pixel coordinate bound
+        :param y_high: Upper y pixel coordinate bound
+        :param x_low: Lower x pixel coordinate bound
+        :param x_high: Upper x pixel coordinate bound
+        :return: List of all alignment points with centers within the given coordinate bounds.
+                 If no AP satisfies the condition, return an empty list.
+        """
+
+        ap_list = []
+        for ap in self.alignment_points:
+            if y_low <= ap['y'] <= y_high and x_low <= ap['x'] <= x_high:
+                ap_list.append(ap)
+        return ap_list
+
     def find_alignment_point_neighbors(self):
         """
         Go through the lists of alignment points which during "create_ap_grid" did not satisfy
@@ -287,15 +342,21 @@ class AlignmentPoints(object):
 
         :return: -
         """
+        # Initialize the neighbor lists of all "real" alignment points.
+        for ap in self.alignment_points:
+            ap['low_structure_neighbors'] = []
+            ap['dim_neighbors'] = []
 
         # There are two lists to process: First those APs which have too little structure.
         for ap_low_structure in self.alignment_points_dropped_structure:
             self.find_neighbor(ap_low_structure['y'], ap_low_structure['x'], self.alignment_points)[
                 'low_structure_neighbors'].append(ap_low_structure)
+
         # And now the same for the points where the brightness is too dim or the contrast too low.
         for ap_dim in self.alignment_points_dropped_dim:
             self.find_neighbor(ap_dim['y'], ap_dim['x'], self.alignment_points)[
                 'dim_neighbors'].append(ap_dim)
+        pass
 
     @staticmethod
     def find_neighbor(ap_y, ap_x, alignment_points):
@@ -586,7 +647,10 @@ if __name__ == "__main__":
     # Create alignment points, and show alignment point boxes and patches.
     alignment_points.create_ap_grid(average)
     print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
-          ", number of dropped aps: " + str(len(alignment_points.alignment_points_dropped)))
+          ", number of dropped aps (dim): " + str(
+        len(alignment_points.alignment_points_dropped_dim)) +
+          ", number of dropped aps (structure): " + str(
+        len(alignment_points.alignment_points_dropped_structure)))
     color_image = alignment_points.show_alignment_points(average)
 
     plt.imshow(color_image)
@@ -597,3 +661,40 @@ if __name__ == "__main__":
     alignment_points.compute_frame_qualities()
     end = time()
     print('Elapsed time in ranking frames for every alignment point: {}'.format(end - start))
+
+    y_low = 490
+    y_high = 570
+    x_low = 880
+    x_high = 960
+    found_ap_list = alignment_points.find_alignment_points(y_low, y_high, x_low, x_high)
+    print ("Removing alignment points between bounds " + str(y_low) + " <= y <= " + str(y_high) +
+           ", " + str(x_low) + " <= x <= " + str(x_high) + ":")
+    for ap in found_ap_list:
+        print ("y: " + str(ap['y']) + ", x: " + str(ap['x']))
+        alignment_points.remove_alignment_point(ap)
+
+    y_new = 530
+    x_new = 920
+    half_box_width_new = 40
+    half_patch_width_new = 50
+    num_pixels_y = average.shape[0]
+    num_pixels_x = average.shape[1]
+
+    alignment_points.alignment_points.append(
+        alignment_points.new_alignment_point(average, frames.color, y_new, x_new,
+                                             half_box_width_new,
+                                             half_patch_width_new, num_pixels_y, num_pixels_x,
+                                             extend_x_low=False, extend_x_high=False))
+    print("Searching for neighbors of failed APs.")
+    alignment_points.find_alignment_point_neighbors()
+
+    # Show updated alignment point boxes and patches.
+    print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
+          ", number of dropped aps (dim): " + str(
+        len(alignment_points.alignment_points_dropped_dim)) +
+          ", number of dropped aps (structure): " + str(
+        len(alignment_points.alignment_points_dropped_structure)))
+    color_image = alignment_points.show_alignment_points(average)
+
+    plt.imshow(color_image)
+    plt.show()
