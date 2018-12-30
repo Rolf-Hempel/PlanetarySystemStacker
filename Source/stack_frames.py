@@ -136,6 +136,13 @@ class StackFrames(object):
                                  total_shift_y, total_shift_x,
                                  alignment_point['patch_y_low'], alignment_point['patch_y_high'],
                                  alignment_point['patch_x_low'], alignment_point['patch_x_high'])
+                # Remap the patches of the "failed" neighbor APs with the same shift values.
+                for ap_neighbor in alignment_point['low_structure_neighbors'] +\
+                                   alignment_point['dim_neighbors']:
+                    self.remap_rigid(frame, ap_neighbor['stacking_buffer'],
+                                     total_shift_y, total_shift_x,
+                                     ap_neighbor['patch_y_low'], ap_neighbor['patch_y_high'],
+                                     ap_neighbor['patch_x_low'], ap_neighbor['patch_x_high'])
                 self.my_timer.stop('Stacking: remapping and adding')
 
     def remap_rigid(self, frame, buffer, shift_y, shift_x, y_low, y_high, x_low, x_high):
@@ -209,7 +216,9 @@ class StackFrames(object):
         self.my_timer.start('Stacking: merging AP buffers')
         # For each image buffer pixel count the number of image contributions.
         single_stack_size = float(self.alignment_points.stack_size)
-        for alignment_point in self.alignment_points.alignment_points:
+        for alignment_point in self.alignment_points.alignment_points +\
+                               self.alignment_points.alignment_points_dropped_structure +\
+                               self.alignment_points.alignment_points_dropped_dim:
             patch_y_low = alignment_point['patch_y_low']
             patch_y_high = alignment_point['patch_y_high']
             patch_x_low = alignment_point['patch_x_low']

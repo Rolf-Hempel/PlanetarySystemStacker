@@ -61,7 +61,8 @@ class AlignmentPoints(object):
         self.rank_frames = rank_frames
         self.align_frames = align_frames
         self.alignment_points = None
-        self.alignment_points_dropped = None
+        self.alignment_points_dropped_dim = None
+        self.alignment_points_dropped_structure = None
 
         self.stack_size = None
 
@@ -136,11 +137,10 @@ class AlignmentPoints(object):
         ap_locations_y = self.ap_locations(num_pixels_y, half_box_width, search_width, step_size,
                                            True)
         ap_locations_x_even = self.ap_locations(num_pixels_x, half_box_width, search_width,
-                                                step_size,
-                                                True)
+                                                step_size, True)
         ap_locations_x_odd = self.ap_locations(num_pixels_x, half_box_width, search_width,
-                                               step_size,
-                                               False)
+                                               step_size, False)
+        ap_locations_x_odd_len_minus_1 = len(ap_locations_x_odd) - 1
 
         self.alignment_points = []
         self.alignment_points_dropped_dim = []
@@ -156,7 +156,7 @@ class AlignmentPoints(object):
                 ap_locations_x = ap_locations_x_odd
 
             # For each location create an alignment point.
-            for x in ap_locations_x:
+            for index_x, x in enumerate(ap_locations_x):
                 alignment_point = {}
                 alignment_point['y'] = y
                 alignment_point['x'] = x
@@ -166,8 +166,16 @@ class AlignmentPoints(object):
                 alignment_point['box_x_high'] = x + half_box_width
                 alignment_point['patch_y_low'] = max(0, y - half_patch_width)
                 alignment_point['patch_y_high'] = min(num_pixels_y, y + half_patch_width)
-                alignment_point['patch_x_low'] = max(0, x - half_patch_width)
-                alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
+                # For odd rows: Fill the space left of the first patch and right of the last patch.
+                if even or 0 < index_x < ap_locations_x_odd_len_minus_1:
+                    alignment_point['patch_x_low'] = max(0, x - half_patch_width)
+                    alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
+                elif index_x == 0:
+                    alignment_point['patch_x_low'] = 0
+                    alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
+                elif index_x == ap_locations_x_odd_len_minus_1:
+                    alignment_point['patch_x_low'] = max(0, x - half_patch_width)
+                    alignment_point['patch_x_high'] = num_pixels_x
                 # Initialize lists with neighboring aps with low structure or low light.
                 alignment_point['low_structure_neighbors'] = []
                 alignment_point['dim_neighbors'] = []
@@ -213,26 +221,50 @@ class AlignmentPoints(object):
                 alignment_points_dropped_structure_indices.append(alignment_point_index)
                 self.alignment_points_dropped_structure.append(alignment_point)
 
-        # Remove alignment points which do not satisfy the structure condition
-        alignment_points_new = []
-        dropped_index = 0
-        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
-            if alignment_point_index != alignment_points_dropped_structure_indices[dropped_index]:
-                alignment_points_new.append(alignment_point)
-            elif dropped_index < len(alignment_points_dropped_structure_indices)-1:
-                    dropped_index += 1
-        self.alignment_points = alignment_points_new
+        # Remove alignment points which do not satisfy the structure condition, if there is any.
+        if alignment_points_dropped_structure_indices:
+            alignment_points_new = []
+            dropped_index = 0
+            for alignment_point_index, alignment_point in enumerate(self.alignment_points):
+                if alignment_point_index != alignment_points_dropped_structure_indices[dropped_index]:
+                    alignment_points_new.append(alignment_point)
+                elif dropped_index < len(alignment_points_dropped_structure_indices)-1:
+                        dropped_index += 1
+            self.alignment_points = alignment_points_new
 
     def find_alignment_point_neighbors(self):
+        """
+        Go through the lists of alignment points which during "create_ap_grid" did not satisfy
+        either the brightness/contrast or the structure conditions. For each such point find the
+        closest "real" alignment point. Put the "failed" alignment point on the neighbor list of
+        its "real" neighbor.
+
+        In stacking, for the "failed" APs frame ranks and shifts will be copied from their "real"
+        neighbor.
+
+        :return: -
+        """
+
+        # There are two lists to process: First those APs which have too little structure.
         for ap_low_structure in self.alignment_points_dropped_structure:
             self.find_neighbor(ap_low_structure['y'], ap_low_structure['x'], self.alignment_points)[
                 'low_structure_neighbors'].append(ap_low_structure)
+        # And now the same for the points where the brightness is too dim or the contrast too low.
         for ap_dim in self.alignment_points_dropped_dim:
             self.find_neighbor(ap_dim['y'], ap_dim['x'], self.alignment_points)[
                 'dim_neighbors'].append(ap_dim)
 
     @staticmethod
     def find_neighbor(ap_y, ap_x, alignment_points):
+        """
+        For a given (y, x) position find the closest "real" alignment point.
+
+        :param ap_y: y cocrdinate of location of interest
+        :param ap_x: x cocrdinate of location of interest
+        :param alignment_points: List of alignment points to be searched
+
+        :return: Alignment point object of closest AP
+        """
         min_distance_squared = 1.e30
         ap_neighbor = None
         for ap in alignment_points:
