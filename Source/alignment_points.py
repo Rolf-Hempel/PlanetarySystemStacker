@@ -26,6 +26,7 @@ from time import time
 
 import matplotlib.pyplot as plt
 from numpy import arange, amax, stack, amin, float32, uint8, zeros
+from scipy import ndimage
 from skimage.feature import register_translation
 
 from align_frames import AlignFrames
@@ -187,6 +188,42 @@ class AlignmentPoints(object):
                 # If the alignment box satisfies the brightness conditions, add the AP to the list.
                 if max_brightness > brightness_threshold and max_brightness - \
                         min_brightness > contrast_threshold:
+
+                    # Check if the fraction of dark pixels exceeds a threshold.
+                    box = alignment_point['reference_box']
+                    fraction = (box < brightness_threshold).sum() / float(box.shape[0]*box.shape[1])
+                    if fraction > self.configuration.alignment_points_dim_fraction_threshold:
+
+                        # Compute the center of mass of the brightness distribution within the box,
+                        # and shift the box center to this location.
+                        com = ndimage.measurements.center_of_mass(box)
+                        shift_y = int(com[0])
+                        shift_x = int(com[1])
+                        y_adapted = y + shift_y
+                        x_adapted = x + shift_x
+                        box_increment = max(shift_y, shift_x)
+
+                        # Increase the box and patch sizes to avoid holes in the stacking image.
+                        half_box_width_adapted = half_box_width + box_increment
+                        half_patch_width_adapted = half_patch_width + box_increment
+
+                        # Replace the alignment point with a new one, using the updated
+                        # coordinates and box / patch sizes.
+                        if not even and index_x == 0:
+                            alignment_point = self.new_alignment_point(mean_frame,
+                                self.frames.color, y_adapted, x_adapted, half_box_width_adapted,
+                                half_patch_width_adapted, num_pixels_y, num_pixels_x,
+                                extend_x_low=True)
+                        elif not even and index_x == ap_locations_x_odd_len_minus_1:
+                            alignment_point = self.new_alignment_point(mean_frame,
+                                self.frames.color, y_adapted, x_adapted, half_box_width_adapted,
+                                half_patch_width_adapted, num_pixels_y, num_pixels_x,
+                                extend_x_high=True)
+                        else:
+                            alignment_point = self.new_alignment_point(mean_frame,
+                                self.frames.color, y_adapted, x_adapted, half_box_width_adapted,
+                                half_patch_width_adapted, num_pixels_y, num_pixels_x)
+
                     alignment_point['structure'] = Miscellaneous.quality_measure(
                         alignment_point['reference_box'])
                     self.alignment_points.append(alignment_point)
@@ -245,10 +282,10 @@ class AlignmentPoints(object):
         alignment_point = {}
         alignment_point['y'] = y
         alignment_point['x'] = x
-        alignment_point['box_y_low'] = y - half_box_width
-        alignment_point['box_y_high'] = y + half_box_width
-        alignment_point['box_x_low'] = x - half_box_width
-        alignment_point['box_x_high'] = x + half_box_width
+        alignment_point['box_y_low'] = max(0, y - half_box_width)
+        alignment_point['box_y_high'] = min(num_pixels_y, y + half_box_width)
+        alignment_point['box_x_low'] = max(0, x - half_box_width)
+        alignment_point['box_x_high'] = min(num_pixels_x, x + half_box_width)
         alignment_point['patch_y_low'] = max(0, y - half_patch_width)
         alignment_point['patch_y_high'] = min(num_pixels_y, y + half_patch_width)
         if extend_x_low:

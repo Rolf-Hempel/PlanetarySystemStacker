@@ -42,6 +42,7 @@ class Configuration(object):
         self.alignment_points_structure_threshold = 0.05
         self.alignment_points_brightness_threshold = 10
         self.alignment_points_contrast_threshold = 5
+        self.alignment_points_dim_fraction_threshold = 0.7
         self.alignment_points_frame_percent = 10.
         self.alignment_points_rank_method = "Laplace"
         self.alignment_points_rank_pixel_stride = 2
