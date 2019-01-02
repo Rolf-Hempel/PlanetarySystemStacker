@@ -22,7 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import glob
 from math import ceil
-from time import time
+from time import time, sleep
 
 import matplotlib.pyplot as plt
 from numpy import arange, amax, stack, amin, float32, uint8, zeros
@@ -716,12 +716,13 @@ if __name__ == "__main__":
     half_patch_width_new = 50
     num_pixels_y = average.shape[0]
     num_pixels_x = average.shape[1]
-
     alignment_points.alignment_points.append(
         alignment_points.new_alignment_point(average, frames.color, y_new, x_new,
                                              half_box_width_new,
                                              half_patch_width_new, num_pixels_y, num_pixels_x,
                                              extend_x_low=False, extend_x_high=False))
+    print ("Added alignment point at y: " + str(y_new) + ", x: " + str(x_new) + ", box size: "
+           + str(2*half_box_width_new) + ", patch size: " + str(2*half_patch_width_new))
     print("Searching for neighbors of failed APs.")
     alignment_points.find_alignment_point_neighbors()
 
