@@ -197,9 +197,6 @@ class StackFrames(object):
 
         # The same for monochrome mode.
         else:
-            if x_high_source - x_low_source != x_high_target - x_low_target or \
-                    y_high_source - y_low_source != y_high_target - y_low_target:
-                print("")
             buffer[y_low_target:y_high_target, x_low_target:x_high_target] += \
                 frame[y_low_source:y_high_source, x_low_source:x_high_source]
 

@@ -452,7 +452,7 @@ class Miscellaneous(object):
         dy_min = 0
         dx_min = 0
 
-        # Initialize list of minimum deviations for each search radius and field of deviations.
+        # Initialize list of minimum deviations for each search radius.
         dev_r = [deviation_min]
 
         # Start with shift [0, 0]. Stop when a circle with radius 1 around the current optimum
