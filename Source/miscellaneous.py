@@ -453,8 +453,7 @@ class Miscellaneous(object):
         dx_min = 0
 
         # Initialize list of minimum deviations for each search radius and field of deviations.
-        dev_r = []
-        deviations = np.zeros((2 * search_width + 1, 2 * search_width + 1))
+        dev_r = [deviation_min]
 
         # Start with shift [0, 0]. Stop when a circle with radius 1 around the current optimum
         # reaches beyond the search area.
@@ -479,14 +478,12 @@ class Miscellaneous(object):
                                       x_low - dx:x_high - dx:sampling_stride]).sum()
                     if deviation < deviation_min_1:
                         deviation_min_1, dy_min_1, dx_min_1 = deviation, dy, dx
-                    deviations[dy + search_width, dx + search_width] = deviation
             else:
                 for (dx, dy) in circle_1:
                     deviation = abs(
                         reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
                     if deviation < deviation_min_1:
                         deviation_min_1, dy_min_1, dx_min_1 = deviation, dy, dx
-                    deviations[dy + search_width, dx + search_width] = deviation
 
             # Append the minimal deviation found in this step to list of minima.
             dev_r.append(deviation_min_1)
