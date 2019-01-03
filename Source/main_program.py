@@ -65,8 +65,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Example-3*.jpg')
     else:
         # input_file = 'short_video'
-        # input_file = 'another_short_video'
-        input_file = 'Moon_Tile-024_043939'
+        input_file = 'another_short_video'
+        # input_file = 'Moon_Tile-024_043939'
         names = 'Videos/' + input_file + '.avi'
     print(names)
 
@@ -76,6 +76,7 @@ if __name__ == "__main__":
     configuration = Configuration()
 
     # Read the frames.
+    print ("+++ Start reading frames")
     my_timer.create('Read all frames')
     try:
         frames = Frames(configuration, names, type=type, convert_to_grayscale=False)
@@ -86,7 +87,17 @@ if __name__ == "__main__":
         exit()
     my_timer.stop('Read all frames')
 
+    # The whole quality analysis and shift determination process is performed on a monochrome
+    # version of the frames. If the original frames are in RGB, the monochrome channel can be
+    # selected via a configuration parameter. Add a list of monochrome images for all frames to
+    # the "Frames" object.
+    print("+++ Start creating blurred monochrome images")
+    my_timer.create('Create blurred monochrome images')
+    frames.add_monochrome(configuration.frames_mono_channel)
+    my_timer.stop('Create blurred monochrome images')
+
     # Rank the frames by their overall local contrast.
+    print("+++ Start ranking images")
     my_timer.create('Ranking images')
     rank_frames = RankFrames(frames, configuration)
     rank_frames.frame_score()
@@ -107,6 +118,7 @@ if __name__ == "__main__":
           str(y_high_opt) + ", x_low: " + str(x_low_opt) + ", x_high: " + str(x_high_opt))
 
     # Align all frames globally relative to the frame with the highest score.
+    print("+++ Start aligning all frames")
     my_timer.create('Global frame alignment')
     try:
         align_frames.align_frames()
@@ -124,6 +136,7 @@ if __name__ == "__main__":
 
     # Compute the average frame.
     my_timer.create('Compute reference frame')
+    print("+++ Start computing average frame")
     average = align_frames.average_frame()
     my_timer.stop('Compute reference frame')
     print("Average frame computed from the best " + str(
@@ -135,6 +148,7 @@ if __name__ == "__main__":
     my_timer.stop('Initialize alignment point object')
 
     # Create alignment points, and create an image with wll alignment point boxes and patches.
+    print("+++ Start creating alignment points")
     my_timer.create('Create alignment points')
     alignment_points.create_ap_grid(average)
     my_timer.stop('Create alignment points')
@@ -147,6 +161,7 @@ if __name__ == "__main__":
 
     # For each alignment point rank frames by their quality.
     my_timer.create('Rank frames at alignment points')
+    print("+++ Start ranking frames at alignment points")
     alignment_points.compute_frame_qualities()
     my_timer.stop('Rank frames at alignment points')
 
@@ -154,9 +169,11 @@ if __name__ == "__main__":
     stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, my_timer)
 
     # Stack all frames.
+    print("+++ Start stacking frames")
     stack_frames.stack_frames()
 
     # Merge the stacked alignment point buffers into a single image.
+    print("+++ Start merging alignment patches")
     stacked_image = stack_frames.merge_alignment_point_buffers()
 
     # Save the stacked image as 16bit int (color or mono).

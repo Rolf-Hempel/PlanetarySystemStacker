@@ -48,12 +48,6 @@ class RankFrames(object):
         self.number = frames.number
         self.shape = frames.shape
         self.configuration = configuration
-
-        # The whole quality analysis and shift determination process is performed on a monochrome
-        # version of the frames. If the original frames are in RGB, the monochrome channel can be
-        # selected via a configuration parameter. Add a list of monochrome images for all frames to
-        # the "Frames" object.
-        frames.add_monochrome(self.configuration.frames_mono_channel)
         self.frames_mono = frames.frames_mono
         self.frames_mono_blurred = frames.frames_mono_blurred
         self.quality_sorted_indices = None
@@ -117,15 +111,22 @@ if __name__ == "__main__":
         print("Error: " + e.message)
         exit()
 
+    # The whole quality analysis and shift determination process is performed on a monochrome
+    # version of the frames. If the original frames are in RGB, the monochrome channel can be
+    # selected via a configuration parameter. Add a list of monochrome images for all frames to
+    # the "Frames" object.
+    start = time()
+    frames.add_monochrome(configuration.frames_mono_channel)
+    end = time()
+    print('Elapsed time in creating blurred monochrome images: {}'.format(end - start))
+
     # Rank the frames by their overall local contrast.
     start = time()
     rank_frames = RankFrames(frames, configuration)
-    end = time()
-    print('Elapsed time in computing monochromatic images and blurring them: {}'.format(end - start))
-
-    start = time()
     rank_frames.frame_score()
     end = time()
+    print('Elapsed time in ranking all frames: {}'.format(end - start))
+
     # for rank, index in enumerate(rank_frames.quality_sorted_indices):
     #     frame_quality = rank_frames.frame_ranks[index]
     #     print("Rank: " + str(rank) + ", Frame no. " + str(index) + ", quality: " + str(frame_quality))
