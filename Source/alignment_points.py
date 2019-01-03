@@ -209,20 +209,11 @@ class AlignmentPoints(object):
 
                         # Replace the alignment point with a new one, using the updated
                         # coordinates and box / patch sizes.
-                        if not even and index_x == 0:
-                            alignment_point = self.new_alignment_point(mean_frame,
-                                self.frames.color, y_adapted, x_adapted, half_box_width_adapted,
-                                half_patch_width_adapted, num_pixels_y, num_pixels_x,
-                                extend_x_low=True)
-                        elif not even and index_x == ap_locations_x_odd_len_minus_1:
-                            alignment_point = self.new_alignment_point(mean_frame,
-                                self.frames.color, y_adapted, x_adapted, half_box_width_adapted,
-                                half_patch_width_adapted, num_pixels_y, num_pixels_x,
-                                extend_x_high=True)
-                        else:
-                            alignment_point = self.new_alignment_point(mean_frame,
-                                self.frames.color, y_adapted, x_adapted, half_box_width_adapted,
-                                half_patch_width_adapted, num_pixels_y, num_pixels_x)
+                        alignment_point = self.new_alignment_point(mean_frame,
+                            self.frames.color, y_adapted, x_adapted, half_box_width_adapted,
+                            half_patch_width_adapted, num_pixels_y, num_pixels_x,
+                            extend_x_low=not even and index_x == 0,
+                            extend_x_high=not even and index_x == ap_locations_x_odd_len_minus_1)
 
                     alignment_point['structure'] = Miscellaneous.quality_measure(
                         alignment_point['reference_box'])
