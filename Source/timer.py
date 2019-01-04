@@ -48,8 +48,7 @@ class timer(object):
         """
 
         if name in self.counters.keys():
-            # raise ArgumentError("Attempt to initialize timer with existing name")
-            self.counters[name][1] = time()
+            raise ArgumentError("Attempt to initialize timer with existing name")
         else:
             self.counters[name] = [0., time()]
 
