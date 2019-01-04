@@ -57,6 +57,7 @@ class AlignFrames(object):
         self.shape = frames.shape
         self.frame_shifts = None
         self.intersection_shape = None
+        self.intersection_shape_original = None
         self.mean_frame = None
         self.configuration = configuration
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
@@ -122,10 +123,6 @@ class AlignFrames(object):
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
         self.frame_shifts = []
-        # Initialize lists which for each frame give the dy and dx displacements between the
-        # reference frame and current frame.
-        self.dy = []
-        self.dx = []
 
         # Initialize lists with info on failed frames.
         self.dev_r_list = []
@@ -236,10 +233,9 @@ class AlignFrames(object):
                                    [max(b[1] for b in self.frame_shifts),
                                     min(b[1] for b in self.frame_shifts) + self.shape[1]]]
 
-        # Compute global offsets of current frame relative to intersection frame.
-        for idx in range(len(self.frames_mono_blurred)):
-            self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
-            self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
+        if not self.intersection_shape_original:
+            self.intersection_shape_original = self.intersection_shape.copy()
+
 
         if len(self.failed_index_list) > 0:
             raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
@@ -254,6 +250,15 @@ class AlignFrames(object):
 
         if self.intersection_shape == None:
             raise WrongOrderingError("Method 'average_frames' is called before 'align_frames'")
+
+        # Compute global offsets of current frame relative to intersection frame. Start with
+        # Initializing lists which for each frame give the dy and dx displacements between the
+        # reference frame and current frame.
+        self.dy = []
+        self.dx = []
+        for idx in range(len(self.frames_mono_blurred)):
+            self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
+            self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
 
         self.average_frame_number = max(
             ceil(self.number * self.configuration.align_frames_average_frame_percent / 100.), 1)
@@ -285,13 +290,23 @@ class AlignFrames(object):
         :param y_max: Upper y pixel bound
         :param x_min: Lower x pixel bound
         :param x_max: Upper x pixel bound
-        :return: -
+        :return: The new averaged frame, restricted to the ROI
         """
 
-        if y_min < 0 or y_max > self.intersection_shape[0][1] - self.intersection_shape[0][0] or \
-            x_min < 0 or x_max > self.intersection_shape[1][1] - self.intersection_shape[1][0] or \
-            y_min >= y_max or x_min >= x_max:
+        if self.intersection_shape == None:
+            raise WrongOrderingError("Method 'set_roi' is called before 'align_frames'")
+
+        if y_min < 0 or y_max > self.intersection_shape_original[0][1] - \
+                self.intersection_shape_original[0][0] or \
+                x_min < 0 or x_max > self.intersection_shape_original[1][1] - \
+                self.intersection_shape_original[1][0] or \
+                y_min >= y_max or x_min >= x_max:
             raise ArgumentError("Invalid ROI index bounds specified")
+
+        # Reduce
+        self.intersection_shape = [[y_min, y_max], [x_min, x_max]]
+
+        return self.average_frame()
 
 
     def write_stabilized_video(self, name, fps, stabilized=True):
@@ -414,9 +429,15 @@ if __name__ == "__main__":
     plt.show()
 
     # Write video with stabilized frames, annotated with their frame indices.
-    stabilized = True
+    stabilized = False
     if stabilized:
         name = 'Videos/stabilized_video_with_frame_numbers.avi'
     else:
         name = 'Videos/not_stabilized_video_with_frame_numbers.avi'
     align_frames.write_stabilized_video(name, 5, stabilized=stabilized)
+
+    print ("Setting ROI and computing new average frame")
+    average = align_frames.set_roi(300, 600, 500, 1000)
+    plt.imshow(average, cmap='Greys_r')
+    plt.show()
+

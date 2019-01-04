@@ -135,12 +135,19 @@ if __name__ == "__main__":
           + str(align_frames.intersection_shape[1][1]))
 
     # Compute the average frame.
-    my_timer.create('Compute reference frame')
     print("+++ Start computing average frame")
+    my_timer.create('Compute reference frame')
     average = align_frames.average_frame()
     my_timer.stop('Compute reference frame')
     print("Average frame computed from the best " + str(
         align_frames.average_frame_number) + " frames.")
+
+    roi = True
+    if roi:
+        print("+++ Start setting ROI and computing new average frame")
+        my_timer.create('Setting ROI and new reference')
+        average_roi = align_frames.set_roi(300, 900, 500, 1100)
+        my_timer.stop('Setting ROI and new reference')
 
     # Initialize the AlignmentPoints object.
     my_timer.create('Initialize alignment point object')
@@ -150,14 +157,23 @@ if __name__ == "__main__":
     # Create alignment points, and create an image with wll alignment point boxes and patches.
     print("+++ Start creating alignment points")
     my_timer.create('Create alignment points')
-    alignment_points.create_ap_grid(average)
+
+    if roi:
+        alignment_points.create_ap_grid(average_roi)
+    else:
+        alignment_points.create_ap_grid(average)
+
     my_timer.stop('Create alignment points')
     print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
           ", aps dropped because too dim: " + str(
         len(alignment_points.alignment_points_dropped_dim)) +
           ", aps dropped because too little structure: " + str(
         len(alignment_points.alignment_points_dropped_structure)))
-    color_image_with_aps = alignment_points.show_alignment_points(average)
+
+    if roi:
+        color_image_with_aps = alignment_points.show_alignment_points(average_roi)
+    else:
+        color_image_with_aps = alignment_points.show_alignment_points(average)
 
     # For each alignment point rank frames by their quality.
     my_timer.create('Rank frames at alignment points')
@@ -185,6 +201,15 @@ if __name__ == "__main__":
     my_timer.stop('Execution over all')
     my_timer.print()
 
+    # Show the original average frame.
+    plt.imshow(average, cmap='Greys_r')
+    plt.show()
+
+    if roi:
+        # Show the ROI frame.
+        plt.imshow(average_roi, cmap='Greys_r')
+        plt.show()
+
     # Write the image with alignment points.
     frames.save_image('Images/' + input_file + '_alignment_points.tiff', color_image_with_aps,
                       color=True)
@@ -196,3 +221,4 @@ if __name__ == "__main__":
     # Convert the stacked image to 8bit and show in Window.
     plt.imshow(img_as_ubyte(stacked_image))
     plt.show()
+

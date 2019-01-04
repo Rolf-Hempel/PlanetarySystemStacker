@@ -101,6 +101,18 @@ class Frames(object):
         self.frames_mono = None
         self.frames_mono_blurred = None
         self.frames_mono_blurred_laplacian = None
+        self.used_alignment_points = None
+
+        # Initialize the alignment point lists for all frames.
+        self.reset_alignment_point_lists()
+
+    def reset_alignment_point_lists(self):
+        """
+        Every frame keeps a list with the alignment points for which this frame is among the
+        sharpest ones (so it is used in stacking). Reset this list for all frames.
+
+        :return: -
+        """
 
         # For every frame initialize the list with used alignment points.
         self.used_alignment_points = []

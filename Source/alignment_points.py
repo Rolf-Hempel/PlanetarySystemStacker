@@ -67,6 +67,9 @@ class AlignmentPoints(object):
 
         self.stack_size = None
 
+        # Reset the list of alignment points registered with each frame.
+        self.frames.reset_alignment_point_lists()
+
     def ap_locations(self, num_pixels, half_box_width, search_width, step_size, even):
         """
         Compute optimal alignment patch coordinates in one coordinate direction. Place boundary
