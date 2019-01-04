@@ -22,7 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import glob
 from math import ceil
-from time import time, sleep
+from time import time
 
 import matplotlib.pyplot as plt
 from numpy import arange, amax, stack, amin, float32, uint8, zeros
@@ -411,6 +411,10 @@ class AlignmentPoints(object):
         For each alignment point compute a ranking of best frames. Store the list in the
         alignment point dictionary with the key 'best_frame_indices'.
 
+        Consider the special case that sampled-down Laplacians have been stored for frame ranking.
+        In this case they can be re-used for ranking the boxes around alignment points (but only
+        if "Laplace" has been selected for alignment point ranking).
+
         :return: -
         """
 
@@ -429,22 +433,46 @@ class AlignmentPoints(object):
                 "Ranking method " + self.configuration.alignment_points_rank_method +
                 " not supported")
 
-        # Cycle through all alignment points:
-        for alignment_point in self.alignment_points:
-            alignment_point['frame_qualities'] = []
-            # Cycle through all frames. Use the blurred monochrome image for ranking.
-            for frame_index, frame in enumerate(self.frames.frames_mono_blurred):
-                # Compute patch bounds within the current frame.
-                y_low = max(0, alignment_point['patch_y_low'] + self.align_frames.dy[frame_index])
-                y_high = min(self.frames.shape[0],
-                             alignment_point['patch_y_high'] + self.align_frames.dy[frame_index])
-                x_low = max(0, alignment_point['patch_x_low'] + self.align_frames.dx[frame_index])
-                x_high = min(self.frames.shape[1],
-                             alignment_point['patch_x_high'] + self.align_frames.dx[frame_index])
-                # Compute the frame quality and append it to the list for this alignment point.
-                alignment_point['frame_qualities'].append(
-                    method(frame[y_low:y_high, x_low:x_high],
-                           self.configuration.alignment_points_rank_pixel_stride))
+        if self.configuration.rank_frames_method != "Laplace" or \
+                self.configuration.alignment_points_rank_method != "Laplace":
+            # There are no stored Laplacians, or they cannot be used for the specified method.
+            # Cycle through all alignment points:
+            for alignment_point in self.alignment_points:
+                alignment_point['frame_qualities'] = []
+                # Cycle through all frames. Use the blurred monochrome image for ranking.
+                for frame_index, frame in enumerate(self.frames.frames_mono_blurred):
+                    # Compute patch bounds within the current frame.
+                    y_low = max(0, alignment_point['patch_y_low'] + self.align_frames.dy[frame_index])
+                    y_high = min(self.frames.shape[0],
+                                 alignment_point['patch_y_high'] + self.align_frames.dy[frame_index])
+                    x_low = max(0, alignment_point['patch_x_low'] + self.align_frames.dx[frame_index])
+                    x_high = min(self.frames.shape[1],
+                                 alignment_point['patch_x_high'] + self.align_frames.dx[frame_index])
+                    # Compute the frame quality and append it to the list for this alignment point.
+                    alignment_point['frame_qualities'].append(
+                        method(frame[y_low:y_high, x_low:x_high],
+                               self.configuration.alignment_points_rank_pixel_stride))
+        else:
+            # Sampled-down Laplacians of all blurred frames have been computed in
+            # "frames.add_monochrome". Cut out boxes around alignment points from those objects,
+            # rather than computing new Laplacians. Cycle through all alignment points:
+            for alignment_point in self.alignment_points:
+                alignment_point['frame_qualities'] = []
+                # Cycle through all frames. Use the blurred monochrome image for ranking.
+                for frame_index, frame in enumerate(self.frames.frames_mono_blurred_laplacian):
+                    # Compute patch bounds within the current frame.
+                    y_low = int(max(0, alignment_point['patch_y_low'] + self.align_frames.dy[
+                        frame_index]) / self.configuration.align_frames_sampling_stride)
+                    y_high = int(min(self.frames.shape[0],
+                                 alignment_point['patch_y_high'] + self.align_frames.dy[
+                                     frame_index]) / self.configuration.align_frames_sampling_stride)
+                    x_low = int(max(0, alignment_point['patch_x_low'] + self.align_frames.dx[
+                        frame_index]) / self.configuration.align_frames_sampling_stride)
+                    x_high = int(min(self.frames.shape[1],
+                                 alignment_point['patch_x_high'] + self.align_frames.dx[
+                                     frame_index]) / self.configuration.align_frames_sampling_stride)
+                    # Compute the frame quality and append it to the list for this alignment point.
+                    alignment_point['frame_qualities'].append(frame[y_low:y_high, x_low:x_high].var())
 
         # For each alignment point sort the computed quality ranks in descending order.
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):

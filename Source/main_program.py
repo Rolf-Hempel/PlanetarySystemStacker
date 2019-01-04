@@ -65,8 +65,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Example-3*.jpg')
     else:
         # input_file = 'short_video'
-        # input_file = 'another_short_video'
-        input_file = 'Moon_Tile-024_043939'
+        input_file = 'another_short_video'
+        # input_file = 'Moon_Tile-024_043939'
         names = 'Videos/' + input_file + '.avi'
     print(names)
 
@@ -91,10 +91,10 @@ if __name__ == "__main__":
     # version of the frames. If the original frames are in RGB, the monochrome channel can be
     # selected via a configuration parameter. Add a list of monochrome images for all frames to
     # the "Frames" object.
-    print("+++ Start creating blurred monochrome images")
-    my_timer.create('Create blurred monochrome images')
+    print("+++ Start creating blurred monochrome images and Laplacians")
+    my_timer.create('Blurred monochrome images and Laplacians')
     frames.add_monochrome(configuration.frames_mono_channel)
-    my_timer.stop('Create blurred monochrome images')
+    my_timer.stop('Blurred monochrome images and Laplacians')
 
     # Rank the frames by their overall local contrast.
     print("+++ Start ranking images")

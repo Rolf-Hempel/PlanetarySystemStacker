@@ -27,7 +27,7 @@ import matplotlib.pyplot as plt
 from numpy import empty, mean, arange
 
 from configuration import Configuration
-from exceptions import WrongOrderingError, NotSupportedError, InternalError
+from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -277,6 +277,23 @@ class AlignFrames(object):
         self.mean_frame = mean(buffer, axis=0)
         return self.mean_frame
 
+    def set_roi(self, y_min, y_max, x_min, x_max):
+        """
+        Make the stacking region snmaller than the intersection size.
+
+        :param y_min: Lower y pixel bound
+        :param y_max: Upper y pixel bound
+        :param x_min: Lower x pixel bound
+        :param x_max: Upper x pixel bound
+        :return: -
+        """
+
+        if y_min < 0 or y_max > self.intersection_shape[0][1] - self.intersection_shape[0][0] or \
+            x_min < 0 or x_max > self.intersection_shape[1][1] - self.intersection_shape[1][0] or \
+            y_min >= y_max or x_min >= x_max:
+            raise ArgumentError("Invalid ROI index bounds specified")
+
+
     def write_stabilized_video(self, name, fps, stabilized=True):
         """
         Write out a stabilized videos. For all frames the part common to all frames is extracted
@@ -287,10 +304,6 @@ class AlignFrames(object):
         :param stabilized: if False, switch off image stabilization. Write original frames.
         :return: -
         """
-
-        # Compute video frame size.
-        frame_height = self.intersection_shape[0][1] - self.intersection_shape[0][0]
-        frame_width = self.intersection_shape[1][1] - self.intersection_shape[1][0]
 
         # Initialize lists of stabilized frames and index strings.
         frames_mono_stabilized = []
@@ -343,6 +356,14 @@ if __name__ == "__main__":
         print("Image shape: " + str(frames.shape))
     except Exception as e:
         print("Error: " + str(e))
+        exit()
+
+    # Create monochrome versions of all frames. If the original frames are monochrome,
+    # just point the monochrome frame list to the original images (no deep copy!).
+    try:
+        frames.add_monochrome(configuration.frames_mono_channel)
+    except ArgumentError as e:
+        print("Error: " + e.message)
         exit()
 
     # Rank the frames by their overall local contrast.

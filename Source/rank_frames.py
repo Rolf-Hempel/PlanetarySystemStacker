@@ -22,6 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import glob
 from time import time
+from numpy import mean
 
 from configuration import Configuration
 from frames import Frames
@@ -50,6 +51,7 @@ class RankFrames(object):
         self.configuration = configuration
         self.frames_mono = frames.frames_mono
         self.frames_mono_blurred = frames.frames_mono_blurred
+        self.frames_mono_blurred_laplacian = frames.frames_mono_blurred_laplacian
         self.quality_sorted_indices = None
         self.frame_ranks = []
         self.frame_ranks_max_index = None
@@ -73,8 +75,13 @@ class RankFrames(object):
                                     " not supported")
 
         # For all frames compute the quality with the selected method.
-        for frame in self.frames_mono_blurred:
-            self.frame_ranks.append(method(frame, self.configuration.rank_frames_pixel_stride))
+        if method != Miscellaneous.local_contrast_laplace:
+            for frame in self.frames_mono_blurred:
+                self.frame_ranks.append(method(frame, self.configuration.rank_frames_pixel_stride))
+        else:
+            for frame in self.frames_mono_blurred_laplacian:
+                # self.frame_ranks.append(mean((frame - frame.mean())**2))
+                self.frame_ranks.append(frame.var())
 
         # Sort the frame indices in descending order of quality.
         self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),

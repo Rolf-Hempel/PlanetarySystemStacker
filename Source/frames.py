@@ -96,9 +96,11 @@ class Frames(object):
         else:
             raise ShapeError("Image shape not supported")
 
-        # Initialize lists of monochrome frames (with and without Gaussian blur).
+        # Initialize lists of monochrome frames (with and without Gaussian blur) and their
+        # Laplacians.
         self.frames_mono = None
         self.frames_mono_blurred = None
+        self.frames_mono_blurred_laplacian = None
 
         # For every frame initialize the list with used alignment points.
         self.used_alignment_points = []
@@ -110,7 +112,7 @@ class Frames(object):
         Create monochrome versions of all frames. Add a list of monochrome frames
         "self.frames_mono". If the original frames are monochrome, just point the monochrome frame
         list to the original images (no deep copy!). Also, add a blurred version of the frame list
-        (using a Gaussian filter) "self.frames_mono_blurred".
+        (using a Gaussian filter) "self.frames_mono_blurred", and the Laplacian of that image.
 
         :param color: Either "red" or "green", "blue", or "panchromatic"
         :return: -
@@ -127,9 +129,17 @@ class Frames(object):
         else:
             self.frames_mono = self.frames
 
+        # Add versions of all frames with Gaussian blur added.
         self.frames_mono_blurred = [cv2.GaussianBlur(frame, (
             self.configuration.frames_gauss_width, self.configuration.frames_gauss_width),
                                                      0) for frame in self.frames_mono]
+
+        if self.configuration.rank_frames_method == "Laplace":
+            # Add the Laplacians of down-sampled blurred images.
+            self.frames_mono_blurred_laplacian = [cv2.Laplacian(
+                frame[::self.configuration.align_frames_sampling_stride,
+                ::self.configuration.align_frames_sampling_stride], cv2.CV_32F) for frame in
+                                                  self.frames_mono_blurred]
 
     def save_image(self, filename, image, color=False):
         """
@@ -194,7 +204,7 @@ if __name__ == "__main__":
     # Create monochrome versions of all frames. If the original frames are monochrome, just point
     # the monochrome frame list to the original images (no deep copy!).
     try:
-        frames.add_monochrome('red')
+        frames.add_monochrome(configuration.frames_mono_channel)
     except ArgumentError as e:
         print("Error: " + e.message)
         exit()
