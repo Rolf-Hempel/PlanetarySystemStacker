@@ -278,11 +278,13 @@ class StackFrames(object):
         weights = np.empty((patch_high_offset,), dtype=np.float32)
 
         # Ramping up between lower patch and box borders.
-        weights[0:box_low_offset] = np.arange(0., 1., 1. / float(box_low_offset), dtype=np.float32)
+        if box_low_offset > 0:
+            weights[0:box_low_offset] = np.arange(0., 1., 1. / float(box_low_offset), dtype=np.float32)
         # Box interior
         weights[box_low_offset:box_high_offset] = 1.
         # Ramping up between upper box and patch borders.
-        weights[box_high_offset:patch_high_offset] = np.arange(1., 0.,
+        if patch_high_offset > box_high_offset:
+            weights[box_high_offset:patch_high_offset] = np.arange(1., 0.,
                                                                -1. / float(patch_high - box_high),
                                                                dtype=np.float32)
         return weights

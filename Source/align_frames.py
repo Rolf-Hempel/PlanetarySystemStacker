@@ -147,9 +147,9 @@ class AlignFrames(object):
             # relative to the reference.
             else:
                 frame = self.frames_mono_blurred[idx]
-                frame_window = self.frames_mono_blurred[idx][self.y_low_opt:self.y_high_opt,
-                               self.x_low_opt:self.x_high_opt]
                 if self.configuration.align_frames_method == "Translation":
+                    frame_window = self.frames_mono_blurred[idx][self.y_low_opt:self.y_high_opt,
+                                   self.x_low_opt:self.x_high_opt]
                     self.frame_shifts.append(
                         Miscellaneous.translation(self.reference_window, frame_window,
                                                   self.reference_window_shape))

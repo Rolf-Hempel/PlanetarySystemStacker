@@ -40,8 +40,8 @@ class Configuration(object):
         self.alignment_points_half_patch_width = 30
         self.alignment_points_search_width = 6
         self.alignment_points_structure_threshold = 0.05
-        self.alignment_points_brightness_threshold = 10
-        self.alignment_points_contrast_threshold = 5
+        self.alignment_points_brightness_threshold = 5
+        self.alignment_points_contrast_threshold = 0
         self.alignment_points_dim_fraction_threshold = 0.7
         self.alignment_points_frame_percent = 10.
         self.alignment_points_rank_method = "Laplace"
