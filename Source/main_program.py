@@ -75,7 +75,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
 
     print("\n" +
           "*************************************************************************************\n"
-          + "Start processing " + str(names) +
+          + "Start processing " + str(input_name) +
           "\n*************************************************************************************")
     my_timer.create('Execution over all')
 
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     """
 
     ####################################### Specify test case ######################################
-    redirect_stdout = False
+    redirect_stdout = True
     show_results = True
     # input_type = 'video'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
