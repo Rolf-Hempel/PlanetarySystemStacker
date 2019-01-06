@@ -171,17 +171,19 @@ class AlignmentPoints(object):
                     alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
                                                                half_box_width,
                                                                half_patch_width, num_pixels_y,
-                                                               num_pixels_x, extend_x_low=True)
+                                                               num_pixels_x, search_width,
+                                                               extend_x_low=True)
                 elif not even and index_x == ap_locations_x_odd_len_minus_1:
                     alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
                                                                half_box_width,
                                                                half_patch_width, num_pixels_y,
-                                                               num_pixels_x, extend_x_high=True)
+                                                               num_pixels_x, search_width,
+                                                               extend_x_high=True)
                 else:
                     alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
                                                                half_box_width,
                                                                half_patch_width, num_pixels_y,
-                                                               num_pixels_x)
+                                                               num_pixels_x, search_width)
 
                 # Increase the counter of standard APs.
                 self.num_standard_aps += 1
@@ -214,7 +216,7 @@ class AlignmentPoints(object):
                         # coordinates and box / patch sizes.
                         alignment_point = self.new_alignment_point(mean_frame,
                             self.frames.color, y_adapted, x_adapted, half_box_width_adapted,
-                            half_patch_width_adapted, num_pixels_y, num_pixels_x,
+                            half_patch_width_adapted, num_pixels_y, num_pixels_x, search_width,
                             extend_x_low=not even and index_x == 0,
                             extend_x_high=not even and index_x == ap_locations_x_odd_len_minus_1)
 
@@ -253,7 +255,7 @@ class AlignmentPoints(object):
 
     @staticmethod
     def new_alignment_point(mean_frame, color, y, x, half_box_width, half_patch_width, num_pixels_y,
-                            num_pixels_x, extend_x_low=False, extend_x_high=False):
+                            num_pixels_x, search_width, extend_x_low=False, extend_x_high=False):
         """
         Create a new alignment point. This method is called in creating the initial alignment point
         grid. Later it can be invoked by the user to add single alignment points.
@@ -266,6 +268,7 @@ class AlignmentPoints(object):
         :param half_patch_width: Half-width of the alignment patch (used in stacking)
         :param num_pixels_y: Number of pixels in y direction
         :param num_pixels_x: Number of pixels in x direction
+        :param search_width: Maximum search width for alignment point matching
         :param extend_x_low: True, if patch is to be extended to the left frame boundary.
                              False otherwise.
         :param extend_x_high: True, if patch is to be extended to the right frame boundary.
@@ -277,9 +280,9 @@ class AlignmentPoints(object):
         alignment_point['y'] = y
         alignment_point['x'] = x
         alignment_point['box_y_low'] = max(0, y - half_box_width)
-        alignment_point['box_y_high'] = min(num_pixels_y, y + half_box_width)
+        alignment_point['box_y_high'] = min(num_pixels_y - search_width, y + half_box_width)
         alignment_point['box_x_low'] = max(0, x - half_box_width)
-        alignment_point['box_x_high'] = min(num_pixels_x, x + half_box_width)
+        alignment_point['box_x_high'] = min(num_pixels_x - search_width, x + half_box_width)
         alignment_point['patch_y_low'] = max(0, y - half_patch_width)
         alignment_point['patch_y_high'] = min(num_pixels_y, y + half_patch_width)
         if extend_x_low:
@@ -592,7 +595,7 @@ class AlignmentPoints(object):
             # Expand the monochrome reference frame to RGB
             color_image = stack((image.astype(uint8),) * 3, -1)
 
-        # For all alignment box insert a color-coded cross.
+        # For all alignment boxes insert a color-coded cross.
         cross_half_len = 5
 
         for alignment_point in (self.alignment_points):
@@ -600,12 +603,16 @@ class AlignmentPoints(object):
             x_center = alignment_point['x']
             Miscellaneous.insert_cross(color_image, y_center,
                                        x_center, cross_half_len, 'red')
-            for y in arange(alignment_point['box_y_low'], alignment_point['box_y_high']):
-                color_image[y, alignment_point['box_x_low']] = [255, 255, 255]
-                color_image[y, alignment_point['box_x_high']] = [255, 255, 255]
-            for x in arange(alignment_point['box_x_low'], alignment_point['box_x_high']):
-                color_image[alignment_point['box_y_low'], x] = [255, 255, 255]
-                color_image[alignment_point['box_y_high'], x] = [255, 255, 255]
+            box_y_low = max(alignment_point['box_y_low'], 0)
+            box_y_high = min(alignment_point['box_y_high'], image.shape[0]) - 1
+            box_x_low = max(alignment_point['box_x_low'], 0)
+            box_x_high = min(alignment_point['box_x_high'], image.shape[1]) - 1
+            for y in arange(box_y_low, box_y_high):
+                color_image[y, box_x_low] = [255, 255, 255]
+                color_image[y, box_x_high] = [255, 255, 255]
+            for x in arange(box_x_low, box_x_high):
+                color_image[box_y_low, x] = [255, 255, 255]
+                color_image[box_y_high, x] = [255, 255, 255]
 
             patch_y_low = max(alignment_point['patch_y_low'], 0)
             patch_y_high = min(alignment_point['patch_y_high'], image.shape[0]) -1

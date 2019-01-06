@@ -26,6 +26,7 @@ from pathlib import Path
 import cv2
 import matplotlib.pyplot as plt
 from scipy import misc
+import numpy as np
 
 from configuration import Configuration
 from exceptions import TypeError, ShapeError, ArgumentError
@@ -57,7 +58,10 @@ class Frames(object):
             if convert_to_grayscale:
                 self.frames = [misc.imread(path, mode='F') for path in names]
             else:
-                self.frames = [misc.imread(path) for path in names]
+                self.frames = [cv2.imread(path, -1) for path in names]
+                if self.frames[0].dtype == 'uint16':
+                    conversion_factor = np.float32(1. / 255.)
+                    self.frames = [frame*conversion_factor for frame in self.frames]
             self.number = len(names)
             self.shape = self.frames[0].shape
 

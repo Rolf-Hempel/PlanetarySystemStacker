@@ -91,7 +91,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
-        print("Error: " + e.message)
+        print("Error: " + str(e))
         exit()
     my_timer.stop('Read all frames')
 
@@ -173,7 +173,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
         alignment_points.create_ap_grid(average)
 
     my_timer.stop('Create alignment points')
-    print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
+    print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)) +
           ", aps dropped because too dim: " + str(
         len(alignment_points.alignment_points_dropped_dim)) +
           ", aps dropped because too little structure: " + str(
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     """
 
     ####################################### Specify test case ######################################
-    redirect_stdout = True
+    redirect_stdout = False
     show_results = True
     # input_type = 'video'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
