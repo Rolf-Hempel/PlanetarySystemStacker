@@ -230,11 +230,11 @@ if __name__ == "__main__":
     ####################################### Specify test case ######################################
     redirect_stdout = False
     show_results = True
-    # input_type = 'video'
-    # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
-    input_type = 'image'
-    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
-    convert_to_grayscale = True
+    input_type = 'video'
+    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
+    # input_type = 'image'
+    # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
+    convert_to_grayscale = False
     roi = None
     ####################################### Specify test case end ##################################
 
