@@ -117,7 +117,7 @@ class AlignFrames(object):
         :return: -
         """
 
-        if self.x_low_opt == None:
+        if self.x_low_opt is None:
             raise WrongOrderingError(
                 "Method 'align_frames' is called before 'select_alignment_rect'")
 
@@ -248,7 +248,7 @@ class AlignFrames(object):
         :return: The averaged frame
         """
 
-        if self.intersection_shape == None:
+        if self.intersection_shape is None:
             raise WrongOrderingError("Method 'average_frames' is called before 'align_frames'")
 
         # Compute global offsets of current frame relative to intersection frame. Start with
@@ -293,7 +293,7 @@ class AlignFrames(object):
         :return: The new averaged frame, restricted to the ROI
         """
 
-        if self.intersection_shape == None:
+        if self.intersection_shape is None:
             raise WrongOrderingError("Method 'set_roi' is called before 'align_frames'")
 
         if y_min < 0 or y_max > self.intersection_shape_original[0][1] - \
