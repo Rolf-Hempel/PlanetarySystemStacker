@@ -51,9 +51,9 @@ class Miscellaneous(object):
         dx = np.diff(frame)[:, :]
         dy = np.diff(frame, axis=0)[:, :]
 
-        # Compute the sharpness per coordinate direction as the 2-norm of point values.
-        sharpness_x = np.average(np.sqrt(dx ** 2))
-        sharpness_y = np.average(np.sqrt(dy ** 2))
+        # Compute the sharpness per coordinate direction as the 1-norm of point values.
+        sharpness_x = np.average(np.abs(dx))
+        sharpness_y = np.average(np.abs(dy))
 
         # Return the sharpness in the direction where it is minimal.
         sharpness = min(sharpness_x, sharpness_y)
