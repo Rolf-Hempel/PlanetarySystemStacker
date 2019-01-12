@@ -102,7 +102,8 @@ class AlignFrames(object):
                 #     x_low:x_high], self.configuration.quality_area_pixel_stride)
                 new_quality = Miscellaneous.quality_measure_alternative(
                     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
-                    x_low:x_high])
+                    x_low:x_high],
+                    black_threshold=self.configuration.align_frames_rectangle_black_threshold)
                 if new_quality > quality:
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
                         x_low, x_high, y_low, y_high)

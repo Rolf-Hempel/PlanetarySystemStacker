@@ -30,6 +30,7 @@ class Configuration(object):
 
         self.align_frames_method = "SteepestDescent"
         self.align_frames_rectangle_scale_factor = 3
+        self.align_frames_rectangle_black_threshold = 40
         self.align_frames_search_width = 20
         self.align_frames_border_width = 10
         self.align_frames_sampling_stride = 2
