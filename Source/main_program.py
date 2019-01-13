@@ -114,16 +114,18 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
 
     # Initialize the frame alignment object.
     align_frames = AlignFrames(frames, rank_frames, configuration)
-    my_timer.create('Select optimal alignment patch')
-    # Select the local rectangular patch in the image where the L gradient is highest in both x
-    # and y direction. The scale factor specifies how much smaller the patch is compared to the
-    # whole image frame.
-    (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
-        configuration.align_frames_rectangle_scale_factor)
-    my_timer.stop('Select optimal alignment patch')
 
-    print("optimal alignment rectangle, y_low: " + str(y_low_opt) + ", y_high: " +
-          str(y_high_opt) + ", x_low: " + str(x_low_opt) + ", x_high: " + str(x_high_opt))
+    if configuration.align_frames_mode == "Surface":
+        my_timer.create('Select optimal alignment patch')
+        # Select the local rectangular patch in the image where the L gradient is highest in both x
+        # and y direction. The scale factor specifies how much smaller the patch is compared to the
+        # whole image frame.
+        (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
+            configuration.align_frames_rectangle_scale_factor)
+        my_timer.stop('Select optimal alignment patch')
+
+        print("optimal alignment rectangle, y_low: " + str(y_low_opt) + ", y_high: " +
+              str(y_high_opt) + ", x_low: " + str(x_low_opt) + ", x_high: " + str(x_high_opt))
 
     # Align all frames globally relative to the frame with the highest score.
     print("+++ Start aligning all frames")

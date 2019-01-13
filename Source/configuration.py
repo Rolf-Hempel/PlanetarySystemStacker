@@ -28,6 +28,7 @@ class Configuration(object):
         self.rank_frames_pixel_stride = 1
         self.rank_frames_method = "Laplace"
 
+        self.align_frames_mode = "Surface"
         self.align_frames_method = "SteepestDescent"
         self.align_frames_rectangle_scale_factor = 3
         self.align_frames_rectangle_black_threshold = 40
@@ -46,8 +47,8 @@ class Configuration(object):
         self.alignment_points_dim_fraction_threshold = 0.7
         self.alignment_points_frame_percent = 10.
         self.alignment_points_rank_method = "Laplace"
-        self.alignment_points_rank_pixel_stride = 1
+        self.alignment_points_rank_pixel_stride = 2
         self.alignment_points_de_warp = True
         self.alignment_points_method = 'SteepestDescent'
-        self.alignment_points_sampling_stride = 1
+        self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False

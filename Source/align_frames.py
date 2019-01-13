@@ -24,6 +24,7 @@ import glob
 from math import ceil
 
 import matplotlib.pyplot as plt
+from scipy import ndimage
 from numpy import empty, mean, arange
 
 from configuration import Configuration
@@ -118,9 +119,30 @@ class AlignFrames(object):
         :return: -
         """
 
-        if self.x_low_opt is None:
-            raise WrongOrderingError(
-                "Method 'align_frames' is called before 'select_alignment_rect'")
+        if self.configuration.align_frames_mode == "Surface":
+            # For "Surface" mode the alignment rectangle has to be selected first.
+            if self.x_low_opt is None:
+                raise WrongOrderingError(
+                    "Method 'align_frames' is called before 'select_alignment_rect'")
+
+            # From the sharpest frame cut out the alignment rectangle. The shifts of all other frames
+            #  will be computed relativ to this patch.
+            self.reference_window = self.frames_mono_blurred[self.frame_ranks_max_index][
+                                    self.y_low_opt:self.y_high_opt,
+                                    self.x_low_opt:self.x_high_opt]
+            self.reference_window_shape = self.reference_window.shape
+
+        elif self.configuration.align_frames_mode == "Planet":
+            # For "Planetary" mode compute the center of gravity for the reference image.
+            cog_real = ndimage.measurements.center_of_mass(
+                self.frames_mono_blurred[self.frame_ranks_max_index])
+            cog_reference_y = int(round(cog_real[0]))
+            cog_reference_x = int(round(cog_real[1]))
+
+        else:
+            raise NotSupportedError(
+                "Frame alignment mode " + self.configuration.align_frames_mode +
+                " not supported")
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
         self.frame_shifts = []
@@ -133,28 +155,39 @@ class AlignFrames(object):
         # point for the next step. This reduces the search radius if frames are drifting.
         dy_min_cum = dx_min_cum = 0
 
-        # From the sharpest frame cut out the alignment rectangle. The shifts of all other frames
-        #  will be computed relativ to this patch.
-        self.reference_window = self.frames_mono_blurred[self.frame_ranks_max_index][
-                                self.y_low_opt:self.y_high_opt, self.x_low_opt:self.x_high_opt]
-        self.reference_window_shape = self.reference_window.shape
         for idx, frame in enumerate(self.frames_mono_blurred):
 
             # For the sharpest frame the displacement is 0 because it is used as the reference.
             if idx == self.frame_ranks_max_index:
                 self.frame_shifts.append([0, 0])
 
-            # For all other frames: Cut out the alignment patch and compute its translation
-            # relative to the reference.
+            # For all other frames: Compute the global shift, using the "blurred" monochrome image.
             else:
                 frame = self.frames_mono_blurred[idx]
-                if self.configuration.align_frames_method == "Translation":
+
+                if self.configuration.align_frames_mode == "Planet":
+                    # In Planetary mode the shift of the "center of gravity" of the image is
+                    # computed. This algorithm cannot fail.
+                    cog_frame_real = ndimage.measurements.center_of_mass(frame)
+                    self.frame_shifts.append([cog_reference_y - int(round(cog_frame_real[0])),
+                                              cog_reference_x - int(round(cog_frame_real[1]))])
+                    continue
+
+                # In "Surface" mode three alignment algorithms can be chosen from. In each case
+                # the result is the shift vector [dy_min, dx_min]. The second and third algorithm
+                # do a local search. It can fail if within the search radius no minimum is found.
+                # The first algorithm (cross-correlation) can fail as well, but in this case there
+                # is no indication that this happened.
+                elif self.configuration.align_frames_method == "Translation":
+                    # The shift is computed with cross-correlation. Cut out the alignment patch and
+                    # compute its translation relative to the reference.
                     frame_window = self.frames_mono_blurred[idx][self.y_low_opt:self.y_high_opt,
                                    self.x_low_opt:self.x_high_opt]
                     self.frame_shifts.append(
                         Miscellaneous.translation(self.reference_window, frame_window,
                                                   self.reference_window_shape))
                     continue
+
                 elif self.configuration.align_frames_method == "RadialSearch":
                     # Spiral out from the shift position of the previous frame and search for the
                     # local optimum.
@@ -185,9 +218,13 @@ class AlignFrames(object):
                 dy_min_cum += dy_min
                 dx_min_cum += dx_min
                 self.frame_shifts.append([dy_min_cum, dx_min_cum])
+
+                # In "Surface" mode shift computation can fail if no minimum is found within
+                # the pre-defined search radius.
                 if len(dev_r) > 2 and dy_min == 0 and dx_min == 0:
                     self.failed_index_list.append(idx)
                     self.dev_r_list.append(dev_r)
+                    continue
 
                 # If the alignment window gets too close to a frame edge, move it away from
                 # that edge by half the border width.
@@ -389,24 +426,25 @@ if __name__ == "__main__":
     # Initialize the frame alignment object.
     align_frames = AlignFrames(frames, rank_frames, configuration)
 
-    # Select the local rectangular patch in the image where the L gradient is highest in both x
-    # and y direction. The scale factor specifies how much smaller the patch is compared to the
-    # whole image frame.
-    (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
-        configuration.align_frames_rectangle_scale_factor)
+    if configuration.align_frames_mode == "Surface":
+        # Select the local rectangular patch in the image where the L gradient is highest in both x
+        # and y direction. The scale factor specifies how much smaller the patch is compared to the
+        # whole image frame.
+        (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
+            configuration.align_frames_rectangle_scale_factor)
 
-    # Alternative: Set the alignment rectangle by hand.
-    # (align_frames.x_low_opt, align_frames.x_high_opt, align_frames.y_low_opt,
-    #  align_frames.y_high_opt) = (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = (
-    # 650, 950, 550, 750)
+        # Alternative: Set the alignment rectangle by hand.
+        # (align_frames.x_low_opt, align_frames.x_high_opt, align_frames.y_low_opt,
+        #  align_frames.y_high_opt) = (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = (
+        # 650, 950, 550, 750)
 
-    print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
-        x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
-    frame = align_frames.frames_mono_blurred[align_frames.frame_ranks_max_index].copy()
-    frame[y_low_opt, x_low_opt:x_high_opt] = frame[y_high_opt - 1, x_low_opt:x_high_opt] = 255
-    frame[y_low_opt:y_high_opt, x_low_opt] = frame[y_low_opt:y_high_opt, x_high_opt - 1] = 255
-    plt.imshow(frame, cmap='Greys_r')
-    plt.show()
+        print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
+            x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
+        frame = align_frames.frames_mono_blurred[align_frames.frame_ranks_max_index].copy()
+        frame[y_low_opt, x_low_opt:x_high_opt] = frame[y_high_opt - 1, x_low_opt:x_high_opt] = 255
+        frame[y_low_opt:y_high_opt, x_low_opt] = frame[y_low_opt:y_high_opt, x_high_opt - 1] = 255
+        plt.imshow(frame, cmap='Greys_r')
+        plt.show()
 
     # Align all frames globally relative to the frame with the highest score.
     try:
