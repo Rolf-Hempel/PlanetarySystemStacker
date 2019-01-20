@@ -80,8 +80,8 @@ class StackFrames(object):
         # The arrays for the stacked image and the summation buffer need to accommodate three
         # color channels in the case of color images.
         if self.frames.color:
-            self.stacked_image_buffer = np.empty([dim_y, dim_x, 3], dtype=np.float32)
-            self.stacked_image = np.empty([dim_y, dim_x, 3], dtype=np.int16)
+            self.stacked_image_buffer = np.zeros([dim_y, dim_x, 3], dtype=np.float32)
+            self.stacked_image = np.zeros([dim_y, dim_x, 3], dtype=np.int16)
         else:
             self.stacked_image_buffer = np.zeros([dim_y, dim_x], dtype=np.float32)
             self.stacked_image = np.zeros([dim_y, dim_x], dtype=np.int16)
