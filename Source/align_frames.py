@@ -25,7 +25,7 @@ from math import ceil
 
 import matplotlib.pyplot as plt
 from scipy import ndimage
-from numpy import empty, mean, arange
+from numpy import empty, mean, arange, float32
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
@@ -52,6 +52,7 @@ class AlignFrames(object):
         :param configuration: Configuration object with parameters
         """
 
+        self.frames = frames.frames
         self.frames_mono = frames.frames_mono
         self.frames_mono_blurred = frames.frames_mono_blurred
         self.number = frames.number
@@ -279,10 +280,15 @@ class AlignFrames(object):
             raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
                                 " frames: " + str(self.failed_index_list))
 
-    def average_frame(self):
+    def average_frame(self, average_frame_number=None, color=False):
         """
         Compute an averaged frame from the best (monochrome) frames.
 
+        :param average_frame_number: Number of best frames to be averaged. If None, the number is
+                                     computed from the configuration parameter
+                                      "align_frames_average_frame_percent"
+        :param color: If True, compute an average of the original (color) images. Otherwise use the
+                      monochrome frame versions.
         :return: The averaged frame
         """
 
@@ -298,24 +304,41 @@ class AlignFrames(object):
             self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
             self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
 
-        self.average_frame_number = max(
-            ceil(self.number * self.configuration.align_frames_average_frame_percent / 100.), 1)
-        frames = [self.frames_mono[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
+        # If the number of frames is not specified explicitly, compute it from configuration.
+        if average_frame_number is not None:
+            self.average_frame_number = average_frame_number
+        else:
+            self.average_frame_number = max(
+                ceil(self.number * self.configuration.align_frames_average_frame_percent / 100.), 1)
 
         shifts = [self.frame_shifts[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
 
         # Create an empty numpy buffer. The first dimension is the frame index, the second and
-        # third dimenstions are the y and x coordinates.
-        buffer = empty(
-            [self.average_frame_number, self.intersection_shape[0][1] - self.intersection_shape[0][0],
-             self.intersection_shape[1][1] - self.intersection_shape[1][0]])
+        # third dimenstions are the y and x coordinates. For color frames add a fourth dimension.
+        if color:
+            frames = [self.frames[i] for i in
+                      self.quality_sorted_indices[:self.average_frame_number]]
+            buffer = empty([self.average_frame_number,
+                 self.intersection_shape[0][1] - self.intersection_shape[0][0],
+                 self.intersection_shape[1][1] - self.intersection_shape[1][0], 3], dtype=float32)
+            for idx, frame in enumerate(frames):
+                buffer[idx, :, :, :] = frame[self.intersection_shape[0][0] - shifts[idx][0]:
+                                          self.intersection_shape[0][1] - shifts[idx][0],
+                                    self.intersection_shape[1][0] - shifts[idx][1]:
+                                    self.intersection_shape[1][1] - shifts[idx][1], :]
+        else:
+            frames = [self.frames_mono[i] for i in
+                      self.quality_sorted_indices[:self.average_frame_number]]
+            buffer = empty([self.average_frame_number,
+                 self.intersection_shape[0][1] - self.intersection_shape[0][0],
+                 self.intersection_shape[1][1] - self.intersection_shape[1][0]], dtype=float32)
+            # For each frame, cut out the intersection area and copy it to the buffer.
+            for idx, frame in enumerate(frames):
+                buffer[idx, :, :] = frame[self.intersection_shape[0][0] - shifts[idx][0]:
+                                          self.intersection_shape[0][1] - shifts[idx][0],
+                                    self.intersection_shape[1][0] - shifts[idx][1]:
+                                    self.intersection_shape[1][1] - shifts[idx][1]]
 
-        # For each frame, cut out the intersection area and copy it to the buffer.
-        for idx, frame in enumerate(frames):
-            buffer[idx, :, :] = frame[self.intersection_shape[0][0] - shifts[idx][0]:
-                                      self.intersection_shape[0][1] - shifts[idx][0],
-                                self.intersection_shape[1][0] - shifts[idx][1]:
-                                self.intersection_shape[1][1] - shifts[idx][1]]
         # Compute the mean frame by averaging over the first index.
         self.mean_frame = mean(buffer, axis=0)
         return self.mean_frame

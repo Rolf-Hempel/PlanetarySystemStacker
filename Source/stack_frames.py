@@ -25,6 +25,7 @@ import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
+import cv2
 from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
@@ -72,23 +73,30 @@ class StackFrames(object):
 
         # Allocate work space for image buffer and the image converted for output.
         # [dim_y, dim_x] is the size of the intersection of all frames.
-        dim_y = self.align_frames.intersection_shape[0][1] - \
+        self.dim_y = self.align_frames.intersection_shape[0][1] - \
                 self.align_frames.intersection_shape[0][0]
-        dim_x = self.align_frames.intersection_shape[1][1] - \
+        self.dim_x = self.align_frames.intersection_shape[1][1] - \
                 self.align_frames.intersection_shape[1][0]
 
         # The arrays for the stacked image and the summation buffer need to accommodate three
         # color channels in the case of color images.
         if self.frames.color:
-            self.stacked_image_buffer = np.zeros([dim_y, dim_x, 3], dtype=np.float32)
-            self.stacked_image = np.zeros([dim_y, dim_x, 3], dtype=np.int16)
+            self.stacked_image_buffer = np.zeros([self.dim_y, self.dim_x, 3], dtype=np.float32)
+            self.stacked_image = np.zeros([self.dim_y, self.dim_x, 3], dtype=np.int16)
         else:
-            self.stacked_image_buffer = np.zeros([dim_y, dim_x], dtype=np.float32)
-            self.stacked_image = np.zeros([dim_y, dim_x], dtype=np.int16)
+            self.stacked_image_buffer = np.zeros([self.dim_y, self.dim_x], dtype=np.float32)
+            self.stacked_image = np.zeros([self.dim_y, self.dim_x], dtype=np.int16)
+
+        # If the alignment point patches do not cover the entire frame, a background image must
+        # be computed and blended in. At this point it is not yet clear if this is necessary.
+        self.stacked_background_buffer = None
+
         # Allocate a buffer which for each pixel of the image buffer counts the number of
-        # contributing alignment patch images. This buffer is used to normalize the buffer.
-        # Initialize the buffer to a small value to avoid divide by zero.
-        self.single_frame_contributions = np.full([dim_y, dim_x], 0.0001, dtype=np.float32)
+        # contributing alignment patch images. Also, allocate a second buffer of same type and size
+        # to accumulate the weights at each pixel. This buffer is used to normalize the image
+        # buffer. Both buffers are initialized with a small value to avoid divide by zero.
+        self.number_single_frame_contributions = np.full([self.dim_y, self.dim_x], 0, dtype=np.int32)
+        self.sum_single_frame_weights = np.full([self.dim_y, self.dim_x], 0.0001, dtype=np.float32)
 
         self.my_timer.stop('Stacking: AP initialization')
 
@@ -212,10 +220,19 @@ class StackFrames(object):
 
         self.my_timer.start('Stacking: merging AP buffers')
         # For each image buffer pixel count the number of image contributions.
-        single_stack_size = float(self.alignment_points.stack_size)
-        for alignment_point in self.alignment_points.alignment_points +\
-                               self.alignment_points.alignment_points_dropped_structure +\
-                               self.alignment_points.alignment_points_dropped_dim:
+        single_stack_size_int = self.alignment_points.stack_size
+        single_stack_size_float = float(single_stack_size_int)
+
+        # Decide for which alignment points the individual patches are to be merged. If full
+        # coverage was selected, it is assumed that the alignment points together with their failed
+        # siblings cover the entire frame. In this case no "background image" has to be blended in.
+        aps = self.alignment_points.alignment_points
+        if self.configuration.stack_frames_merge_full_coverage:
+            aps += self.alignment_points.alignment_points_dropped_structure +\
+                   self.alignment_points.alignment_points_dropped_dim
+
+        # Add the contributions of all alignment points into a single buffer.
+        for alignment_point in aps:
             patch_y_low = alignment_point['patch_y_low']
             patch_y_high = alignment_point['patch_y_high']
             patch_x_low = alignment_point['patch_x_low']
@@ -238,15 +255,50 @@ class StackFrames(object):
                 patch_y_low:patch_y_high,
                 patch_x_low: patch_x_high] += alignment_point['stacking_buffer'] * weights_yx
 
-            # For each image buffer pixel count the number of image contributions.
-            self.single_frame_contributions[patch_y_low:patch_y_high,
-                patch_x_low: patch_x_high] += single_stack_size * weights_yx
+            # For each image buffer pixel count the number of image contributions and add the
+            # weights.
+            self.number_single_frame_contributions[patch_y_low:patch_y_high,
+                patch_x_low: patch_x_high] += self.alignment_points.stack_size
+            self.sum_single_frame_weights[patch_y_low:patch_y_high,
+                patch_x_low: patch_x_high] += single_stack_size_float * weights_yx
 
         # Divide the global stacking buffer pixel-wise by the number of image contributions.
         if self.frames.color:
-            self.stacked_image_buffer /= self.single_frame_contributions[:, :, np.newaxis]
+            self.stacked_image_buffer /= self.sum_single_frame_weights[:, :, np.newaxis]
         else:
-            self.stacked_image_buffer /= self.single_frame_contributions
+            self.stacked_image_buffer /= self.sum_single_frame_weights
+
+        # If the alignment points do not cover the full frame, blend the AP contributions with
+        # a background computed as the average of globally shifted best frames. The background
+        # should only shine through outside AP patches.
+        if not self.configuration.stack_frames_merge_full_coverage:
+            # First compute the background as the average of the best frames. Only global shifts
+            # are applied (no small-scale de-warping).
+            averaged_background = self.align_frames.average_frame(
+                average_frame_number=single_stack_size_int, color=self.frames.color)
+            # The "real" alignment point contributions are already in the "stacked_image_buffer".
+            # Only the "holes" in the buffer have to be filled with the "averaged_background".
+            # Initialize a mask for blending both buffers with each other. Set values to:
+            #   - 0.  at points not covered by a single AP patch.
+            #   - 1.  at points covered by more then one AP, and at points within the interior
+            #         (AP box) of a single AP.
+            #   - 0.5 between those areas. After blurring the mask, values in these transition
+            #         regions will show a smooth transition between APs and background.
+            mask_intermediate = np.where((self.number_single_frame_contributions == 0), 0., 0.5)
+            mask = np.where((np.logical_or(
+                self.number_single_frame_contributions > single_stack_size_int,
+                self.sum_single_frame_weights > single_stack_size_float)), 1., mask_intermediate)
+            # Apply a Gaussian blur to the mask to make transitions smoother.
+            blur_width = self.configuration.stack_frames_gauss_width
+            mask = cv2.GaussianBlur(mask, (blur_width, blur_width), 0)
+
+            # blend the AP buffer with the background.
+            if self.frames.color:
+                self.stacked_image_buffer = (self.stacked_image_buffer-averaged_background) * \
+                                            mask[:, :, np.newaxis] + averaged_background
+            else:
+                self.stacked_image_buffer = (self.stacked_image_buffer-averaged_background) * mask\
+                                            + averaged_background
 
         # Scale the image buffer such that entries are in the interval [0., 1.]. Then convert the
         # float image buffer to 16bit int (or 48bit in color mode).
@@ -282,7 +334,7 @@ class StackFrames(object):
             weights[0:box_low_offset] = np.arange(0., 1., 1. / float(box_low_offset), dtype=np.float32)
         # Box interior
         weights[box_low_offset:box_high_offset] = 1.
-        # Ramping up between upper box and patch borders.
+        # Ramping down between upper box and patch borders.
         if patch_high_offset > box_high_offset:
             weights[box_high_offset:patch_high_offset] = np.arange(1., 0.,
                                                                -1. / float(patch_high - box_high),
