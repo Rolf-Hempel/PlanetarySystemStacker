@@ -202,15 +202,21 @@ class AlignmentPoints(object):
                         # Compute the center of mass of the brightness distribution within the box,
                         # and shift the box center to this location.
                         com = ndimage.measurements.center_of_mass(box)
-                        shift_y = int(com[0])
-                        shift_x = int(com[1])
-                        y_adapted = y + shift_y
-                        x_adapted = x + shift_x
-                        box_increment = max(shift_y, shift_x)
+                        y_adapted = y + int(com[0]) - half_box_width
+                        x_adapted = x + int(com[1]) - half_box_width
+                        shift_y = y_adapted - y
+                        shift_x = x_adapted - x
 
-                        # Increase the box and patch sizes to avoid holes in the stacking image.
-                        half_box_width_adapted = half_box_width + box_increment
-                        half_patch_width_adapted = half_patch_width + box_increment
+                        # If the alignment points must cover the whole frame, extend the size of
+                        # ap box and patch, so that no holes will open up.
+                        if self.configuration.stack_frames_merge_full_coverage:
+                            # Increase the box and patch sizes to avoid holes in the stacking image.
+                            box_increment = max(shift_y, shift_x)
+                            half_box_width_adapted = half_box_width + box_increment
+                            half_patch_width_adapted = half_patch_width + box_increment
+                        else:
+                            half_box_width_adapted = half_box_width
+                            half_patch_width_adapted = half_patch_width
 
                         # Replace the alignment point with a new one, using the updated
                         # coordinates and box / patch sizes.
@@ -390,7 +396,6 @@ class AlignmentPoints(object):
         for ap_dim in self.alignment_points_dropped_dim:
             self.find_neighbor(ap_dim['y'], ap_dim['x'], self.alignment_points)[
                 'dim_neighbors'].append(ap_dim)
-        pass
 
     @staticmethod
     def find_neighbor(ap_y, ap_x, alignment_points):
