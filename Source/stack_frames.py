@@ -291,6 +291,7 @@ class StackFrames(object):
             # Apply a Gaussian blur to the mask to make transitions smoother.
             blur_width = self.configuration.stack_frames_gauss_width
             mask = cv2.GaussianBlur(mask, (blur_width, blur_width), 0)
+            mask = np.where((self.number_single_frame_contributions == 0), 0., mask)
 
             # blend the AP buffer with the background.
             if self.frames.color:
@@ -317,8 +318,9 @@ class StackFrames(object):
         :param patch_high: Upper index of AP patch in the given coordinate direction
         :param box_low: Lower index of AP box in the given coordinate direction
         :param box_high: Upper index of AP box in the given coordinate direction
-        :return: Vector with weights, starting with 0. at patch_low, ramping up to 1. at box_low,
-                 staying at 1. up to box_high, and than ramping down to 0. at patch_high.
+        :return: Vector with weights, starting with 1./(border_width+1) at patch_low, ramping up to
+                 1. at box_low, staying at 1. up to box_high-1, and than ramping down to
+                 1./(border_width+1) at patch_high-1.
         """
 
         # Compute offsets relative to patch_low.
@@ -331,14 +333,12 @@ class StackFrames(object):
 
         # Ramping up between lower patch and box borders.
         if box_low_offset > 0:
-            weights[0:box_low_offset] = np.arange(0., 1., 1. / float(box_low_offset), dtype=np.float32)
+            weights[0:box_low_offset] = np.arange(1 ,box_low_offset+1 , 1) / np.float32(box_low_offset+1)
         # Box interior
         weights[box_low_offset:box_high_offset] = 1.
         # Ramping down between upper box and patch borders.
         if patch_high_offset > box_high_offset:
-            weights[box_high_offset:patch_high_offset] = np.arange(1., 0.,
-                                                               -1. / float(patch_high - box_high),
-                                                               dtype=np.float32)
+            weights[box_high_offset:patch_high_offset] = np.arange(patch_high - box_high, 0, -1) / np.float32(patch_high - box_high + 1)
         return weights
 
 
@@ -364,7 +364,7 @@ if __name__ == "__main__":
 
     my_timer.create('Read all frames')
     try:
-        frames = Frames(configuration, names, type=type, convert_to_grayscale=False)
+        frames = Frames(configuration, names, type=type, convert_to_grayscale=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:

@@ -53,6 +53,6 @@ class Configuration(object):
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
 
-        self.stack_frames_merge_full_coverage = True
+        self.stack_frames_merge_full_coverage = False
         self.stack_frames_ramp_threshold = 0.5
         self.stack_frames_gauss_width = 7
