@@ -181,15 +181,15 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
           ", aps dropped because too little structure: " + str(
         len(alignment_points.alignment_points_dropped_structure)))
 
-    if not configuration.stack_frames_merge_full_coverage:
-        y_low = 500
-        y_high = 750
-        x_low = 600
-        x_high = 800
-        ap_list = alignment_points.find_alignment_points(y_low, y_high, x_low, x_high)
-        for ap in ap_list:
-            print ("Removing alignment point at y: " + str(ap["y"]) + ", x:" + str(ap["x"]))
-            alignment_points.remove_alignment_point(ap)
+    # if not configuration.stack_frames_merge_full_coverage:
+    #     y_low = 500
+    #     y_high = 750
+    #     x_low = 600
+    #     x_high = 800
+    #     ap_list = alignment_points.find_alignment_points(y_low, y_high, x_low, x_high)
+    #     for ap in ap_list:
+    #         print ("Removing alignment point at y: " + str(ap["y"]) + ", x:" + str(ap["x"]))
+    #         alignment_points.remove_alignment_point(ap)
 
     # Produce an overview image showing all alignment points.
     if roi:

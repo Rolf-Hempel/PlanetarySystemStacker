@@ -124,14 +124,14 @@ class AlignmentPoints(object):
         # Size of the mean frame in y and x directions
         num_pixels_y = mean_frame.shape[0]
         num_pixels_x = mean_frame.shape[1]
-        # The alignment box is the object on which the displacement computation is performed.
-        half_box_width = self.configuration.alignment_points_half_box_width
         # The alignment patch is the area which is stacked after a rigid displacement.
         half_patch_width = self.configuration.alignment_points_half_patch_width
-        # Maximum displacement searched for in the alignment process.
-        search_width = self.configuration.alignment_points_search_width
+        # The alignment box is the object on which the displacement computation is performed.
+        half_box_width = self.configuration.alignment_points_half_box_width
         # Number of pixels in one coordinate direction between alignment points
         step_size = self.configuration.alignment_points_step_size
+        # Maximum displacement searched for in the alignment process.
+        search_width = self.configuration.alignment_points_search_width
         # Minimum structure value for an alignment point (between 0. and 1.)
         structure_threshold = self.configuration.alignment_points_structure_threshold
         # The brightest pixel must be brighter than this value (0 < value <256)
