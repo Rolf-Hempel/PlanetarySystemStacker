@@ -317,6 +317,9 @@ class AlignmentPoints(object):
               alignment_point['box_x_low']:alignment_point['box_x_high']]
         alignment_point['reference_box'] = box
 
+        # Initialize the reference to the corresponding widget in the AP viewer scene.
+        alignment_point['graphics_item'] = None
+
         return alignment_point
 
     def remove_alignment_point(self, alignment_point):

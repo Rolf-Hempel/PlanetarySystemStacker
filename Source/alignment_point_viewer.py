@@ -1,4 +1,27 @@
-# Copied from https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview
+# -*- coding: utf-8; -*-
+"""
+Copyright (c) 2018 Rolf Hempel, rolf6419@gmx.de
+
+This file is part of the PlanetarySystemStacker tool (PSS).
+https://github.com/Rolf-Hempel/PlanetarySystemStacker
+
+PSS is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with PSS.  If not, see <http://www.gnu.org/licenses/>.
+
+Part of this module (in class "AlignmentPointViewer" was copied from
+https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview
+
+"""
 
 import cv2
 import numpy as np
@@ -6,61 +29,131 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 
 
 class GraphicsScene(QtWidgets.QGraphicsScene):
+    """
+    Handle mouse events on the graphics scene depicting the image with the alignment points (APs)
+    superimposed. The left mouse button can be used to create APs, to move them, and to change their
+    sizes. Using the right mouse button APs can be deleted.
+
+    """
 
     def __init__(self, photo_viewer, parent=None):
+        """
+        Initialize the scene object.
+
+        :param photo_viewer: the object in which the scene is defined
+        :param parent: The parent class
+        """
+
         QtWidgets.QGraphicsScene.__init__(self, parent)
         self.photo_viewer = photo_viewer
         self.left_button_pressed = False
         self.right_button_pressed = False
+
+        # Set the maximum diestance between a right click and a right release up to which they
+        # are identified with each other. If the distance is larger, the mouse events are
+        # identified with the opening of a rectangular patch between.
         self.single_click_threshold = 5
+        # Set the maximum distance up to which a mouse position is identified with an existing
+        # alignment point location.
         self.max_match_distance = 5
+        # Initialize a state variable telling if an AP is being moved.
         self.move_ap = None
 
     def mousePressEvent(self, event):
+        """
+        A nouse button is pressed. This can either be a lft or a right button.
+
+        :param event: event object
+        :return: -
+        """
+
         pos = event.lastScenePos()
         x = pos.x()
         y = pos.y()
+
+        # The left button is pressed.
         if event.button() == QtCore.Qt.LeftButton:
-            # print ("Left press, x: " + str(x) + ", y: " + str(y))
             self.left_button_pressed = True
+
+            # The following actions are not performed in drag-and-zoom mode. The switch between both
+            # modes is handled in the higher-level object "photo_viewer".
             if not self.photo_viewer.drag_mode:
+
+                # Find the closest AP.
                 neighbor_ap, distance = self.photo_viewer.aps.find_neighbor(y, x)
+
+                # If the distance is very small, assume that the AP is to be moved.
                 if distance < self.max_match_distance:
                     self.remember_ap = neighbor_ap
                     self.move_ap = True
+
+                # Create a new AP.
                 else:
+                    # Compute the size of the AP. Take the standard size and reduce it to fit it
+                    # into the frame if necessary.
                     half_patch_width_new = min(self.photo_viewer.aps.half_patch_width, y,
                                                self.photo_viewer.aps.shape_y - y, x,
                                                self.photo_viewer.aps.shape_x - x)
+                    # Create a preliminary AP with the computed size. It only becomes a real AP when
+                    # the mouse is released.
                     self.remember_ap = self.photo_viewer.aps.new_alignment_point(y, x,
                                        self.photo_viewer.aps.half_box_width, half_patch_width_new)
+                    # Add a widget showing the AP to the scene and remember the current mouse
+                    # position.
                     self.photo_viewer.draw_alignment_point(self.remember_ap)
                     self.left_y_start = y
                     self.left_x_start = x
                     self.move_ap = False
 
+        # The right button is pressed.
         elif event.button() == QtCore.Qt.RightButton:
-            # print("Right press, x: " + str(x) + ", y: " + str(y))
             self.right_button_pressed = True
+
+            # If not in drag-and-zoom mode, remember the location and initialize an object which
+            # during mouse moving stores the rectangular patch opening between start and end
+            # positions.
             if not self.photo_viewer.drag_mode:
-                x = pos.x()
-                y = pos.y()
-                self.right_y_start = y
-                self.right_x_start = x
+                self.right_y_start = pos.y()
+                self.right_x_start = pos.x()
                 self.remember_sr = None
 
     def mouseReleaseEvent(self, event):
+        """
+        A mouse button is released.
+
+        :param event: event object
+        :return: -
+        """
+
         pos = event.lastScenePos()
-        if event.button() == QtCore.Qt.RightButton:
+
+        # The left button is released.
+        if event.button() == QtCore.Qt.LeftButton:
+            self.left_button_pressed = False
+            if not self.photo_viewer.drag_mode:
+
+                # If a new AP is being created, append the preliminary AP to the list of APs.
+                if not self.move_ap:
+                    self.photo_viewer.aps.alignment_points.append(self.remember_ap)
+
+        # The right button is released.
+        elif event.button() == QtCore.Qt.RightButton:
             self.right_button_pressed = False
             if not self.photo_viewer.drag_mode:
                 x = pos.x()
                 y = pos.y()
+
+                # If the mouse was not moved much between press and release, a single AP is deleted.
                 if max(abs(y - self.right_y_start),
                        abs(x - self.right_x_start)) < self.single_click_threshold:
+
+                    # Find the closest AP and remove it from the scene and the AP list.
                     ap, dist = self.photo_viewer.aps.find_neighbor(y, x)
                     self.removeItem(ap['graphics_item'])
                     self.photo_viewer.aps.remove_alignment_points([ap])
+
+                # The mouse was moved between press and release. Remove all APs in the opening
+                # rectangular patch, both from the scene and the AP list.
                 else:
                     remove_ap_list = []
                     y_low = min(self.right_y_start, self.right_y_end)
@@ -74,22 +167,31 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                     self.removeItem(self.remember_sr)
                     self.photo_viewer.aps.remove_alignment_points(remove_ap_list)
 
-        elif event.button() == QtCore.Qt.LeftButton:
-            self.left_button_pressed = False
-            if not self.photo_viewer.drag_mode:
-                if not self.move_ap:
-                    self.photo_viewer.aps.alignment_points.append(self.remember_ap)
-
     def mouseMoveEvent(self, event):
+        """
+        The mouse is moved while being pressed.
+
+        :param event: event object
+        :return: -
+        """
+
+        # The mouse is moved with the left button pressed.
         if self.left_button_pressed:
             pos = event.lastScenePos()
             if not self.photo_viewer.drag_mode:
                 x_new = pos.x()
                 y_new = pos.y()
+
+                # The scene widget corresponding to the preliminary AP was stored with the AP.
+                # Remove it from the scene before the moved AP is drawn.
                 self.removeItem(self.remember_ap['graphics_item'])
+
+                # Move the preliminary AP to the new coordinates.
                 if self.move_ap:
                     new_ap = self.photo_viewer.aps.move_alignment_point(self.remember_ap, y_new,
                                                                         x_new)
+                # The preliminary AP stays at the same position, but its size is being increased.
+                # Compute the new size and create a new preliminary AP.
                 else:
                     half_patch_width_new = max(abs(y_new - self.left_y_start),
                                                abs(x_new - self.left_x_start))
@@ -100,21 +202,26 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                     new_ap = self.photo_viewer.aps.new_alignment_point(self.left_y_start,
                                 self.left_x_start, self.photo_viewer.aps.half_box_width,
                                 half_patch_width_new)
+
+                # Draw the new preliminary AP.
                 self.photo_viewer.draw_alignment_point(new_ap)
                 self.remember_ap = new_ap
 
+        # The mouse is moved with the right button pressed.
         elif self.right_button_pressed:
             pos = event.lastScenePos()
-            x = pos.x()
-            y = pos.y()
-            # print("Right move, x: " + str(x) + ", y: " + str(y))
+
             if not self.photo_viewer.drag_mode:
                 x = pos.x()
                 y = pos.y()
                 self.right_y_end = y
                 self.right_x_end = x
+
+                # Compute the new rectangle for selecting APs to be removed.
                 new_sr = SelectionRectangleGraphicsItem(
                     self.right_y_start, self.right_x_start, y, x)
+
+                # If the rectangle was drawn for a previous location, replace it with the new one.
                 if self.remember_sr is not None:
                     self.removeItem(self.remember_sr)
                 self.addItem(new_sr)
@@ -122,10 +229,21 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
 
 class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
+    """
+    This widget represents an AP. It consists of a small red dot at the AP location, a red
+    bounding rectangle, and a transparent green filling.
+    """
+
     def __init__(self, ap):
         super(AlignmentPointGraphicsItem, self).__init__()
+
+        # Set the size of the central dot.
         self.dot_width = 4
+
+        # Set the color and transparency of the filling.
         self.color_surface = QtGui.QColor(0, 255, 0, 20)
+
+        # Set the color of the bouding rectangle.
         self.color_boundary = QtGui.QColor(255, 0, 0)
         self.y = ap["y"]
         self.x = ap["x"]
@@ -139,6 +257,8 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         self.width_x_external = self.width_x + self.pen_boundary.width()
         self.width_y = self.patch_y_high - self.patch_y_low
         self.width_y_external = self.width_y + self.pen_boundary.width()
+
+        # Store a reference of the widget at the corresponding AP.
         ap['graphics_item'] = self
 
     def boundingRect(self):
@@ -155,14 +275,25 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
 
 
 class SelectionRectangleGraphicsItem(QtWidgets.QGraphicsItem):
-    def __init__(self, y_1, x_1, y_2, x_2):
+    """
+    This widget represents the selection rectangle opening when the mouse is being moved with the
+    right mouse button  pressed.
+    """
+
+    def __init__(self, y_start, x_start, y_end, x_end):
         super(SelectionRectangleGraphicsItem, self).__init__()
+
+        # Set the color of the transparent rectangle filling.
         self.color_surface = QtGui.QColor(0, 0, 255, 40)
+
+        # Set the color of the bounding rectangle.
         self.color_boundary = QtGui.QColor(255, 0, 0)
-        self.y_low = min(y_1, y_2)
-        self.x_low = min(x_1, x_2)
-        self.y_high = max(y_1, y_2)
-        self.x_high = max(x_1, x_2)
+
+        # Set the coordinate limits of the rectangle. Start and end locations can be anywhere.
+        self.y_low = min(y_start, y_end)
+        self.x_low = min(x_start, x_end)
+        self.y_high = max(y_start, y_end)
+        self.x_high = max(x_start, x_end)
         self.pen_boundary = QtGui.QPen(self.color_boundary)
         self.pen_boundary.setWidth(1)
         self.width_y = self.y_high - self.y_low
@@ -180,12 +311,21 @@ class SelectionRectangleGraphicsItem(QtWidgets.QGraphicsItem):
 
 
 class AlignmentPointViewer(QtWidgets.QGraphicsView):
+    """
+    This widget implements a viewer for handling APs superimposed onto an image. It supports two
+    modes:
+    - In "drag mode" the mouse can be used for panning, and the scroll wheel for zooming.
+    - In "alignment point mode" the mouse is used to create/remove APs, or to move them.
+    The "cntrl" key is used to switch between the two modes.
+    """
 
     def __init__(self, parent):
         super(AlignmentPointViewer, self).__init__(parent)
         self._zoom = 0
         self._empty = True
+        # Initialize the scene. This object handles mouse events if not in drag mode.
         self._scene = GraphicsScene(self, self)
+        # Initialize the photo object. No image is loaded yet.
         self._photo = QtWidgets.QGraphicsPixmapItem()
         self._scene.addItem(self._photo)
         self.setScene(self._scene)
@@ -197,12 +337,19 @@ class AlignmentPointViewer(QtWidgets.QGraphicsView):
         self.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.drag_mode = True
+        # Initialize the alignment point object.
         self.aps = None
 
     def hasPhoto(self):
         return not self._empty
 
-    def fitInView(self, scale=True):
+    def fitInView(self):
+        """
+        Scale the scene such that it fits into the window completely.
+
+        :return: -
+        """
+
         rect = QtCore.QRectF(self._photo.pixmap().rect())
         if not rect.isNull():
             self.setSceneRect(rect)
@@ -217,6 +364,13 @@ class AlignmentPointViewer(QtWidgets.QGraphicsView):
             self._zoom = 0
 
     def setPhoto(self, pixmap=None):
+        """
+        Assign a pixmap to the photo object.
+
+        :param pixmap: pixmap object containing the photo.
+        :return: -
+        """
+
         if pixmap and not pixmap.isNull():
             self._empty = False
             self._photo.setPixmap(pixmap)
@@ -225,23 +379,49 @@ class AlignmentPointViewer(QtWidgets.QGraphicsView):
             self._photo.setPixmap(QtGui.QPixmap())
 
     def set_alignment_points(self, aps):
+        """
+        Store a reference to the object holding the alignment points, and draw all APs.
+
+        :param aps: instance of class AlignmentPoints
+        :return: -
+        """
+
         self.aps = aps
         for ap in self.aps.alignment_points:
             self.draw_alignment_point(ap)
 
     def draw_alignment_point(self, ap):
+        """
+        Create a widget representing an AP and add it to the scene.
+
+        :param ap: AP object
+        :return: AP widget
+        """
+
         ap_graphics_item = AlignmentPointGraphicsItem(ap)
         self._scene.addItem(ap_graphics_item)
         return ap_graphics_item
 
     def wheelEvent(self, event):
+        """
+        Handle scroll events for zooming in and out of the scene. This is only active when a photo
+        is loaded.
+
+        :param event: wheel event object
+        :return: -
+        """
+
         if self.hasPhoto():
+            # Depending of wheel direction, set the zoom factor to greater or smaller than 1.
             if event.angleDelta().y() > 0:
                 factor = 1.25
                 self._zoom += 1
             else:
                 factor = 0.8
                 self._zoom -= 1
+
+            # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene to the
+            # window size.
             if self._zoom > 0:
                 self.scale(factor, factor)
             elif self._zoom == 0:
@@ -250,6 +430,15 @@ class AlignmentPointViewer(QtWidgets.QGraphicsView):
                 self._zoom = 0
 
     def keyPressEvent(self, event):
+        """
+        The control key is used to switch between drag and AP modes.
+
+        :param event: event object
+        :return: -
+        """
+
+        # If the control key is pressed, switch to "no drag mode".
+        # Use default handling for other keys.
         if event.key() == QtCore.Qt.Key_Control:
             self.setDragMode(QtWidgets.QGraphicsView.NoDrag)
             self.drag_mode = False
@@ -257,6 +446,8 @@ class AlignmentPointViewer(QtWidgets.QGraphicsView):
             super(AlignmentPointViewer, self).keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
+        # If the control key is released, switch back to "drag mode".
+        # Use default handling for other keys.
         if event.key() == QtCore.Qt.Key_Control:
             self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
             self.drag_mode = True
@@ -265,6 +456,11 @@ class AlignmentPointViewer(QtWidgets.QGraphicsView):
 
 
 class AlignmentPoints(object):
+    """
+    This is a mock-up for the real AlignmentPoints class with simplified behaviour. In the final
+    code it is to be replaced with the real class.
+    """
+
     def __init__(self, shape_y, shape_x, step_size, half_box_width, half_patch_width):
         self.alignment_points = []
         self.shape_y = shape_y
