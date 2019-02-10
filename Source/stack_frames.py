@@ -66,7 +66,6 @@ class StackFrames(object):
         self.alignment_points = alignment_points
         self.my_timer = my_timer
         self.my_timer.create('Stacking: AP initialization')
-        self.my_timer.create('Stacking: find neighbors of dropped APs')
         self.my_timer.create('Stacking: compute AP shifts')
         self.my_timer.create('Stacking: remapping and adding')
         self.my_timer.create('Stacking: merging AP buffers')
@@ -108,11 +107,6 @@ class StackFrames(object):
         :return: -
         """
 
-        # Find neighbors of unstructured and dim alignment points.
-        self.my_timer.start('Stacking: find neighbors of dropped APs')
-        self.alignment_points.find_alignment_point_neighbors()
-        self.my_timer.stop('Stacking: find neighbors of dropped APs')
-
         # Go through the list of all frames.
         for frame_index, frame in enumerate(self.frames.frames):
 
@@ -144,13 +138,6 @@ class StackFrames(object):
                                  total_shift_y, total_shift_x,
                                  alignment_point['patch_y_low'], alignment_point['patch_y_high'],
                                  alignment_point['patch_x_low'], alignment_point['patch_x_high'])
-                # Remap the patches of the "failed" neighbor APs with the same shift values.
-                for ap_neighbor in alignment_point['low_structure_neighbors'] +\
-                                   alignment_point['dim_neighbors']:
-                    self.remap_rigid(frame, ap_neighbor['stacking_buffer'],
-                                     total_shift_y, total_shift_x,
-                                     ap_neighbor['patch_y_low'], ap_neighbor['patch_y_high'],
-                                     ap_neighbor['patch_x_low'], ap_neighbor['patch_x_high'])
                 self.my_timer.stop('Stacking: remapping and adding')
 
     def remap_rigid(self, frame, buffer, shift_y, shift_x, y_low, y_high, x_low, x_high):
@@ -223,16 +210,8 @@ class StackFrames(object):
         single_stack_size_int = self.alignment_points.stack_size
         single_stack_size_float = float(single_stack_size_int)
 
-        # Decide for which alignment points the individual patches are to be merged. If full
-        # coverage was selected, it is assumed that the alignment points together with their failed
-        # siblings cover the entire frame. In this case no "background image" has to be blended in.
-        aps = self.alignment_points.alignment_points
-        if self.configuration.stack_frames_merge_full_coverage:
-            aps += self.alignment_points.alignment_points_dropped_structure +\
-                   self.alignment_points.alignment_points_dropped_dim
-
         # Add the contributions of all alignment points into a single buffer.
-        for alignment_point in aps:
+        for alignment_point in self.alignment_points.alignment_points:
             patch_y_low = alignment_point['patch_y_low']
             patch_y_high = alignment_point['patch_y_high']
             patch_x_low = alignment_point['patch_x_low']
@@ -268,10 +247,13 @@ class StackFrames(object):
         else:
             self.stacked_image_buffer /= self.sum_single_frame_weights
 
+        self.my_timer.stop('Stacking: merging AP buffers')
+
         # If the alignment points do not cover the full frame, blend the AP contributions with
         # a background computed as the average of globally shifted best frames. The background
         # should only shine through outside AP patches.
-        if not self.configuration.stack_frames_merge_full_coverage:
+        if np.count_nonzero(self.number_single_frame_contributions == 0) > 0:
+            self.my_timer.create('Stacking: blending APs with background')
             # First compute the background as the average of the best frames. Only global shifts
             # are applied (no small-scale de-warping).
             averaged_background = self.align_frames.average_frame(
@@ -301,11 +283,12 @@ class StackFrames(object):
                 self.stacked_image_buffer = (self.stacked_image_buffer-averaged_background) * mask\
                                             + averaged_background
 
+            self.my_timer.stop('Stacking: blending APs with background')
+
         # Scale the image buffer such that entries are in the interval [0., 1.]. Then convert the
         # float image buffer to 16bit int (or 48bit in color mode).
         self.stacked_image = img_as_uint(self.stacked_image_buffer / float(255))
 
-        self.my_timer.stop('Stacking: merging AP buffers')
         return self.stacked_image
 
     @staticmethod
@@ -450,10 +433,9 @@ if __name__ == "__main__":
     alignment_points.create_ap_grid(average)
     my_timer.stop('Create alignment points')
     print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
-          ", number of dropped aps (dim): " + str(
-        len(alignment_points.alignment_points_dropped_dim)) +
+          ", number of dropped aps (dim): " + str(alignment_points.alignment_points_dropped_dim) +
           ", number of dropped aps (structure): " + str(
-        len(alignment_points.alignment_points_dropped_structure)))
+          alignment_points.alignment_points_dropped_structure))
     color_image = alignment_points.show_alignment_points(average)
 
     plt.imshow(color_image)

@@ -44,6 +44,7 @@ class Configuration(object):
         self.alignment_points_brightness_threshold = 10
         self.alignment_points_contrast_threshold = 0
         self.alignment_points_dim_fraction_threshold = 0.6
+        self.alignment_points_adjust_edge_patches = True
         self.alignment_points_frame_percent = 10.
         self.alignment_points_rank_method = "Laplace"
         self.alignment_points_rank_pixel_stride = 2
@@ -52,7 +53,6 @@ class Configuration(object):
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
 
-        self.stack_frames_merge_full_coverage = False
         self.stack_frames_gauss_width = 5
 
         # Derived configuration parameters:

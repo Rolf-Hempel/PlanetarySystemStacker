@@ -86,7 +86,7 @@ class AlignmentPoints(object):
         # The number of interior alignment boxes in general is not an integer. Round to the next
         # higher number.
         num_interior_odd = int(
-            ceil(float(num_pixels - 2* (half_box_width + search_width)) / float(step_size)))
+            ceil(float(num_pixels - 2 * (half_box_width + search_width)) / float(step_size)))
         # Because alignment points are arranged in a staggered grid, in even rows there is one point
         # more.
         num_interior_even = num_interior_odd + 1
@@ -149,11 +149,11 @@ class AlignmentPoints(object):
                                                step_size, False)
         ap_locations_x_odd_len_minus_1 = len(ap_locations_x_odd) - 1
 
-        # Standard alignment points are those which are created initially with this method.
-        self.num_standard_aps = 0
+        # Initialize the list of alignment points and counters for APs which are dropped because
+        # they do not satisfy the brightness or structure condition.
         self.alignment_points = []
-        self.alignment_points_dropped_dim = []
-        self.alignment_points_dropped_structure = []
+        self.alignment_points_dropped_dim = 0
+        self.alignment_points_dropped_structure = 0
 
         # Create alignment point rows, start with an even one.
         even = True
@@ -185,8 +185,6 @@ class AlignmentPoints(object):
                                                                half_patch_width, num_pixels_y,
                                                                num_pixels_x, search_width)
 
-                # Increase the counter of standard APs.
-                self.num_standard_aps += 1
                 # Compute structure and brightness information for the alignment box.
                 max_brightness = amax(alignment_point['reference_box'])
                 min_brightness = amin(alignment_point['reference_box'])
@@ -196,7 +194,8 @@ class AlignmentPoints(object):
 
                     # Check if the fraction of dark pixels exceeds a threshold.
                     box = alignment_point['reference_box']
-                    fraction = (box < brightness_threshold).sum() / float(box.shape[0]*box.shape[1])
+                    fraction = (box < brightness_threshold).sum() / float(
+                        box.shape[0] * box.shape[1])
                     if fraction > self.configuration.alignment_points_dim_fraction_threshold:
 
                         # Compute the center of mass of the brightness distribution within the box,
@@ -209,7 +208,7 @@ class AlignmentPoints(object):
 
                         # If the alignment points must cover the whole frame, extend the size of
                         # ap box and patch, so that no holes will open up.
-                        if self.configuration.stack_frames_merge_full_coverage:
+                        if self.configuration.alignment_points_adjust_edge_patches:
                             # Increase the box and patch sizes to avoid holes in the stacking image.
                             box_increment = max(shift_y, shift_x)
                             half_box_width_adapted = half_box_width + box_increment
@@ -230,8 +229,8 @@ class AlignmentPoints(object):
                         alignment_point['reference_box'])
                     self.alignment_points.append(alignment_point)
                 else:
-                    # If a point does not satisfy the conditions, add it to the dropped list.
-                    self.alignment_points_dropped_dim.append(alignment_point)
+                    # If a point does not satisfy the conditions, increase the counter.
+                    self.alignment_points_dropped_dim += 1
 
             # Switch between even and odd rows.
             even = not even
@@ -243,20 +242,21 @@ class AlignmentPoints(object):
         alignment_points_dropped_structure_indices = []
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):
             alignment_point['structure'] /= structure_max
-            # Remove alignment points with too little structure.
+            # Remove alignment points with too little structure and increment the counter.
             if alignment_point['structure'] < structure_threshold:
                 alignment_points_dropped_structure_indices.append(alignment_point_index)
-                self.alignment_points_dropped_structure.append(alignment_point)
+                self.alignment_points_dropped_structure += 1
 
         # Remove alignment points which do not satisfy the structure condition, if there is any.
         if alignment_points_dropped_structure_indices:
             alignment_points_new = []
             dropped_index = 0
             for alignment_point_index, alignment_point in enumerate(self.alignment_points):
-                if alignment_point_index != alignment_points_dropped_structure_indices[dropped_index]:
+                if alignment_point_index != alignment_points_dropped_structure_indices[
+                    dropped_index]:
                     alignment_points_new.append(alignment_point)
-                elif dropped_index < len(alignment_points_dropped_structure_indices)-1:
-                        dropped_index += 1
+                elif dropped_index < len(alignment_points_dropped_structure_indices) - 1:
+                    dropped_index += 1
             self.alignment_points = alignment_points_new
 
     @staticmethod
@@ -300,9 +300,6 @@ class AlignmentPoints(object):
         else:
             alignment_point['patch_x_low'] = max(0, x - half_patch_width)
             alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
-        # Initialize lists with neighboring aps with low structure or low light.
-        alignment_point['low_structure_neighbors'] = None
-        alignment_point['dim_neighbors'] = None
         # Allocate space for the stacking buffer.
         if color:
             alignment_point['stacking_buffer'] = zeros(
@@ -324,11 +321,7 @@ class AlignmentPoints(object):
 
     def remove_alignment_point(self, alignment_point):
         """
-        Remove an alignment point from the current list. If it is a "standard" point allocated
-        by "create_ap_grid", the AP is transferred to the list of failed APs (too dim). This way,
-        the area covered by the AP will be filled during stacking, using the shift at some
-        neighboring point. If the AP to be removed was allocated by the user, it is just removed
-        from the list.
+        Remove an alignment point from the current list.
 
         :param alignment_point: Alignment point object to be removed
         :return: True, if the AP was removed successfully. False, otherwise.
@@ -340,16 +333,8 @@ class AlignmentPoints(object):
         except:
             return False
 
-        # Treat user-allocated APs separately. Just remove it from the list.
-        if ap_index >= self.num_standard_aps:
-            self.alignment_points = self.alignment_points[0:ap_index] +\
-                                   self.alignment_points[ap_index+1:]
-        else:
-            # For a standard AP, transfer it to the list of dropped APs and decrement the counter
-            # of standard APs.
-            self.alignment_points_dropped_dim.append(self.alignment_points.pop(ap_index))
-            self.num_standard_aps -= 1
-
+        self.alignment_points = self.alignment_points[0:ap_index] + \
+                                self.alignment_points[ap_index + 1:]
         return True
 
     def find_alignment_points(self, y_low, y_high, x_low, x_high):
@@ -369,33 +354,6 @@ class AlignmentPoints(object):
             if y_low <= ap['y'] <= y_high and x_low <= ap['x'] <= x_high:
                 ap_list.append(ap)
         return ap_list
-
-    def find_alignment_point_neighbors(self):
-        """
-        Go through the lists of alignment points which during "create_ap_grid" did not satisfy
-        either the brightness/contrast or the structure conditions. For each such point find the
-        closest "real" alignment point. Put the "failed" alignment point on the neighbor list of
-        its "real" neighbor.
-
-        In stacking, for the "failed" APs frame ranks and shifts will be copied from their "real"
-        neighbor.
-
-        :return: -
-        """
-        # Initialize the neighbor lists of all "real" alignment points.
-        for ap in self.alignment_points:
-            ap['low_structure_neighbors'] = []
-            ap['dim_neighbors'] = []
-
-        # There are two lists to process: First those APs which have too little structure.
-        for ap_low_structure in self.alignment_points_dropped_structure:
-            self.find_neighbor(ap_low_structure['y'], ap_low_structure['x'], self.alignment_points)[
-                'low_structure_neighbors'].append(ap_low_structure)
-
-        # And now the same for the points where the brightness is too dim or the contrast too low.
-        for ap_dim in self.alignment_points_dropped_dim:
-            self.find_neighbor(ap_dim['y'], ap_dim['x'], self.alignment_points)[
-                'dim_neighbors'].append(ap_dim)
 
     @staticmethod
     def find_neighbor(ap_y, ap_x, alignment_points):
@@ -431,7 +389,7 @@ class AlignmentPoints(object):
 
         # Compute the stack size from the given percentage. Take at least one frame.
         self.stack_size = max(int(ceil(
-                self.frames.number * self.configuration.alignment_points_frame_percent / 100.)), 1)
+            self.frames.number * self.configuration.alignment_points_frame_percent / 100.)), 1)
         # Select the ranking method.
         if self.configuration.alignment_points_rank_method == "xy gradient":
             method = Miscellaneous.local_contrast
@@ -453,12 +411,16 @@ class AlignmentPoints(object):
                 # Cycle through all frames. Use the blurred monochrome image for ranking.
                 for frame_index, frame in enumerate(self.frames.frames_mono_blurred):
                     # Compute patch bounds within the current frame.
-                    y_low = max(0, alignment_point['patch_y_low'] + self.align_frames.dy[frame_index])
+                    y_low = max(0,
+                                alignment_point['patch_y_low'] + self.align_frames.dy[frame_index])
                     y_high = min(self.frames.shape[0],
-                                 alignment_point['patch_y_high'] + self.align_frames.dy[frame_index])
-                    x_low = max(0, alignment_point['patch_x_low'] + self.align_frames.dx[frame_index])
+                                 alignment_point['patch_y_high'] + self.align_frames.dy[
+                                     frame_index])
+                    x_low = max(0,
+                                alignment_point['patch_x_low'] + self.align_frames.dx[frame_index])
                     x_high = min(self.frames.shape[1],
-                                 alignment_point['patch_x_high'] + self.align_frames.dx[frame_index])
+                                 alignment_point['patch_x_high'] + self.align_frames.dx[
+                                     frame_index])
                     # Compute the frame quality and append it to the list for this alignment point.
                     alignment_point['frame_qualities'].append(
                         method(frame[y_low:y_high, x_low:x_high],
@@ -475,15 +437,16 @@ class AlignmentPoints(object):
                     y_low = int(max(0, alignment_point['patch_y_low'] + self.align_frames.dy[
                         frame_index]) / self.configuration.align_frames_sampling_stride)
                     y_high = int(min(self.frames.shape[0],
-                                 alignment_point['patch_y_high'] + self.align_frames.dy[
-                                     frame_index]) / self.configuration.align_frames_sampling_stride)
+                                     alignment_point['patch_y_high'] + self.align_frames.dy[
+                                         frame_index]) / self.configuration.align_frames_sampling_stride)
                     x_low = int(max(0, alignment_point['patch_x_low'] + self.align_frames.dx[
                         frame_index]) / self.configuration.align_frames_sampling_stride)
                     x_high = int(min(self.frames.shape[1],
-                                 alignment_point['patch_x_high'] + self.align_frames.dx[
-                                     frame_index]) / self.configuration.align_frames_sampling_stride)
+                                     alignment_point['patch_x_high'] + self.align_frames.dx[
+                                         frame_index]) / self.configuration.align_frames_sampling_stride)
                     # Compute the frame quality and append it to the list for this alignment point.
-                    alignment_point['frame_qualities'].append(frame[y_low:y_high, x_low:x_high].var())
+                    alignment_point['frame_qualities'].append(
+                        frame[y_low:y_high, x_low:x_high].var())
 
         # For each alignment point sort the computed quality ranks in descending order.
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):
@@ -620,21 +583,22 @@ class AlignmentPoints(object):
                 color_image[box_y_high, x] = [255, 255, 255]
 
             patch_y_low = max(alignment_point['patch_y_low'], 0)
-            patch_y_high = min(alignment_point['patch_y_high'], image.shape[0]) -1
+            patch_y_high = min(alignment_point['patch_y_high'], image.shape[0]) - 1
             patch_x_low = max(alignment_point['patch_x_low'], 0)
             patch_x_high = min(alignment_point['patch_x_high'], image.shape[1]) - 1
             for y in arange(patch_y_low, patch_y_high):
                 color_image[y, patch_x_low] = [0, int(
-                    (255+color_image[y, patch_x_low][1])/2.), 0]
+                    (255 + color_image[y, patch_x_low][1]) / 2.), 0]
                 color_image[y, patch_x_high] = [0, int(
                     (255 + color_image[y, patch_x_high][1]) / 2.), 0]
             for x in arange(patch_x_low, patch_x_high):
                 color_image[patch_y_low, x] = [0, int(
-                    (255+color_image[patch_y_low, x][1])/2.), 0]
+                    (255 + color_image[patch_y_low, x][1]) / 2.), 0]
                 color_image[patch_y_high, x] = [0, int(
                     (255 + color_image[patch_y_high, x][1]) / 2.), 0]
 
         return color_image
+
 
 if __name__ == "__main__":
     # Images can either be extracted from a video file or a batch of single photographs. Select
@@ -699,7 +663,8 @@ if __name__ == "__main__":
         x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
                                 x_low_opt:x_high_opt] = 255
         reference_frame_with_alignment_points[y_low_opt:y_high_opt,
-        x_low_opt] = reference_frame_with_alignment_points[y_low_opt:y_high_opt, x_high_opt - 1] = 255
+        x_low_opt] = reference_frame_with_alignment_points[y_low_opt:y_high_opt,
+                     x_high_opt - 1] = 255
         # plt.imshow(reference_frame_with_alignment_points, cmap='Greys_r')
         # plt.show()
 
@@ -730,9 +695,9 @@ if __name__ == "__main__":
     alignment_points.create_ap_grid(average)
     print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
           ", number of dropped aps (dim): " + str(
-        len(alignment_points.alignment_points_dropped_dim)) +
+        alignment_points.alignment_points_dropped_dim) +
           ", number of dropped aps (structure): " + str(
-        len(alignment_points.alignment_points_dropped_structure)))
+        alignment_points.alignment_points_dropped_structure))
     color_image = alignment_points.show_alignment_points(average)
 
     plt.imshow(color_image)
@@ -749,10 +714,10 @@ if __name__ == "__main__":
     x_low = 880
     x_high = 960
     found_ap_list = alignment_points.find_alignment_points(y_low, y_high, x_low, x_high)
-    print ("Removing alignment points between bounds " + str(y_low) + " <= y <= " + str(y_high) +
-           ", " + str(x_low) + " <= x <= " + str(x_high) + ":")
+    print("Removing alignment points between bounds " + str(y_low) + " <= y <= " + str(y_high) +
+          ", " + str(x_low) + " <= x <= " + str(x_high) + ":")
     for ap in found_ap_list:
-        print ("y: " + str(ap['y']) + ", x: " + str(ap['x']))
+        print("y: " + str(ap['y']) + ", x: " + str(ap['x']))
         alignment_points.remove_alignment_point(ap)
 
     y_new = 530
@@ -765,18 +730,16 @@ if __name__ == "__main__":
         alignment_points.new_alignment_point(average, frames.color, y_new, x_new,
                                              half_box_width_new,
                                              half_patch_width_new, num_pixels_y, num_pixels_x,
+                                             configuration.alignment_points_search_width,
                                              extend_x_low=False, extend_x_high=False))
-    print ("Added alignment point at y: " + str(y_new) + ", x: " + str(x_new) + ", box size: "
-           + str(2*half_box_width_new) + ", patch size: " + str(2*half_patch_width_new))
-    print("Searching for neighbors of failed APs.")
-    alignment_points.find_alignment_point_neighbors()
+    print("Added alignment point at y: " + str(y_new) + ", x: " + str(x_new) + ", box size: "
+          + str(2 * half_box_width_new) + ", patch size: " + str(2 * half_patch_width_new))
 
     # Show updated alignment point boxes and patches.
     print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
-          ", number of dropped aps (dim): " + str(
-        len(alignment_points.alignment_points_dropped_dim)) +
+          ", number of dropped aps (dim): " + str(alignment_points.alignment_points_dropped_dim) +
           ", number of dropped aps (structure): " + str(
-        len(alignment_points.alignment_points_dropped_structure)))
+        alignment_points.alignment_points_dropped_structure))
     color_image = alignment_points.show_alignment_points(average)
 
     plt.imshow(color_image)
