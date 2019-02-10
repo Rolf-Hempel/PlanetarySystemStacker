@@ -239,7 +239,7 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         super(AlignmentPointGraphicsItem, self).__init__()
 
         # Set the size of the central dot.
-        self.dot_width = 2
+        self.dot_width = 4
 
         # Set the color and transparency of the filling.
         self.color_surface = QtGui.QColor(0, 255, 0, 20)
@@ -594,9 +594,9 @@ class Window(QtWidgets.QWidget):
 if __name__ == '__main__':
     import sys
 
-    # file_name = 'Images/2018-03-24_20-00MEZ_Mond_LRGB.jpg'
-    file_name = 'Images/Moon_Tile-024_043939_stacked_interpolate_pp.tif'
-    alignment_point_half_patch_width = 40
+    file_name = 'Images/2018-03-24_20-00MEZ_Mond_LRGB.jpg'
+    # file_name = 'Images/Moon_Tile-024_043939_stacked_interpolate_pp.tif'
+    alignment_point_half_patch_width = 110
     alignment_points_search_width = 5
     app = QtWidgets.QApplication(sys.argv)
     window = Window(file_name, alignment_point_half_patch_width, alignment_points_search_width)
