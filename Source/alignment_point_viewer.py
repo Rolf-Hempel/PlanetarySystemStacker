@@ -205,6 +205,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
                 # Draw the new preliminary AP.
                 self.photo_viewer.draw_alignment_point(new_ap)
+                self.update()
                 self.remember_ap = new_ap
 
         # The mouse is moved with the right button pressed.
@@ -238,7 +239,7 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         super(AlignmentPointGraphicsItem, self).__init__()
 
         # Set the size of the central dot.
-        self.dot_width = 4
+        self.dot_width = 2
 
         # Set the color and transparency of the filling.
         self.color_surface = QtGui.QColor(0, 255, 0, 20)
@@ -339,6 +340,8 @@ class AlignmentPointViewer(QtWidgets.QGraphicsView):
         self.drag_mode = True
         # Initialize the alignment point object.
         self.aps = None
+        # Set the focus on the viewer, so the key event is caught.
+        self.setFocus()
 
     def hasPhoto(self):
         return not self._empty
@@ -591,12 +594,13 @@ class Window(QtWidgets.QWidget):
 if __name__ == '__main__':
     import sys
 
-    file_name = 'Images/2018-03-24_20-00MEZ_Mond_LRGB.jpg'
-    alignment_point_half_patch_width = 110
-    alignment_points_search_width = 10
+    # file_name = 'Images/2018-03-24_20-00MEZ_Mond_LRGB.jpg'
+    file_name = 'Images/Moon_Tile-024_043939_stacked_interpolate_pp.tif'
+    alignment_point_half_patch_width = 40
+    alignment_points_search_width = 5
     app = QtWidgets.QApplication(sys.argv)
     window = Window(file_name, alignment_point_half_patch_width, alignment_points_search_width)
     # window.viewer.setAP(3000, 1500, 400)
     window.setGeometry(500, 300, 800, 600)
-    window.show()
+    window.showMaximized()
     sys.exit(app.exec_())
