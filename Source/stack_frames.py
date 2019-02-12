@@ -103,13 +103,13 @@ class StackFrames(object):
 
         self.my_timer.stop('Stacking: AP initialization')
 
-    def identify_holes_between_stacks(self):
+    def prepare_for_stack_blending(self):
         """
-        Find image locations where no AP patch contributes in stacking. If the fraction of such
-        pixels is above a given parameter, a full background image is constructed from the best
+        Find image locations where the background image is needed for stacking. If the fraction of
+        such pixels is above a given parameter, a full background image is constructed from the best
         frames during the stacking process. If the fraction is low, the image is subdivided into
         quadratic patches. To save computing time, the background image is constructed only in those
-        patches which contain at least one pixel as described above.
+        patches which contain at least one pixel where the background is needed.
 
         :return:
         """
@@ -127,7 +127,10 @@ class StackFrames(object):
             patch_x_low: patch_x_high] += self.alignment_points.stack_size
 
             # For AP patches on the frame border, avoid blending with a non-existing background
-            # image patch.
+            # image patch. This is done by adding "virtual" frame contributions between the frame
+            # border and the AP box. Since in those areas it looks like two APs were contributing,
+            # the background is assigned a zero weight. Therefore, the background does not have to
+            # be computed in those locations. Quite tricky, isn't it?
             y_low = alignment_point['box_y_low']
             y_high = alignment_point['box_y_high']
             x_low = alignment_point['box_x_low']
@@ -143,7 +146,7 @@ class StackFrames(object):
             self.number_single_frame_contributions[y_low:y_high, x_low:x_high] += \
                 self.alignment_points.stack_size
 
-        # For each image buffer pixel count the number of image contributions.
+        # The stack size is the number of frames which contribute to each AP stack.
         single_stack_size_float = float(self.alignment_points.stack_size)
 
         # Add the contributions of all alignment points into a single buffer.
@@ -153,12 +156,13 @@ class StackFrames(object):
             patch_x_low = alignment_point['patch_x_low']
             patch_x_high = alignment_point['patch_x_high']
 
+            # Compute the weights used in AP blending and store them with the AP.
             alignment_point['weights_yx'] = self.one_dim_weight(patch_y_low, patch_y_high,
                     alignment_point['box_y_low'], alignment_point['box_y_high'])[:, np.newaxis] * \
                     self.one_dim_weight(patch_x_low, patch_x_high, alignment_point['box_x_low'],
                     alignment_point['box_x_high'])
 
-            # For each image buffer pixel add the weights.
+            # For each image buffer pixel add the weights. This is used for normalization later.
             self.sum_single_frame_weights[patch_y_low:patch_y_high,
             patch_x_low: patch_x_high] += single_stack_size_float * alignment_point['weights_yx']
 
@@ -211,7 +215,10 @@ class StackFrames(object):
 
         # If the fraction is below a certain limit, it is worthwhile to compute the background
         # image only where it is needed. Construct a list with patches where the background is
-        # needed.
+        # needed. The mask blurring has slightly changed the number of pixels where the background
+        # is needed, so the value of "fraction_stacking_holes" is not exact. The difference will be
+        # very small, though. Since the fraction is only used to decide if a complete background
+        # image should be computed, the approximate value is more than sufficient.
         if self.fraction_stacking_holes < self.configuration.stack_frames_background_fraction:
 
             # Initialize a list of background patches.
@@ -235,7 +242,7 @@ class StackFrames(object):
                     if patch_x_low == patch_x_high:
                         continue
 
-                    # If the patch contains pixels with no AP contribution, add it to the list.
+                    # If the patch contains pixels where the background is used, add it to the list.
                     if np.count_nonzero(
                             self.number_single_frame_contributions[patch_y_low:patch_y_high,
                             patch_x_low:patch_x_high] == 0) > 0:
@@ -257,7 +264,7 @@ class StackFrames(object):
         """
 
         # First find out if there are holes between AP patches.
-        self.identify_holes_between_stacks()
+        self.prepare_for_stack_blending()
 
         # Go through the list of all frames.
         for frame_index, frame in enumerate(self.frames.frames):

@@ -246,7 +246,7 @@ if __name__ == "__main__":
     redirect_stdout = False
     show_results = True
     input_type = 'video'
-    input_directory = 'D:/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
+    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
     # input_type = 'image'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
     convert_to_grayscale = False
