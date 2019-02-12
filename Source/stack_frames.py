@@ -185,7 +185,7 @@ class StackFrames(object):
         # Only the "holes" in the buffer have to be filled with the "averaged_background".
         # Initialize a mask for blending both buffers with each other. Set values to:
         #   0.  at points not covered by a single AP patch.
-        #   1.  at points covered by more then one AP, and at points within the interior
+        #   1.  at points covered by more than one AP, and at points within the interior
         #       (AP box) of a single AP.
         #   0.5 between those areas. After blurring the mask, values in these transition
         #       regions will show a smooth transition between APs and background.
