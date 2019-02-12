@@ -70,7 +70,8 @@ class AlignmentPoints(object):
         # Reset the list of alignment points registered with each frame.
         self.frames.reset_alignment_point_lists()
 
-    def ap_locations(self, num_pixels, half_box_width, search_width, step_size, even):
+    @staticmethod
+    def ap_locations(num_pixels, half_box_width, search_width, step_size, even):
         """
         Compute optimal alignment patch coordinates in one coordinate direction. Place boundary
         neighbors as close as possible to the boundary.
@@ -147,7 +148,6 @@ class AlignmentPoints(object):
                                                 step_size, True)
         ap_locations_x_odd = self.ap_locations(num_pixels_x, half_box_width, search_width,
                                                step_size, False)
-        ap_locations_x_odd_len_minus_1 = len(ap_locations_x_odd) - 1
 
         # Initialize the list of alignment points and counters for APs which are dropped because
         # they do not satisfy the brightness or structure condition.
@@ -157,7 +157,12 @@ class AlignmentPoints(object):
 
         # Create alignment point rows, start with an even one.
         even = True
-        for y in ap_locations_y:
+        for index_y, y in enumerate(ap_locations_y):
+            # For the first row extend the patch to the upper frame border, and for the last row
+            # to the lower frame border.
+            extend_y_low  = (index_y == 0)
+            extend_y_high = (index_y == len(ap_locations_y)-1)
+
             # Create x coordinate, depending on the y row being even or odd (staggered grid).
             if even:
                 ap_locations_x = ap_locations_x_even
@@ -166,24 +171,16 @@ class AlignmentPoints(object):
 
             # For each location create an alignment point.
             for index_x, x in enumerate(ap_locations_x):
-                # For odd rows: Fill the space left of the first patch and right of the last patch.
-                if not even and index_x == 0:
-                    alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
+                # For the first point in a row, extend the patch to the left frame border, and for
+                # the last point in a row to the right frame border.
+                extend_x_low  = (index_x == 0)
+                extend_x_high = (index_x == len(ap_locations_x) - 1)
+
+                alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
                                                                half_box_width,
-                                                               half_patch_width, num_pixels_y,
-                                                               num_pixels_x, search_width,
-                                                               extend_x_low=True)
-                elif not even and index_x == ap_locations_x_odd_len_minus_1:
-                    alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
-                                                               half_box_width,
-                                                               half_patch_width, num_pixels_y,
-                                                               num_pixels_x, search_width,
-                                                               extend_x_high=True)
-                else:
-                    alignment_point = self.new_alignment_point(mean_frame, self.frames.color, y, x,
-                                                               half_box_width,
-                                                               half_patch_width, num_pixels_y,
-                                                               num_pixels_x, search_width)
+                                                               half_patch_width, search_width,
+                                                               extend_x_low, extend_x_high,
+                                                               extend_y_low, extend_y_high)
 
                 # Compute structure and brightness information for the alignment box.
                 max_brightness = amax(alignment_point['reference_box'])
@@ -221,9 +218,8 @@ class AlignmentPoints(object):
                         # coordinates and box / patch sizes.
                         alignment_point = self.new_alignment_point(mean_frame,
                             self.frames.color, y_adapted, x_adapted, half_box_width_adapted,
-                            half_patch_width_adapted, num_pixels_y, num_pixels_x, search_width,
-                            extend_x_low=not even and index_x == 0,
-                            extend_x_high=not even and index_x == ap_locations_x_odd_len_minus_1)
+                            half_patch_width_adapted, search_width,
+                            extend_x_low, extend_x_high, extend_y_low, extend_y_high)
 
                     alignment_point['structure'] = Miscellaneous.quality_measure(
                         alignment_point['reference_box'])
@@ -260,8 +256,8 @@ class AlignmentPoints(object):
             self.alignment_points = alignment_points_new
 
     @staticmethod
-    def new_alignment_point(mean_frame, color, y, x, half_box_width, half_patch_width, num_pixels_y,
-                            num_pixels_x, search_width, extend_x_low=False, extend_x_high=False):
+    def new_alignment_point(mean_frame, color, y, x, half_box_width, half_patch_width, search_width,
+                            extend_x_low, extend_x_high, extend_y_low, extend_y_high):
         """
         Create a new alignment point. This method is called in creating the initial alignment point
         grid. Later it can be invoked by the user to add single alignment points.
@@ -272,34 +268,42 @@ class AlignmentPoints(object):
         :param x: x coordinate of alignment point center
         :param half_box_width: Half-width of the alignment boxes
         :param half_patch_width: Half-width of the alignment patch (used in stacking)
-        :param num_pixels_y: Number of pixels in y direction
-        :param num_pixels_x: Number of pixels in x direction
         :param search_width: Maximum search width for alignment point matching
         :param extend_x_low: True, if patch is to be extended to the left frame boundary.
                              False otherwise.
         :param extend_x_high: True, if patch is to be extended to the right frame boundary.
                               False otherwise.
+        :param extend_y_low: True, if patch is to be extended to the upper frame boundary.
+                             False otherwise.
+        :param extend_y_high: True, if patch is to be extended to the lower frame boundary.
+                              False otherwise.
         :return:
         """
 
+        num_pixels_y = mean_frame.shape[0]
+        num_pixels_x = mean_frame.shape[1]
         alignment_point = {}
         alignment_point['y'] = y
         alignment_point['x'] = x
-        alignment_point['box_y_low'] = max(0, y - half_box_width)
+        alignment_point['box_y_low'] = max(search_width, y - half_box_width)
         alignment_point['box_y_high'] = min(num_pixels_y - search_width, y + half_box_width)
-        alignment_point['box_x_low'] = max(0, x - half_box_width)
+        alignment_point['box_x_low'] = max(search_width, x - half_box_width)
         alignment_point['box_x_high'] = min(num_pixels_x - search_width, x + half_box_width)
+
         alignment_point['patch_y_low'] = max(0, y - half_patch_width)
         alignment_point['patch_y_high'] = min(num_pixels_y, y + half_patch_width)
+        if extend_y_low:
+            alignment_point['patch_y_low'] = 0
+        elif extend_y_high:
+            alignment_point['patch_y_high'] = num_pixels_y
+
+        alignment_point['patch_x_low'] = max(0, x - half_patch_width)
+        alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
         if extend_x_low:
             alignment_point['patch_x_low'] = 0
-            alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
         elif extend_x_high:
-            alignment_point['patch_x_low'] = max(0, x - half_patch_width)
             alignment_point['patch_x_high'] = num_pixels_x
-        else:
-            alignment_point['patch_x_low'] = max(0, x - half_patch_width)
-            alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
+
         # Allocate space for the stacking buffer.
         if color:
             alignment_point['stacking_buffer'] = zeros(
@@ -731,10 +735,9 @@ if __name__ == "__main__":
     num_pixels_x = average.shape[1]
     alignment_points.alignment_points.append(
         alignment_points.new_alignment_point(average, frames.color, y_new, x_new,
-                                             half_box_width_new,
-                                             half_patch_width_new, num_pixels_y, num_pixels_x,
+                                             half_box_width_new, half_patch_width_new,
                                              configuration.alignment_points_search_width,
-                                             extend_x_low=False, extend_x_high=False))
+                                             False, False, False, False))
     print("Added alignment point at y: " + str(y_new) + ", x: " + str(x_new) + ", box size: "
           + str(2 * half_box_width_new) + ", patch size: " + str(2 * half_patch_width_new))
 

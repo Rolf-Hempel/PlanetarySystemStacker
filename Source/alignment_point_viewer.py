@@ -155,15 +155,16 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 # The mouse was moved between press and release. Remove all APs in the opening
                 # rectangular patch, both from the scene and the AP list.
                 else:
+
                     remove_ap_list = []
                     y_low = min(self.right_y_start, self.right_y_end)
                     y_high = max(self.right_y_start, self.right_y_end)
                     x_low = min(self.right_x_start, self.right_x_end)
                     x_high = max(self.right_x_start, self.right_x_end)
-                    for ap in self.photo_viewer.aps.alignment_points:
-                        if y_low < ap['y'] < y_high and x_low < ap['x'] < x_high:
-                            remove_ap_list.append(ap)
-                            self.removeItem(ap['graphics_item'])
+                    remove_ap_list = self.photo_viewer.aps.find_alignment_points(y_low, y_high,
+                                                                                 x_low, x_high)
+                    for ap in remove_ap_list:
+                        self.removeItem(ap['graphics_item'])
                     self.removeItem(self.remember_sr)
                     self.photo_viewer.aps.remove_alignment_points(remove_ap_list)
 
@@ -205,7 +206,13 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
                 # Draw the new preliminary AP.
                 self.photo_viewer.draw_alignment_point(new_ap)
-                self.update()
+                # Update an area slightly larger than the AP patch.
+                x_low = new_ap["patch_x_low"] - 5
+                y_low = new_ap["patch_y_low"] - 5
+                width = new_ap["patch_x_high"] - new_ap["patch_x_low"] + 10
+                height = new_ap["patch_y_high"] - new_ap["patch_y_low"] + 10
+                self.update(x_low, y_low, width, height)
+
                 self.remember_ap = new_ap
 
         # The mouse is moved with the right button pressed.
@@ -238,9 +245,6 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
     def __init__(self, ap):
         super(AlignmentPointGraphicsItem, self).__init__()
 
-        # Set the size of the central dot.
-        self.dot_width = 4
-
         # Set the color and transparency of the filling.
         self.color_surface = QtGui.QColor(0, 255, 0, 20)
 
@@ -258,6 +262,9 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         self.width_x_external = self.width_x + self.pen_boundary.width()
         self.width_y = self.patch_y_high - self.patch_y_low
         self.width_y_external = self.width_y + self.pen_boundary.width()
+
+        # Set the size of the central dot.
+        self.dot_width = max(2, int(self.width_x / 50))
 
         # Store a reference of the widget at the corresponding AP.
         ap['graphics_item'] = self
@@ -532,6 +539,24 @@ class AlignmentPoints(object):
                 ap_neighbor = ap
                 min_distance_squared = distance_squared
         return ap_neighbor, np.sqrt(min_distance_squared)
+
+    def find_alignment_points(self, y_low, y_high, x_low, x_high):
+        """
+        Find all alignment points the centers of which are within given (y, x) bounds.
+
+        :param y_low: Lower y pixel coordinate bound
+        :param y_high: Upper y pixel coordinate bound
+        :param x_low: Lower x pixel coordinate bound
+        :param x_high: Upper x pixel coordinate bound
+        :return: List of all alignment points with centers within the given coordinate bounds.
+                 If no AP satisfies the condition, return an empty list.
+        """
+
+        ap_list = []
+        for ap in self.alignment_points:
+            if y_low <= ap['y'] <= y_high and x_low <= ap['x'] <= x_high:
+                ap_list.append(ap)
+        return ap_list
 
     def remove_alignment_points(self, ap_list):
         aps_new = []

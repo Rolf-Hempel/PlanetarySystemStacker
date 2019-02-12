@@ -66,8 +66,10 @@ class StackFrames(object):
         self.alignment_points = alignment_points
         self.my_timer = my_timer
         self.my_timer.create('Stacking: AP initialization')
+        self.my_timer.create('Stacking: Initialize background blending')
         self.my_timer.create('Stacking: compute AP shifts')
         self.my_timer.create('Stacking: remapping and adding')
+        self.my_timer.create('Stacking: computing background')
         self.my_timer.create('Stacking: merging AP buffers')
 
         # Allocate work space for image buffer and the image converted for output.
@@ -76,6 +78,7 @@ class StackFrames(object):
                 self.align_frames.intersection_shape[0][0]
         self.dim_x = self.align_frames.intersection_shape[1][1] - \
                 self.align_frames.intersection_shape[1][0]
+        self.number_pixels = self.dim_y * self.dim_x
 
         # The arrays for the stacked image and the summation buffer need to accommodate three
         # color channels in the case of color images.
@@ -88,16 +91,162 @@ class StackFrames(object):
 
         # If the alignment point patches do not cover the entire frame, a background image must
         # be computed and blended in. At this point it is not yet clear if this is necessary.
+        self.background_patches = None
         self.stacked_background_buffer = None
 
         # Allocate a buffer which for each pixel of the image buffer counts the number of
         # contributing alignment patch images. Also, allocate a second buffer of same type and size
         # to accumulate the weights at each pixel. This buffer is used to normalize the image
-        # buffer. Both buffers are initialized with a small value to avoid divide by zero.
+        # buffer. The second buffer is initialized with a small value to avoid divide by zero.
         self.number_single_frame_contributions = np.full([self.dim_y, self.dim_x], 0, dtype=np.int32)
         self.sum_single_frame_weights = np.full([self.dim_y, self.dim_x], 0.0001, dtype=np.float32)
 
         self.my_timer.stop('Stacking: AP initialization')
+
+    def identify_holes_between_stacks(self):
+        """
+        Find image locations where no AP patch contributes in stacking. If the fraction of such
+        pixels is above a given parameter, a full background image is constructed from the best
+        frames during the stacking process. If the fraction is low, the image is subdivided into
+        quadratic patches. To save computing time, the background image is constructed only in those
+        patches which contain at least one pixel as described above.
+
+        :return:
+        """
+
+        self.my_timer.start('Stacking: Initialize background blending')
+        # Loop over all APs and add the number of image contributions to all pixels covered by them.
+        for alignment_point in self.alignment_points.alignment_points:
+            patch_y_low = alignment_point['patch_y_low']
+            patch_y_high = alignment_point['patch_y_high']
+            patch_x_low = alignment_point['patch_x_low']
+            patch_x_high = alignment_point['patch_x_high']
+
+            # For each image buffer pixel count the number of image contributions.
+            self.number_single_frame_contributions[patch_y_low:patch_y_high,
+            patch_x_low: patch_x_high] += self.alignment_points.stack_size
+
+            # For AP patches on the frame border, avoid blending with a non-existing background
+            # image patch.
+            y_low = alignment_point['box_y_low']
+            y_high = alignment_point['box_y_high']
+            x_low = alignment_point['box_x_low']
+            x_high = alignment_point['box_x_high']
+            if patch_y_low == 0:
+                y_low = 0
+            if patch_y_high == self.dim_y:
+                y_high = self.dim_y
+            if patch_x_low == 0:
+                x_low = 0
+            if patch_x_high == self.dim_x:
+                x_high = self.dim_x
+            self.number_single_frame_contributions[y_low:y_high, x_low:x_high] += \
+                self.alignment_points.stack_size
+
+        # For each image buffer pixel count the number of image contributions.
+        single_stack_size_float = float(self.alignment_points.stack_size)
+
+        # Add the contributions of all alignment points into a single buffer.
+        for alignment_point in self.alignment_points.alignment_points:
+            patch_y_low = alignment_point['patch_y_low']
+            patch_y_high = alignment_point['patch_y_high']
+            patch_x_low = alignment_point['patch_x_low']
+            patch_x_high = alignment_point['patch_x_high']
+
+            alignment_point['weights_yx'] = self.one_dim_weight(patch_y_low, patch_y_high,
+                    alignment_point['box_y_low'], alignment_point['box_y_high'])[:, np.newaxis] * \
+                    self.one_dim_weight(patch_x_low, patch_x_high, alignment_point['box_x_low'],
+                    alignment_point['box_x_high'])
+
+            # For each image buffer pixel add the weights.
+            self.sum_single_frame_weights[patch_y_low:patch_y_high,
+            patch_x_low: patch_x_high] += single_stack_size_float * alignment_point['weights_yx']
+
+        # Compute the fraction of pixels where no AP patch contributes.
+        self.number_stacking_holes = np.count_nonzero(
+            self.number_single_frame_contributions == 0)
+        self.fraction_stacking_holes = self.number_stacking_holes / self.number_pixels
+
+        # If all pixels are covered by AP patches, no background image is required.
+        if self.number_stacking_holes == 0:
+            self.my_timer.stop('Stacking: Initialize background blending')
+            return
+
+        # If the alignment points do not cover the full frame, blend the AP contributions with
+        # a background computed as the average of globally shifted best frames. The background
+        # should only shine through outside AP patches.
+        #
+        # The "real" alignment point contributions are already in the
+        # "stacked_image_buffer".
+        # Only the "holes" in the buffer have to be filled with the "averaged_background".
+        # Initialize a mask for blending both buffers with each other. Set values to:
+        #   0.  at points not covered by a single AP patch.
+        #   1.  at points covered by more then one AP, and at points within the interior
+        #       (AP box) of a single AP.
+        #   0.5 between those areas. After blurring the mask, values in these transition
+        #       regions will show a smooth transition between APs and background.
+        mask_intermediate = np.where((self.number_single_frame_contributions == 0), 0., 0.5)
+        self.mask = np.where((
+        np.logical_or(self.number_single_frame_contributions > self.alignment_points.stack_size,
+                      self.sum_single_frame_weights > single_stack_size_float)), 1.,
+                      mask_intermediate)
+
+        # Apply a Gaussian blur to the mask to make transitions smoother.
+        blur_width = self.configuration.stack_frames_gauss_width
+        self.mask = cv2.GaussianBlur(self.mask, (blur_width, blur_width), 0)
+
+        # The Gaussian blur might have created nonzero mask entries outside AP patches. Reset
+        # them to zero to avoid artifacts.
+        self.mask = np.where((self.number_single_frame_contributions == 0), 0., self.mask)
+
+        # Re-use the array "number_single_frame_contributions". It is set to 0 at all pixels
+        # where a background is required. At all other locations it is set to 1.
+        self.number_single_frame_contributions = np.where((self.mask >= 1.), 1, 0)
+
+        # Allocate a buffer for the background image.
+        if self.frames.color:
+            self.averaged_background = np.zeros([self.dim_y, self.dim_x, 3], dtype=np.float32)
+        else:
+            self.averaged_background = np.zeros([self.dim_y, self.dim_x], dtype=np.float32)
+
+        # If the fraction is below a certain limit, it is worthwhile to compute the background
+        # image only where it is needed. Construct a list with patches where the background is
+        # needed.
+        if self.fraction_stacking_holes < self.configuration.stack_frames_background_fraction:
+
+            # Initialize a list of background patches.
+            self.background_patches = []
+
+            # Subdivide the image area in quadratic patches. Cycle through all patch locations.
+            for patch_y_low in range(0, self.dim_y,
+                                     self.configuration.stack_frames_background_patch_size):
+                patch_y_high = min(
+                    patch_y_low + self.configuration.stack_frames_background_patch_size,
+                    self.dim_y - 1)
+
+                # Handle the special case where the patch has zero size in one direction.
+                if patch_y_low == patch_y_high:
+                    continue
+                for patch_x_low in range(0, self.dim_x,
+                                         self.configuration.stack_frames_background_patch_size):
+                    patch_x_high = min(
+                        patch_x_low + self.configuration.stack_frames_background_patch_size,
+                        self.dim_x - 1)
+                    if patch_x_low == patch_x_high:
+                        continue
+
+                    # If the patch contains pixels with no AP contribution, add it to the list.
+                    if np.count_nonzero(
+                            self.number_single_frame_contributions[patch_y_low:patch_y_high,
+                            patch_x_low:patch_x_high] == 0) > 0:
+                        background_patch = {}
+                        background_patch['patch_y_low'] = patch_y_low
+                        background_patch['patch_y_high'] = patch_y_high
+                        background_patch['patch_x_low'] = patch_x_low
+                        background_patch['patch_x_high'] = patch_x_high
+                        self.background_patches.append(background_patch)
+
+        self.my_timer.stop('Stacking: Initialize background blending')
 
     def stack_frames(self):
         """
@@ -106,6 +255,9 @@ class StackFrames(object):
 
         :return: -
         """
+
+        # First find out if there are holes between AP patches.
+        self.identify_holes_between_stacks()
 
         # Go through the list of all frames.
         for frame_index, frame in enumerate(self.frames.frames):
@@ -139,6 +291,53 @@ class StackFrames(object):
                                  alignment_point['patch_y_low'], alignment_point['patch_y_high'],
                                  alignment_point['patch_x_low'], alignment_point['patch_x_high'])
                 self.my_timer.stop('Stacking: remapping and adding')
+
+            # If there are holes between AP patches, add this frame's contribution (if any) to the
+            # averaged background image.
+            if self.number_stacking_holes > 0 and \
+                    frame_index in self.align_frames.quality_sorted_indices[
+                        :self.alignment_points.stack_size]:
+                self.my_timer.start('Stacking: computing background')
+
+                # Treat the case that the background is computed for specific patches only.
+                if self.background_patches:
+                    if self.frames.color:
+                        for patch in self.background_patches:
+                            self.averaged_background[patch['patch_y_low']:patch['patch_y_high'],
+                                      patch['patch_x_low']:patch['patch_x_high'], :] += \
+                                frame[patch['patch_y_low'] + self.align_frames.dy[frame_index] :
+                                      patch['patch_y_high'] + self.align_frames.dy[frame_index],
+                                      patch['patch_x_low'] + self.align_frames.dx[frame_index] :
+                                      patch['patch_x_high'] + self.align_frames.dx[frame_index], :]
+                    else:
+                        for patch in self.background_patches:
+                            self.averaged_background[patch['patch_y_low']:patch['patch_y_high'],
+                                      patch['patch_x_low']:patch['patch_x_high']] += \
+                                frame[patch['patch_y_low'] + self.align_frames.dy[frame_index] :
+                                      patch['patch_y_high'] + self.align_frames.dy[frame_index],
+                                      patch['patch_x_low'] + self.align_frames.dx[frame_index] :
+                                      patch['patch_x_high'] + self.align_frames.dx[frame_index]]
+
+                # The complete background image is computed.
+                else:
+                    if self.frames.color:
+                        self.averaged_background += frame[self.align_frames.dy[frame_index]:
+                                                    self.dim_y + self.align_frames.dy[frame_index],
+                                                    self.align_frames.dx[frame_index]:
+                                                    self.dim_x + self.align_frames.dx[frame_index],
+                                                    :]
+                    else:
+                        self.averaged_background += frame[self.align_frames.dy[frame_index]:
+                                                    self.dim_y + self.align_frames.dy[frame_index],
+                                                    self.align_frames.dx[frame_index]:
+                                                    self.dim_x + self.align_frames.dx[frame_index]]
+                self.my_timer.stop('Stacking: computing background')
+
+        # If a background image is being computed, divide the buffer by the number of contributions.
+        if self.number_stacking_holes > 0:
+            self.my_timer.start('Stacking: computing background')
+            self.averaged_background /= self.alignment_points.stack_size
+            self.my_timer.stop('Stacking: computing background')
 
     def remap_rigid(self, frame, buffer, shift_y, shift_x, y_low, y_high, x_low, x_high):
         """
@@ -217,29 +416,17 @@ class StackFrames(object):
             patch_x_low = alignment_point['patch_x_low']
             patch_x_high = alignment_point['patch_x_high']
 
-            weights_yx = self.one_dim_weight(patch_y_low, patch_y_high,
-                                             alignment_point['box_y_low'],
-                                             alignment_point['box_y_high'])[:, np.newaxis] * \
-                         self.one_dim_weight(patch_x_low, patch_x_high,
-                                             alignment_point['box_x_low'],
-                                             alignment_point['box_x_high'])
             # Add the stacking buffer of the alignment point to the appropriate location of the
             # global stacking buffer.
             if self.frames.color:
                 self.stacked_image_buffer[patch_y_low:patch_y_high,
                 patch_x_low: patch_x_high, :] += alignment_point['stacking_buffer'] * \
-                                                 weights_yx[:, :, np.newaxis]
+                                                 alignment_point['weights_yx'][:, :, np.newaxis]
             else:
                 self.stacked_image_buffer[
                 patch_y_low:patch_y_high,
-                patch_x_low: patch_x_high] += alignment_point['stacking_buffer'] * weights_yx
-
-            # For each image buffer pixel count the number of image contributions and add the
-            # weights.
-            self.number_single_frame_contributions[patch_y_low:patch_y_high,
-                patch_x_low: patch_x_high] += self.alignment_points.stack_size
-            self.sum_single_frame_weights[patch_y_low:patch_y_high,
-                patch_x_low: patch_x_high] += single_stack_size_float * weights_yx
+                patch_x_low: patch_x_high] += alignment_point['stacking_buffer'] * \
+                                              alignment_point['weights_yx']
 
         # Divide the global stacking buffer pixel-wise by the number of image contributions.
         if self.frames.color:
@@ -252,36 +439,16 @@ class StackFrames(object):
         # If the alignment points do not cover the full frame, blend the AP contributions with
         # a background computed as the average of globally shifted best frames. The background
         # should only shine through outside AP patches.
-        if np.count_nonzero(self.number_single_frame_contributions == 0) > 0:
+        if self.fraction_stacking_holes > 0:
             self.my_timer.create('Stacking: blending APs with background')
-            # First compute the background as the average of the best frames. Only global shifts
-            # are applied (no small-scale de-warping).
-            averaged_background = self.align_frames.average_frame(
-                average_frame_number=single_stack_size_int, color=self.frames.color)
-            # The "real" alignment point contributions are already in the "stacked_image_buffer".
-            # Only the "holes" in the buffer have to be filled with the "averaged_background".
-            # Initialize a mask for blending both buffers with each other. Set values to:
-            #   - 0.  at points not covered by a single AP patch.
-            #   - 1.  at points covered by more then one AP, and at points within the interior
-            #         (AP box) of a single AP.
-            #   - 0.5 between those areas. After blurring the mask, values in these transition
-            #         regions will show a smooth transition between APs and background.
-            mask_intermediate = np.where((self.number_single_frame_contributions == 0), 0., 0.5)
-            mask = np.where((np.logical_or(
-                self.number_single_frame_contributions > single_stack_size_int,
-                self.sum_single_frame_weights > single_stack_size_float)), 1., mask_intermediate)
-            # Apply a Gaussian blur to the mask to make transitions smoother.
-            blur_width = self.configuration.stack_frames_gauss_width
-            mask = cv2.GaussianBlur(mask, (blur_width, blur_width), 0)
-            mask = np.where((self.number_single_frame_contributions == 0), 0., mask)
 
             # blend the AP buffer with the background.
             if self.frames.color:
-                self.stacked_image_buffer = (self.stacked_image_buffer-averaged_background) * \
-                                            mask[:, :, np.newaxis] + averaged_background
+                self.stacked_image_buffer = (self.stacked_image_buffer-self.averaged_background) * \
+                                            self.mask[:, :, np.newaxis] + self.averaged_background
             else:
-                self.stacked_image_buffer = (self.stacked_image_buffer-averaged_background) * mask\
-                                            + averaged_background
+                self.stacked_image_buffer = (self.stacked_image_buffer-self.averaged_background) * \
+                                            self.mask + self.averaged_background
 
             self.my_timer.stop('Stacking: blending APs with background')
 

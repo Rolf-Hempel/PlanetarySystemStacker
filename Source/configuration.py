@@ -40,7 +40,7 @@ class Configuration(object):
 
         self.alignment_points_half_patch_width = 30
         self.alignment_points_search_width = 10
-        self.alignment_points_structure_threshold = 0.20
+        self.alignment_points_structure_threshold = 0.05
         self.alignment_points_brightness_threshold = 10
         self.alignment_points_contrast_threshold = 0
         self.alignment_points_dim_fraction_threshold = 0.6
@@ -53,6 +53,8 @@ class Configuration(object):
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
 
+        self.stack_frames_background_fraction = 0.3
+        self.stack_frames_background_patch_size = 100
         self.stack_frames_gauss_width = 5
 
         # Derived configuration parameters:
