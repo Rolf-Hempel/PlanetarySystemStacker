@@ -48,7 +48,9 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         self.photo_editor = photo_editor
         self.left_button_pressed = False
         self.right_button_pressed = False
-        self.ap_to_be_replaced = None
+        self.moved_ap = None
+        self.new_ap = False
+        self.remember_ap = None
 
         # Set the maximum diestance between a right click and a right release up to which they
         # are identified with each other. If the distance is larger, the mouse events are
@@ -84,7 +86,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
                 # If the distance is very small, assume that the AP is to be moved.
                 if distance < self.max_match_distance:
-                    self.ap_to_be_replaced = neighbor_ap
+                    self.moved_ap = neighbor_ap
                     self.remember_ap = neighbor_ap.copy()
 
                 # Create a new AP.
@@ -96,10 +98,9 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                                                self.photo_editor.aps.shape_x - x)
                     # Create a preliminary AP with the computed size. It only becomes a real AP when
                     # the mouse is released.
-                    new_ap = self.photo_editor.aps.new_alignment_point(y, x,
+                    self.remember_ap = self.photo_editor.aps.new_alignment_point(y, x,
                                         self.photo_editor.aps.half_box_width, half_patch_width_new)
-                    # Add the alignment point to the list.
-                    self.photo_editor.add_alignment_point(new_ap)
+                    self.new_ap = True
 
             # The right button is pressed.
             elif event.button() == QtCore.Qt.RightButton:
@@ -129,11 +130,16 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 self.left_button_pressed = False
 
                 # An existing AP was moved, replace it with the moved one.
-                if self.ap_to_be_replaced:
+                if self.moved_ap:
                     self.removeItem(self.remember_ap['graphics_item'])
-                    self.photo_editor.replace_alignment_point(self.ap_to_be_replaced,
+                    self.photo_editor.replace_alignment_point(self.moved_ap,
                                                               self.remember_ap)
-                    self.ap_to_be_replaced = None
+                    self.moved_ap = None
+                # A new AP was created, and possibly moved. Add it to the list.
+                elif self.new_ap:
+                    self.removeItem(self.remember_ap['graphics_item'])
+                    self.photo_editor.add_alignment_point(self.remember_ap)
+                    self.new_ap = False
 
             # The right button is released.
             elif event.button() == QtCore.Qt.RightButton:
@@ -472,28 +478,44 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         return ap_graphics_item
 
     def add_alignment_point(self, ap):
+        """
+        Add an AP using the undo framework.
+
+        :param ap: AP object in the AP list
+        :return: -
+        """
+
         command = CommandAdd(self, self.aps, ap)
         self.undoStack.push(command)
 
     def remove_alignment_points(self, ap_list):
+        """
+        Remove an AP using the undo framework.
+
+        :param ap: AP object in the AP list
+        :return: -
+        """
+
         command = CommandRemove(self, self.aps, ap_list)
         self.undoStack.push(command)
 
     def replace_alignment_point(self, ap_old, ap_new):
-        # # Update an area slightly larger than the AP patch.
-        # x_low = ap_new["patch_x_low"] - 5
-        # y_low = ap_new["patch_y_low"] - 5
-        # width = ap_new["patch_x_high"] - ap_new["patch_x_low"] + 10
-        # height = ap_new["patch_y_high"] - ap_new["patch_y_low"] + 10
-        # self._scene.update(x_low, y_low, width, height)
-        # self.aps.replace_alignment_point(ap_old, ap_new)
-        # print("Replacing alignemnt point, length is now: " + str(len(self.aps.alignment_points)))
+        """
+        Replace an AP with another one using the undo framework.
+
+        :param ap_old: AP object in the AP list to be replaced
+        :param ap_new: new AP object to be added to the AP list
+        :return: -
+        """
+
         command = CommandReplace(self, self.aps, ap_old, ap_new)
         self.undoStack.push(command)
 
 
 class CommandAdd(QtWidgets.QUndoCommand):
-
+    """
+    Undoable command to add an AP to the AP list.
+    """
     def __init__(self, photo_editor, aps_object, ap):
         super(CommandAdd, self).__init__()
         self.photo_editor = photo_editor
@@ -510,7 +532,9 @@ class CommandAdd(QtWidgets.QUndoCommand):
 
 
 class CommandRemove(QtWidgets.QUndoCommand):
-
+    """
+    Undoable command to remove an AP from the AP list.
+    """
     def __init__(self, photo_editor, aps_object, ap_list):
         super(CommandRemove, self).__init__()
         self.photo_editor = photo_editor
@@ -529,7 +553,9 @@ class CommandRemove(QtWidgets.QUndoCommand):
 
 
 class CommandReplace(QtWidgets.QUndoCommand):
-
+    """
+    Undoable command to replace an AP on the AP list with another one.
+    """
     def __init__(self, photo_editor, aps_object, ap_old, ap_new):
         super(CommandReplace, self).__init__()
         self.photo_editor = photo_editor
@@ -684,11 +710,15 @@ class AlignmentPoints(object):
 
 
 class Window(QtWidgets.QWidget):
-    def __init__(self, file_name, alignment_points_half_patch_width, alignment_points_search_width):
+    def __init__(self, file_name, alignment_points_half_box_width,
+                 alignment_points_half_patch_width, alignment_points_search_width,
+                 alignment_points_step_size):
         super(Window, self).__init__()
         self.file_name = file_name
+        self.alignment_points_half_box_width = alignment_points_half_box_width
         self.alignment_points_half_patch_width = alignment_points_half_patch_width
         self.alignment_points_search_width = alignment_points_search_width
+        self.alignment_points_step_size = alignment_points_step_size
         # 'Load image' button
         self.btnLoad = QtWidgets.QToolButton(self)
         self.btnLoad.setText('Load image')
@@ -729,12 +759,8 @@ class Window(QtWidgets.QWidget):
         self.viewer.fitInView()
 
     def createApGrid(self):
-        alignment_points_step_size = int(round((self.alignment_points_half_patch_width * 5) / 3))
-        alignment_points_half_box_width = min(
-            int(round((self.alignment_points_half_patch_width * 2) / 3)),
-            self.alignment_points_half_patch_width - self.alignment_points_search_width)
-        self.aps = AlignmentPoints(self.shape_y, self.shape_x, alignment_points_step_size,
-                                   alignment_points_half_box_width,
+        self.aps = AlignmentPoints(self.shape_y, self.shape_x, self.alignment_points_step_size,
+                                   self.alignment_points_half_box_width,
                                    self.alignment_points_half_patch_width)
         self.aps.create_ap_grid()
         self.viewer.set_alignment_points(self.aps)
@@ -745,11 +771,18 @@ if __name__ == '__main__':
 
     file_name = 'Images/2018-03-24_20-00MEZ_Mond_LRGB.jpg'
     # file_name = 'Images/Moon_Tile-024_043939_stacked_interpolate_pp.tif'
-    alignment_point_half_patch_width = 110
+    alignment_points_half_patch_width = 110
     alignment_points_search_width = 5
+
+    # Compute derived constants.
+    alignment_points_half_box_width = min(int(
+        round((alignment_points_half_patch_width * 2) / 3)),
+        alignment_points_half_patch_width - alignment_points_search_width)
+    alignment_points_step_size = int(
+        round((alignment_points_half_patch_width * 5) / 3))
+
     app = QtWidgets.QApplication(sys.argv)
-    window = Window(file_name, alignment_point_half_patch_width, alignment_points_search_width)
-    # window.viewer.setAP(3000, 1500, 400)
-    window.setGeometry(500, 300, 800, 600)
+    window = Window(file_name, alignment_points_half_box_width, alignment_points_half_patch_width,
+                    alignment_points_search_width, alignment_points_step_size)
     window.showMaximized()
     sys.exit(app.exec_())
