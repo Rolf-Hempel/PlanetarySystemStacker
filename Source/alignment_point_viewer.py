@@ -56,8 +56,8 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         # Set the maximum distance up to which a mouse position is identified with an existing
         # alignment point location.
         self.max_match_distance = 5
-        # Initialize a state variable telling if an AP is being moved.
-        self.move_ap = None
+        # Set the factor by which the AP size is changed with a single mouse wheel stop.
+        self.ap_size_change_factor = 1.05
 
     def mousePressEvent(self, event):
         """
@@ -67,17 +67,16 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         :return: -
         """
 
-        pos = event.lastScenePos()
-        x = pos.x()
-        y = pos.y()
+        # The following actions are not performed in drag-and-zoom mode. The switch between both
+        # modes is handled in the higher-level object "photo_viewer".
+        if not self.photo_viewer.drag_mode:
+            pos = event.lastScenePos()
+            x = pos.x()
+            y = pos.y()
 
-        # The left button is pressed.
-        if event.button() == QtCore.Qt.LeftButton:
-            self.left_button_pressed = True
-
-            # The following actions are not performed in drag-and-zoom mode. The switch between both
-            # modes is handled in the higher-level object "photo_viewer".
-            if not self.photo_viewer.drag_mode:
+            # The left button is pressed.
+            if event.button() == QtCore.Qt.LeftButton:
+                self.left_button_pressed = True
 
                 # Find the closest AP.
                 neighbor_ap, distance = self.photo_viewer.aps.find_neighbor(y, x)
@@ -85,7 +84,6 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 # If the distance is very small, assume that the AP is to be moved.
                 if distance < self.max_match_distance:
                     self.remember_ap = neighbor_ap
-                    self.move_ap = True
 
                 # Create a new AP.
                 else:
@@ -103,16 +101,13 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                     self.photo_viewer.draw_alignment_point(self.remember_ap)
                     self.left_y_start = y
                     self.left_x_start = x
-                    self.move_ap = False
 
-        # The right button is pressed.
-        elif event.button() == QtCore.Qt.RightButton:
-            self.right_button_pressed = True
+            # The right button is pressed.
+            elif event.button() == QtCore.Qt.RightButton:
+                self.right_button_pressed = True
 
-            # If not in drag-and-zoom mode, remember the location and initialize an object which
-            # during mouse moving stores the rectangular patch opening between start and end
-            # positions.
-            if not self.photo_viewer.drag_mode:
+                # Remember the location and initialize an object which during mouse moving stores
+                # the rectangular patch opening between start and end positions.
                 self.right_y_start = pos.y()
                 self.right_x_start = pos.x()
                 self.remember_sr = None
@@ -125,23 +120,21 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         :return: -
         """
 
-        pos = event.lastScenePos()
+        if not self.photo_viewer.drag_mode:
+            pos = event.lastScenePos()
+            x = pos.x()
+            y = pos.y()
 
-        # The left button is released.
-        if event.button() == QtCore.Qt.LeftButton:
-            self.left_button_pressed = False
-            if not self.photo_viewer.drag_mode:
+            # The left button is released.
+            if event.button() == QtCore.Qt.LeftButton:
+                self.left_button_pressed = False
 
-                # If a new AP is being created, append the preliminary AP to the list of APs.
-                if not self.move_ap:
-                    self.photo_viewer.aps.alignment_points.append(self.remember_ap)
+                # Append the preliminary AP to the list of APs.
+                self.photo_viewer.aps.alignment_points.append(self.remember_ap)
 
-        # The right button is released.
-        elif event.button() == QtCore.Qt.RightButton:
-            self.right_button_pressed = False
-            if not self.photo_viewer.drag_mode:
-                x = pos.x()
-                y = pos.y()
+            # The right button is released.
+            elif event.button() == QtCore.Qt.RightButton:
+                self.right_button_pressed = False
 
                 # If the mouse was not moved much between press and release, a single AP is deleted.
                 if max(abs(y - self.right_y_start),
@@ -155,8 +148,6 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 # The mouse was moved between press and release. Remove all APs in the opening
                 # rectangular patch, both from the scene and the AP list.
                 else:
-
-                    remove_ap_list = []
                     y_low = min(self.right_y_start, self.right_y_end)
                     y_high = max(self.right_y_start, self.right_y_end)
                     x_low = min(self.right_x_start, self.right_x_end)
@@ -176,34 +167,21 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         :return: -
         """
 
-        # The mouse is moved with the left button pressed.
-        if self.left_button_pressed:
+        if not self.photo_viewer.drag_mode:
             pos = event.lastScenePos()
-            if not self.photo_viewer.drag_mode:
-                x_new = pos.x()
-                y_new = pos.y()
+            self.x = pos.x()
+            self.y = pos.y()
+
+            # The mouse is moved with the left button pressed.
+            if self.left_button_pressed:
 
                 # The scene widget corresponding to the preliminary AP was stored with the AP.
                 # Remove it from the scene before the moved AP is drawn.
                 self.removeItem(self.remember_ap['graphics_item'])
 
                 # Move the preliminary AP to the new coordinates.
-                if self.move_ap:
-                    new_ap = self.photo_viewer.aps.move_alignment_point(self.remember_ap, y_new,
-                                                                        x_new)
-                # The preliminary AP stays at the same position, but its size is being increased.
-                # Compute the new size and create a new preliminary AP.
-                else:
-                    half_patch_width_new = max(abs(y_new - self.left_y_start),
-                                               abs(x_new - self.left_x_start))
-                    half_patch_width_new = min(half_patch_width_new, self.left_y_start,
-                                               self.photo_viewer.aps.shape_y - self.left_y_start,
-                                               self.left_x_start,
-                                               self.photo_viewer.aps.shape_x - self.left_x_start)
-                    new_ap = self.photo_viewer.aps.new_alignment_point(self.left_y_start,
-                                self.left_x_start, self.photo_viewer.aps.half_box_width,
-                                half_patch_width_new)
-
+                new_ap = self.photo_viewer.aps.move_alignment_point(self.remember_ap, self.y,
+                                                                    self.x)
                 # Draw the new preliminary AP.
                 self.photo_viewer.draw_alignment_point(new_ap)
                 # Update an area slightly larger than the AP patch.
@@ -212,22 +190,16 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 width = new_ap["patch_x_high"] - new_ap["patch_x_low"] + 10
                 height = new_ap["patch_y_high"] - new_ap["patch_y_low"] + 10
                 self.update(x_low, y_low, width, height)
-
                 self.remember_ap = new_ap
 
-        # The mouse is moved with the right button pressed.
-        elif self.right_button_pressed:
-            pos = event.lastScenePos()
-
-            if not self.photo_viewer.drag_mode:
-                x = pos.x()
-                y = pos.y()
-                self.right_y_end = y
-                self.right_x_end = x
+            # The mouse is moved with the right button pressed.
+            elif self.right_button_pressed:
+                self.right_y_end = self.y
+                self.right_x_end = self.x
 
                 # Compute the new rectangle for selecting APs to be removed.
                 new_sr = SelectionRectangleGraphicsItem(
-                    self.right_y_start, self.right_x_start, y, x)
+                    self.right_y_start, self.right_x_start, self.y, self.x)
 
                 # If the rectangle was drawn for a previous location, replace it with the new one.
                 if self.remember_sr is not None:
@@ -235,6 +207,31 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 self.addItem(new_sr)
                 self.remember_sr = new_sr
 
+    def wheelEvent(self, event):
+        """
+        Handle scroll events. Change the size of the nearest AP.
+
+        :param event: wheel event object
+        :return: -
+        """
+
+        # Depending of wheel direction, set the factor to greater or smaller than 1.
+        if event.angleDelta().y() > 0:
+            factor = self.ap_size_change_factor
+        else:
+            factor = 1./self.ap_size_change_factor
+
+        # Find the closest AP and remove it from the scene and the AP list.
+        ap, dist = self.photo_viewer.aps.find_neighbor(self.y, self.x)
+        self.removeItem(ap['graphics_item'])
+        self.photo_viewer.aps.resize_alignment_point(ap, factor)
+        self.photo_viewer.draw_alignment_point(ap)
+        # Update an area slightly larger than the AP patch.
+        x_low = ap["patch_x_low"] - 5
+        y_low = ap["patch_y_low"] - 5
+        width = ap["patch_x_high"] - ap["patch_x_low"] + 10
+        height = ap["patch_y_high"] - ap["patch_y_low"] + 10
+        self.update(x_low, y_low, width, height)
 
 class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
     """
@@ -421,23 +418,28 @@ class AlignmentPointViewer(QtWidgets.QGraphicsView):
         :return: -
         """
 
-        if self.hasPhoto():
-            # Depending of wheel direction, set the zoom factor to greater or smaller than 1.
-            if event.angleDelta().y() > 0:
-                factor = 1.25
-                self._zoom += 1
-            else:
-                factor = 0.8
-                self._zoom -= 1
+        if self.drag_mode:
+            if self.hasPhoto():
+                # Depending of wheel direction, set the zoom factor to greater or smaller than 1.
+                if event.angleDelta().y() > 0:
+                    factor = 1.25
+                    self._zoom += 1
+                else:
+                    factor = 0.8
+                    self._zoom -= 1
 
-            # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene to the
-            # window size.
-            if self._zoom > 0:
-                self.scale(factor, factor)
-            elif self._zoom == 0:
-                self.fitInView()
-            else:
-                self._zoom = 0
+                # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene to the
+                # window size.
+                if self._zoom > 0:
+                    self.scale(factor, factor)
+                elif self._zoom == 0:
+                    self.fitInView()
+                else:
+                    self._zoom = 0
+
+        # If not in drag mode, the wheel event is handled at the scene level.
+        else:
+            self._scene.wheelEvent(event)
 
     def keyPressEvent(self, event):
         """
@@ -511,6 +513,32 @@ class AlignmentPoints(object):
         ap['patch_y_high'] += shift_y
         ap['patch_x_low'] += shift_x
         ap['patch_x_high'] += shift_x
+        ap['graphics_item'] = None
+        return ap
+
+    def resize_alignment_point(self, ap, factor):
+        y = ap["y"]
+        x = ap["x"]
+        patch_y_low = int((ap['patch_y_low'] - y) * factor) + y
+        if patch_y_low < 0:
+            return ap
+        patch_y_high = int((ap['patch_y_high'] - y) * factor) + y
+        if patch_y_high > self.shape_y:
+            return ap
+        patch_x_low = int((ap['patch_x_low'] - x) * factor) + x
+        if patch_x_low < 0:
+            return ap
+        patch_x_high = int((ap['patch_x_high'] - x) * factor) + x
+        if patch_x_high > self.shape_x:
+            return ap
+        ap['patch_y_low'] = patch_y_low
+        ap['patch_y_high'] = patch_y_high
+        ap['patch_x_low'] = patch_x_low
+        ap['patch_x_high'] = patch_x_high
+        ap['box_y_low'] = int((ap['box_y_low'] - y) * factor) + y
+        ap['box_y_high'] = int((ap['box_y_high'] - y) * factor) + y
+        ap['box_x_low'] = int((ap['box_x_low'] - x) * factor) + x
+        ap['box_x_high'] = int((ap['box_x_high'] - x) * factor) + x
         ap['graphics_item'] = None
         return ap
 
