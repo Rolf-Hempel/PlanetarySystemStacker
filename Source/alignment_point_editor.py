@@ -242,6 +242,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
     def change_ap_size(self, direction):
         """
         Change the size of the nearest AP.
+
         :param direction: If > 0, increase the size by a fixed factor. If < 0, decrease its size.
         :return: -
         """
@@ -258,7 +259,6 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         # Copy the AP, and apply the changes to the copy only.
         ap_new = ap.copy()
         self.photo_editor.aps.resize_alignment_point(ap_new, factor)
-        # self.photo_editor.draw_alignment_point(ap_new)
 
         # Replace the old AP with the resized version of it.
         self.photo_editor.replace_alignment_point(ap, ap_new)
