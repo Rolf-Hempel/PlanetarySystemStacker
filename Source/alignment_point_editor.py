@@ -222,7 +222,32 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         """
 
         # Depending of wheel direction, set the factor to greater or smaller than 1.
-        if event.angleDelta().y() > 0:
+        self.change_ap_size(event.angleDelta().y())
+
+    def keyPressEvent(self, event):
+        """
+        Handle key events as an alternative to wheel events. Change the size of the nearest AP.
+
+        :param event: key event
+        :return: -
+        """
+
+        # This is a workaround: Instead of "93" it should read "QtCore.Qt.Key_Plus", but that
+        # returns 43 instead.
+        if event.key() == 93 and event.modifiers() & QtCore.Qt.ControlModifier:
+            self.change_ap_size(1)
+        elif event.key() == QtCore.Qt.Key_Minus and event.modifiers() & QtCore.Qt.ControlModifier:
+            self.change_ap_size(-1)
+
+    def change_ap_size(self, direction):
+        """
+        Change the size of the nearest AP.
+        :param direction: If > 0, increase the size by a fixed factor. If < 0, decrease its size.
+        :return: -
+        """
+
+        # Depending of direction value, set the factor to greater or smaller than 1.
+        if direction > 0:
             factor = self.ap_size_change_factor
         else:
             factor = 1. / self.ap_size_change_factor
@@ -405,28 +430,39 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         """
 
         if self.drag_mode:
-            if self.hasPhoto():
-                # Depending of wheel direction, set the zoom factor to greater or smaller than 1.
-                if event.angleDelta().y() > 0:
-                    factor = 1.25
-                    self._zoom += 1
-                else:
-                    factor = 0.8
-                    self._zoom -= 1
-
-                # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene
-                # to the
-                # window size.
-                if self._zoom > 0:
-                    self.scale(factor, factor)
-                elif self._zoom == 0:
-                    self.fitInView()
-                else:
-                    self._zoom = 0
+            # Depending of wheel direction, set the direction value to greater or smaller than 1.
+            self.zoom(event.angleDelta().y())
 
         # If not in drag mode, the wheel event is handled at the scene level.
         else:
             self._scene.wheelEvent(event)
+
+    def zoom(self, direction):
+        """
+        Zoom in or out. This is only active when a photo is loaded
+
+        :param direction: If > 0, zoom in, otherwise zoom out.
+        :return: -
+        """
+
+        if self.hasPhoto():
+
+            # Depending of direction value, set the zoom factor to greater or smaller than 1.
+            if direction > 0:
+                factor = 1.25
+                self._zoom += 1
+            else:
+                factor = 0.8
+                self._zoom -= 1
+
+            # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene
+            # to the window size.
+            if self._zoom > 0:
+                self.scale(factor, factor)
+            elif self._zoom == 0:
+                self.fitInView()
+            else:
+                self._zoom = 0
 
     def keyPressEvent(self, event):
         """
@@ -441,6 +477,10 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         if event.key() == QtCore.Qt.Key_Control:
             self.setDragMode(QtWidgets.QGraphicsView.NoDrag)
             self.drag_mode = False
+        elif event.key() == QtCore.Qt.Key_Plus and not event.modifiers() & QtCore.Qt.ControlModifier:
+            self.zoom(1)
+        elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
+            self.zoom(-1)
         elif event.key() == QtCore.Qt.Key_Z and event.modifiers() & QtCore.Qt.ControlModifier:
             self.undoStack.undo()
         elif event.key() == QtCore.Qt.Key_Y and event.modifiers() & QtCore.Qt.ControlModifier:
