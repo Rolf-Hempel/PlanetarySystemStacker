@@ -441,6 +441,10 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         if event.key() == QtCore.Qt.Key_Control:
             self.setDragMode(QtWidgets.QGraphicsView.NoDrag)
             self.drag_mode = False
+        elif event.key() == QtCore.Qt.Key_Z and event.modifiers() & QtCore.Qt.ControlModifier:
+            self.undoStack.undo()
+        elif event.key() == QtCore.Qt.Key_Y and event.modifiers() & QtCore.Qt.ControlModifier:
+            self.undoStack.redo()
         else:
             super(AlignmentPointEditor, self).keyPressEvent(event)
 
@@ -784,5 +788,6 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication(sys.argv)
     window = Window(file_name, alignment_points_half_box_width, alignment_points_half_patch_width,
                     alignment_points_search_width, alignment_points_step_size)
+    window.setMinimumSize(800,600)
     window.showMaximized()
     sys.exit(app.exec_())
