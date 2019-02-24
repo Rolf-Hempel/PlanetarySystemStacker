@@ -192,7 +192,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
                                                          cut_hole_in_ap_grid[3])
         for ap in ap_list:
             print ("Removing alignment point at y: " + str(ap["y"]) + ", x:" + str(ap["x"]))
-            alignment_points.remove_alignment_point(ap)
+        alignment_points.remove_alignment_points(ap_list)
 
     # Produce an overview image showing all alignment points.
     if roi:

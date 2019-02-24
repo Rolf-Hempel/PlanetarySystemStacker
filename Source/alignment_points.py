@@ -25,7 +25,7 @@ from math import ceil
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin, float32, uint8, zeros
+from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt
 from scipy import ndimage
 from skimage.feature import register_translation
 
@@ -304,6 +304,155 @@ class AlignmentPoints(object):
         elif extend_x_high:
             alignment_point['patch_x_high'] = num_pixels_x
 
+        # Initialize the reference to the corresponding widget in the AP viewer scene.
+        alignment_point['graphics_item'] = None
+
+        # Allocate buffers and fill alignment point box with mean frame.
+        AlignmentPoints.allocate_ap_buffers(alignment_point, mean_frame, color)
+
+        return alignment_point
+
+    def add_alignment_point(self, ap):
+        """
+        Add an alignment point to the list.
+
+        :param ap: AP to be added
+        :return: -
+        """
+
+        self.alignment_points.append(ap)
+
+    def remove_alignment_points(self, ap_list):
+        """
+        Remove a list of alignment points from the current list.
+
+        :param ap_list: List of point objects to be removed
+        :return: -
+        """
+
+        for ap in ap_list:
+            try:
+                self.alignment_points.remove(ap)
+            except ValueError:
+                pass
+
+    def replace_alignment_point(self, ap_old, ap_new):
+        """
+        Replace an alignment point with a new one.
+
+        :param ap_old: Existing alignment point to be replaced
+        :param ap_new: New alignment point to replace the old one
+        :return: True, if successful; False otherwise
+        """
+
+        try:
+            self.alignment_points[self.alignment_points.index(ap_old)] = ap_new
+            return True
+        except ValueError:
+            return False
+
+    @staticmethod
+    def move_alignment_point(ap, mean_frame, y_new, x_new):
+        """
+        Move an existing AP to a different position.
+
+        :param ap: Esisting alignment point to be moved
+        :param mean_frame: Average frame (only used for pixel bound calculations)
+        :param y_new: New y coordinate of AP center
+        :param x_new: New x coordinate of AP center
+        :return: The updated AP
+        """
+
+        num_pixels_y = mean_frame.shape[0]
+        num_pixels_x = mean_frame.shape[1]
+        shift_y = y_new - ap["y"]
+        shift_y = max(shift_y, -ap['patch_y_low'])
+        shift_y = min(shift_y, num_pixels_y - ap['patch_y_high'])
+        shift_x = x_new - ap["x"]
+        shift_x = max(shift_x, -ap['patch_x_low'])
+        shift_x = min(shift_x, num_pixels_x - ap['patch_x_high'])
+
+        # Shift all coordinates by the computed shift vector.
+        ap["y"] += shift_y
+        ap["x"] += shift_x
+        ap['box_y_low'] += shift_y
+        ap['box_y_high'] += shift_y
+        ap['box_x_low'] += shift_x
+        ap['box_x_high'] += shift_x
+        ap['patch_y_low'] += shift_y
+        ap['patch_y_high'] += shift_y
+        ap['patch_x_low'] += shift_x
+        ap['patch_x_high'] += shift_x
+
+        # Invalidate buffers. To save computing time, they are not re-computed at every mouse
+        # movement.
+        ap['graphics_item'] = None
+        ap['reference_box'] = None
+        ap['stacking_buffer'] = None
+
+        return ap
+
+    @staticmethod
+    def resize_alignment_point(ap, mean_frame, factor):
+        """
+        Change the size of an existing alignment point.
+
+        :param ap: Esisting alignment point to be resized
+        :param mean_frame: Average frame (only used for pixel bound calculations)
+        :param factor: Factor by which the size is to be changed
+        :return: The resized alignment point
+        """
+
+        num_pixels_y = mean_frame.shape[0]
+        num_pixels_x = mean_frame.shape[1]
+        y = ap["y"]
+        x = ap["x"]
+
+        # Compute resized patch bounds. If resizing hits the image boundary on at least one side,
+        # the operation is aborted and the original AP is returned.
+        patch_y_low = int((ap['patch_y_low'] - y) * factor) + y
+        if patch_y_low < 0:
+            return ap
+        patch_y_high = int((ap['patch_y_high'] - y) * factor) + y
+        if patch_y_high > num_pixels_y:
+            return ap
+        patch_x_low = int((ap['patch_x_low'] - x) * factor) + x
+        if patch_x_low < 0:
+            return ap
+        patch_x_high = int((ap['patch_x_high'] - x) * factor) + x
+        if patch_x_high > num_pixels_x:
+            return ap
+
+        # Perform the changes.
+        ap['patch_y_low'] = patch_y_low
+        ap['patch_y_high'] = patch_y_high
+        ap['patch_x_low'] = patch_x_low
+        ap['patch_x_high'] = patch_x_high
+        ap['box_y_low'] = int((ap['box_y_low'] - y) * factor) + y
+        ap['box_y_high'] = int((ap['box_y_high'] - y) * factor) + y
+        ap['box_x_low'] = int((ap['box_x_low'] - x) * factor) + x
+        ap['box_x_high'] = int((ap['box_x_high'] - x) * factor) + x
+
+        # Invalidate buffers. To save computing time, they are not re-computed at every wheel
+        # event.
+        ap['graphics_item'] = None
+        ap['reference_box'] = None
+        ap['stacking_buffer'] = None
+
+        return ap
+
+    @staticmethod
+    def allocate_ap_buffers(alignment_point, mean_frame, color):
+        """
+        For APs which have been changed in the AP editor, buffers have been invalidated. They have
+        to be re-computed after AP editing is done.
+
+        :param alignment_point: Alignment_point object
+        :param mean_frame: Average frame
+        :param color: True, if stacking is to be done for color frames. False for monochrome case.
+        :return: -
+        """
+
         # Allocate space for the stacking buffer.
         if color:
             alignment_point['stacking_buffer'] = zeros(
@@ -320,29 +469,6 @@ class AlignmentPoints(object):
         box = mean_frame[alignment_point['box_y_low']:alignment_point['box_y_high'],
               alignment_point['box_x_low']:alignment_point['box_x_high']]
         alignment_point['reference_box'] = box
-
-        # Initialize the reference to the corresponding widget in the AP viewer scene.
-        alignment_point['graphics_item'] = None
-
-        return alignment_point
-
-    def remove_alignment_point(self, alignment_point):
-        """
-        Remove an alignment point from the current list.
-
-        :param alignment_point: Alignment point object to be removed
-        :return: True, if the AP was removed successfully. False, otherwise.
-        """
-
-        # The index calculation can fail if the AP is not in the list.
-        try:
-            ap_index = self.alignment_points.index(alignment_point)
-        except:
-            return False
-
-        self.alignment_points = self.alignment_points[0:ap_index] + \
-                                self.alignment_points[ap_index + 1:]
-        return True
 
     def find_alignment_points(self, y_low, y_high, x_low, x_high):
         """
@@ -371,7 +497,7 @@ class AlignmentPoints(object):
         :param ap_x: x cocrdinate of location of interest
         :param alignment_points: List of alignment points to be searched
 
-        :return: Alignment point object of closest AP
+        :return: Alignment point object of closest AP, and distance in pixels
         """
         min_distance_squared = 1.e30
         ap_neighbor = None
@@ -380,7 +506,7 @@ class AlignmentPoints(object):
             if distance_squared < min_distance_squared:
                 ap_neighbor = ap
                 min_distance_squared = distance_squared
-        return ap_neighbor
+        return ap_neighbor, sqrt(min_distance_squared)
 
     def compute_frame_qualities(self):
         """
@@ -725,7 +851,7 @@ if __name__ == "__main__":
           ", " + str(x_low) + " <= x <= " + str(x_high) + ":")
     for ap in found_ap_list:
         print("y: " + str(ap['y']) + ", x: " + str(ap['x']))
-        alignment_points.remove_alignment_point(ap)
+    alignment_points.remove_alignment_points(found_ap_list)
 
     y_new = 530
     x_new = 920

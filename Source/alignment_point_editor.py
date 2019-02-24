@@ -22,10 +22,18 @@ Part of this module (in class "AlignmentPointEditor" was copied from
 https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview
 
 """
+import glob
+import sys
+from time import time
 
-import cv2
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
+
+from align_frames import AlignFrames
+from alignment_points import AlignmentPoints
+from configuration import Configuration
+from frames import Frames
+from rank_frames import RankFrames
 
 
 class GraphicsScene(QtWidgets.QGraphicsScene):
@@ -74,15 +82,16 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         # modes is handled in the higher-level object "photo_viewer".
         if not self.photo_editor.drag_mode:
             pos = event.lastScenePos()
-            x = pos.x()
-            y = pos.y()
+            x = int(pos.x())
+            y = int(pos.y())
 
             # The left button is pressed.
             if event.button() == QtCore.Qt.LeftButton:
                 self.left_button_pressed = True
 
                 # Find the closest AP.
-                neighbor_ap, distance = self.photo_editor.aps.find_neighbor(y, x)
+                neighbor_ap, distance = self.photo_editor.aps.find_neighbor(y, x,
+                                        self.photo_editor.aps.alignment_points)
 
                 # If the distance is very small, assume that the AP is to be moved.
                 if distance < self.max_match_distance:
@@ -93,13 +102,17 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 else:
                     # Compute the size of the AP. Take the standard size and reduce it to fit it
                     # into the frame if necessary.
-                    half_patch_width_new = min(self.photo_editor.aps.half_patch_width, y,
-                                               self.photo_editor.aps.shape_y - y, x,
-                                               self.photo_editor.aps.shape_x - x)
+                    # half_patch_width_new = min(self.photo_editor.aps.half_patch_width, y,
+                    #                            self.photo_editor.aps.shape_y - y, x,
+                    #                            self.photo_editor.aps.shape_x - x)
                     # Create a preliminary AP with the computed size. It only becomes a real AP when
                     # the mouse is released.
-                    self.remember_ap = self.photo_editor.aps.new_alignment_point(y, x,
-                                        self.photo_editor.aps.half_box_width, half_patch_width_new)
+                    self.remember_ap = self.photo_editor.aps.new_alignment_point(
+                        self.photo_editor.image, self.photo_editor.aps.frames.color, y, x,
+                        self.photo_editor.aps.configuration.alignment_points_half_box_width,
+                        self.photo_editor.aps.configuration.alignment_points_half_patch_width,
+                        self.photo_editor.aps.configuration.alignment_points_search_width,
+                        False, False, False, False)
                     self.new_ap = True
 
             # The right button is pressed.
@@ -122,8 +135,8 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
         if not self.photo_editor.drag_mode:
             pos = event.lastScenePos()
-            x = pos.x()
-            y = pos.y()
+            x = int(pos.x())
+            y = int(pos.y())
 
             # The left button is released.
             if event.button() == QtCore.Qt.LeftButton:
@@ -150,7 +163,8 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                        abs(x - self.right_x_start)) < self.single_click_threshold:
 
                     # Find the closest AP and remove it from the scene and the AP list.
-                    ap, dist = self.photo_editor.aps.find_neighbor(y, x)
+                    ap, dist = self.photo_editor.aps.find_neighbor(y, x,
+                               self.photo_editor.aps.alignment_points)
                     self.photo_editor.remove_alignment_points([ap])
 
                 # The mouse was moved between press and release. Remove all APs in the opening
@@ -164,6 +178,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                                                                                  x_low, x_high)
                     self.removeItem(self.remember_sr)
                     self.photo_editor.remove_alignment_points(remove_ap_list)
+            self.update()
 
     def mouseMoveEvent(self, event):
         """
@@ -175,8 +190,8 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
         if not self.photo_editor.drag_mode:
             pos = event.lastScenePos()
-            self.x = pos.x()
-            self.y = pos.y()
+            self.x = int(pos.x())
+            self.y = int(pos.y())
 
             # The mouse is moved with the left button pressed.
             if self.left_button_pressed:
@@ -186,16 +201,10 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 self.removeItem(self.remember_ap['graphics_item'])
 
                 # Move the preliminary AP to the new coordinates.
-                new_ap = self.photo_editor.aps.move_alignment_point(self.remember_ap, self.y,
-                                                                    self.x)
+                new_ap = self.photo_editor.aps.move_alignment_point(self.remember_ap,
+                         self.photo_editor.image, self.y, self.x)
                 # Draw the new preliminary AP.
                 self.photo_editor.draw_alignment_point(new_ap)
-                # Update an area slightly larger than the AP patch.
-                x_low = new_ap["patch_x_low"] - 5
-                y_low = new_ap["patch_y_low"] - 5
-                width = new_ap["patch_x_high"] - new_ap["patch_x_low"] + 10
-                height = new_ap["patch_y_high"] - new_ap["patch_y_low"] + 10
-                self.update(x_low, y_low, width, height)
                 self.remember_ap = new_ap
 
             # The mouse is moved with the right button pressed.
@@ -212,6 +221,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                     self.removeItem(self.remember_sr)
                 self.addItem(new_sr)
                 self.remember_sr = new_sr
+            self.update()
 
     def wheelEvent(self, event):
         """
@@ -254,14 +264,16 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
             factor = 1. / self.ap_size_change_factor
 
         # Find the closest AP.
-        ap, dist = self.photo_editor.aps.find_neighbor(self.y, self.x)
+        ap, dist = self.photo_editor.aps.find_neighbor(self.y, self.x,
+                                                       self.photo_editor.aps.alignment_points)
 
         # Copy the AP, and apply the changes to the copy only.
         ap_new = ap.copy()
-        self.photo_editor.aps.resize_alignment_point(ap_new, factor)
+        self.photo_editor.aps.resize_alignment_point(ap_new, self.photo_editor.image, factor)
 
         # Replace the old AP with the resized version of it.
         self.photo_editor.replace_alignment_point(ap, ap_new)
+        self.update()
 
 
 class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
@@ -292,7 +304,7 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         self.width_y_external = self.width_y + self.pen_boundary.width()
 
         # Set the size of the central dot.
-        self.dot_width = max(2, int(self.width_x / 50))
+        self.dot_width = max(1, int(self.width_x / 50))
 
         # Store a reference of the widget at the corresponding AP.
         ap['graphics_item'] = self
@@ -360,6 +372,9 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         super(AlignmentPointEditor, self).__init__(parent)
         self._zoom = 0
         self._empty = True
+        self.image = None
+        self.shape_y = None
+        self.shape_x = None
         # Initialize the scene. This object handles mouse events if not in drag mode.
         self._scene = GraphicsScene(self, self)
         # Initialize the photo object. No image is loaded yet.
@@ -405,13 +420,22 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
                 self.scale(factor, factor)
             self._zoom = 0
 
-    def setPhoto(self, pixmap=None):
+    def setPhoto(self, image):
         """
-        Assign a pixmap to the photo object.
+        Convert a grayscale image to a pixmap and assign it to the photo object.
 
-        :param pixmap: pixmap object containing the photo.
+        :param image: grayscale image in format float32.
         :return: -
         """
+
+        self.image = image
+        # Convert the float32 monochrome image into uint8 format.
+        image_uint8 = self.image.astype(np.uint8)
+        self.shape_y = image_uint8.shape[0]
+        self.shape_x = image_uint8.shape[1]
+        qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y,
+                                QtGui.QImage.Format_Grayscale8)
+        pixmap = QtGui.QPixmap(qt_image)
 
         if pixmap and not pixmap.isNull():
             self._empty = False
@@ -620,149 +644,27 @@ class CommandReplace(QtWidgets.QUndoCommand):
         self.photo_editor._scene.update()
 
 
-class AlignmentPoints(object):
-    """
-    This is a mock-up for the real AlignmentPoints class with simplified behaviour. In the final
-    code it is to be replaced with the real class.
-    """
-
-    def __init__(self, shape_y, shape_x, step_size, half_box_width, half_patch_width):
-        self.alignment_points = []
-        self.shape_y = shape_y
-        self.shape_x = shape_x
-        self.step_size = step_size
-        self.half_box_width = half_box_width
-        self.half_patch_width = half_patch_width
-
-    def new_alignment_point(self, y, x, half_box_width, half_patch_width):
-        ap = {}
-        ap["y"] = y
-        ap["x"] = x
-        ap['box_y_low'] = y - half_box_width
-        ap['box_y_high'] = y + half_box_width
-        ap['box_x_low'] = x - half_box_width
-        ap['box_x_high'] = x + half_box_width
-        ap['patch_y_low'] = y - half_patch_width
-        ap['patch_y_high'] = y + half_patch_width
-        ap['patch_x_low'] = x - half_patch_width
-        ap['patch_x_high'] = x + half_patch_width
-        ap['graphics_item'] = None
-        return ap
-
-    def add_alignment_point(self, ap):
-        self.alignment_points.append(ap)
-
-    def remove_alignment_points(self, ap_list):
-        aps_new = []
-        for ap in self.alignment_points:
-            if not ap in ap_list:
-                aps_new.append(ap)
-        self.alignment_points = aps_new
-
-    def replace_alignment_point(self, ap, ap_new):
-        self.alignment_points[self.alignment_points.index(ap)] = ap_new
-
-    def move_alignment_point(self, ap, y_new, x_new):
-        shift_y = y_new - ap["y"]
-        shift_y = max(shift_y, -ap['patch_y_low'])
-        shift_y = min(shift_y, self.shape_y - ap['patch_y_high'])
-        shift_x = x_new - ap["x"]
-        shift_x = max(shift_x, -ap['patch_x_low'])
-        shift_x = min(shift_x, self.shape_x - ap['patch_x_high'])
-        ap["y"] += shift_y
-        ap["x"] += shift_x
-        ap['box_y_low'] += shift_y
-        ap['box_y_high'] += shift_y
-        ap['box_x_low'] += shift_x
-        ap['box_x_high'] += shift_x
-        ap['patch_y_low'] += shift_y
-        ap['patch_y_high'] += shift_y
-        ap['patch_x_low'] += shift_x
-        ap['patch_x_high'] += shift_x
-        ap['graphics_item'] = None
-        return ap
-
-    def resize_alignment_point(self, ap, factor):
-        y = ap["y"]
-        x = ap["x"]
-        patch_y_low = int((ap['patch_y_low'] - y) * factor) + y
-        if patch_y_low < 0:
-            return ap
-        patch_y_high = int((ap['patch_y_high'] - y) * factor) + y
-        if patch_y_high > self.shape_y:
-            return ap
-        patch_x_low = int((ap['patch_x_low'] - x) * factor) + x
-        if patch_x_low < 0:
-            return ap
-        patch_x_high = int((ap['patch_x_high'] - x) * factor) + x
-        if patch_x_high > self.shape_x:
-            return ap
-        ap['patch_y_low'] = patch_y_low
-        ap['patch_y_high'] = patch_y_high
-        ap['patch_x_low'] = patch_x_low
-        ap['patch_x_high'] = patch_x_high
-        ap['box_y_low'] = int((ap['box_y_low'] - y) * factor) + y
-        ap['box_y_high'] = int((ap['box_y_high'] - y) * factor) + y
-        ap['box_x_low'] = int((ap['box_x_low'] - x) * factor) + x
-        ap['box_x_high'] = int((ap['box_x_high'] - x) * factor) + x
-        ap['graphics_item'] = None
-        return ap
-
-    def create_ap_grid(self):
-        for y in np.arange(2 * self.half_patch_width, self.shape_y - 2 * self.half_patch_width,
-                           self.step_size):
-            for x in np.arange(2 * self.half_patch_width, self.shape_x - 2 * self.half_patch_width,
-                               self.step_size):
-                self.alignment_points.append(
-                    self.new_alignment_point(y, x, self.half_box_width, self.half_patch_width))
-
-    def find_neighbor(self, y, x):
-        """
-        For a given (y, x) position find the closest "real" alignment point.
-
-        :param y: y cocrdinate of location of interest
-        :param x: x cocrdinate of location of interest
-
-        :return: (Alignment point object of closest AP, distance to this AP)
-        """
-        min_distance_squared = 1.e30
-        ap_neighbor = None
-        for ap in self.alignment_points:
-            distance_squared = (ap['y'] - y) ** 2 + (ap['x'] - x) ** 2
-            if distance_squared < min_distance_squared:
-                ap_neighbor = ap
-                min_distance_squared = distance_squared
-        return ap_neighbor, np.sqrt(min_distance_squared)
-
-    def find_alignment_points(self, y_low, y_high, x_low, x_high):
-        """
-        Find all alignment points the centers of which are within given (y, x) bounds.
-
-        :param y_low: Lower y pixel coordinate bound
-        :param y_high: Upper y pixel coordinate bound
-        :param x_low: Lower x pixel coordinate bound
-        :param x_high: Upper x pixel coordinate bound
-        :return: List of all alignment points with centers within the given coordinate bounds.
-                 If no AP satisfies the condition, return an empty list.
-        """
-
-        ap_list = []
-        for ap in self.alignment_points:
-            if y_low <= ap['y'] <= y_high and x_low <= ap['x'] <= x_high:
-                ap_list.append(ap)
-        return ap_list
-
-
 class Window(QtWidgets.QWidget):
-    def __init__(self, file_name, alignment_points_half_box_width,
-                 alignment_points_half_patch_width, alignment_points_search_width,
-                 alignment_points_step_size):
+    """
+    This widget implements the AP viewer, to be used as part of the application GUI.
+    """
+    def __init__(self, image, configuration, alignment_points):
+        """
+        Initialization of the widget.
+
+        :param image: Background image on which the APs are superimposed. Usually, the mean frame is
+                      used for this purpose.
+        :param configuration: Configuration object with parameters
+        :param alignment_points: Alignment point object
+        """
         super(Window, self).__init__()
-        self.file_name = file_name
-        self.alignment_points_half_box_width = alignment_points_half_box_width
-        self.alignment_points_half_patch_width = alignment_points_half_patch_width
-        self.alignment_points_search_width = alignment_points_search_width
-        self.alignment_points_step_size = alignment_points_step_size
+        self.image = image
+        self.configuration = configuration
+        self.aps = alignment_points
+        # self.alignment_points_half_box_width = self.configuration.alignment_points_half_box_width
+        # self.alignment_points_half_patch_width = self.configuration.alignment_points_half_patch_width
+        # self.alignment_points_search_width = self.configuration.alignment_points_search_width
+        # self.alignment_points_step_size = self.configuration.alignment_points_step_size
         # 'Load image' button
         self.btnLoad = QtWidgets.QToolButton(self)
         self.btnLoad.setText('Load image')
@@ -777,7 +679,6 @@ class Window(QtWidgets.QWidget):
         self.btnRedo = QtWidgets.QToolButton(self)
         self.btnRedo.setText('Redo')
         self.btnRedo.clicked.connect(self.viewer.undoStack.redo)
-        self.aps = None
         self.shape_y = None
         self.shape_x = None
         # Arrange layout
@@ -792,42 +693,134 @@ class Window(QtWidgets.QWidget):
         VBlayout.addLayout(HBlayout)
 
     def loadImage(self):
-        # self.viewer.setPhoto(QtGui.QPixmap('2018-03-24_20-00MEZ_Mond_LRGB.jpg'))
-        image = cv2.imread(self.file_name)
-        self.shape_y = image.shape[0]
-        self.shape_x = image.shape[1]
-        qt_image = QtGui.QImage(image, image.shape[1], image.shape[0], image.shape[1] * 3,
-                                QtGui.QImage.Format_RGB888).rgbSwapped()
-        pixmap = QtGui.QPixmap(qt_image)
-        self.viewer.setPhoto(pixmap)
+        """
+        Load the average frame picture into the alignment point viewer.
+
+        :return: -
+        """
+
+        self.viewer.setPhoto(self.image)
         self.viewer.fitInView()
 
     def createApGrid(self):
-        self.aps = AlignmentPoints(self.shape_y, self.shape_x, self.alignment_points_step_size,
-                                   self.alignment_points_half_box_width,
-                                   self.alignment_points_half_patch_width)
-        self.aps.create_ap_grid()
+        """
+        Create an initial alignment point grid, and display it in the viewer.
+
+        :return: -
+        """
+
+        self.aps.create_ap_grid(self.image)
+        print("Number of alignment points selected: " + str(len(self.aps.alignment_points)) +
+            ", aps dropped because too dim: " + str(self.aps.alignment_points_dropped_dim) +
+            ", aps dropped because too little structure: " + str(
+                self.aps.alignment_points_dropped_structure))
         self.viewer.set_alignment_points(self.aps)
 
 
 if __name__ == '__main__':
-    import sys
+    # Images can either be extracted from a video file or a batch of single photographs. Select
+    # the example for the test run.
+    type = 'video'
+    if type == 'image':
+        names = glob.glob('Images/2012*.tif')
+        # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
+        # names = glob.glob('Images/Example-3*.jpg')
+    else:
+        names = 'Videos/short_video.avi'
+    print(names)
 
-    file_name = 'Images/2018-03-24_20-00MEZ_Mond_LRGB.jpg'
-    # file_name = 'Images/Moon_Tile-024_043939_stacked_interpolate_pp.tif'
-    alignment_points_half_patch_width = 110
-    alignment_points_search_width = 5
+    # Get configuration parameters.
+    configuration = Configuration()
+    try:
+        frames = Frames(configuration, names, type=type)
+        print("Number of images read: " + str(frames.number))
+        print("Image shape: " + str(frames.shape))
+    except Exception as e:
+        print("Error: " + e.message)
+        exit()
 
-    # Compute derived constants.
-    alignment_points_half_box_width = min(int(
-        round((alignment_points_half_patch_width * 2) / 3)),
-        alignment_points_half_patch_width - alignment_points_search_width)
-    alignment_points_step_size = int(
-        round((alignment_points_half_patch_width * 5) / 3))
+    # The whole quality analysis and shift determination process is performed on a monochrome
+    # version of the frames. If the original frames are in RGB, the monochrome channel can be
+    # selected via a configuration parameter. Add a list of monochrome images for all frames to
+    # the "Frames" object.
+    start = time()
+    frames.add_monochrome(configuration.frames_mono_channel)
+    end = time()
+    print('Elapsed time in creating blurred monochrome images: {}'.format(end - start))
+
+    # Rank the frames by their overall local contrast.
+    rank_frames = RankFrames(frames, configuration)
+    start = time()
+    rank_frames.frame_score()
+    end = time()
+    print('Elapsed time in ranking images: {}'.format(end - start))
+    print("Index of maximum: " + str(rank_frames.frame_ranks_max_index))
+    print("Frame scores: " + str(rank_frames.frame_ranks))
+    print("Frame scores (sorted): " + str(
+        [rank_frames.frame_ranks[i] for i in rank_frames.quality_sorted_indices]))
+    print("Sorted index list: " + str(rank_frames.quality_sorted_indices))
+
+    # Initialize the frame alignment object.
+    align_frames = AlignFrames(frames, rank_frames, configuration)
+
+    if configuration.align_frames_mode == "Surface":
+        start = time()
+        # Select the local rectangular patch in the image where the L gradient is highest in both x
+        # and y direction. The scale factor specifies how much smaller the patch is compared to the
+        # whole image frame.
+        (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
+            configuration.align_frames_rectangle_scale_factor)
+        end = time()
+        print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
+        print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
+            x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
+        reference_frame_with_alignment_points = align_frames.frames_mono[
+            align_frames.frame_ranks_max_index].copy()
+        reference_frame_with_alignment_points[y_low_opt,
+        x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
+                                x_low_opt:x_high_opt] = 255
+        reference_frame_with_alignment_points[y_low_opt:y_high_opt,
+        x_low_opt] = reference_frame_with_alignment_points[y_low_opt:y_high_opt,
+                     x_high_opt - 1] = 255
+        # plt.imshow(reference_frame_with_alignment_points, cmap='Greys_r')
+        # plt.show()
+
+    # Align all frames globally relative to the frame with the highest score.
+    start = time()
+    align_frames.align_frames()
+    end = time()
+    print('Elapsed time in aligning all frames: {}'.format(end - start))
+    print("Frame shifts: " + str(align_frames.frame_shifts))
+    print("Intersection: " + str(align_frames.intersection_shape))
+
+    start = time()
+    # Compute the reference frame by averaging the best frames.
+    average = align_frames.average_frame()
+
+    # Initialize the AlignmentPoints object. This includes the computation of the average frame
+    # against which the alignment point shifts are measured.
+
+    alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
+    end = time()
+    print('Elapsed time in computing average frame: {}'.format(end - start))
+    print("Average frame computed from the best " + str(
+        align_frames.average_frame_number) + " frames.")
+    # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
+    # plt.show()
 
     app = QtWidgets.QApplication(sys.argv)
-    window = Window(file_name, alignment_points_half_box_width, alignment_points_half_patch_width,
-                    alignment_points_search_width, alignment_points_step_size)
+    window = Window(average, configuration, alignment_points)
     window.setMinimumSize(800,600)
     window.showMaximized()
-    sys.exit(app.exec_())
+    app.exec_()
+
+    print ("After AP editing, number of APs: " + str(len(alignment_points.alignment_points)))
+    count_updates = 0
+    for ap in alignment_points.alignment_points:
+        if ap['reference_box'] is not None:
+            continue
+        count_updates += 1
+        AlignmentPoints.allocate_ap_buffers(ap, align_frames.mean_frame, frames.color)
+    print ("Buffers allocated for " + str(count_updates) + " alignment points.")
+    sys.exit()
+
