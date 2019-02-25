@@ -71,10 +71,6 @@ class AlignmentPoints(object):
         self.alignment_points_dropped_dim = 0
         self.alignment_points_dropped_structure = 0
 
-        # Initialize the AP identifier. Each AP gets a unique identifier, bo be used in delete
-        # operations.
-        self.alignment_point_id = 0
-
         # Initialize the number of frames to be stacked at each AP.
         self.stack_size = None
 
@@ -293,8 +289,6 @@ class AlignmentPoints(object):
         num_pixels_y = mean_frame.shape[0]
         num_pixels_x = mean_frame.shape[1]
         alignment_point = {}
-        alignment_point['id'] = self.alignment_point_id
-        self.alignment_point_id += 1
         alignment_point['y'] = y
         alignment_point['x'] = x
         alignment_point['box_y_low'] = max(search_width, y - half_box_width)
@@ -342,13 +336,11 @@ class AlignmentPoints(object):
         :return: -
         """
 
-        # Build a list with the identifiers of alignment points to be removed.
-        id_list = [alignment_point['id'] for alignment_point in ap_list]
-
-        # Construct a list of all APs the identifiers of which are not on the list.
+        # Initialize the reduced AP list.
         new_alignment_point_list = []
+
         for ap in self.alignment_points:
-            if ap['id'] not in id_list:
+            if ap not in ap_list:
                 new_alignment_point_list.append(ap)
 
         # Replace the original AP list with the reduced one.
@@ -360,21 +352,10 @@ class AlignmentPoints(object):
 
         :param ap_old: Existing alignment point to be replaced
         :param ap_new: New alignment point to replace the old one
-        :return: True, if successful; False otherwise
+        :return: -
         """
 
-        # Look up the identifier of the old alignment point.
-        id_old = ap_old['id']
-        success = False
-
-        # Look for an AP with the same identifier and replace it with the new AP.
-        for index, ap in enumerate(self.alignment_points):
-            if ap['id'] == id_old:
-                self.alignment_points[index] = ap_new
-                success = True
-                break
-
-        return success
+        self.alignment_points[self.alignment_points.index(ap_old)] = ap_new
 
     @staticmethod
     def move_alignment_point(ap, mean_frame, y_new, x_new):

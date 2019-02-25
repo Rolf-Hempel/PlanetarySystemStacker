@@ -40,7 +40,7 @@ from stack_frames import StackFrames
 from timer import timer
 
 def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=False,
-             automatic_ap_creation=True, cut_hole_in_ap_grid=None):
+             automatic_ap_creation=True):
     """
     Execute the whole stacking workflow for a test case. This can either use a video file (.avi)
     or still images stored in a single directory.
@@ -51,10 +51,6 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
                 of interest"
     :param convert_to_grayscale: If True, input frames are converted to grayscale mode before
                                  processing. In this case, the stacked image is grayscale as well.
-    :param cut_hole_in_ap_grid: Either e tuple of four ints, or None. The tuple defines a
-                                rectangular patch (y_low, y_high, x_low, x_high). All alignment
-                                points with their center coordinates in this patch are removed from
-                                the AP grid. If False, don't change the grid.
     :return: average, [average_roi,] color_image_with_aps, stacked_image
              with: - average: global mean frame
                    - average_roi: mean frame restricted to ROI (only if roi is specified)
@@ -187,19 +183,10 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
               ", aps dropped because too dim: " + str(alignment_points.alignment_points_dropped_dim) +
               ", aps dropped because too little structure: " + str(
               alignment_points.alignment_points_dropped_structure))
-
-        if cut_hole_in_ap_grid:
-            ap_list = alignment_points.find_alignment_points(cut_hole_in_ap_grid[0],
-                                                             cut_hole_in_ap_grid[1],
-                                                             cut_hole_in_ap_grid[2],
-                                                             cut_hole_in_ap_grid[3])
-            for ap in ap_list:
-                print ("Removing alignment point at y: " + str(ap["y"]) + ", x:" + str(ap["x"]))
-            alignment_points.remove_alignment_points(ap_list)
     else:
         # Open the alignment point editor.
         app = QtWidgets.QApplication(sys.argv)
-        window = Window(average, configuration, alignment_points)
+        window = Window(configuration, align_frames, alignment_points)
         window.setMinimumSize(800, 600)
         window.showMaximized()
         app.exec_()
@@ -272,8 +259,6 @@ if __name__ == "__main__":
     automatic_ap_creation = False
     roi = None
     # roi = (400, 700, 300, 800)
-    cut_hole_in_ap_grid = None
-    # cut_hole_in_ap_grid = (500, 750, 600, 800)
     ####################################### Specify test case end ##################################
 
     # Redirect standard output to a file if requested.
@@ -308,16 +293,14 @@ if __name__ == "__main__":
 
     # Start the processing workflow in batch mode for all AVIs / file directories.
     for input_name in input_names:
-        if roi and automatic_ap_creation:
+        if roi:
             average, average_roi, color_image_with_aps, stacked_image = workflow(input_name,
                 input_type=input_type, roi=roi, convert_to_grayscale=convert_to_grayscale,
-                automatic_ap_creation=automatic_ap_creation,
-                cut_hole_in_ap_grid=cut_hole_in_ap_grid)
+                automatic_ap_creation=automatic_ap_creation)
         else:
             average, color_image_with_aps, stacked_image = workflow(input_name,
                 input_type=input_type, convert_to_grayscale=convert_to_grayscale,
-                automatic_ap_creation=automatic_ap_creation,
-                cut_hole_in_ap_grid = cut_hole_in_ap_grid)
+                automatic_ap_creation=automatic_ap_creation)
 
         # Interrupt the workflow to display resulting images only if requested.
         if show_results:
@@ -325,7 +308,7 @@ if __name__ == "__main__":
             plt.imshow(average, cmap='Greys_r')
             plt.show()
 
-            if roi and automatic_ap_creation:
+            if roi:
                 # Show the ROI average frame.
                 plt.imshow(average_roi, cmap='Greys_r')
                 plt.show()

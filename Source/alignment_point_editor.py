@@ -651,17 +651,19 @@ class Window(QtWidgets.QWidget):
     """
     This widget implements the AP viewer, to be used as part of the application GUI.
     """
-    def __init__(self, image, configuration, alignment_points):
+    def __init__(self, configuration, align_frames, alignment_points):
         """
         Initialization of the widget.
 
         :param image: Background image on which the APs are superimposed. Usually, the mean frame is
                       used for this purpose.
         :param configuration: Configuration object with parameters
+        :param align_frames: AlignFrames object with global shift information for all frames
         :param alignment_points: Alignment point object
         """
+
         super(Window, self).__init__()
-        self.image = image
+        self.mean_frame = align_frames.mean_frame
         self.configuration = configuration
         self.aps = alignment_points
         self.btnLoad = QtWidgets.QToolButton(self)
@@ -682,7 +684,7 @@ class Window(QtWidgets.QWidget):
         self.btnDone.clicked.connect(self.done)
         self.shape_y = None
         self.shape_x = None
-        # Arrange layout
+        # Arrange layout.
         VBlayout = QtWidgets.QVBoxLayout(self)
         VBlayout.addWidget(self.viewer)
         HBlayout = QtWidgets.QHBoxLayout()
@@ -701,7 +703,7 @@ class Window(QtWidgets.QWidget):
         :return: -
         """
 
-        self.viewer.setPhoto(self.image)
+        self.viewer.setPhoto(self.mean_frame)
         self.viewer.fitInView()
 
     def createApGrid(self):
@@ -711,7 +713,7 @@ class Window(QtWidgets.QWidget):
         :return: -
         """
 
-        self.aps.create_ap_grid(self.image)
+        self.aps.create_ap_grid(self.mean_frame)
         print("Number of alignment points selected: " + str(len(self.aps.alignment_points)) +
             ", aps dropped because too dim: " + str(self.aps.alignment_points_dropped_dim) +
             ", aps dropped because too little structure: " + str(
@@ -815,10 +817,11 @@ if __name__ == '__main__':
     # plt.show()
 
     app = QtWidgets.QApplication(sys.argv)
-    window = Window(average, configuration, alignment_points)
+    window = Window(configuration, align_frames, alignment_points)
     window.setMinimumSize(800,600)
     window.showMaximized()
     app.exec_()
+    window.loadImage()
 
     print ("After AP editing, number of APs: " + str(len(alignment_points.alignment_points)))
     count_updates = 0
