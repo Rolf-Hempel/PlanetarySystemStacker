@@ -93,8 +93,9 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 neighbor_ap, distance = self.photo_editor.aps.find_neighbor(y, x,
                                         self.photo_editor.aps.alignment_points)
 
-                # If the distance is very small, assume that the AP is to be moved.
-                if distance < self.max_match_distance:
+                # If the AP list is not empty and the closest distance is very small, assume that
+                # the AP is to be moved.
+                if neighbor_ap and distance < self.max_match_distance:
                     self.moved_ap = neighbor_ap
                     self.remember_ap = neighbor_ap.copy()
 
@@ -368,7 +369,7 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
     The "cntrl" key is used to switch between the two modes.
     """
 
-    def __init__(self, parent):
+    def __init__(self, parent, alignment_points):
         super(AlignmentPointEditor, self).__init__(parent)
         self._zoom = 0
         self._empty = True
@@ -393,7 +394,7 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.drag_mode = True
         # Initialize the alignment point object.
-        self.aps = None
+        self.aps = alignment_points
         # Set the focus on the viewer, so the key event is caught.
         self.setFocus()
 
@@ -521,15 +522,17 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         else:
             super(AlignmentPointEditor, self).keyPressEvent(event)
 
-    def set_alignment_points(self, aps):
+    def initialize_ap_grid(self):
         """
-        Store a reference to the object holding the alignment points, and draw all APs.
+        Remove all APs from the scene, reset the undo stack, and draw all new APs.
 
-        :param aps: instance of class AlignmentPoints
         :return: -
         """
 
-        self.aps = aps
+        for item in self._scene.items():
+            if isinstance(item, AlignmentPointGraphicsItem):
+                self._scene.removeItem(item)
+
         for ap in self.aps.alignment_points:
             self.draw_alignment_point(ap)
 
@@ -661,24 +664,22 @@ class Window(QtWidgets.QWidget):
         self.image = image
         self.configuration = configuration
         self.aps = alignment_points
-        # self.alignment_points_half_box_width = self.configuration.alignment_points_half_box_width
-        # self.alignment_points_half_patch_width = self.configuration.alignment_points_half_patch_width
-        # self.alignment_points_search_width = self.configuration.alignment_points_search_width
-        # self.alignment_points_step_size = self.configuration.alignment_points_step_size
-        # 'Load image' button
         self.btnLoad = QtWidgets.QToolButton(self)
         self.btnLoad.setText('Load image')
         self.btnLoad.clicked.connect(self.loadImage)
         self.btnApGrid = QtWidgets.QToolButton(self)
         self.btnApGrid.setText('Create AP Grid')
         self.btnApGrid.clicked.connect(self.createApGrid)
-        self.viewer = AlignmentPointEditor(self)
+        self.viewer = AlignmentPointEditor(self, self.aps)
         self.btnUndo = QtWidgets.QToolButton(self)
         self.btnUndo.setText('Undo')
         self.btnUndo.clicked.connect(self.viewer.undoStack.undo)
         self.btnRedo = QtWidgets.QToolButton(self)
         self.btnRedo.setText('Redo')
         self.btnRedo.clicked.connect(self.viewer.undoStack.redo)
+        self.btnDone = QtWidgets.QToolButton(self)
+        self.btnDone.setText('Done')
+        self.btnDone.clicked.connect(self.done)
         self.shape_y = None
         self.shape_x = None
         # Arrange layout
@@ -690,6 +691,7 @@ class Window(QtWidgets.QWidget):
         HBlayout.addWidget(self.btnApGrid)
         HBlayout.addWidget(self.btnUndo)
         HBlayout.addWidget(self.btnRedo)
+        HBlayout.addWidget(self.btnDone)
         VBlayout.addLayout(HBlayout)
 
     def loadImage(self):
@@ -714,7 +716,11 @@ class Window(QtWidgets.QWidget):
             ", aps dropped because too dim: " + str(self.aps.alignment_points_dropped_dim) +
             ", aps dropped because too little structure: " + str(
                 self.aps.alignment_points_dropped_structure))
-        self.viewer.set_alignment_points(self.aps)
+        self.viewer.initialize_ap_grid()
+
+    def done(self):
+        # Close the Window.
+        self.close()
 
 
 if __name__ == '__main__':

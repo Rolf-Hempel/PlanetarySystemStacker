@@ -65,6 +65,17 @@ class AlignmentPoints(object):
         self.alignment_points_dropped_dim = None
         self.alignment_points_dropped_structure = None
 
+        # Initialize counters for APs which are dropped because
+        # they do not satisfy the brightness or structure condition.
+        self.alignment_points = []
+        self.alignment_points_dropped_dim = 0
+        self.alignment_points_dropped_structure = 0
+
+        # Initialize the AP identifier. Each AP gets a unique identifier, bo be used in delete
+        # operations.
+        self.alignment_point_id = 0
+
+        # Initialize the number of frames to be stacked at each AP.
         self.stack_size = None
 
         # Reset the list of alignment points registered with each frame.
@@ -149,7 +160,7 @@ class AlignmentPoints(object):
         ap_locations_x_odd = self.ap_locations(num_pixels_x, half_box_width, search_width,
                                                step_size, False)
 
-        # Initialize the list of alignment points and counters for APs which are dropped because
+        # Reset the alignment point list, and initialize counters for APs which are dropped because
         # they do not satisfy the brightness or structure condition.
         self.alignment_points = []
         self.alignment_points_dropped_dim = 0
@@ -255,9 +266,8 @@ class AlignmentPoints(object):
                     dropped_index += 1
             self.alignment_points = alignment_points_new
 
-    @staticmethod
-    def new_alignment_point(mean_frame, color, y, x, half_box_width, half_patch_width, search_width,
-                            extend_x_low, extend_x_high, extend_y_low, extend_y_high):
+    def new_alignment_point(self, mean_frame, color, y, x, half_box_width, half_patch_width,
+                            search_width, extend_x_low, extend_x_high, extend_y_low, extend_y_high):
         """
         Create a new alignment point. This method is called in creating the initial alignment point
         grid. Later it can be invoked by the user to add single alignment points.
@@ -283,6 +293,8 @@ class AlignmentPoints(object):
         num_pixels_y = mean_frame.shape[0]
         num_pixels_x = mean_frame.shape[1]
         alignment_point = {}
+        alignment_point['id'] = self.alignment_point_id
+        self.alignment_point_id += 1
         alignment_point['y'] = y
         alignment_point['x'] = x
         alignment_point['box_y_low'] = max(search_width, y - half_box_width)
@@ -330,11 +342,17 @@ class AlignmentPoints(object):
         :return: -
         """
 
-        for ap in ap_list:
-            try:
-                self.alignment_points.remove(ap)
-            except ValueError:
-                pass
+        # Build a list with the identifiers of alignment points to be removed.
+        id_list = [alignment_point['id'] for alignment_point in ap_list]
+
+        # Construct a list of all APs the identifiers of which are not on the list.
+        new_alignment_point_list = []
+        for ap in self.alignment_points:
+            if ap['id'] not in id_list:
+                new_alignment_point_list.append(ap)
+
+        # Replace the original AP list with the reduced one.
+        self.alignment_points = new_alignment_point_list
 
     def replace_alignment_point(self, ap_old, ap_new):
         """
@@ -345,11 +363,18 @@ class AlignmentPoints(object):
         :return: True, if successful; False otherwise
         """
 
-        try:
-            self.alignment_points[self.alignment_points.index(ap_old)] = ap_new
-            return True
-        except ValueError:
-            return False
+        # Look up the identifier of the old alignment point.
+        id_old = ap_old['id']
+        success = False
+
+        # Look for an AP with the same identifier and replace it with the new AP.
+        for index, ap in enumerate(self.alignment_points):
+            if ap['id'] == id_old:
+                self.alignment_points[index] = ap_new
+                success = True
+                break
+
+        return success
 
     @staticmethod
     def move_alignment_point(ap, mean_frame, y_new, x_new):
@@ -497,8 +522,15 @@ class AlignmentPoints(object):
         :param ap_x: x cocrdinate of location of interest
         :param alignment_points: List of alignment points to be searched
 
-        :return: Alignment point object of closest AP, and distance in pixels
+        :return: Alignment point object of closest AP, and distance in pixels. If the list of
+                 alignment points is empty, (None, None) is returned.
         """
+
+        # If no APs have been created yet, return None for both results.
+        if not alignment_points:
+            return None, None
+
+        # Start with an impossibly large distance, and find the closest AP on the list.
         min_distance_squared = 1.e30
         ap_neighbor = None
         for ap in alignment_points:
