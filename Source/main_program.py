@@ -31,7 +31,7 @@ from PyQt5 import QtWidgets
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
-from alignment_point_editor import Window
+from alignment_point_editor import AlignmentPointEditorWidget
 from configuration import Configuration
 from exceptions import NotSupportedError, InternalError
 from frames import Frames
@@ -186,9 +186,10 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
     else:
         # Open the alignment point editor.
         app = QtWidgets.QApplication(sys.argv)
-        window = Window(configuration, align_frames, alignment_points)
-        window.setMinimumSize(800, 600)
-        window.showMaximized()
+        alignment_point_editor = AlignmentPointEditorWidget(configuration, align_frames,
+                                                            alignment_points)
+        alignment_point_editor.setMinimumSize(800, 600)
+        alignment_point_editor.showMaximized()
         app.exec_()
 
         print("After AP editing, number of APs: " + str(len(alignment_points.alignment_points)))

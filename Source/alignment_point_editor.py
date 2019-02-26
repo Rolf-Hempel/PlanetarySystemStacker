@@ -114,7 +114,8 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                         self.photo_editor.aps.configuration.alignment_points_half_patch_width,
                         self.photo_editor.aps.configuration.alignment_points_search_width,
                         False, False, False, False)
-                    self.new_ap = True
+                    if self.remember_ap:
+                        self.new_ap = True
 
             # The right button is pressed.
             elif event.button() == QtCore.Qt.RightButton:
@@ -189,13 +190,13 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         :return: -
         """
 
-        if not self.photo_editor.drag_mode:
-            pos = event.lastScenePos()
-            self.x = int(pos.x())
-            self.y = int(pos.y())
+        pos = event.lastScenePos()
+        self.x = int(pos.x())
+        self.y = int(pos.y())
 
+        if not self.photo_editor.drag_mode:
             # The mouse is moved with the left button pressed.
-            if self.left_button_pressed:
+            if self.left_button_pressed and (self.moved_ap or self.new_ap):
 
                 # The scene widget corresponding to the preliminary AP was stored with the AP.
                 # Remove it from the scene before the moved AP is drawn.
@@ -205,7 +206,8 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 new_ap = self.photo_editor.aps.move_alignment_point(self.remember_ap,
                          self.photo_editor.image, self.y, self.x)
                 # Draw the new preliminary AP.
-                self.photo_editor.draw_alignment_point(new_ap)
+                new_ap['graphics_item'] = AlignmentPointGraphicsItem(new_ap)
+                self.addItem(new_ap['graphics_item'])
                 self.remember_ap = new_ap
 
             # The mouse is moved with the right button pressed.
@@ -269,12 +271,11 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                                                        self.photo_editor.aps.alignment_points)
 
         # Copy the AP, and apply the changes to the copy only.
-        ap_new = ap.copy()
-        self.photo_editor.aps.resize_alignment_point(ap_new, self.photo_editor.image, factor)
-
+        new_ap = ap.copy()
+        self.photo_editor.aps.resize_alignment_point(new_ap, self.photo_editor.image, factor)
+        new_ap['graphics_item'] = AlignmentPointGraphicsItem(new_ap)
         # Replace the old AP with the resized version of it.
-        self.photo_editor.replace_alignment_point(ap, ap_new)
-        self.update()
+        self.photo_editor.replace_alignment_point(ap, new_ap)
 
 
 class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
@@ -306,9 +307,6 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
 
         # Set the size of the central dot.
         self.dot_width = max(1, int(self.width_x / 50))
-
-        # Store a reference of the widget at the corresponding AP.
-        ap['graphics_item'] = self
 
     def boundingRect(self):
         return QtCore.QRectF(self.patch_x_low, self.patch_y_low, self.width_x_external,
@@ -522,20 +520,6 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         else:
             super(AlignmentPointEditor, self).keyPressEvent(event)
 
-    def initialize_ap_grid(self):
-        """
-        Remove all APs from the scene, reset the undo stack, and draw all new APs.
-
-        :return: -
-        """
-
-        for item in self._scene.items():
-            if isinstance(item, AlignmentPointGraphicsItem):
-                self._scene.removeItem(item)
-
-        for ap in self.aps.alignment_points:
-            self.draw_alignment_point(ap)
-
     def draw_alignment_point(self, ap):
         """
         Create a widget representing an AP and add it to the scene.
@@ -547,6 +531,16 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         ap_graphics_item = AlignmentPointGraphicsItem(ap)
         self._scene.addItem(ap_graphics_item)
         return ap_graphics_item
+
+    def createApGrid(self):
+        """
+        Create an initial alignment point grid, and display it in the viewer.
+
+        :return: -
+        """
+
+        command = CommandCreateApGrid(self)
+        self.undoStack.push(command)
 
     def add_alignment_point(self, ap):
         """
@@ -582,6 +576,52 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         command = CommandReplace(self, self.aps, ap_old, ap_new)
         self.undoStack.push(command)
 
+class CommandCreateApGrid(QtWidgets.QUndoCommand):
+    """
+    Undoable command to replace all existing APs with a new AP grid.
+    """
+    def __init__(self, photo_editor):
+        super(CommandCreateApGrid, self).__init__()
+        self.photo_editor = photo_editor
+        # Copy the old ap list before overwriting it with the new AP grid.
+        self.old_ap_list = self.photo_editor.aps.alignment_points
+        # Create the new AP grid.
+        self.photo_editor.aps.create_ap_grid(self.photo_editor.image)
+        print("Number of alignment points selected: " + str(
+            len(self.photo_editor.aps.alignment_points)) + ", aps dropped because too dim: " + str(
+            self.photo_editor.aps.alignment_points_dropped_dim) +
+            ", aps dropped because too little structure: " + str(
+            self.photo_editor.aps.alignment_points_dropped_structure))
+        # Copy the new list of APs.
+        self.new_ap_list = self.photo_editor.aps.alignment_points
+        for ap in self.new_ap_list:
+            ap['graphics_item'] = AlignmentPointGraphicsItem(ap)
+
+    def redo(self):
+        # Remove all APs from the scene.
+        for item in self.photo_editor._scene.items():
+            if isinstance(item, AlignmentPointGraphicsItem):
+                self.photo_editor._scene.removeItem(item)
+
+        self.photo_editor.aps.alignment_points = self.new_ap_list
+        # Draw all new APs and update the scene.
+        for ap in self.photo_editor.aps.alignment_points:
+            self.photo_editor._scene.addItem(ap['graphics_item'])
+        self.photo_editor._scene.update()
+
+    def undo(self):
+        # Restore the old AP list.
+        self.photo_editor.aps.alignment_points = self.old_ap_list
+
+        # Remove all durrent APs from the scene.
+        for item in self.photo_editor._scene.items():
+            if isinstance(item, AlignmentPointGraphicsItem):
+                self.photo_editor._scene.removeItem(item)
+        # Draw all old APs and update the scene.
+        for ap in self.photo_editor.aps.alignment_points:
+            self.photo_editor._scene.addItem(ap['graphics_item'])
+        self.photo_editor._scene.update()
+
 
 class CommandAdd(QtWidgets.QUndoCommand):
     """
@@ -592,14 +632,17 @@ class CommandAdd(QtWidgets.QUndoCommand):
         self.photo_editor = photo_editor
         self.aps = aps_object
         self.ap = ap
+        self.ap['graphics_item'] = AlignmentPointGraphicsItem(ap)
 
     def redo(self):
         self.aps.add_alignment_point(self.ap)
-        self.photo_editor.draw_alignment_point(self.ap)
+        self.photo_editor._scene.addItem(self.ap['graphics_item'])
+        self.photo_editor._scene.update()
 
     def undo(self):
         self.photo_editor._scene.removeItem(self.ap['graphics_item'])
         self.aps.remove_alignment_points([self.ap])
+        self.photo_editor._scene.update()
 
 
 class CommandRemove(QtWidgets.QUndoCommand):
@@ -616,11 +659,13 @@ class CommandRemove(QtWidgets.QUndoCommand):
         for ap in self.ap_list:
             self.photo_editor._scene.removeItem(ap['graphics_item'])
         self.aps.remove_alignment_points(self.ap_list)
+        self.photo_editor._scene.update()
 
     def undo(self):
         for ap in self.ap_list:
             self.aps.add_alignment_point(ap)
-            self.photo_editor.draw_alignment_point(ap)
+            self.photo_editor._scene.addItem(ap['graphics_item'])
+        self.photo_editor._scene.update()
 
 
 class CommandReplace(QtWidgets.QUndoCommand):
@@ -637,17 +682,17 @@ class CommandReplace(QtWidgets.QUndoCommand):
     def redo(self):
         self.photo_editor._scene.removeItem(self.ap_old['graphics_item'])
         self.aps.replace_alignment_point(self.ap_old, self.ap_new)
-        self.photo_editor.draw_alignment_point(self.ap_new)
+        self.photo_editor._scene.addItem(self.ap_new['graphics_item'])
         self.photo_editor._scene.update()
 
     def undo(self):
         self.photo_editor._scene.removeItem(self.ap_new['graphics_item'])
         self.aps.replace_alignment_point(self.ap_new, self.ap_old)
-        self.photo_editor.draw_alignment_point(self.ap_old)
+        self.photo_editor._scene.addItem(self.ap_old['graphics_item'])
         self.photo_editor._scene.update()
 
 
-class Window(QtWidgets.QWidget):
+class AlignmentPointEditorWidget(QtWidgets.QWidget):
     """
     This widget implements the AP viewer, to be used as part of the application GUI.
     """
@@ -662,17 +707,18 @@ class Window(QtWidgets.QWidget):
         :param alignment_points: Alignment point object
         """
 
-        super(Window, self).__init__()
+        super(AlignmentPointEditorWidget, self).__init__()
         self.mean_frame = align_frames.mean_frame
         self.configuration = configuration
         self.aps = alignment_points
+        self.viewer = AlignmentPointEditor(self, self.aps)
+
         self.btnLoad = QtWidgets.QToolButton(self)
         self.btnLoad.setText('Load image')
         self.btnLoad.clicked.connect(self.loadImage)
         self.btnApGrid = QtWidgets.QToolButton(self)
         self.btnApGrid.setText('Create AP Grid')
-        self.btnApGrid.clicked.connect(self.createApGrid)
-        self.viewer = AlignmentPointEditor(self, self.aps)
+        self.btnApGrid.clicked.connect(self.viewer.createApGrid)
         self.btnUndo = QtWidgets.QToolButton(self)
         self.btnUndo.setText('Undo')
         self.btnUndo.clicked.connect(self.viewer.undoStack.undo)
@@ -705,20 +751,6 @@ class Window(QtWidgets.QWidget):
 
         self.viewer.setPhoto(self.mean_frame)
         self.viewer.fitInView()
-
-    def createApGrid(self):
-        """
-        Create an initial alignment point grid, and display it in the viewer.
-
-        :return: -
-        """
-
-        self.aps.create_ap_grid(self.mean_frame)
-        print("Number of alignment points selected: " + str(len(self.aps.alignment_points)) +
-            ", aps dropped because too dim: " + str(self.aps.alignment_points_dropped_dim) +
-            ", aps dropped because too little structure: " + str(
-                self.aps.alignment_points_dropped_structure))
-        self.viewer.initialize_ap_grid()
 
     def done(self):
         # Close the Window.
@@ -817,7 +849,7 @@ if __name__ == '__main__':
     # plt.show()
 
     app = QtWidgets.QApplication(sys.argv)
-    window = Window(configuration, align_frames, alignment_points)
+    window = AlignmentPointEditorWidget(configuration, align_frames, alignment_points)
     window.setMinimumSize(800,600)
     window.showMaximized()
     app.exec_()

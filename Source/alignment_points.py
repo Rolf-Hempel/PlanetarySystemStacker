@@ -339,8 +339,12 @@ class AlignmentPoints(object):
         # Initialize the reduced AP list.
         new_alignment_point_list = []
 
+        # Create list with unique identifiers of all items on the list.
+        ap_list_ids = [id(ap_list_item) for ap_list_item in ap_list]
+
+        # If the identifier of an alignment point does not match any list item, keep it.
         for ap in self.alignment_points:
-            if ap not in ap_list:
+            if id(ap) not in ap_list_ids:
                 new_alignment_point_list.append(ap)
 
         # Replace the original AP list with the reduced one.
@@ -352,10 +356,15 @@ class AlignmentPoints(object):
 
         :param ap_old: Existing alignment point to be replaced
         :param ap_new: New alignment point to replace the old one
-        :return: -
+        :return: True if successful, False otherwise
         """
 
-        self.alignment_points[self.alignment_points.index(ap_old)] = ap_new
+        ap_old_id = id(ap_old)
+        for index, ap in enumerate(self.alignment_points):
+            if id(ap) == ap_old_id:
+                self.alignment_points[index] = ap_new
+                return True
+        return False
 
     @staticmethod
     def move_alignment_point(ap, mean_frame, y_new, x_new):
