@@ -198,17 +198,21 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
             # The mouse is moved with the left button pressed.
             if self.left_button_pressed and (self.moved_ap or self.new_ap):
 
-                # The scene widget corresponding to the preliminary AP was stored with the AP.
-                # Remove it from the scene before the moved AP is drawn.
-                self.removeItem(self.remember_ap['graphics_item'])
+                # Copy the preliminary AP, and apply the changes to the copy only.
+                new_ap = self.remember_ap.copy()
 
                 # Move the preliminary AP to the new coordinates.
-                new_ap = self.photo_editor.aps.move_alignment_point(self.remember_ap,
+                new_ap = self.photo_editor.aps.move_alignment_point(new_ap,
                          self.photo_editor.image, self.y, self.x)
-                # Draw the new preliminary AP.
-                new_ap['graphics_item'] = AlignmentPointGraphicsItem(new_ap)
-                self.addItem(new_ap['graphics_item'])
-                self.remember_ap = new_ap
+                # The move was successful. Replace the preliminary AP with the new one.
+                if new_ap:
+                    # The scene widget corresponding to the preliminary AP was stored with the AP.
+                    # Remove it from the scene before the moved AP is drawn.
+                    self.removeItem(self.remember_ap['graphics_item'])
+                    # Draw the new preliminary AP.
+                    new_ap['graphics_item'] = AlignmentPointGraphicsItem(new_ap)
+                    self.addItem(new_ap['graphics_item'])
+                    self.remember_ap = new_ap
 
             # The mouse is moved with the right button pressed.
             elif self.right_button_pressed:
@@ -272,10 +276,10 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
         # Copy the AP, and apply the changes to the copy only.
         new_ap = ap.copy()
-        self.photo_editor.aps.resize_alignment_point(new_ap, self.photo_editor.image, factor)
-        new_ap['graphics_item'] = AlignmentPointGraphicsItem(new_ap)
-        # Replace the old AP with the resized version of it.
-        self.photo_editor.replace_alignment_point(ap, new_ap)
+        if self.photo_editor.aps.resize_alignment_point(new_ap, self.photo_editor.image, factor):
+            new_ap['graphics_item'] = AlignmentPointGraphicsItem(new_ap)
+            # Replace the old AP with the resized version of it.
+            self.photo_editor.replace_alignment_point(ap, new_ap)
 
 
 class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
@@ -603,7 +607,7 @@ class CommandCreateApGrid(QtWidgets.QUndoCommand):
             if isinstance(item, AlignmentPointGraphicsItem):
                 self.photo_editor._scene.removeItem(item)
 
-        self.photo_editor.aps.alignment_points = self.new_ap_list
+        self.photo_editor.aps.alignment_points = self.new_ap_list.copy()
         # Draw all new APs and update the scene.
         for ap in self.photo_editor.aps.alignment_points:
             self.photo_editor._scene.addItem(ap['graphics_item'])

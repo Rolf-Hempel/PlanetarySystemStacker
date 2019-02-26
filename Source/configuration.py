@@ -38,7 +38,8 @@ class Configuration(object):
         self.align_frames_sampling_stride = 2
         self.align_frames_average_frame_percent = 5.
 
-        self.alignment_points_half_patch_width = 30
+        self.alignment_points_half_box_width = 20
+        self.alignment_points_min_half_box_width = 10
         self.alignment_points_search_width = 10
         self.alignment_points_structure_threshold = 0.05
         self.alignment_points_brightness_threshold = 10
@@ -58,13 +59,13 @@ class Configuration(object):
         self.stack_frames_gauss_width = 5
 
         # Derived configuration parameters:
+        # Set the alignment patch size to 1.5 times the box size. Between the patch and box
+        # borders there must be at least as many pixels as the alignment search width. This way,
+        # alignment boxes close to the border never leave the frame.
+        self.alignment_points_half_patch_width = max(int(
+            round((self.alignment_points_half_box_width * 3) / 2)),
+            self.alignment_points_half_box_width + self.alignment_points_search_width)
         # Set the AP distance per coordinate direction such that adjacent patches overlap by 1/6
         # of their width.
         self.alignment_points_step_size = int(
             round((self.alignment_points_half_patch_width * 5) / 3))
-        # Set the alignment box size to two third of the patch size. Between the patch and box
-        # borders there must be at least as many pixels as the alignment search width. This way,
-        # alignment boxes close to the border never leave the frame.
-        self.alignment_points_half_box_width = min(int(
-            round((self.alignment_points_half_patch_width * 2) / 3)),
-            self.alignment_points_half_patch_width - self.alignment_points_search_width)

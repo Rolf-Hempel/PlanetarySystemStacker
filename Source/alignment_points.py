@@ -283,28 +283,35 @@ class AlignmentPoints(object):
                              False otherwise.
         :param extend_y_high: True, if patch is to be extended to the lower frame boundary.
                               False otherwise.
-        :return:
+        :return: If successful, the alignment point object is returned; otherwise None.
         """
 
         num_pixels_y = mean_frame.shape[0]
         num_pixels_x = mean_frame.shape[1]
+
+        # If the patch does not fit into the frame, the AP cannot be created at this place.
+        if y<half_patch_width or y>num_pixels_y-half_patch_width or x<half_patch_width or \
+            x>num_pixels_x-half_patch_width:
+            return None
+
         alignment_point = {}
         alignment_point['y'] = y
         alignment_point['x'] = x
-        alignment_point['box_y_low'] = max(search_width, y - half_box_width)
-        alignment_point['box_y_high'] = min(num_pixels_y - search_width, y + half_box_width)
-        alignment_point['box_x_low'] = max(search_width, x - half_box_width)
-        alignment_point['box_x_high'] = min(num_pixels_x - search_width, x + half_box_width)
+        alignment_point['half_box_width'] = half_box_width
+        alignment_point['box_y_low'] = y - half_box_width
+        alignment_point['box_y_high'] = y + half_box_width
+        alignment_point['box_x_low'] = x - half_box_width
+        alignment_point['box_x_high'] = x + half_box_width
 
-        alignment_point['patch_y_low'] = max(0, y - half_patch_width)
-        alignment_point['patch_y_high'] = min(num_pixels_y, y + half_patch_width)
+        alignment_point['patch_y_low'] = y - half_patch_width
+        alignment_point['patch_y_high'] = y + half_patch_width
         if extend_y_low:
             alignment_point['patch_y_low'] = 0
         elif extend_y_high:
             alignment_point['patch_y_high'] = num_pixels_y
 
-        alignment_point['patch_x_low'] = max(0, x - half_patch_width)
-        alignment_point['patch_x_high'] = min(num_pixels_x, x + half_patch_width)
+        alignment_point['patch_x_low'] = x - half_patch_width
+        alignment_point['patch_x_high'] = x + half_patch_width
         if extend_x_low:
             alignment_point['patch_x_low'] = 0
         elif extend_x_high:
@@ -366,8 +373,7 @@ class AlignmentPoints(object):
                 return True
         return False
 
-    @staticmethod
-    def move_alignment_point(ap, mean_frame, y_new, x_new):
+    def move_alignment_point(self, ap, mean_frame, y_new, x_new):
         """
         Move an existing AP to a different position.
 
@@ -378,75 +384,90 @@ class AlignmentPoints(object):
         :return: The updated AP
         """
 
-        num_pixels_y = mean_frame.shape[0]
-        num_pixels_x = mean_frame.shape[1]
-        shift_y = y_new - ap["y"]
-        shift_y = max(shift_y, -ap['patch_y_low'])
-        shift_y = min(shift_y, num_pixels_y - ap['patch_y_high'])
-        shift_x = x_new - ap["x"]
-        shift_x = max(shift_x, -ap['patch_x_low'])
-        shift_x = min(shift_x, num_pixels_x - ap['patch_x_high'])
+        # Try to do the changes. If unsuccessful, return None.
+        return self.change_alignment_point(ap, y_new, x_new, mean_frame, ap['half_box_width'])
 
-        # Shift all coordinates by the computed shift vector.
-        ap["y"] += shift_y
-        ap["x"] += shift_x
-        ap['box_y_low'] += shift_y
-        ap['box_y_high'] += shift_y
-        ap['box_x_low'] += shift_x
-        ap['box_x_high'] += shift_x
-        ap['patch_y_low'] += shift_y
-        ap['patch_y_high'] += shift_y
-        ap['patch_x_low'] += shift_x
-        ap['patch_x_high'] += shift_x
-
-        # Invalidate buffers. To save computing time, they are not re-computed at every mouse
-        # movement.
-        ap['graphics_item'] = None
-        ap['reference_box'] = None
-        ap['stacking_buffer'] = None
-
-        return ap
-
-    @staticmethod
-    def resize_alignment_point(ap, mean_frame, factor):
+    def resize_alignment_point(self, ap, mean_frame, factor):
         """
         Change the size of an existing alignment point.
 
         :param ap: Esisting alignment point to be resized
         :param mean_frame: Average frame (only used for pixel bound calculations)
         :param factor: Factor by which the size is to be changed
-        :return: The resized alignment point
+        :return: The resized alignment point, or None if unsuccessful
         """
 
+        half_box_width_new = ap['half_box_width'] * factor
+
+        # Try to do the changes. If unsuccessful, return None.
+        return self.change_alignment_point(ap, ap["y"], ap["x"], mean_frame, half_box_width_new)
+
+    def change_alignment_point(self, ap, y, x, mean_frame, half_box_width):
+        """
+        Try to fit a resized or moved AP into the frame.
+
+        :param ap: AP to be resized or moved
+        :param y: New y coordinate of center
+        :param x: New x coordinate of center
+        :param mean_frame: Average frame (only used for pixel bound calculations)
+        :param half_box_width: New half width of AP box
+        :return: The resized / moved AP; or None, if unsuccessful
+        """
+
+        # Test if the AP box is too small.
+        if half_box_width < self.configuration.alignment_points_min_half_box_width:
+            return None
+
+        # Compute new values for patch and box sizes.
+        half_patch_width_new_int = int(round(half_box_width *
+                                             self.configuration.alignment_points_half_patch_width /
+                                             self.configuration.alignment_points_half_box_width))
+        half_box_width_new_int = int(round(half_box_width))
         num_pixels_y = mean_frame.shape[0]
         num_pixels_x = mean_frame.shape[1]
-        y = ap["y"]
-        x = ap["x"]
 
         # Compute resized patch bounds. If resizing hits the image boundary on at least one side,
-        # the operation is aborted and the original AP is returned.
-        patch_y_low = int((ap['patch_y_low'] - y) * factor) + y
+        # the operation is aborted.
+        patch_y_low = y - half_patch_width_new_int
         if patch_y_low < 0:
-            return ap
-        patch_y_high = int((ap['patch_y_high'] - y) * factor) + y
+            return None
+        patch_y_high = y + half_patch_width_new_int
         if patch_y_high > num_pixels_y:
-            return ap
-        patch_x_low = int((ap['patch_x_low'] - x) * factor) + x
+            return None
+        patch_x_low = x - half_patch_width_new_int
         if patch_x_low < 0:
-            return ap
-        patch_x_high = int((ap['patch_x_high'] - x) * factor) + x
+            return None
+        patch_x_high = x + half_patch_width_new_int
         if patch_x_high > num_pixels_x:
-            return ap
+            return None
+
+        # Compute resized box bounds. If resizing moves the box closer to the frame border than
+        # the search width on at least one side, the operation is aborted.
+        box_y_low = y - half_box_width_new_int
+        if box_y_low < self.configuration.alignment_points_search_width:
+            return None
+        box_y_high = y + half_box_width_new_int
+        if box_y_high > num_pixels_y - self.configuration.alignment_points_search_width:
+            return None
+        box_x_low = x - half_box_width_new_int
+        if box_x_low < self.configuration.alignment_points_search_width:
+            return None
+        box_x_high = x + half_box_width_new_int
+        if box_x_high > num_pixels_x - self.configuration.alignment_points_search_width:
+            return None
 
         # Perform the changes.
+        ap['y'] = y
+        ap['x'] = x
         ap['patch_y_low'] = patch_y_low
         ap['patch_y_high'] = patch_y_high
         ap['patch_x_low'] = patch_x_low
         ap['patch_x_high'] = patch_x_high
-        ap['box_y_low'] = int((ap['box_y_low'] - y) * factor) + y
-        ap['box_y_high'] = int((ap['box_y_high'] - y) * factor) + y
-        ap['box_x_low'] = int((ap['box_x_low'] - x) * factor) + x
-        ap['box_x_high'] = int((ap['box_x_high'] - x) * factor) + x
+        ap['box_y_low'] = box_y_low
+        ap['box_y_high'] = box_y_high
+        ap['box_x_low'] = box_x_low
+        ap['box_x_high'] = box_x_high
+        ap['half_box_width'] = half_box_width
 
         # Invalidate buffers. To save computing time, they are not re-computed at every wheel
         # event.
