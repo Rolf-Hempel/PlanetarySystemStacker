@@ -319,8 +319,7 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
     def paint(self, painter, option, widget):
         painter.setPen(self.pen_boundary)
         painter.setBrush(self.color_boundary)
-        painter.drawEllipse(self.x - self.dot_width / 2, self.y - self.dot_width / 2,
-                            self.dot_width, self.dot_width)
+        painter.drawEllipse(self.x, self.y, self.dot_width, self.dot_width)
         painter.setBrush(self.color_surface)
         painter.drawRect(self.patch_x_low, self.patch_y_low, self.width_x, self.width_y)
 
