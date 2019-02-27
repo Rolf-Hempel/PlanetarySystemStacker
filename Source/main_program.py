@@ -173,10 +173,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
         my_timer.create('Create alignment points')
 
         # If a ROI is selected, alignment points are created in the ROI window only.
-        if roi:
-            alignment_points.create_ap_grid(average_roi)
-        else:
-            alignment_points.create_ap_grid(average)
+        alignment_points.create_ap_grid()
 
         my_timer.stop('Create alignment points')
         print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)) +

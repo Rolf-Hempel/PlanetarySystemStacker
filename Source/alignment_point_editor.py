@@ -101,18 +101,12 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
                 # Create a new AP.
                 else:
-                    # Compute the size of the AP. Take the standard size and reduce it to fit it
-                    # into the frame if necessary.
-                    # half_patch_width_new = min(self.photo_editor.aps.half_patch_width, y,
-                    #                            self.photo_editor.aps.shape_y - y, x,
-                    #                            self.photo_editor.aps.shape_x - x)
                     # Create a preliminary AP with the computed size. It only becomes a real AP when
                     # the mouse is released.
                     self.remember_ap = self.photo_editor.aps.new_alignment_point(
-                        self.photo_editor.image, self.photo_editor.aps.frames.color, y, x,
+                        self.photo_editor.aps.frames.color, y, x,
                         self.photo_editor.aps.configuration.alignment_points_half_box_width,
                         self.photo_editor.aps.configuration.alignment_points_half_patch_width,
-                        self.photo_editor.aps.configuration.alignment_points_search_width,
                         False, False, False, False)
                     if self.remember_ap:
                         self.new_ap = True
@@ -589,7 +583,7 @@ class CommandCreateApGrid(QtWidgets.QUndoCommand):
         # Copy the old ap list before overwriting it with the new AP grid.
         self.old_ap_list = self.photo_editor.aps.alignment_points
         # Create the new AP grid.
-        self.photo_editor.aps.create_ap_grid(self.photo_editor.image)
+        self.photo_editor.aps.create_ap_grid()
         print("Number of alignment points selected: " + str(
             len(self.photo_editor.aps.alignment_points)) + ", aps dropped because too dim: " + str(
             self.photo_editor.aps.alignment_points_dropped_dim) +

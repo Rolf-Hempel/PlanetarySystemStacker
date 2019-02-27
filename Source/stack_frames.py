@@ -604,7 +604,7 @@ if __name__ == "__main__":
 
     # Create alignment points, and show alignment point boxes and patches.
     my_timer.create('Create alignment points')
-    alignment_points.create_ap_grid(average)
+    alignment_points.create_ap_grid()
     my_timer.stop('Create alignment points')
     print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
           ", number of dropped aps (dim): " + str(alignment_points.alignment_points_dropped_dim) +
