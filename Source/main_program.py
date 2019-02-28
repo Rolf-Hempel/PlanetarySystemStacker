@@ -123,7 +123,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
         my_timer.stop('Select optimal alignment patch')
 
@@ -255,8 +255,8 @@ if __name__ == "__main__":
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
     convert_to_grayscale = False
     automatic_ap_creation = False
-    roi = None
-    # roi = (400, 700, 300, 800)
+    # roi = None
+    roi = (400, 700, 300, 800)
     ####################################### Specify test case end ##################################
 
     # Redirect standard output to a file if requested.

@@ -61,6 +61,7 @@ class AlignFrames(object):
         self.intersection_shape = None
         self.intersection_shape_original = None
         self.mean_frame = None
+        self.mean_frame_original = None
         self.configuration = configuration
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
         self.frame_ranks_max_index = rank_frames.frame_ranks_max_index
@@ -77,7 +78,7 @@ class AlignFrames(object):
 
         :param scale_factor: Ratio of the size of the frame and the alignment patch in both
                              coordinate directions
-        :return: A four tuple (x_low, x_high, y_low, y_high) with pixel coordinates of the
+        :return: A four tuple (y_low, y_high, x_low, x_high) with pixel coordinates of the
                  optimal patch
         """
 
@@ -110,7 +111,23 @@ class AlignFrames(object):
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
                         x_low, x_high, y_low, y_high)
                     quality = new_quality
-        return (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt)
+        return (self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt)
+
+    def set_alignment_rect(self, y_low_opt, y_high_opt, x_low_opt, x_high_opt):
+        """
+        As an alternative to "select_alignment_rect", the rectangular patch can be set explicitly
+
+        :param y_low_opt: Lower y pixel coordinate of patch
+        :param y_high_opt: Upper y pixel coordinate of patch
+        :param x_low_opt: Lower x pixel coordinate of patch
+        :param x_high_opt: Upper x pixel coordinate of patch
+        :return: -
+        """
+
+        self.y_low_opt = y_low_opt
+        self.y_high_opt = y_high_opt
+        self.x_low_opt = x_low_opt
+        self.x_high_opt = x_high_opt
 
     def align_frames(self):
         """
@@ -272,9 +289,6 @@ class AlignFrames(object):
                                    [max(b[1] for b in self.frame_shifts),
                                     min(b[1] for b in self.frame_shifts) + self.shape[1]]]
 
-        if not self.intersection_shape_original:
-            self.intersection_shape_original = self.intersection_shape.copy()
-
 
         if len(self.failed_index_list) > 0:
             raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
@@ -341,11 +355,14 @@ class AlignFrames(object):
 
         # Compute the mean frame by averaging over the first index.
         self.mean_frame = mean(buffer, axis=0)
+
         return self.mean_frame
 
     def set_roi(self, y_min, y_max, x_min, x_max):
         """
-        Make the stacking region snmaller than the intersection size.
+        Make the stacking region snmaller than the intersection size. Be careful: The pixel
+        indices in this method refer to the shape of the intersection of all frames, i.e., the
+        shape of the full mean frame. In general, the original frames are somewhat larger.
 
         :param y_min: Lower y pixel bound
         :param y_max: Upper y pixel bound
@@ -357,6 +374,11 @@ class AlignFrames(object):
         if self.intersection_shape is None:
             raise WrongOrderingError("Method 'set_roi' is called before 'align_frames'")
 
+        # On the first call, keep a copy of the full mean frame and original intersection shape.
+        if not self.mean_frame_original:
+            self.mean_frame_original = self.mean_frame.copy()
+            self.intersection_shape_original = self.intersection_shape.copy()
+
         if y_min < 0 or y_max > self.intersection_shape_original[0][1] - \
                 self.intersection_shape_original[0][0] or \
                 x_min < 0 or x_max > self.intersection_shape_original[1][1] - \
@@ -364,10 +386,22 @@ class AlignFrames(object):
                 y_min >= y_max or x_min >= x_max:
             raise ArgumentError("Invalid ROI index bounds specified")
 
-        # Reduce
-        self.intersection_shape = [[y_min, y_max], [x_min, x_max]]
+        # Reduce the intersection shape and mean frame to the ROI.
+        self.intersection_shape = [[y_min+self.intersection_shape_original[0][0],
+                                    y_max+self.intersection_shape_original[0][0]],
+                                   [x_min+self.intersection_shape_original[1][0],
+                                    x_max+self.intersection_shape_original[1][0]]]
 
-        return self.average_frame()
+        # Re-compute global offsets of current frame relative to reference frame.
+        self.dy = []
+        self.dx = []
+        for idx in range(len(self.frames_mono_blurred)):
+            self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
+            self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
+
+        self.mean_frame = self.mean_frame_original[y_min:y_max, x_min:x_max]
+
+        return self.mean_frame
 
 
     def write_stabilized_video(self, name, fps, stabilized=True):
@@ -453,7 +487,7 @@ if __name__ == "__main__":
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
 
         # Alternative: Set the alignment rectangle by hand.

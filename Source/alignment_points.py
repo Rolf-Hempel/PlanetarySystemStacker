@@ -180,10 +180,8 @@ class AlignmentPoints(object):
                 extend_x_low  = (index_x == 0)
                 extend_x_high = (index_x == len(ap_locations_x) - 1)
 
-                alignment_point = self.new_alignment_point(self.frames.color, y, x,
-                                                            half_box_width, half_patch_width,
-                                                            extend_x_low, extend_x_high,
-                                                            extend_y_low, extend_y_high)
+                alignment_point = self.new_alignment_point(y, x, extend_x_low, extend_x_high,
+                                                           extend_y_low, extend_y_high)
 
                 # Compute structure and brightness information for the alignment box.
                 max_brightness = amax(alignment_point['reference_box'])
@@ -219,10 +217,9 @@ class AlignmentPoints(object):
 
                         # Replace the alignment point with a new one, using the updated
                         # coordinates and box / patch sizes.
-                        alignment_point = self.new_alignment_point(self.frames.color, y_adapted,
-                            x_adapted, half_box_width_adapted,
-                            half_patch_width_adapted, extend_x_low, extend_x_high, extend_y_low,
-                            extend_y_high)
+                        alignment_point = self.new_alignment_point(y_adapted, x_adapted,
+                                                                   extend_x_low, extend_x_high,
+                                                                   extend_y_low, extend_y_high)
 
                     alignment_point['structure'] = Miscellaneous.quality_measure(
                         alignment_point['reference_box'])
@@ -258,17 +255,13 @@ class AlignmentPoints(object):
                     dropped_index += 1
             self.alignment_points = alignment_points_new
 
-    def new_alignment_point(self, color, y, x, half_box_width, half_patch_width,
-                            extend_x_low, extend_x_high, extend_y_low, extend_y_high):
+    def new_alignment_point(self, y, x, extend_x_low, extend_x_high, extend_y_low, extend_y_high):
         """
         Create a new alignment point. This method is called in creating the initial alignment point
         grid. Later it can be invoked by the user to add single alignment points.
 
-        :param color: True, if frames are RGB color. False otherwise.
         :param y: y coordinate of alignment point center
         :param x: x coordinate of alignment point center
-        :param half_box_width: Half-width of the alignment boxes
-        :param half_patch_width: Half-width of the alignment patch (used in stacking)
         :param extend_x_low: True, if patch is to be extended to the left frame boundary.
                              False otherwise.
         :param extend_x_high: True, if patch is to be extended to the right frame boundary.
@@ -280,29 +273,33 @@ class AlignmentPoints(object):
         :return: If successful, the alignment point object is returned; otherwise None.
         """
 
-        # If the patch does not fit into the frame, the AP cannot be created at this place.
-        if y<half_patch_width or y>self.num_pixels_y-half_patch_width or x<half_patch_width or \
-            x>self.num_pixels_x-half_patch_width:
+        # If the patch does not fit into the frame, or the AP box is too close to the border,
+        # the AP cannot be created at this place.
+        min_boundary_distance = max(self.configuration.alignment_points_half_box_width + \
+                                self.configuration.alignment_points_search_width,
+                                self.configuration.alignment_points_half_patch_width)
+        if y<min_boundary_distance or y>self.num_pixels_y-min_boundary_distance or \
+            x<min_boundary_distance or x>self.num_pixels_x-min_boundary_distance:
             return None
 
         alignment_point = {}
         alignment_point['y'] = y
         alignment_point['x'] = x
-        alignment_point['half_box_width'] = half_box_width
-        alignment_point['box_y_low'] = y - half_box_width
-        alignment_point['box_y_high'] = y + half_box_width
-        alignment_point['box_x_low'] = x - half_box_width
-        alignment_point['box_x_high'] = x + half_box_width
+        alignment_point['half_box_width'] = self.configuration.alignment_points_half_box_width
+        alignment_point['box_y_low'] = y - self.configuration.alignment_points_half_box_width
+        alignment_point['box_y_high'] = y + self.configuration.alignment_points_half_box_width
+        alignment_point['box_x_low'] = x - self.configuration.alignment_points_half_box_width
+        alignment_point['box_x_high'] = x + self.configuration.alignment_points_half_box_width
 
-        alignment_point['patch_y_low'] = y - half_patch_width
-        alignment_point['patch_y_high'] = y + half_patch_width
+        alignment_point['patch_y_low'] = y - self.configuration.alignment_points_half_patch_width
+        alignment_point['patch_y_high'] = y + self.configuration.alignment_points_half_patch_width
         if extend_y_low:
             alignment_point['patch_y_low'] = 0
         elif extend_y_high:
             alignment_point['patch_y_high'] = self.num_pixels_y
 
-        alignment_point['patch_x_low'] = x - half_patch_width
-        alignment_point['patch_x_high'] = x + half_patch_width
+        alignment_point['patch_x_low'] = x - self.configuration.alignment_points_half_patch_width
+        alignment_point['patch_x_high'] = x + self.configuration.alignment_points_half_patch_width
         if extend_x_low:
             alignment_point['patch_x_low'] = 0
         elif extend_x_high:
@@ -312,7 +309,7 @@ class AlignmentPoints(object):
         alignment_point['graphics_item'] = None
 
         # Allocate buffers and fill alignment point box with mean frame.
-        AlignmentPoints.allocate_ap_buffers(alignment_point, self.mean_frame, color)
+        AlignmentPoints.allocate_ap_buffers(alignment_point, self.mean_frame, self.frames.color)
 
         return alignment_point
 
@@ -364,43 +361,40 @@ class AlignmentPoints(object):
                 return True
         return False
 
-    def move_alignment_point(self, ap, mean_frame, y_new, x_new):
+    def move_alignment_point(self, ap, y_new, x_new):
         """
         Move an existing AP to a different position.
 
         :param ap: Esisting alignment point to be moved
-        :param mean_frame: Average frame (only used for pixel bound calculations)
         :param y_new: New y coordinate of AP center
         :param x_new: New x coordinate of AP center
-        :return: The updated AP
+        :return: The updated AP; or None, if unsuccessful
         """
 
         # Try to do the changes. If unsuccessful, return None.
-        return self.change_alignment_point(ap, y_new, x_new, mean_frame, ap['half_box_width'])
+        return self.change_alignment_point(ap, y_new, x_new, ap['half_box_width'])
 
-    def resize_alignment_point(self, ap, mean_frame, factor):
+    def resize_alignment_point(self, ap, factor):
         """
         Change the size of an existing alignment point.
 
         :param ap: Esisting alignment point to be resized
-        :param mean_frame: Average frame (only used for pixel bound calculations)
         :param factor: Factor by which the size is to be changed
-        :return: The resized alignment point, or None if unsuccessful
+        :return: The resized alignment point; or None, if unsuccessful
         """
 
         half_box_width_new = ap['half_box_width'] * factor
 
         # Try to do the changes. If unsuccessful, return None.
-        return self.change_alignment_point(ap, ap["y"], ap["x"], mean_frame, half_box_width_new)
+        return self.change_alignment_point(ap, ap["y"], ap["x"], half_box_width_new)
 
-    def change_alignment_point(self, ap, y, x, mean_frame, half_box_width):
+    def change_alignment_point(self, ap, y, x, half_box_width):
         """
         Try to fit a resized or moved AP into the frame.
 
         :param ap: AP to be resized or moved
         :param y: New y coordinate of center
         :param x: New x coordinate of center
-        :param mean_frame: Average frame (only used for pixel bound calculations)
         :param half_box_width: New half width of AP box
         :return: The resized / moved AP; or None, if unsuccessful
         """
@@ -414,8 +408,6 @@ class AlignmentPoints(object):
                                              self.configuration.alignment_points_half_patch_width /
                                              self.configuration.alignment_points_half_box_width))
         half_box_width_new_int = int(round(half_box_width))
-        num_pixels_y = mean_frame.shape[0]
-        num_pixels_x = mean_frame.shape[1]
 
         # Compute resized patch bounds. If resizing hits the image boundary on at least one side,
         # the operation is aborted.
@@ -423,13 +415,13 @@ class AlignmentPoints(object):
         if patch_y_low < 0:
             return None
         patch_y_high = y + half_patch_width_new_int
-        if patch_y_high > num_pixels_y:
+        if patch_y_high > self.num_pixels_y:
             return None
         patch_x_low = x - half_patch_width_new_int
         if patch_x_low < 0:
             return None
         patch_x_high = x + half_patch_width_new_int
-        if patch_x_high > num_pixels_x:
+        if patch_x_high > self.num_pixels_x:
             return None
 
         # Compute resized box bounds. If resizing moves the box closer to the frame border than
@@ -438,13 +430,13 @@ class AlignmentPoints(object):
         if box_y_low < self.configuration.alignment_points_search_width:
             return None
         box_y_high = y + half_box_width_new_int
-        if box_y_high > num_pixels_y - self.configuration.alignment_points_search_width:
+        if box_y_high > self.num_pixels_y - self.configuration.alignment_points_search_width:
             return None
         box_x_low = x - half_box_width_new_int
         if box_x_low < self.configuration.alignment_points_search_width:
             return None
         box_x_high = x + half_box_width_new_int
-        if box_x_high > num_pixels_x - self.configuration.alignment_points_search_width:
+        if box_x_high > self.num_pixels_x - self.configuration.alignment_points_search_width:
             return None
 
         # Perform the changes.
@@ -818,7 +810,7 @@ if __name__ == "__main__":
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
         end = time()
         print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
@@ -894,9 +886,7 @@ if __name__ == "__main__":
     num_pixels_y = average.shape[0]
     num_pixels_x = average.shape[1]
     alignment_points.alignment_points.append(
-        alignment_points.new_alignment_point(frames.color, y_new, x_new,
-                                             half_box_width_new, half_patch_width_new,
-                                             False, False, False, False))
+        alignment_points.new_alignment_point(y_new, x_new, False, False, False, False))
     print("Added alignment point at y: " + str(y_new) + ", x: " + str(x_new) + ", box size: "
           + str(2 * half_box_width_new) + ", patch size: " + str(2 * half_patch_width_new))
 

@@ -103,11 +103,8 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 else:
                     # Create a preliminary AP with the computed size. It only becomes a real AP when
                     # the mouse is released.
-                    self.remember_ap = self.photo_editor.aps.new_alignment_point(
-                        self.photo_editor.aps.frames.color, y, x,
-                        self.photo_editor.aps.configuration.alignment_points_half_box_width,
-                        self.photo_editor.aps.configuration.alignment_points_half_patch_width,
-                        False, False, False, False)
+                    self.remember_ap = self.photo_editor.aps.new_alignment_point(y, x, False, False,
+                        False, False)
                     if self.remember_ap:
                         self.new_ap = True
 
@@ -196,8 +193,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                 new_ap = self.remember_ap.copy()
 
                 # Move the preliminary AP to the new coordinates.
-                new_ap = self.photo_editor.aps.move_alignment_point(new_ap,
-                         self.photo_editor.image, self.y, self.x)
+                new_ap = self.photo_editor.aps.move_alignment_point(new_ap, self.y, self.x)
                 # The move was successful. Replace the preliminary AP with the new one.
                 if new_ap:
                     # The scene widget corresponding to the preliminary AP was stored with the AP.
@@ -270,7 +266,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
         # Copy the AP, and apply the changes to the copy only.
         new_ap = ap.copy()
-        if self.photo_editor.aps.resize_alignment_point(new_ap, self.photo_editor.image, factor):
+        if self.photo_editor.aps.resize_alignment_point(new_ap, factor):
             new_ap['graphics_item'] = AlignmentPointGraphicsItem(new_ap)
             # Replace the old AP with the resized version of it.
             self.photo_editor.replace_alignment_point(ap, new_ap)
@@ -517,18 +513,6 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         else:
             super(AlignmentPointEditor, self).keyPressEvent(event)
 
-    def draw_alignment_point(self, ap):
-        """
-        Create a widget representing an AP and add it to the scene.
-
-        :param ap: AP object
-        :return: AP widget
-        """
-
-        ap_graphics_item = AlignmentPointGraphicsItem(ap)
-        self._scene.addItem(ap_graphics_item)
-        return ap_graphics_item
-
     def createApGrid(self):
         """
         Create an initial alignment point grid, and display it in the viewer.
@@ -600,6 +584,7 @@ class CommandCreateApGrid(QtWidgets.QUndoCommand):
             if isinstance(item, AlignmentPointGraphicsItem):
                 self.photo_editor._scene.removeItem(item)
 
+        # Copy the AP list from grid generation to the "alignment_point" object.
         self.photo_editor.aps.alignment_points = self.new_ap_list.copy()
         # Draw all new APs and update the scene.
         for ap in self.photo_editor.aps.alignment_points:
@@ -805,7 +790,7 @@ if __name__ == '__main__':
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
         end = time()
         print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))

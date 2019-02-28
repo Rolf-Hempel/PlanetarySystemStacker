@@ -30,6 +30,7 @@ class Configuration(object):
         self.rank_frames_method = "Laplace"
 
         self.align_frames_mode = "Surface"
+        self.align_frames_automation = True
         self.align_frames_method = "SteepestDescent"
         self.align_frames_rectangle_scale_factor = 3
         self.align_frames_rectangle_black_threshold = 40
