@@ -414,7 +414,6 @@ class StackFrames(object):
         self.my_timer.start('Stacking: merging AP buffers')
         # For each image buffer pixel count the number of image contributions.
         single_stack_size_int = self.alignment_points.stack_size
-        single_stack_size_float = float(single_stack_size_int)
 
         # Add the contributions of all alignment points into a single buffer.
         for alignment_point in self.alignment_points.alignment_points:

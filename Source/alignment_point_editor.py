@@ -426,7 +426,7 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         image_uint8 = self.image.astype(np.uint8)
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
-        qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y,
+        qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
                                 QtGui.QImage.Format_Grayscale8)
         pixmap = QtGui.QPixmap(qt_image)
 
@@ -695,6 +695,7 @@ class AlignmentPointEditorWidget(QtWidgets.QWidget):
         self.configuration = configuration
         self.aps = alignment_points
         self.viewer = AlignmentPointEditor(self, self.aps)
+        self.viewer.setMinimumSize(800, 600)
 
         self.btnLoad = QtWidgets.QToolButton(self)
         self.btnLoad.setText('Load image')
@@ -846,7 +847,6 @@ if __name__ == '__main__':
     window.setMinimumSize(800,600)
     window.showMaximized()
     app.exec_()
-    window.loadImage()
 
     print ("After AP editing, number of APs: " + str(len(alignment_points.alignment_points)))
     count_updates = 0
