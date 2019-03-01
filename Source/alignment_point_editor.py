@@ -29,6 +29,7 @@ from time import time
 import numpy as np
 from PyQt5 import QtCore, QtGui, QtWidgets
 
+from exceptions import InternalError, NotSupportedError
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
@@ -748,7 +749,7 @@ if __name__ == '__main__':
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        names = 'Videos/short_video.avi'
+        names = 'Videos/another_short_video.avi'
     print(names)
 
     # Get configuration parameters.
@@ -809,7 +810,17 @@ if __name__ == '__main__':
 
     # Align all frames globally relative to the frame with the highest score.
     start = time()
-    align_frames.align_frames()
+    try:
+        align_frames.align_frames()
+    except NotSupportedError as e:
+        print("Error: " + e.message)
+        exit()
+    except InternalError as e:
+        print("Warning: " + e.message)
+        for index, frame_number in enumerate(align_frames.failed_index_list):
+            print("Shift computation failed for frame " + str(
+                align_frames.failed_index_list[index]) + ", minima list: " + str(
+                align_frames.dev_r_list[index]))
     end = time()
     print('Elapsed time in aligning all frames: {}'.format(end - start))
     print("Frame shifts: " + str(align_frames.frame_shifts))

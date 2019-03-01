@@ -255,8 +255,8 @@ if __name__ == "__main__":
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
     convert_to_grayscale = False
     automatic_ap_creation = False
-    # roi = None
-    roi = (400, 700, 300, 800)
+    roi = None
+    # roi = (400, 700, 300, 800)
     ####################################### Specify test case end ##################################
 
     # Redirect standard output to a file if requested.

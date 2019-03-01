@@ -25,7 +25,7 @@ from math import ceil
 
 import matplotlib.pyplot as plt
 from scipy import ndimage
-from numpy import empty, mean, arange, float32
+from numpy import empty, mean, arange, float32, zeros, amax
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
@@ -340,6 +340,15 @@ class AlignFrames(object):
                                           self.intersection_shape[0][1] - shifts[idx][0],
                                     self.intersection_shape[1][0] - shifts[idx][1]:
                                     self.intersection_shape[1][1] - shifts[idx][1], :]
+
+            # self.mean_frame = zeros([self.intersection_shape[0][1] - self.intersection_shape[0][0],
+            #      self.intersection_shape[1][1] - self.intersection_shape[1][0], 3], dtype=float32)
+            # for idx in range(self.average_frame_number):
+            #     self.mean_frame += self.frames[self.quality_sorted_indices[idx]] \
+            #         [self.intersection_shape[0][0] - shifts[idx][0]:
+            #         self.intersection_shape[0][1] - shifts[idx][0],
+            #         self.intersection_shape[1][0] - shifts[idx][1]:
+            #         self.intersection_shape[1][1] - shifts[idx][1], :]
         else:
             frames = [self.frames_mono[i] for i in
                       self.quality_sorted_indices[:self.average_frame_number]]
@@ -352,6 +361,17 @@ class AlignFrames(object):
                                           self.intersection_shape[0][1] - shifts[idx][0],
                                     self.intersection_shape[1][0] - shifts[idx][1]:
                                     self.intersection_shape[1][1] - shifts[idx][1]]
+        #     self.mean_frame = zeros([self.intersection_shape[0][1] - self.intersection_shape[0][0],
+        #                              self.intersection_shape[1][1] - self.intersection_shape[1][0]],
+        #                              dtype=float32)
+        #     for idx in range(self.average_frame_number):
+        #         self.mean_frame += self.frames_mono[self.quality_sorted_indices[idx]] \
+        #             [self.intersection_shape[0][0] - shifts[idx][0]:
+        #             self.intersection_shape[0][1] - shifts[idx][0],
+        #             self.intersection_shape[1][0] - shifts[idx][1]:
+        #             self.intersection_shape[1][1] - shifts[idx][1]]
+        #
+        # self.mean_frame /= self.average_frame_number
 
         # Compute the mean frame by averaging over the first index.
         self.mean_frame = mean(buffer, axis=0)
