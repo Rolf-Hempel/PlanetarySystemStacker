@@ -23,6 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 class Configuration(object):
     def __init__(self):
+        self.version = "Planetary System Stacker 0.5.0"
         self.frames_mono_channel = 'panchromatic'
         self.frames_gauss_width = 7
 
