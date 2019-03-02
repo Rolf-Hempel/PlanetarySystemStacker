@@ -12,6 +12,7 @@ class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
         MainWindow.resize(905, 600)
+        MainWindow.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.centralwidget)
@@ -34,9 +35,11 @@ class Ui_MainWindow(object):
         self.control_area.setObjectName("control_area")
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self.control_area)
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
-        self.pushButton_previous_job = QtWidgets.QPushButton(self.control_area)
-        self.pushButton_previous_job.setObjectName("pushButton_previous_job")
-        self.horizontalLayout_3.addWidget(self.pushButton_previous_job)
+        self.comboBox_back = QtWidgets.QComboBox(self.control_area)
+        self.comboBox_back.setEditable(False)
+        self.comboBox_back.setCurrentText("")
+        self.comboBox_back.setObjectName("comboBox_back")
+        self.horizontalLayout_3.addWidget(self.comboBox_back)
         self.pushButton_start = QtWidgets.QPushButton(self.control_area)
         icon = QtGui.QIcon.fromTheme("SP_MediaPlay")
         self.pushButton_start.setIcon(icon)
@@ -109,6 +112,8 @@ class Ui_MainWindow(object):
         self.actionSave.setObjectName("actionSave")
         self.actionSave_as = QtWidgets.QAction(MainWindow)
         self.actionSave_as.setObjectName("actionSave_as")
+        self.actionQuit = QtWidgets.QAction(MainWindow)
+        self.actionQuit.setObjectName("actionQuit")
         self.menuFile.addAction(self.actionLoad_video_directory)
         self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionSave)
@@ -120,16 +125,17 @@ class Ui_MainWindow(object):
         self.menuFile.addAction(self.actionLoad_postproc_config)
         self.menuFile.addAction(self.actionSave_postproc_config)
         self.menuFile.addSeparator()
+        self.menuFile.addAction(self.actionQuit)
         self.menubar.addAction(self.menuFile.menuAction())
 
         self.retranslateUi(MainWindow)
+        self.comboBox_back.setCurrentIndex(-1)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Planetary System Stacker"))
-        self.pushButton_previous_job.setText(_translate("MainWindow", "Previous Job"))
-        self.pushButton_start.setText(_translate("MainWindow", "Start"))
+        self.pushButton_start.setText(_translate("MainWindow", "Start / Cont."))
         self.pushButton_stop.setText(_translate("MainWindow", "Stop"))
         self.pushButton_next_job.setText(_translate("MainWindow", "Next Job"))
         self.box_automatic.setText(_translate("MainWindow", "Automatic"))
@@ -142,4 +148,5 @@ class Ui_MainWindow(object):
         self.actionSave_postproc_config.setText(_translate("MainWindow", "Save postproc config"))
         self.actionSave.setText(_translate("MainWindow", "Save"))
         self.actionSave_as.setText(_translate("MainWindow", "Save as"))
+        self.actionQuit.setText(_translate("MainWindow", "Quit"))
 

@@ -34,7 +34,7 @@ from timer import timer
 
 class Workflow(QtCore.QObject):
 
-    work_task_finished_signal = QtCore.pyqtSignal(str)
+    work_next_task_signal = QtCore.pyqtSignal(str)
 
     def __init__(self, main_gui):
         super(Workflow, self).__init__()
@@ -52,7 +52,7 @@ class Workflow(QtCore.QObject):
         self.stacked_image_name = None
 
     @QtCore.pyqtSlot()
-    def frames(self, input_name, input_type, convert_to_grayscale):
+    def execute_frames(self, input_name, input_type, convert_to_grayscale):
 
         # Images can either be extracted from a video file or a batch of single photographs. Select
         # the example for the test run.
@@ -96,10 +96,10 @@ class Workflow(QtCore.QObject):
         self.frames.add_monochrome(self.configuration.frames_mono_channel)
         self.my_timer.stop('Blurred monochrome images and Laplacians')
 
-        self.work_task_finished_signal.emit("frames")
+        self.work_next_task_signal.emit("rank_frames")
 
     @QtCore.pyqtSlot()
-    def rank_frames(self):
+    def execute_rank_frames(self):
 
         # Rank the frames by their overall local contrast.
         print("+++ Start ranking images")
@@ -109,10 +109,10 @@ class Workflow(QtCore.QObject):
         self.my_timer.stop('Ranking images')
         print("Index of best frame: " + str(self.rank_frames.frame_ranks_max_index))
 
-        self.work_task_finished_signal.emit("rank_frames")
+        self.work_next_task_signal.emit("align_frames")
 
     @QtCore.pyqtSlot()
-    def align_frames(self, x_low_opt=None, x_high_opt=None, y_low_opt=None, y_high_opt=None):
+    def execute_align_frames(self, x_low_opt, x_high_opt, y_low_opt, y_high_opt):
 
         # Initialize the frame alignment object.
         self.align_frames = AlignFrames(self.frames, self.rank_frames, self.configuration)
@@ -162,20 +162,20 @@ class Workflow(QtCore.QObject):
         print("Average frame computed from the best " + str(
             self.align_frames.average_frame_number) + " frames.")
 
-        self.work_task_finished_signal.emit("align_frames")
+        self.work_next_task_signal.emit("set_roi")
 
     @QtCore.pyqtSlot()
-    def set_roi(self, y_min, y_max, x_min, x_max):
+    def execute_set_roi(self, y_min, y_max, x_min, x_max):
 
         print("+++ Start setting ROI and computing new average frame")
         self.my_timer.create('Setting ROI and new reference')
         self.align_frames.set_roi(y_min, y_max, x_min, x_max)
         self.my_timer.stop('Setting ROI and new reference')
 
-        self.work_task_finished_signal.emit("set_roi")
+        self.work_next_task_signal.emit("compute_frame_qualities")
 
     @QtCore.pyqtSlot()
-    def compute_frame_qualities(self):
+    def execute_compute_frame_qualities(self):
 
         # For each alignment point rank frames by their quality.
         self.my_timer.create('Rank frames at alignment points')
@@ -183,10 +183,10 @@ class Workflow(QtCore.QObject):
         self.alignment_points.compute_frame_qualities()
         self.my_timer.stop('Rank frames at alignment points')
 
-        self.work_task_finished_signal.emit("compute_frame_qualities")
+        self.work_next_task_signal.emit("stack_frames")
 
     @QtCore.pyqtSlot()
-    def stack_frames(self):
+    def execute_stack_frames(self):
 
         # Allocate StackFrames object.
         self.stack_frames = StackFrames(self.configuration, self.frames, self.align_frames,
@@ -200,10 +200,10 @@ class Workflow(QtCore.QObject):
         print("+++ Start merging alignment patches")
         self.stack_frames.merge_alignment_point_buffers()
 
-        self.work_task_finished_signal.emit("stack_frames")
+        self.work_next_task_signal.emit("save_stacked_image")
 
     @QtCore.pyqtSlot()
-    def save_stacked_image(self):
+    def execute_save_stacked_image(self):
 
         # Save the stacked image as 16bit int (color or mono).
         self.my_timer.create('Saving the final image')
@@ -211,4 +211,4 @@ class Workflow(QtCore.QObject):
                                color=self.frames.color)
         self.my_timer.stop('Saving the final image')
 
-        self.work_task_finished_signal.emit("save_stacked_image")
+        self.work_next_task_signal.emit("next_job")
