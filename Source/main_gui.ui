@@ -209,7 +209,15 @@
     <addaction name="separator"/>
     <addaction name="actionQuit"/>
    </widget>
+   <widget class="QMenu" name="menuEdit">
+    <property name="title">
+     <string>Edit</string>
+    </property>
+    <addaction name="actionEdit_configuration"/>
+    <addaction name="actionEdit_postproc_config"/>
+   </widget>
    <addaction name="menuFile"/>
+   <addaction name="menuEdit"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
   <action name="actionLoad_video_directory">
@@ -250,6 +258,16 @@
   <action name="actionQuit">
    <property name="text">
     <string>Quit</string>
+   </property>
+  </action>
+  <action name="actionEdit_configuration">
+   <property name="text">
+    <string>Edit stacking config</string>
+   </property>
+  </action>
+  <action name="actionEdit_postproc_config">
+   <property name="text">
+    <string>Edit postproc config</string>
    </property>
   </action>
  </widget>

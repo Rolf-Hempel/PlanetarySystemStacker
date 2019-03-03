@@ -69,11 +69,28 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Create configuration object and set configuration parameters to standard values.
         self.configuration = Configuration()
 
+        # If the configuration was not read in from a previous run (i.e. only default values have
+        # been set so far), open the configuration editor GUI to let the user make adjustments if
+        # necessary.
+        if self.configuration.file_new:
+            editor = ConfigurationEditor(self.configuration, self.initialized)
+            editor.exec_()
+
+        # If there is no ".ini" file yet in the user's home directory, or if the configuration
+        # has changed, write the current configuration to the ".ini" file.
+        if self.configuration.file_new or editor.configuration_changed:
+            self.configuration.write_config()
+
+        # Set dependent parameters.
+        self.configuration.set_derived_parameters()
+
         # Write the program version into the window title.
-        self.setWindowTitle(self.configuration.version)
+        self.setWindowTitle(self.configuration.global_parameters_version)
 
         self.ui.comboBox_back.addItems(['Previous Job'])
         self.ui.actionQuit.triggered.connect(self.closeEvent)
+
+        self.ui.pushButton_start.clicked.connect(self.play)
 
         # Create the workflow thread and start it.
         self.thread = QtCore.QThread()
@@ -106,41 +123,49 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.job_index = 0
         self.job_names = []
         self.job_types = []
-        self.current_activity = None
+        self.activities = ['Frames', 'Rank frames', 'Align frames', 'Set ROI',
+                           'Compute frame qualities', 'Stack frames', 'Save stacked image',
+                           'Next job']
+        self.activity_index = 0
 
-    def work_next_task(self, activity):
-        self.set_previous_actions_button(activity)
+    def play(self):
+        self.work_next_task(self.activity_index)
+
+    def work_next_task(self, next_activity):
+        self.activity_index = next_activity
+        self.set_previous_actions_button(self.activity_index)
         self.update_status()
-        if activity == "frames":
+        if self.activity_index == "Frames":
             self.signal_frames.emit(self.job_names[self.job_index],
                                     self.job_types[self.job_index], False)
-        if activity == "rank_frames":
+        if self.activity_index == "Rank frames":
             if not self.automatic:
                 pass
             self.signal_rank_frames.emit()
-        elif activity == "align_frames":
+        elif self.activity_index == "Align frames":
             if not self.automatic:
                 pass
             self.signal_align_frames.emit()
-        elif activity == "set_roi":
+        elif self.activity_index == "Set ROI":
             if not self.automatic:
                 pass
             self.signal_set_roi.emit()
-        elif activity == "compute_frame_qualities":
+        elif self.activity_index == "Compute frame qualities":
             if not self.automatic:
                 pass
             self.signal_compute_frame_qualities.emit()
-        elif activity == "stack_frames":
+        elif self.activity_index == "Stack frames":
             if not self.automatic:
                 pass
             self.signal_stack_frames.emit()
-        elif activity == "save_stacked_image":
+        elif self.activity_index == "Save stacked image":
             if not self.automatic:
                 pass
             self.signal_save_stacked_image.emit()
-        elif activity == "next_job":
+        elif self.activity_index == "Next job":
             self.job_index += 1
             if self.job_index < self.job_number:
+                self.activity_index = 0
                 if not self.automatic:
                     pass
                 self.signal_frames.emit(self.job_names[self.job_index],
@@ -166,22 +191,22 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.comboBox_back.clear()
         if self.job_index > 1:
             self.ui.comboBox_back.addItem('Previous job')
-        if next_activity == "rank_frames":
+        if next_activity == "Rank frames":
             self.ui.comboBox_back.addItems(['Read frames'])
-        elif next_activity == "align_frames":
+        elif next_activity == "Align frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames'])
-        elif next_activity == "set_roi":
+        elif next_activity == "Set ROI":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames'])
-        elif next_activity == "compute_frame_qualities":
+        elif next_activity == "Compute frame qualities":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
                                             'Set ROI'])
-        elif next_activity == "stack_frames":
+        elif next_activity == "Stack frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Compute frame qualities'])
-        elif next_activity == "save_stacked_image":
+        elif next_activity == "Save stacked image":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Compute frame qualities', 'Stack frames'])
-        elif next_activity == "next_job":
+        elif next_activity == "Next job":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Compute frame qualities', 'Stack frames',
                                             'Save stacked image'])

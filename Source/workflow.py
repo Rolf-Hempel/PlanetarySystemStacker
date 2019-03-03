@@ -96,7 +96,7 @@ class Workflow(QtCore.QObject):
         self.frames.add_monochrome(self.configuration.frames_mono_channel)
         self.my_timer.stop('Blurred monochrome images and Laplacians')
 
-        self.work_next_task_signal.emit("rank_frames")
+        self.work_next_task_signal.emit("Rank frames")
 
     @QtCore.pyqtSlot()
     def execute_rank_frames(self):
@@ -109,7 +109,7 @@ class Workflow(QtCore.QObject):
         self.my_timer.stop('Ranking images')
         print("Index of best frame: " + str(self.rank_frames.frame_ranks_max_index))
 
-        self.work_next_task_signal.emit("align_frames")
+        self.work_next_task_signal.emit("Align frames")
 
     @QtCore.pyqtSlot()
     def execute_align_frames(self, x_low_opt, x_high_opt, y_low_opt, y_high_opt):
@@ -162,7 +162,7 @@ class Workflow(QtCore.QObject):
         print("Average frame computed from the best " + str(
             self.align_frames.average_frame_number) + " frames.")
 
-        self.work_next_task_signal.emit("set_roi")
+        self.work_next_task_signal.emit("Set ROI")
 
     @QtCore.pyqtSlot()
     def execute_set_roi(self, y_min, y_max, x_min, x_max):
@@ -172,7 +172,7 @@ class Workflow(QtCore.QObject):
         self.align_frames.set_roi(y_min, y_max, x_min, x_max)
         self.my_timer.stop('Setting ROI and new reference')
 
-        self.work_next_task_signal.emit("compute_frame_qualities")
+        self.work_next_task_signal.emit("Compute frames qualities")
 
     @QtCore.pyqtSlot()
     def execute_compute_frame_qualities(self):
@@ -183,7 +183,7 @@ class Workflow(QtCore.QObject):
         self.alignment_points.compute_frame_qualities()
         self.my_timer.stop('Rank frames at alignment points')
 
-        self.work_next_task_signal.emit("stack_frames")
+        self.work_next_task_signal.emit("Stack frames")
 
     @QtCore.pyqtSlot()
     def execute_stack_frames(self):
@@ -200,7 +200,7 @@ class Workflow(QtCore.QObject):
         print("+++ Start merging alignment patches")
         self.stack_frames.merge_alignment_point_buffers()
 
-        self.work_next_task_signal.emit("save_stacked_image")
+        self.work_next_task_signal.emit("Save stacked image")
 
     @QtCore.pyqtSlot()
     def execute_save_stacked_image(self):
@@ -211,4 +211,4 @@ class Workflow(QtCore.QObject):
                                color=self.frames.color)
         self.my_timer.stop('Saving the final image')
 
-        self.work_next_task_signal.emit("next_job")
+        self.work_next_task_signal.emit("Next job")
