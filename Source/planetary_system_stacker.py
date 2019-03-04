@@ -32,6 +32,7 @@ from PyQt5 import QtWidgets, QtCore
 from main_gui import Ui_MainWindow
 
 from configuration import Configuration
+from configuration_editor import ConfigurationEditor
 from workflow import Workflow
 
 
@@ -72,13 +73,12 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # If the configuration was not read in from a previous run (i.e. only default values have
         # been set so far), open the configuration editor GUI to let the user make adjustments if
         # necessary.
-        if self.configuration.file_new:
-            editor = ConfigurationEditor(self.configuration, self.initialized)
-            editor.exec_()
+        if not self.configuration.config_file_exists:
+            self.edit_configuration()
 
         # If there is no ".ini" file yet in the user's home directory, or if the configuration
         # has changed, write the current configuration to the ".ini" file.
-        if self.configuration.file_new or editor.configuration_changed:
+        if not self.configuration.config_file_exists or self.configuration.configuration_changed:
             self.configuration.write_config()
 
         # Set dependent parameters.
@@ -127,6 +127,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                            'Compute frame qualities', 'Stack frames', 'Save stacked image',
                            'Next job']
         self.activity_index = 0
+
+    def edit_configuration(self):
+        editor = ConfigurationEditor(self.configuration)
+        editor.exec_()
 
     def play(self):
         self.work_next_task(self.activity_index)
