@@ -49,11 +49,11 @@ class ConfigurationParameters(object):
         self.global_parameters_version = "Planetary System Stacker 0.5.0"
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = True
-        self.global_parameters_store_protocol_with_result = None
+        self.global_parameters_store_protocol_with_result = False
         self.frames_gauss_width = 7
         self.align_frames_mode = 'Surface'
-        self.align_frames_automation = 'True'
-        self.align_frames_rectangle_scale_factor = 1./0.3
+        self.align_frames_automation = True
+        self.align_frames_rectangle_scale_factor = int(1./0.3)
         self.align_frames_search_width = 20
         self.align_frames_average_frame_percent = 5
         self.alignment_points_half_box_width = 20
@@ -151,6 +151,7 @@ class Configuration(object):
 
         # Mark the configuration as not changed.
         self.configuration_changed = False
+        self.go_back_to_activity = None
 
     def import_from_configuration_parameters(self, configuration_parameters):
         """

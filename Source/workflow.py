@@ -28,6 +28,7 @@ from align_frames import AlignFrames
 from exceptions import NotSupportedError, InternalError
 from frames import Frames
 from rank_frames import RankFrames
+from alignment_points import AlignmentPoints
 from stack_frames import StackFrames
 from timer import timer
 
@@ -112,7 +113,7 @@ class Workflow(QtCore.QObject):
         self.work_next_task_signal.emit("Align frames")
 
     @QtCore.pyqtSlot()
-    def execute_align_frames(self, x_low_opt, x_high_opt, y_low_opt, y_high_opt):
+    def execute_align_frames(self, auto_execution, x_low_opt, x_high_opt, y_low_opt, y_high_opt):
 
         # Initialize the frame alignment object.
         self.align_frames = AlignFrames(self.frames, self.rank_frames, self.configuration)
@@ -121,8 +122,9 @@ class Workflow(QtCore.QObject):
 
             # Compute the local rectangular patch in the image where the L gradient is highest
             # in both x and y direction. The scale factor specifies how much smaller the patch
-            # is compared to the whole image frame.
-            if self.configuration.align_frames_automation:
+            # is compared to the whole image frame. In batch mode, variable "auto_execution" is
+            # set to "True", and the automatic patch computation is the only option.
+            if auto_execution or self.configuration.align_frames_automation:
                 self.my_timer.create('Select optimal alignment patch')
                 (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = \
                     self.align_frames.select_alignment_rect(
@@ -171,6 +173,32 @@ class Workflow(QtCore.QObject):
         self.my_timer.create('Setting ROI and new reference')
         self.align_frames.set_roi(y_min, y_max, x_min, x_max)
         self.my_timer.stop('Setting ROI and new reference')
+
+        self.work_next_task_signal.emit("Set alignment points")
+
+    @QtCore.pyqtSlot()
+    def execute_set_alignment_points(self):
+
+        # Initialize the AlignmentPoints object.
+        self.my_timer.create('Initialize alignment point object')
+        self.alignment_points = AlignmentPoints(self.configuration, self.frames, self.rank_frames,
+                                           self.align_frames)
+        self.my_timer.stop('Initialize alignment point object')
+
+        # Create alignment points, and create an image with wll alignment point boxes and patches.
+        print("+++ Start creating alignment points")
+        self.my_timer.create('Create alignment points')
+
+        # If a ROI is selected, alignment points are created in the ROI window only.
+        self.alignment_points.create_ap_grid()
+
+        self.my_timer.stop('Create alignment points')
+        print("Number of alignment points selected: " + str(
+            len(self.alignment_points.alignment_points)) +
+              ", aps dropped because too dim: " + str(
+            self.alignment_points.alignment_points_dropped_dim) +
+              ", aps dropped because too little structure: " + str(
+            self.alignment_points.alignment_points_dropped_structure))
 
         self.work_next_task_signal.emit("Compute frames qualities")
 

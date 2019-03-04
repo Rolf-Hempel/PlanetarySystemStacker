@@ -46,8 +46,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
     signal_frames = QtCore.pyqtSignal(str, str, bool)
     signal_rank_frames = QtCore.pyqtSignal()
-    signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
+    signal_align_frames = QtCore.pyqtSignal(bool, int, int, int, int)
     signal_set_roi = QtCore.pyqtSignal(int, int, int, int)
+    signal_set_alignment_points = QtCore.pyqtSignal()
     signal_compute_frame_qualities = QtCore.pyqtSignal()
     signal_stack_frames = QtCore.pyqtSignal()
     signal_save_stacked_image = QtCore.pyqtSignal()
@@ -105,6 +106,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.signal_rank_frames.connect(self.workflow.execute_rank_frames)
         self.signal_align_frames.connect(self.workflow.execute_align_frames)
         self.signal_set_roi.connect(self.workflow.execute_set_roi)
+        self.signal_set_alignment_points.connect(self.workflow.execute_set_alignment_points)
         self.signal_compute_frame_qualities.connect(self.workflow.execute_compute_frame_qualities)
         self.signal_stack_frames.connect(self.workflow.execute_stack_frames)
         self.signal_save_stacked_image.connect(self.workflow.execute_save_stacked_image)
@@ -123,53 +125,57 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.job_index = 0
         self.job_names = []
         self.job_types = []
-        self.activities = ['Frames', 'Rank frames', 'Align frames', 'Set ROI',
-                           'Compute frame qualities', 'Stack frames', 'Save stacked image',
-                           'Next job']
-        self.activity_index = 0
+        self.activities = ['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
+                           'Set alignment points', 'Compute frame qualities', 'Stack frames',
+                           'Save stacked image', 'Next job']
+        self.activity = 'Frames'
 
     def edit_configuration(self):
         editor = ConfigurationEditor(self.configuration)
         editor.exec_()
 
     def play(self):
-        self.work_next_task(self.activity_index)
+        self.work_next_task(self.activity)
 
     def work_next_task(self, next_activity):
-        self.activity_index = next_activity
-        self.set_previous_actions_button(self.activity_index)
+        self.activity = next_activity
+        self.set_previous_actions_button(self.activity)
         self.update_status()
-        if self.activity_index == "Frames":
+        if self.activity == "Read frames":
             self.signal_frames.emit(self.job_names[self.job_index],
                                     self.job_types[self.job_index], False)
-        if self.activity_index == "Rank frames":
+        if self.activity == "Rank frames":
             if not self.automatic:
                 pass
             self.signal_rank_frames.emit()
-        elif self.activity_index == "Align frames":
+        elif self.activity == "Align frames":
             if not self.automatic:
                 pass
-            self.signal_align_frames.emit()
-        elif self.activity_index == "Set ROI":
+            self.signal_align_frames.emit(True, 0, 0, 0, 0)
+        elif self.activity == "Set ROI":
             if not self.automatic:
                 pass
             self.signal_set_roi.emit()
-        elif self.activity_index == "Compute frame qualities":
+        elif self.activity == "Set alignment points":
+            if not self.automatic:
+                pass
+            self.signal_set_alignment_points.emit()
+        elif self.activity == "Compute frame qualities":
             if not self.automatic:
                 pass
             self.signal_compute_frame_qualities.emit()
-        elif self.activity_index == "Stack frames":
+        elif self.activity == "Stack frames":
             if not self.automatic:
                 pass
             self.signal_stack_frames.emit()
-        elif self.activity_index == "Save stacked image":
+        elif self.activity == "Save stacked image":
             if not self.automatic:
                 pass
             self.signal_save_stacked_image.emit()
-        elif self.activity_index == "Next job":
+        elif self.activity == "Next job":
             self.job_index += 1
             if self.job_index < self.job_number:
-                self.activity_index = 0
+                self.activity = 0
                 if not self.automatic:
                     pass
                 self.signal_frames.emit(self.job_names[self.job_index],
@@ -201,19 +207,23 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames'])
         elif next_activity == "Set ROI":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames'])
-        elif next_activity == "Compute frame qualities":
+        elif next_activity == "Set alignment points":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
                                             'Set ROI'])
+        elif next_activity == "Compute frame qualities":
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
+                                            'Set ROI', 'Set alignment points'])
         elif next_activity == "Stack frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
-                                            'Compute frame qualities'])
+                                            'Set alignment points', 'Compute frame qualities'])
         elif next_activity == "Save stacked image":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
-                                            'Compute frame qualities', 'Stack frames'])
+                                            'Set alignment points', 'Compute frame qualities',
+                                            'Stack frames'])
         elif next_activity == "Next job":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
-                                            'Compute frame qualities', 'Stack frames',
-                                            'Save stacked image'])
+                                            'Set alignment points', 'Compute frame qualities',
+                                            'Stack frames', 'Save stacked image'])
 
     def update_status(self):
         if self.automatic:
