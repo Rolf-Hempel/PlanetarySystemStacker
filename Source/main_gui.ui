@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>905</width>
-    <height>600</height>
+    <width>938</width>
+    <height>697</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -17,16 +17,19 @@
    <locale language="English" country="UnitedStates"/>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QVBoxLayout" name="verticalLayout_2">
+   <layout class="QVBoxLayout" name="verticalLayout_2" stretch="100,0">
     <item>
-     <widget class="QFrame" name="display_area">
-      <property name="frameShape">
-       <enum>QFrame::Panel</enum>
+     <spacer name="verticalSpacer">
+      <property name="orientation">
+       <enum>Qt::Vertical</enum>
       </property>
-      <property name="frameShadow">
-       <enum>QFrame::Sunken</enum>
+      <property name="sizeHint" stdset="0">
+       <size>
+        <width>20</width>
+        <height>40</height>
+       </size>
       </property>
-     </widget>
+     </spacer>
     </item>
     <item>
      <layout class="QHBoxLayout" name="tool_line" stretch="0,3,5,12,3,3,12,12">
@@ -188,7 +191,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>905</width>
+     <width>938</width>
      <height>21</height>
     </rect>
    </property>

@@ -28,17 +28,24 @@ from configuration import ConfigurationParameters, Configuration
 from parameter_configuration import Ui_ConfigurationDialog
 
 
-class ConfigurationEditor(QtWidgets.QDialog, Ui_ConfigurationDialog):
+class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
     """
     Update the parameters used by PlanetarySystemStacker which are stored in the configuration
     object. The interaction with the user is through the ConfigurationDialog class.
     """
 
-    def __init__(self, configuration, parent=None):
-        QtWidgets.QDialog.__init__(self, parent)
+    def __init__(self, parent_gui, parent=None):
+        QtWidgets.QFrame.__init__(self, parent)
         self.setupUi(self)
 
-        self.configuration = configuration
+        self.setFrameShape(QtWidgets.QFrame.Panel)
+        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.setObjectName("configuration_editor")
+
+        self.setFixedSize(900, 600)
+
+        self.parent_gui = parent_gui
+        self.configuration = parent_gui.configuration
 
         # On return set the following variable to the activity to which the workflow has to go back
         # due to parameter changes. If it is None, nothing has to be repeated.
@@ -83,11 +90,12 @@ class ConfigurationEditor(QtWidgets.QDialog, Ui_ConfigurationDialog):
                                            QtCore.Qt.MatchFixedString)
         if index >= 0:
             self.afm_comboBox.setCurrentIndex(index)
+        self.afm_activate_deactivate_widgets()
         self.afa_checkBox.setChecked(self.config_copy.align_frames_automation)
         self.afrsf_slider_value.setValue(
-            int(round(100. / self.config_copy.align_frames_rectangle_scale_factor)))
+            int(100. / self.config_copy.align_frames_rectangle_scale_factor))
         self.afrsf_label_display.setText(
-            str(int(round(100. / self.config_copy.align_frames_rectangle_scale_factor))))
+            str(int(100. / self.config_copy.align_frames_rectangle_scale_factor)))
         self.afsw_slider_value.setValue(self.config_copy.align_frames_search_width)
         self.afsw_label_display.setText(str(self.config_copy.align_frames_search_width))
         self.afafp_slider_value.setValue(self.config_copy.align_frames_average_frame_percent)
@@ -115,12 +123,31 @@ class ConfigurationEditor(QtWidgets.QDialog, Ui_ConfigurationDialog):
 
     def afm_changed(self, value):
         self.config_copy.align_frames_mode = value
+        self.afm_activate_deactivate_widgets()
+
+    def afm_activate_deactivate_widgets(self):
+        if self.config_copy.align_frames_mode == 'Planet':
+            self.afa_checkBox.setEnabled(False)
+            self.afrsf_label_display.setEnabled(False)
+            self.afrsf_slider_value.setEnabled(False)
+            self.afrsf_label_parameter.setEnabled(False)
+            self.afsw_label_parameter.setEnabled(False)
+            self.afsw_slider_value.setEnabled(False)
+            self.afsw_label_display.setEnabled(False)
+        else:
+            self.afa_checkBox.setEnabled(True)
+            self.afrsf_label_display.setEnabled(True)
+            self.afrsf_slider_value.setEnabled(True)
+            self.afrsf_label_parameter.setEnabled(True)
+            self.afsw_label_parameter.setEnabled(True)
+            self.afsw_slider_value.setEnabled(True)
+            self.afsw_label_display.setEnabled(True)
 
     def afa_changed(self, state):
         self.config_copy.align_frames_automation = (state == QtCore.Qt.Checked)
 
     def afrsf_changed(self, value):
-        self.config_copy.align_frames_rectangle_scale_factor = int(round(100. / value))
+        self.config_copy.align_frames_rectangle_scale_factor = 100. / value
 
     def afsw_changed(self, value):
         self.config_copy.align_frames_search_width = value
@@ -132,7 +159,7 @@ class ConfigurationEditor(QtWidgets.QDialog, Ui_ConfigurationDialog):
         self.config_copy.global_parameters_write_protocol_to_file = (state == QtCore.Qt.Checked)
 
     def gpspwr_changed(self, state):
-        self.config_copy.global_parameters_write_protocol_to_file = (state == QtCore.Qt.Checked)
+        self.config_copy.global_parameters_store_protocol_with_result = (state == QtCore.Qt.Checked)
 
     def gppl_changed(self, value):
         self.config_copy.global_parameters_protocol_level = value
@@ -268,6 +295,11 @@ class ConfigurationEditor(QtWidgets.QDialog, Ui_ConfigurationDialog):
                 self.config_copy.global_parameters_protocol_level
             self.configuration.configuration_changed = True
 
+        # Set dependent parameters.
+        self.configuration.set_derived_parameters()
+
+        self.close()
+
     def reject(self):
         """
         The Cancel button is pressed, discard the changes and close the GUI window.
@@ -279,14 +311,10 @@ class ConfigurationEditor(QtWidgets.QDialog, Ui_ConfigurationDialog):
         self.close()
 
     def closeEvent(self, event):
+
+        # Write ".ini" file if it does not exist yet or parameters have changed.
+        if not self.configuration.config_file_exists or self.configuration.configuration_changed:
+            self.configuration.write_config()
+
+        self.parent_gui.display_widget(None, display=False)
         self.close()
-
-if __name__ == '__main__':
-
-    # Get configuration parameters.
-    configuration = Configuration()
-
-    app = QtWidgets.QApplication(sys.argv)
-    myapp = ConfigurationEditor(configuration)
-    myapp.showMaximized()
-    sys.exit(app.exec_())

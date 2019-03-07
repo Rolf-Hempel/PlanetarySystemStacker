@@ -29,6 +29,7 @@ from exceptions import IncompatibleVersionsError
 class ConfigurationParameters(object):
     def __init__(self):
 
+        self.hidden_parameters_current_dir = None
         self.global_parameters_version = None
         self.global_parameters_protocol_level = None
         self.global_parameters_write_protocol_to_file = None
@@ -46,6 +47,7 @@ class ConfigurationParameters(object):
         self.alignment_points_frame_percent = None
 
     def set_defaults(self):
+        self.hidden_parameters_current_dir = os.path.expanduser("~")
         self.global_parameters_version = "Planetary System Stacker 0.5.0"
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = True
@@ -53,7 +55,7 @@ class ConfigurationParameters(object):
         self.frames_gauss_width = 7
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
-        self.align_frames_rectangle_scale_factor = int(1./0.3)
+        self.align_frames_rectangle_scale_factor = 3.
         self.align_frames_search_width = 20
         self.align_frames_average_frame_percent = 5
         self.alignment_points_half_box_width = 20
@@ -63,6 +65,7 @@ class ConfigurationParameters(object):
         self.alignment_points_frame_percent = 10
 
     def copy_from_config_object(self, configuration_object):
+        self.hidden_parameters_current_dir = configuration_object.hidden_parameters_current_dir
         self.global_parameters_version = configuration_object.global_parameters_version
         self.global_parameters_protocol_level = \
             configuration_object.global_parameters_protocol_level
@@ -102,9 +105,7 @@ class Configuration(object):
         self.configuration_read = False
         if self.config_file_exists:
             try:
-                self.conf = self.read_config()
-                # Get the parameters from the configparser.
-                self.get_all_parameters_from_configparser(self.conf)
+                self.read_config()
                 # Set flag to indicate that parameters were read from file successfully.
                 self.configuration_read = True
             except:
@@ -120,7 +121,8 @@ class Configuration(object):
             # Set current configuration parameters to the new values.
             self.import_from_configuration_parameters(configuration_parameters)
 
-        # Set parameters which are hidden from the user.
+        # Set fixed parameters which are hidden from the user. Hidden parameters which are
+        # changeable are stored in the configuration object.
         self.frames_mono_channel = 'panchromatic'
 
         self.rank_frames_pixel_stride = 1
@@ -160,6 +162,8 @@ class Configuration(object):
         :param configuration_parameters: ConfigurarionParameters object with new parameter values.
         :return: -
         """
+
+        self.hidden_parameters_current_dir = configuration_parameters.hidden_parameters_current_dir
         self.global_parameters_version = configuration_parameters.global_parameters_version
         self.global_parameters_protocol_level = \
             configuration_parameters.global_parameters_protocol_level
@@ -192,6 +196,8 @@ class Configuration(object):
         :param configuration_parameters: ConfigurarionParameters object to be updated.
         :return: -
         """
+
+        configuration_parameters.hidden_parameters_current_dir = self.hidden_parameters_current_dir
         configuration_parameters.global_parameters_version = self.global_parameters_version
         configuration_parameters.global_parameters_protocol_level = \
             self.global_parameters_protocol_level
@@ -236,6 +242,7 @@ class Configuration(object):
             raise IncompatibleVersionsError(
                 "Error: parameter file read does not match program version")
 
+        self.hidden_parameters_current_dir = conf.get('Hidden parameters', 'current directory')
         self.global_parameters_protocol_level = conf.getint('Global parameters',
                                                                  'protocol level')
         self.global_parameters_write_protocol_to_file = conf.getboolean('Global parameters',
@@ -246,7 +253,7 @@ class Configuration(object):
         self.frames_gauss_width = conf.getint('Frames', 'gauss width')
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
-        self.align_frames_rectangle_scale_factor = conf.getint('Align frames',
+        self.align_frames_rectangle_scale_factor = conf.getfloat('Align frames',
                                                                     'rectangle scale factor')
         self.align_frames_search_width = conf.getint('Align frames', 'search width')
         self.align_frames_average_frame_percent = conf.getint('Align frames',
@@ -272,7 +279,10 @@ class Configuration(object):
         conf = configparser.ConfigParser()
 
         # Copy all current parameters from the current configuration into the ConfigParser object.
-        self.conf.add_section('Global parameters')
+        conf.add_section('Hidden parameters')
+        self.set_parameter(conf, 'Hidden parameters', 'current directory',
+                           self.hidden_parameters_current_dir)
+        conf.add_section('Global parameters')
         self.set_parameter(conf, 'Global parameters', 'version', self.global_parameters_version)
         self.set_parameter(conf, 'Global parameters', 'protocol level',
                            str(self.global_parameters_protocol_level))
@@ -281,10 +291,10 @@ class Configuration(object):
         self.set_parameter(conf, 'Global parameters', 'store protocol with result',
                            str(self.global_parameters_store_protocol_with_result))
 
-        self.conf.add_section('Frames')
+        conf.add_section('Frames')
         self.set_parameter(conf, 'Frames', 'gauss width', str(self.frames_gauss_width))
 
-        self.conf.add_section('Align frames')
+        conf.add_section('Align frames')
         self.set_parameter(conf, 'Align frames', 'mode', self.align_frames_mode)
         self.set_parameter(conf, 'Align frames', 'automation', str(self.align_frames_automation))
         self.set_parameter(conf, 'Align frames', 'rectangle scale factor',
@@ -293,15 +303,17 @@ class Configuration(object):
                            str(self.align_frames_search_width))
         self.set_parameter(conf, 'Align frames', 'average frame percent',
                            str(self.align_frames_average_frame_percent))
-        self.set_parameter(conf, 'Align frames', 'half box width',
+
+        conf.add_section('Alignment points')
+        self.set_parameter(conf, 'Alignment points', 'half box width',
                            str(self.alignment_points_half_box_width))
-        self.set_parameter(conf, 'Align frames', 'search width',
+        self.set_parameter(conf, 'Alignment points', 'search width',
                            str(self.alignment_points_search_width))
-        self.set_parameter(conf, 'Align frames', 'structure threshold',
+        self.set_parameter(conf, 'Alignment points', 'structure threshold',
                            str(self.alignment_points_structure_threshold))
-        self.set_parameter(conf, 'Align frames', 'brightness threshold',
+        self.set_parameter(conf, 'Alignment points', 'brightness threshold',
                            str(self.alignment_points_brightness_threshold))
-        self.set_parameter(conf, 'Align frames', 'frame percent',
+        self.set_parameter(conf, 'Alignment points', 'frame percent',
                            str(self.alignment_points_frame_percent))
 
         return conf
@@ -375,5 +387,7 @@ class Configuration(object):
         if not file_name:
             file_name = self.config_filename
         conf.read(file_name)
+
+        self.get_all_parameters_from_configparser(conf)
 
         return conf

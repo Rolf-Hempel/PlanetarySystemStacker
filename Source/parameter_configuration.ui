@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>906</width>
-    <height>574</height>
+    <height>524</height>
    </rect>
   </property>
   <property name="font">
@@ -18,10 +18,226 @@
   <property name="windowTitle">
    <string>Parameter Configuration</string>
   </property>
-  <layout class="QGridLayout" name="GridLayout" columnstretch="5,1,10,1,3,1,1,1,5,1,10,1,3">
+  <layout class="QGridLayout" name="GridLayout" columnstretch="5,0,0,0,0,0,0,0,0,0,0,0,0">
    <property name="verticalSpacing">
     <number>22</number>
    </property>
+   <item row="4" column="4">
+    <widget class="QLabel" name="afrsf_label_display">
+     <property name="text">
+      <string>TextLabel</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="8">
+    <widget class="QLabel" name="apst_label_parameter">
+     <property name="toolTip">
+      <string>In the automatic construction of alignment point grids, points are discarded if there is too little local structure.
+Higher values result in more points to be discarded. If the value is too low, unreliable alignment points are included.</string>
+     </property>
+     <property name="text">
+      <string>Minimum structure</string>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="0" colspan="5">
+    <widget class="Line" name="line_2">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="0">
+    <widget class="QLabel" name="afafp_label_parameter">
+     <property name="toolTip">
+      <string>The reference frame for the multipoint alignment is computed as the average of the best frames. This value specifies the number of frames to be used.</string>
+     </property>
+     <property name="text">
+      <string>Percentage of best frames for
+reference frame computation</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="11">
+    <spacer name="horizontalSpacer_5">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="4" column="10">
+    <widget class="QSlider" name="apbt_slider_value">
+     <property name="minimum">
+      <number>2</number>
+     </property>
+     <property name="maximum">
+      <number>50</number>
+     </property>
+     <property name="singleStep">
+      <number>2</number>
+     </property>
+     <property name="pageStep">
+      <number>2</number>
+     </property>
+     <property name="value">
+      <number>10</number>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="2">
+    <widget class="QSlider" name="fgw_slider_value">
+     <property name="minimum">
+      <number>1</number>
+     </property>
+     <property name="maximum">
+      <number>6</number>
+     </property>
+     <property name="singleStep">
+      <number>1</number>
+     </property>
+     <property name="pageStep">
+      <number>1</number>
+     </property>
+     <property name="value">
+      <number>4</number>
+     </property>
+     <property name="sliderPosition">
+      <number>4</number>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="1">
+    <spacer name="horizontalSpacer">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="1" column="9">
+    <spacer name="horizontalSpacer_6">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="9" column="4">
+    <widget class="QSpinBox" name="gppl_spinBox">
+     <property name="maximum">
+      <number>2</number>
+     </property>
+     <property name="value">
+      <number>1</number>
+     </property>
+    </widget>
+   </item>
+   <item row="10" column="0">
+    <widget class="QCheckBox" name="gpspwr_checkBox">
+     <property name="toolTip">
+      <string>Check this option if only rigid transformation should be applied to the color image.
+Usually this leads to a less accurate match.</string>
+     </property>
+     <property name="text">
+      <string>Store protocol with results</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="8">
+    <widget class="QLabel" name="apbt_label_parameter">
+     <property name="toolTip">
+      <string>In the automatic construction of alignment point grids, points are discarded if no pixels in the surrounding box are bright enough.
+Higher values result in more points to be discarded. If the value is too low, unreliable alignment points are included.</string>
+     </property>
+     <property name="text">
+      <string>Minimum brightness</string>
+     </property>
+    </widget>
+   </item>
+   <item row="8" column="0">
+    <widget class="QLabel" name="label_4">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="font">
+      <font>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="toolTip">
+      <string>With these parameters parts of the computing workflow can be skipped.</string>
+     </property>
+     <property name="text">
+      <string>Workflow Parameters</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="12">
+    <widget class="QLabel" name="apbt_label_display">
+     <property name="text">
+      <string>TextLabel</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QLabel" name="afrsf_label_parameter">
+     <property name="toolTip">
+      <string>Only for &quot;Surface&quot; mode: Size of the stabilization patch relative to the frame size.</string>
+     </property>
+     <property name="text">
+      <string>Stabilization patch size
+(% of frame size)</string>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="12">
+    <widget class="QLabel" name="apfp_label_display">
+     <property name="text">
+      <string>TextLabel</string>
+     </property>
+    </widget>
+   </item>
+   <item row="9" column="2">
+    <widget class="QLabel" name="gppl_label_parameter">
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="text">
+      <string>Protocol detail level</string>
+     </property>
+     <property name="alignment">
+      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
+     </property>
+    </widget>
+   </item>
    <item row="6" column="10">
     <widget class="QSlider" name="apfp_slider_value">
      <property name="minimum">
@@ -63,37 +279,6 @@
      </property>
     </widget>
    </item>
-   <item row="6" column="8">
-    <widget class="QLabel" name="apfp_label_parameter">
-     <property name="toolTip">
-      <string>At each alignment point the same number of frames are stacked.
-This value specifies this number relative to the total number of frames.</string>
-     </property>
-     <property name="text">
-      <string>Percentage of best frames
-to be stacked</string>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="10">
-    <widget class="QSlider" name="apst_slider_value">
-     <property name="minimum">
-      <number>1</number>
-     </property>
-     <property name="maximum">
-      <number>30</number>
-     </property>
-     <property name="pageStep">
-      <number>5</number>
-     </property>
-     <property name="value">
-      <number>5</number>
-     </property>
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
    <item row="1" column="3">
     <spacer name="horizontalSpacer_2">
      <property name="orientation">
@@ -106,6 +291,13 @@ to be stacked</string>
       </size>
      </property>
     </spacer>
+   </item>
+   <item row="3" column="12">
+    <widget class="QLabel" name="apst_label_display">
+     <property name="text">
+      <string>TextLabel</string>
+     </property>
+    </widget>
    </item>
    <item row="0" column="0" colspan="5">
     <widget class="QLabel" name="label">
@@ -131,13 +323,6 @@ is rotated, shifted and stretched to match the B/W image.</string>
      </property>
     </widget>
    </item>
-   <item row="3" column="12">
-    <widget class="QLabel" name="apst_label_display">
-     <property name="text">
-      <string>TextLabel</string>
-     </property>
-    </widget>
-   </item>
    <item row="9" column="0">
     <widget class="QCheckBox" name="gpwptf_checkBox">
      <property name="toolTip">
@@ -152,179 +337,27 @@ In this case only the optical flow is computed for fine-tuning.</string>
      </property>
     </widget>
    </item>
-   <item row="1" column="9">
-    <spacer name="horizontalSpacer_6">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>40</width>
-       <height>20</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item row="1" column="11">
-    <spacer name="horizontalSpacer_5">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>40</width>
-       <height>20</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item row="10" column="0">
-    <widget class="QCheckBox" name="gpspwr_checkBox">
-     <property name="toolTip">
-      <string>Check this option if only rigid transformation should be applied to the color image.
-Usually this leads to a less accurate match.</string>
-     </property>
-     <property name="text">
-      <string>Store protocol with results</string>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="10">
-    <widget class="QSlider" name="apbt_slider_value">
-     <property name="minimum">
-      <number>2</number>
-     </property>
-     <property name="maximum">
-      <number>50</number>
-     </property>
-     <property name="singleStep">
-      <number>2</number>
-     </property>
-     <property name="pageStep">
-      <number>2</number>
-     </property>
-     <property name="value">
-      <number>10</number>
-     </property>
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="7" column="0" colspan="5">
-    <widget class="Line" name="line_2">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="6" column="0">
-    <widget class="QLabel" name="afafp_label_parameter">
-     <property name="toolTip">
-      <string>The reference frame for the multipoint alignment is computed as the average of the best frames. This value specifies the number of frames to be used.</string>
-     </property>
-     <property name="text">
-      <string>Percentage of best frames for
-reference frame computation</string>
-     </property>
-    </widget>
-   </item>
-   <item row="9" column="4">
-    <widget class="QSpinBox" name="gppl_spinBox">
-     <property name="maximum">
-      <number>2</number>
-     </property>
-     <property name="value">
-      <number>1</number>
-     </property>
-    </widget>
-   </item>
-   <item row="6" column="12">
-    <widget class="QLabel" name="apfp_label_display">
-     <property name="text">
-      <string>TextLabel</string>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="12">
-    <widget class="QLabel" name="apbt_label_display">
-     <property name="text">
-      <string>TextLabel</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="2">
-    <widget class="QSlider" name="fgw_slider_value">
+   <item row="3" column="10">
+    <widget class="QSlider" name="apst_slider_value">
      <property name="minimum">
       <number>1</number>
      </property>
      <property name="maximum">
-      <number>6</number>
-     </property>
-     <property name="singleStep">
-      <number>1</number>
+      <number>30</number>
      </property>
      <property name="pageStep">
-      <number>1</number>
+      <number>5</number>
      </property>
      <property name="value">
-      <number>4</number>
-     </property>
-     <property name="sliderPosition">
-      <number>4</number>
+      <number>5</number>
      </property>
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>
-   <item row="9" column="2">
-    <widget class="QLabel" name="gppl_label_parameter">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="text">
-      <string>Protocol detail level</string>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="8">
-    <widget class="QLabel" name="apbt_label_parameter">
-     <property name="toolTip">
-      <string>In the automatic construction of alignment point grids, points are discarded if no pixels in the surrounding box are bright enough.
-Higher values result in more points to be discarded. If the value is too low, unreliable alignment points are included.</string>
-     </property>
-     <property name="text">
-      <string>Minimum brightness</string>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="8">
-    <widget class="QLabel" name="apst_label_parameter">
-     <property name="toolTip">
-      <string>In the automatic construction of alignment point grids, points are discarded if there is too little local structure.
-Higher values result in more points to be discarded. If the value is too low, unreliable alignment points are included.</string>
-     </property>
-     <property name="text">
-      <string>Minimum structure</string>
-     </property>
-    </widget>
-   </item>
-   <item row="4" column="4">
-    <widget class="QLabel" name="afrsf_label_display">
-     <property name="text">
-      <string>TextLabel</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="1">
-    <spacer name="horizontalSpacer">
+   <item row="1" column="7">
+    <spacer name="horizontalSpacer_4">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
@@ -335,50 +368,6 @@ Higher values result in more points to be discarded. If the value is too low, un
       </size>
      </property>
     </spacer>
-   </item>
-   <item row="4" column="0">
-    <widget class="QLabel" name="afrsf_label_parameter">
-     <property name="toolTip">
-      <string>Only for &quot;Surface&quot; mode: Size of the stabilization patch relative to the frame size.</string>
-     </property>
-     <property name="text">
-      <string>Stabilization patch size
-(% of frame size)</string>
-     </property>
-    </widget>
-   </item>
-   <item row="8" column="0">
-    <widget class="QLabel" name="label_4">
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Fixed">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="font">
-      <font>
-       <pointsize>12</pointsize>
-      </font>
-     </property>
-     <property name="toolTip">
-      <string>With these parameters parts of the computing workflow can be skipped.</string>
-     </property>
-     <property name="text">
-      <string>Workflow Parameters</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="0">
-    <widget class="QLabel" name="afm_label_parameter">
-     <property name="toolTip">
-      <string>All frames have to be globally aligned with each other before stacking. Two modes are supported: &quot;Surface&quot; and &quot;Planetary&quot;.
-In &quot;Surface&quot; mode (moon, sun) a patch with sufficient local contrast is used for image registration.
-In &quot;Planetary&quot; mode, the &quot;centers of gravity&quot; of all frames are registered with each other.</string>
-     </property>
-     <property name="text">
-      <string>Frame stabilization  mode</string>
-     </property>
-    </widget>
    </item>
    <item row="0" column="8" colspan="5">
     <widget class="QLabel" name="label_2">
@@ -413,18 +402,17 @@ Gaussian blur can help finding the global optimum. Try higher values for noisy i
      </property>
     </widget>
    </item>
-   <item row="1" column="7">
-    <spacer name="horizontalSpacer_4">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+   <item row="2" column="0">
+    <widget class="QLabel" name="afm_label_parameter">
+     <property name="toolTip">
+      <string>All frames have to be globally aligned with each other before stacking. Two modes are supported: &quot;Surface&quot; and &quot;Planetary&quot;.
+In &quot;Surface&quot; mode (moon, sun) a patch with sufficient local contrast is used for image registration.
+In &quot;Planetary&quot; mode, the &quot;centers of gravity&quot; of all frames are registered with each other.</string>
      </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>40</width>
-       <height>20</height>
-      </size>
+     <property name="text">
+      <string>Frame stabilization  mode</string>
      </property>
-    </spacer>
+    </widget>
    </item>
    <item row="1" column="8">
     <widget class="QLabel" name="aphbw_label_parameter">
@@ -438,134 +426,77 @@ Smaller values result in better resolution of locality, but shift detection can 
      </property>
     </widget>
    </item>
-   <item row="2" column="12">
-    <widget class="QLabel" name="apsw_label_display">
-     <property name="text">
-      <string>TextLabel</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="4">
-    <widget class="QLabel" name="fgw_label_display">
-     <property name="text">
-      <string>TextLabel</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="10">
-    <widget class="QSlider" name="apsw_slider_value">
+   <item row="6" column="2">
+    <widget class="QSlider" name="afafp_slider_value">
      <property name="minimum">
-      <number>6</number>
+      <number>3</number>
      </property>
      <property name="maximum">
       <number>30</number>
      </property>
      <property name="singleStep">
-      <number>2</number>
+      <number>3</number>
      </property>
      <property name="pageStep">
-      <number>2</number>
+      <number>3</number>
      </property>
      <property name="value">
-      <number>10</number>
+      <number>6</number>
      </property>
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>
-   <item row="1" column="12">
-    <widget class="QLabel" name="aphbw_label_display">
+   <item row="9" column="10" colspan="3">
+    <widget class="QPushButton" name="restore_standard_values">
+     <property name="toolTip">
+      <string>Reset parameters to original values. In most cases they should give satisfactory results.</string>
+     </property>
+     <property name="text">
+      <string>Restore standard values</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="2">
+    <widget class="QComboBox" name="afm_comboBox">
+     <property name="currentText">
+      <string/>
+     </property>
+     <property name="currentIndex">
+      <number>-1</number>
+     </property>
+     <property name="maxVisibleItems">
+      <number>2</number>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="2">
+    <widget class="QSlider" name="afsw_slider_value">
+     <property name="minimum">
+      <number>5</number>
+     </property>
+     <property name="maximum">
+      <number>60</number>
+     </property>
+     <property name="singleStep">
+      <number>5</number>
+     </property>
+     <property name="pageStep">
+      <number>5</number>
+     </property>
+     <property name="value">
+      <number>20</number>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="5" column="4">
+    <widget class="QLabel" name="afsw_label_display">
      <property name="text">
       <string>TextLabel</string>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="8">
-    <widget class="QLabel" name="apsw_label_parameter">
-     <property name="toolTip">
-      <string>Maximum allowed local warp per coordinate direction.</string>
-     </property>
-     <property name="text">
-      <string>Max. alignment search
-width (pixels)</string>
-     </property>
-    </widget>
-   </item>
-   <item row="0" column="6" rowspan="12">
-    <widget class="Line" name="line">
-     <property name="orientation">
-      <enum>Qt::Vertical</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="6" column="4">
-    <widget class="QLabel" name="afafp_label_display">
-     <property name="text">
-      <string>TextLabel</string>
-     </property>
-    </widget>
-   </item>
-   <item row="11" column="8" colspan="5">
-    <widget class="Line" name="line_5">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="3" column="0">
-    <widget class="QCheckBox" name="afa_checkBox">
-     <property name="toolTip">
-      <string>Only for &quot;Surface&quot; mode: Identify frame stabilization patch automatically.</string>
-     </property>
-     <property name="text">
-      <string>Automatic frame stabilization</string>
-     </property>
-     <property name="checked">
-      <bool>true</bool>
-     </property>
-    </widget>
-   </item>
-   <item row="5" column="8" colspan="2">
-    <widget class="QLabel" name="label_8">
-     <property name="font">
-      <font>
-       <pointsize>12</pointsize>
-      </font>
-     </property>
-     <property name="text">
-      <string>Stacking Parameters</string>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="5">
-    <spacer name="horizontalSpacer_3">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-     <property name="sizeHint" stdset="0">
-      <size>
-       <width>40</width>
-       <height>20</height>
-      </size>
-     </property>
-    </spacer>
-   </item>
-   <item row="7" column="8" colspan="5">
-    <widget class="Line" name="line_3">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="5" column="0">
-    <widget class="QLabel" name="afsw_label_parameter">
-     <property name="toolTip">
-      <string>Only for &quot;Surface&quot; mode: Maximum allowed shift of consecutive frames per coordinate direction in pixels.</string>
-     </property>
-     <property name="text">
-      <string>Stabilization search width
-(pixels)</string>
      </property>
     </widget>
    </item>
@@ -594,62 +525,120 @@ width (pixels)</string>
      </property>
     </widget>
    </item>
-   <item row="5" column="4">
-    <widget class="QLabel" name="afsw_label_display">
+   <item row="5" column="0">
+    <widget class="QLabel" name="afsw_label_parameter">
+     <property name="toolTip">
+      <string>Only for &quot;Surface&quot; mode: Maximum allowed shift of consecutive frames per coordinate direction in pixels.</string>
+     </property>
+     <property name="text">
+      <string>Stabilization search width
+(pixels)</string>
+     </property>
+    </widget>
+   </item>
+   <item row="7" column="8" colspan="5">
+    <widget class="Line" name="line_3">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="5">
+    <spacer name="horizontalSpacer_3">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
+   </item>
+   <item row="5" column="8" colspan="2">
+    <widget class="QLabel" name="label_8">
+     <property name="font">
+      <font>
+       <pointsize>12</pointsize>
+      </font>
+     </property>
+     <property name="text">
+      <string>Stacking Parameters</string>
+     </property>
+    </widget>
+   </item>
+   <item row="3" column="0">
+    <widget class="QCheckBox" name="afa_checkBox">
+     <property name="toolTip">
+      <string>Only for &quot;Surface&quot; mode: Identify frame stabilization patch automatically.</string>
+     </property>
+     <property name="text">
+      <string>Automatic frame stabilization</string>
+     </property>
+     <property name="checked">
+      <bool>true</bool>
+     </property>
+    </widget>
+   </item>
+   <item row="6" column="4">
+    <widget class="QLabel" name="afafp_label_display">
      <property name="text">
       <string>TextLabel</string>
      </property>
     </widget>
    </item>
-   <item row="5" column="2">
-    <widget class="QSlider" name="afsw_slider_value">
-     <property name="minimum">
-      <number>5</number>
-     </property>
-     <property name="maximum">
-      <number>60</number>
-     </property>
-     <property name="singleStep">
-      <number>5</number>
-     </property>
-     <property name="pageStep">
-      <number>5</number>
-     </property>
-     <property name="value">
-      <number>20</number>
-     </property>
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="2">
-    <widget class="QComboBox" name="afm_comboBox">
-     <property name="currentText">
-      <string/>
-     </property>
-     <property name="currentIndex">
-      <number>-1</number>
-     </property>
-     <property name="maxVisibleItems">
-      <number>2</number>
-     </property>
-    </widget>
-   </item>
-   <item row="11" column="0" colspan="5">
-    <widget class="Line" name="line_4">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="9" column="10" colspan="3">
-    <widget class="QPushButton" name="restore_standard_values">
+   <item row="2" column="8">
+    <widget class="QLabel" name="apsw_label_parameter">
      <property name="toolTip">
-      <string>Reset parameters to original values. In most cases they should give satisfactory results.</string>
+      <string>Maximum allowed local warp per coordinate direction.</string>
      </property>
      <property name="text">
-      <string>Restore standard values</string>
+      <string>Max. alignment search
+width (pixels)</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="12">
+    <widget class="QLabel" name="aphbw_label_display">
+     <property name="text">
+      <string>TextLabel</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="10">
+    <widget class="QSlider" name="apsw_slider_value">
+     <property name="minimum">
+      <number>6</number>
+     </property>
+     <property name="maximum">
+      <number>30</number>
+     </property>
+     <property name="singleStep">
+      <number>2</number>
+     </property>
+     <property name="pageStep">
+      <number>2</number>
+     </property>
+     <property name="value">
+      <number>10</number>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="4">
+    <widget class="QLabel" name="fgw_label_display">
+     <property name="text">
+      <string>TextLabel</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="12">
+    <widget class="QLabel" name="apsw_label_display">
+     <property name="text">
+      <string>TextLabel</string>
      </property>
     </widget>
    </item>
@@ -660,25 +649,22 @@ width (pixels)</string>
      </property>
     </widget>
    </item>
-   <item row="6" column="2">
-    <widget class="QSlider" name="afafp_slider_value">
-     <property name="minimum">
-      <number>3</number>
+   <item row="6" column="8">
+    <widget class="QLabel" name="apfp_label_parameter">
+     <property name="toolTip">
+      <string>At each alignment point the same number of frames are stacked.
+This value specifies this number relative to the total number of frames.</string>
      </property>
-     <property name="maximum">
-      <number>30</number>
+     <property name="text">
+      <string>Percentage of best frames
+to be stacked</string>
      </property>
-     <property name="singleStep">
-      <number>3</number>
-     </property>
-     <property name="pageStep">
-      <number>3</number>
-     </property>
-     <property name="value">
-      <number>6</number>
-     </property>
+    </widget>
+   </item>
+   <item row="0" column="6" rowspan="11">
+    <widget class="Line" name="line">
      <property name="orientation">
-      <enum>Qt::Horizontal</enum>
+      <enum>Qt::Vertical</enum>
      </property>
     </widget>
    </item>

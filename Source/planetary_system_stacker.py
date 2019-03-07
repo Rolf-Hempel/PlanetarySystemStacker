@@ -65,25 +65,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
-        # Initialize the path to the home directory.
-        self.current_dir = str(Path.home())
-
         # Create configuration object and set configuration parameters to standard values.
         self.configuration = Configuration()
 
-        # If the configuration was not read in from a previous run (i.e. only default values have
-        # been set so far), open the configuration editor GUI to let the user make adjustments if
-        # necessary.
-        if not self.configuration.config_file_exists:
-            self.edit_configuration()
-
-        # If there is no ".ini" file yet in the user's home directory, or if the configuration
-        # has changed, write the current configuration to the ".ini" file.
-        if not self.configuration.config_file_exists or self.configuration.configuration_changed:
-            self.configuration.write_config()
-
-        # Set dependent parameters.
-        self.configuration.set_derived_parameters()
+        # Initialize variables.
+        self.widget_saved = None
 
         # Write the program version into the window title.
         self.setWindowTitle(self.configuration.global_parameters_version)
@@ -92,6 +78,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.actionQuit.triggered.connect(self.closeEvent)
 
         self.ui.pushButton_start.clicked.connect(self.play)
+        self.ui.actionEdit_configuration.triggered.connect(self.edit_configuration)
+        self.ui.actionLoad_config.triggered.connect(self.load_config_file)
+        self.ui.actionSave_config.triggered.connect(self.save_config_file)
 
         # Create the workflow thread and start it.
         self.thread = QtCore.QThread()
@@ -130,9 +119,55 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                            'Save stacked image', 'Next job']
         self.activity = 'Frames'
 
+        # If the configuration was not read in from a previous run (i.e. only default values have
+        # been set so far), open the configuration editor GUI to let the user make adjustments if
+        # necessary.
+        if not self.configuration.config_file_exists:
+            self.edit_configuration()
+
     def edit_configuration(self):
-        editor = ConfigurationEditor(self.configuration)
-        editor.exec_()
+        self.display_widget(ConfigurationEditor(self))
+
+    def display_widget(self, widget, display=True):
+        if display:
+            if self.widget_saved:
+                self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+                self.widget_saved.close()
+            self.widget_saved = widget
+            self.ui.verticalLayout_2.insertWidget(0, widget)
+        else:
+            self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+            self.widget_saved.close()
+            self.widget_saved = None
+
+    def load_config_file(self):
+        options = QtWidgets.QFileDialog.Options()
+        filename = QtWidgets.QFileDialog.getOpenFileName(self, "Load configuration file",
+                    self.configuration.hidden_parameters_current_dir, "*.pss", options=options)
+        file_name = filename[0]
+        if file_name != '':
+            # Read configuration parameters from the selected file.
+            self.configuration.read_config(file_name=file_name)
+            # Remember the current directory for next file dialog.
+            self.configuration.current_dir = str(Path(file_name).parents[0])
+            self.display_widget(ConfigurationEditor(self))
+
+    def save_config_file(self):
+        options = QtWidgets.QFileDialog.Options()
+        filename = QtWidgets.QFileDialog.getSaveFileName(self, "Save configuration file",
+                    self.configuration.hidden_parameters_current_dir, "Config file (*.pss)",
+                    options=options)
+        # Store image only if the chooser did not return with a cancel.
+        file_name = filename[0]
+        if file_name != "":
+            my_file = Path(file_name)
+            # Remember the current directory for next file dialog.
+            self.configuration.hidden_parameters_current_dir = str(my_file.parents[0])
+            if my_file.is_file():
+                os.remove(str(my_file))
+            self.configuration.write_config(file_name=str(my_file))
+        else:
+            print ("File not written")
 
     def play(self):
         self.work_next_task(self.activity)
@@ -278,5 +313,6 @@ if __name__ == "__main__":
 
     app = QtWidgets.QApplication(sys.argv)
     myapp = PlanetarySystemStacker()
-    myapp.showMaximized()
+    myapp.setGeometry(200, 200, 1200, 800)
+    myapp.show()
     sys.exit(app.exec_())
