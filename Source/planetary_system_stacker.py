@@ -83,7 +83,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Write the program version into the window title.
         self.setWindowTitle(self.configuration.global_parameters_version)
 
-        self.ui.comboBox_back.addItems(['Previous Job'])
+
         self.ui.actionQuit.triggered.connect(self.closeEvent)
 
         self.ui.pushButton_start.clicked.connect(self.play)
@@ -102,6 +102,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # self.workflow.set_error_signal.connect(self.show_error_message)
         self.thread.start()
 
+        # Connect signals to start activities on the workflow thread (in method "work_next_task").
         self.signal_frames.connect(self.workflow.execute_frames)
         self.signal_rank_frames.connect(self.workflow.execute_rank_frames)
         self.signal_align_frames.connect(self.workflow.execute_align_frames)
@@ -116,13 +117,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # self.ImageWindow.setObjectName("ImageWindow")
         # self.ui.verticalLayout_3.insertWidget(1, self.ImageWindow, stretch=1)
 
-        self.activate_gui_elements(
-            [self.ui.comboBox_back, self.ui.pushButton_start, self.ui.pushButton_stop,
-             self.ui.pushButton_next_job, self.ui.actionSave, self.ui.actionSave_as,
-             self.ui.actionEdit_postproc_config], False)
-        self.show_current_progress_widgets(False)
-        self.show_batch_progress_widgets(False)
-
         # Initialize status variables
         self.automatic = self.ui.box_automatic.isChecked()
         self.job_number = 0
@@ -134,6 +128,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                            'Save stacked image', 'Next job']
         self.activity = 'Read frames'
 
+        # Initialize the "backwards" combobox: The user can only go back to those program steps
+        # which have been executed already.
+        self.set_previous_actions_button(self.activity)
+
+        # Deactivate GUI elements which do not make sense yet.
+        self.activate_gui_elements(
+            [self.ui.comboBox_back, self.ui.pushButton_start, self.ui.pushButton_stop,
+             self.ui.pushButton_next_job, self.ui.actionSave, self.ui.actionSave_as,
+             self.ui.actionEdit_postproc_config], False)
+        self.show_current_progress_widgets(False)
+        self.show_batch_progress_widgets(False)
+
         # If the configuration was not read in from a previous run (i.e. only default values have
         # been set so far), open the configuration editor GUI to let the user make adjustments if
         # necessary.
@@ -141,9 +147,25 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.edit_configuration()
 
     def edit_configuration(self):
+        """
+        This method is invoked by selecting the "edit stacking config" menu entry.
+
+        :return: -
+        """
+
+        # Display the configuration editor widget in the central QFrame.
         self.display_widget(ConfigurationEditor(self))
 
     def display_widget(self, widget, display=True):
+        """
+        Display a widget in the central main GUI location, or remove it from there.
+
+        :param widget: Widget object to be displayed.
+        :param display: If "True", display the widget. If "False", remove the current widget from
+                        the GUI.
+        :return: -
+        """
+
         if display:
             if self.widget_saved:
                 self.ui.verticalLayout_2.removeWidget(self.widget_saved)
@@ -157,10 +179,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 self.widget_saved = None
 
     def load_config_file(self):
+        """
+        Load a stacking configuration file (extension ".pss").
+        :return: -
+        """
+
         options = QtWidgets.QFileDialog.Options()
         filename = QtWidgets.QFileDialog.getOpenFileName(self, "Load configuration file",
                     self.configuration.hidden_parameters_current_dir, "*.pss", options=options)
         file_name = filename[0]
+
+        # If a valid file was selected, read parameters from the file and open the configuration
+        # editor.
         if file_name != '':
             # Read configuration parameters from the selected file.
             self.configuration.read_config(file_name=file_name)
@@ -169,38 +199,80 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.display_widget(ConfigurationEditor(self))
 
     def save_config_file(self):
+        """
+        Save all stacking parameters in a configuration file.
+
+        :return: -
+        """
+
+        # Open the file chooser.
         options = QtWidgets.QFileDialog.Options()
         filename = QtWidgets.QFileDialog.getSaveFileName(self, "Save configuration file",
                     self.configuration.hidden_parameters_current_dir, "Config file (*.pss)",
                     options=options)
+
         # Store file only if the chooser did not return with a cancel.
         file_name = filename[0]
         if file_name != "":
             my_file = Path(file_name)
+
             # Remember the current directory for next file dialog.
             self.configuration.hidden_parameters_current_dir = str(my_file.parents[0])
+
+            # If the config file exists, delete it first.
             if my_file.is_file():
                 os.remove(str(my_file))
             self.configuration.write_config(file_name=str(my_file))
-        else:
-            print ("File not written")
 
     def load_video_directory(self):
+        """
+        This method is invoked by selecting "Open" from the "file" menu.
+
+        :return: -
+        """
+
+        # Open the job editor widget.
         self.display_widget(JobEditor(self))
 
     def play(self):
+        """
+        This method is invoked when the "Start / Cont." button is pressed.
+        :return:
+        """
+
+        # Start the next task.
         self.work_next_task(self.activity)
 
     def work_next_task(self, next_activity):
+        """
+        This is the central place where all activities are scheduled. Depending on the
+         "next_activity" chosen, the appropriate activity is started on the workflow thread.
+
+        :param next_activity: Activity to be performed next.
+        :return: -
+        """
+
         self.activity = next_activity
+
+        # Depending on the current activity, the "previous action button" presents different
+        # choices. One can only go back to activities which have been performed already.
         self.set_previous_actions_button(self.activity)
+
+        # Activate / Deactivate GUI elements depending on the current situation.
         self.update_status()
+
+        # Start workflow activities. When a workflow method terminates, it invokes this method on
+        # the GUI thread, with "next_activity" denoting the next step in the processing chain.
         if self.activity == "Read frames":
+            # For the first activity (reading all frames from the file system) there is no
+            # GUI interaction. Start the workflow action immediately.
             self.signal_frames.emit(self.job_names[self.job_index],
                                     self.job_types[self.job_index], False)
         if self.activity == "Rank frames":
+            # If batch mode is deselected, start GUI activity.
             if not self.automatic:
                 pass
+            # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit()
         elif self.activity == "Align frames":
             if not self.automatic:
@@ -227,15 +299,24 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 pass
             self.signal_save_stacked_image.emit()
         elif self.activity == "Next job":
+            # If there are more jobs on the batch list, increment the job counter and reset the
+            # "self.activity" variable to the beginning of the processing workflow.
             self.job_index += 1
             if self.job_index < self.job_number:
-                self.activity = 0
+                self.activity = "Read frames"
                 if not self.automatic:
                     pass
                 self.signal_frames.emit(self.job_names[self.job_index],
                                         self.job_types[self.job_index], False)
 
     def show_current_progress_widgets(self, show):
+        """
+        Show or hide the GUI widgets showing the progress of the current job.
+
+        :param show: If "True", show the widgets, otherwise hide them.
+        :return: -
+        """
+
         if show:
             self.ui.progressBar_current.show()
             self.ui.label_current_progress.show()
@@ -244,6 +325,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.ui.label_current_progress.hide()
 
     def show_batch_progress_widgets(self, show):
+        """
+        Show or hide the GUI widgets showing the progress of the batch.
+
+        :param show: If "True", show the widgets, otherwise hide them.
+        :return: -
+        """
+
         if show:
             self.ui.progressBar_batch.show()
             self.ui.label_batch_progress.show()
@@ -252,12 +340,20 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.ui.label_batch_progress.hide()
 
     def set_previous_actions_button(self, next_activity):
+        """
+        Initialize the "backwards" combobox: The user can only go back to those program steps
+        which have been executed already.
+
+        :param next_activity: The next step in the processing workflow.
+        :return: -
+        """
+
         self.ui.comboBox_back.clear()
         if self.job_index > 1:
             self.ui.comboBox_back.addItem('Previous job')
         if next_activity == "Read frames":
             self.ui.comboBox_back.addItems(['Read frames'])
-        if next_activity == "Rank frames":
+        elif next_activity == "Rank frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames'])
         elif next_activity == "Align frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames'])
@@ -284,12 +380,20 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                             'Stack frames', 'Save stacked image'])
 
     def update_status(self):
+        """
+        Activate / Deactivate GUI elements depending on the current processing status.
+
+        :return: -
+        """
+
+        # In batch mode: Deactivate most buttons and menu entries.
         if self.automatic:
             self.activate_gui_elements([self.ui.comboBox_back, self.ui.pushButton_start,
                                         self.ui.pushButton_next_job, self.ui.menuFile], False)
+        # In manual mode, activate most buttons and menu entries.
         else:
             self.activate_gui_elements([self.ui.pushButton_start, self.ui.menuFile], True)
-            self.activate_gui_elements([self.ui.comboBox_back], self.job_index > 0)
+            # self.activate_gui_elements([self.ui.comboBox_back], self.job_index > 0)
             self.activate_gui_elements([self.ui.pushButton_next_job],
                                         self.job_index < self.job_number - 1)
 
@@ -297,6 +401,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.show_batch_progress_widgets(self.job_number > 1)
 
     def activate_gui_elements(self, elements, enable):
+        """
+        Enable / Disable selected GUI elements.
+
+        :param elements: List of GUI elements.
+        :param enable: If "True", enable the elements; otherwise disable them.
+        :return: -
+        """
+
         for element in elements:
             element.setEnabled(enable)
 
@@ -316,6 +428,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.configuration.hidden_parameters_main_window_y0 = y0
             self.configuration.hidden_parameters_main_window_width = width
             self.configuration.hidden_parameters_main_window_height = height
+
+        # Write the current configuration to the ".ini" file in the user's home directory.
         self.configuration.write_config()
         sys.exit(0)
 

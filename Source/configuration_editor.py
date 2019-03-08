@@ -69,7 +69,6 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.gpwptf_checkBox.stateChanged.connect(self.gpwptf_changed)
         self.gpspwr_checkBox.stateChanged.connect(self.gpspwr_changed)
         self.gppl_spinBox.valueChanged['int'].connect(self.gppl_changed)
-
         self.aphbw_slider_value.valueChanged['int'].connect(self.aphbw_changed)
         self.apsw_slider_value.valueChanged['int'].connect(self.apsw_changed)
         self.apst_slider_value.valueChanged['int'].connect(self.apst_changed)
@@ -81,8 +80,13 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.initialize_widgets_and_local_parameters()
 
     def initialize_widgets_and_local_parameters(self):
-        # Initialize GUI widgets with current configuration parameter values.
-        self.fgw_slider_value.setValue(int((self.config_copy.frames_gauss_width+1)/2))
+        """
+        Initialize GUI widgets with current configuration parameter values.
+
+        :return: -
+        """
+
+        self.fgw_slider_value.setValue(int((self.config_copy.frames_gauss_width + 1) / 2))
         self.fgw_label_display.setText(str(self.config_copy.frames_gauss_width))
         index = self.afm_comboBox.findText(self.config_copy.align_frames_mode,
                                            QtCore.Qt.MatchFixedString)
@@ -116,6 +120,16 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.apfp_label_display.setText(str(self.config_copy.alignment_points_frame_percent))
 
     def fgw_changed(self, value):
+        """
+        When the widget changes its value, update the corresponding entry in the configuration copy.
+        Please note that for some parameters the representations differ.
+
+        The methods following this one do the same for all other configuration parameters.
+
+        :param value: New value sent by widget
+        :return: -
+        """
+
         self.config_copy.frames_gauss_width = 2 * value - 1
         self.fgw_label_display.setText(str(self.config_copy.frames_gauss_width))
 
@@ -124,6 +138,13 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.afm_activate_deactivate_widgets()
 
     def afm_activate_deactivate_widgets(self):
+        """
+        Special case: Depending on the "frame stabilization mode" selected, some other parameters
+        do not make sense, so they are greyed out (for case 'Planet').
+
+        :return:-
+        """
+
         if self.config_copy.align_frames_mode == 'Planet':
             self.afa_checkBox.setEnabled(False)
             self.afrsf_label_display.setEnabled(False)
