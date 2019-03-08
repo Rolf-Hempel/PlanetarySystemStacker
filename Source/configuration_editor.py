@@ -20,11 +20,9 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import sys
-
 from PyQt5 import QtWidgets, QtCore
 
-from configuration import ConfigurationParameters, Configuration
+from configuration import ConfigurationParameters
 from parameter_configuration import Ui_ConfigurationDialog
 
 

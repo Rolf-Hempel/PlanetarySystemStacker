@@ -25,7 +25,6 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 
 import sys
 from pathlib import Path
-from time import sleep
 
 from PyQt5 import QtWidgets, QtCore
 
@@ -33,6 +32,7 @@ from main_gui import Ui_MainWindow
 
 from configuration import Configuration
 from configuration_editor import ConfigurationEditor
+from job_editor import JobEditor
 from workflow import Workflow
 
 
@@ -68,6 +68,15 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Create configuration object and set configuration parameters to standard values.
         self.configuration = Configuration()
 
+        # Look up the location and size of the main GUI. Replace the location parameters with those
+        # stored in the configuration file when the GUI was closed last time. This way, the GUI
+        # memorizes its location between MPM invocations.
+        x0 = self.configuration.hidden_parameters_main_window_x0
+        y0 = self.configuration.hidden_parameters_main_window_y0
+        width = self.configuration.hidden_parameters_main_window_width
+        height = self.configuration.hidden_parameters_main_window_height
+        self.setGeometry(x0, y0, width, height)
+
         # Initialize variables.
         self.widget_saved = None
 
@@ -78,9 +87,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.actionQuit.triggered.connect(self.closeEvent)
 
         self.ui.pushButton_start.clicked.connect(self.play)
+        self.ui.actionLoad_video_directory.triggered.connect(self.load_video_directory)
         self.ui.actionEdit_configuration.triggered.connect(self.edit_configuration)
         self.ui.actionLoad_config.triggered.connect(self.load_config_file)
         self.ui.actionSave_config.triggered.connect(self.save_config_file)
+
 
         # Create the workflow thread and start it.
         self.thread = QtCore.QThread()
@@ -105,6 +116,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # self.ImageWindow.setObjectName("ImageWindow")
         # self.ui.verticalLayout_3.insertWidget(1, self.ImageWindow, stretch=1)
 
+        self.activate_gui_elements(
+            [self.ui.comboBox_back, self.ui.pushButton_start, self.ui.pushButton_stop,
+             self.ui.pushButton_next_job, self.ui.actionSave, self.ui.actionSave_as,
+             self.ui.actionEdit_postproc_config], False)
         self.show_current_progress_widgets(False)
         self.show_batch_progress_widgets(False)
 
@@ -117,7 +132,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.activities = ['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                            'Set alignment points', 'Compute frame qualities', 'Stack frames',
                            'Save stacked image', 'Next job']
-        self.activity = 'Frames'
+        self.activity = 'Read frames'
 
         # If the configuration was not read in from a previous run (i.e. only default values have
         # been set so far), open the configuration editor GUI to let the user make adjustments if
@@ -136,9 +151,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.widget_saved = widget
             self.ui.verticalLayout_2.insertWidget(0, widget)
         else:
-            self.ui.verticalLayout_2.removeWidget(self.widget_saved)
-            self.widget_saved.close()
-            self.widget_saved = None
+            if self.widget_saved:
+                self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+                self.widget_saved.close()
+                self.widget_saved = None
 
     def load_config_file(self):
         options = QtWidgets.QFileDialog.Options()
@@ -157,7 +173,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         filename = QtWidgets.QFileDialog.getSaveFileName(self, "Save configuration file",
                     self.configuration.hidden_parameters_current_dir, "Config file (*.pss)",
                     options=options)
-        # Store image only if the chooser did not return with a cancel.
+        # Store file only if the chooser did not return with a cancel.
         file_name = filename[0]
         if file_name != "":
             my_file = Path(file_name)
@@ -168,6 +184,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.configuration.write_config(file_name=str(my_file))
         else:
             print ("File not written")
+
+    def load_video_directory(self):
+        self.display_widget(JobEditor(self))
 
     def play(self):
         self.work_next_task(self.activity)
@@ -236,25 +255,29 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.comboBox_back.clear()
         if self.job_index > 1:
             self.ui.comboBox_back.addItem('Previous job')
-        if next_activity == "Rank frames":
+        if next_activity == "Read frames":
             self.ui.comboBox_back.addItems(['Read frames'])
-        elif next_activity == "Align frames":
+        if next_activity == "Rank frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames'])
-        elif next_activity == "Set ROI":
+        elif next_activity == "Align frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames'])
-        elif next_activity == "Set alignment points":
+        elif next_activity == "Set ROI":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
                                             'Set ROI'])
-        elif next_activity == "Compute frame qualities":
+        elif next_activity == "Set alignment points":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
                                             'Set ROI', 'Set alignment points'])
-        elif next_activity == "Stack frames":
+        elif next_activity == "Compute frame qualities":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Set alignment points', 'Compute frame qualities'])
-        elif next_activity == "Save stacked image":
+        elif next_activity == "Stack frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Set alignment points', 'Compute frame qualities',
                                             'Stack frames'])
+        elif next_activity == "Save stacked image":
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
+                                            'Set alignment points', 'Compute frame qualities',
+                                            'Stack frames', 'Save stacked image'])
         elif next_activity == "Next job":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Set alignment points', 'Compute frame qualities',
@@ -286,6 +309,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
+        # Store the geometry of main window, so it is placed the same at next program start.
+        if self.windowState() != QtCore.Qt.WindowMaximized:
+            (x0, y0, width, height) = self.geometry().getRect()
+            self.configuration.hidden_parameters_main_window_x0 = x0
+            self.configuration.hidden_parameters_main_window_y0 = y0
+            self.configuration.hidden_parameters_main_window_width = width
+            self.configuration.hidden_parameters_main_window_height = height
+        self.configuration.write_config()
         sys.exit(0)
 
 
@@ -313,6 +344,6 @@ if __name__ == "__main__":
 
     app = QtWidgets.QApplication(sys.argv)
     myapp = PlanetarySystemStacker()
-    myapp.setGeometry(200, 200, 1200, 800)
+    # myapp.setGeometry(200, 200, 1200, 800)
     myapp.show()
     sys.exit(app.exec_())

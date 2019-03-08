@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import os
+import ctypes
 
 from PyQt5 import QtCore
 
@@ -51,6 +52,15 @@ class Workflow(QtCore.QObject):
         self.alignment_points = None
         self.stack_frames = None
         self.stacked_image_name = None
+
+        mkl_rt = ctypes.CDLL('mkl_rt.dll')
+        mkl_get_max_threads = mkl_rt.mkl_get_max_threads
+
+        def mkl_set_num_threads(cores):
+            mkl_rt.mkl_set_num_threads(ctypes.byref(ctypes.c_int(cores)))
+
+        mkl_set_num_threads(2)
+        print("Number of threads used by mkl: " + str(mkl_get_max_threads()))
 
     @QtCore.pyqtSlot()
     def execute_frames(self, input_name, input_type, convert_to_grayscale):

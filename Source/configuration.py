@@ -30,6 +30,10 @@ class ConfigurationParameters(object):
     def __init__(self):
 
         self.hidden_parameters_current_dir = None
+        self.hidden_parameters_main_window_x0 = None
+        self.hidden_parameters_main_window_y0 = None
+        self.hidden_parameters_main_window_width = None
+        self.hidden_parameters_main_window_height = None
         self.global_parameters_version = None
         self.global_parameters_protocol_level = None
         self.global_parameters_write_protocol_to_file = None
@@ -48,6 +52,10 @@ class ConfigurationParameters(object):
 
     def set_defaults(self):
         self.hidden_parameters_current_dir = os.path.expanduser("~")
+        self.hidden_parameters_main_window_x0 = 100
+        self.hidden_parameters_main_window_y0 = 100
+        self.hidden_parameters_main_window_width = 1200
+        self.hidden_parameters_main_window_height = 800
         self.global_parameters_version = "Planetary System Stacker 0.5.0"
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = True
@@ -66,6 +74,14 @@ class ConfigurationParameters(object):
 
     def copy_from_config_object(self, configuration_object):
         self.hidden_parameters_current_dir = configuration_object.hidden_parameters_current_dir
+        self.hidden_parameters_main_window_x0 = \
+            configuration_object.hidden_parameters_main_window_x0
+        self.hidden_parameters_main_window_y0 = \
+            configuration_object.hidden_parameters_main_window_y0
+        self.hidden_parameters_main_window_width = \
+            configuration_object.hidden_parameters_main_window_width
+        self.hidden_parameters_main_window_height = \
+            configuration_object.hidden_parameters_main_window_height
         self.global_parameters_version = configuration_object.global_parameters_version
         self.global_parameters_protocol_level = \
             configuration_object.global_parameters_protocol_level
@@ -164,6 +180,14 @@ class Configuration(object):
         """
 
         self.hidden_parameters_current_dir = configuration_parameters.hidden_parameters_current_dir
+        self.hidden_parameters_main_window_x0 = \
+            configuration_parameters.hidden_parameters_main_window_x0
+        self.hidden_parameters_main_window_y0 = \
+            configuration_parameters.hidden_parameters_main_window_y0
+        self.hidden_parameters_main_window_width = \
+            configuration_parameters.hidden_parameters_main_window_width
+        self.hidden_parameters_main_window_height = \
+            configuration_parameters.hidden_parameters_main_window_height
         self.global_parameters_version = configuration_parameters.global_parameters_version
         self.global_parameters_protocol_level = \
             configuration_parameters.global_parameters_protocol_level
@@ -198,6 +222,14 @@ class Configuration(object):
         """
 
         configuration_parameters.hidden_parameters_current_dir = self.hidden_parameters_current_dir
+        configuration_parameters.hidden_parameters_main_window_x0 = \
+            self.hidden_parameters_main_window_x0
+        configuration_parameters.hidden_parameters_main_window_y0 = \
+            self.hidden_parameters_main_window_y0
+        configuration_parameters.hidden_parameters_main_window_width = \
+            self.hidden_parameters_main_window_width
+        configuration_parameters.hidden_parameters_main_window_height = \
+            self.hidden_parameters_main_window_height
         configuration_parameters.global_parameters_version = self.global_parameters_version
         configuration_parameters.global_parameters_protocol_level = \
             self.global_parameters_protocol_level
@@ -243,6 +275,12 @@ class Configuration(object):
                 "Error: parameter file read does not match program version")
 
         self.hidden_parameters_current_dir = conf.get('Hidden parameters', 'current directory')
+        self.hidden_parameters_main_window_x0 = conf.getint('Hidden parameters', 'main window x0')
+        self.hidden_parameters_main_window_y0 = conf.getint('Hidden parameters', 'main window y0')
+        self.hidden_parameters_main_window_width = \
+            conf.getint('Hidden parameters', 'main window width')
+        self.hidden_parameters_main_window_height = conf.getint('Hidden parameters',
+                                                               'main window height')
         self.global_parameters_protocol_level = conf.getint('Global parameters',
                                                                  'protocol level')
         self.global_parameters_write_protocol_to_file = conf.getboolean('Global parameters',
@@ -282,6 +320,14 @@ class Configuration(object):
         conf.add_section('Hidden parameters')
         self.set_parameter(conf, 'Hidden parameters', 'current directory',
                            self.hidden_parameters_current_dir)
+        self.set_parameter(conf, 'Hidden parameters', 'main window x0',
+                           str(self.hidden_parameters_main_window_x0))
+        self.set_parameter(conf, 'Hidden parameters', 'main window y0',
+                           str(self.hidden_parameters_main_window_y0))
+        self.set_parameter(conf, 'Hidden parameters', 'main window width',
+                           str(self.hidden_parameters_main_window_width))
+        self.set_parameter(conf, 'Hidden parameters', 'main window height',
+                           str(self.hidden_parameters_main_window_height))
         conf.add_section('Global parameters')
         self.set_parameter(conf, 'Global parameters', 'version', self.global_parameters_version)
         self.set_parameter(conf, 'Global parameters', 'protocol level',
