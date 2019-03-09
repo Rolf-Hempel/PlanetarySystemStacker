@@ -52,6 +52,16 @@ class timer(object):
         else:
             self.counters[name] = [0., time()]
 
+    def create_no_check(self, name):
+        """
+        If a named timer does not exist, create one. If it exists, reset and start it.
+
+        :param name: Name of the timer
+        :return: -
+        """
+
+        self.counters[name] = [0., time()]
+
     def delete(self, name):
         """
         Delete a named timer.
@@ -64,6 +74,16 @@ class timer(object):
             raise ArgumentError("Attempt to delete timer with undefined name")
         else:
             del self.counters[name]
+
+    def exists(self, name):
+        """
+        Find out if a named timer with a given name already exists.
+
+        :param name: Name of the timer
+        :return: True, if the timer exists; otherwise False.
+        """
+
+        return name in self.counters.keys()
 
     def start(self, name):
         """

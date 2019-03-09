@@ -26,6 +26,7 @@ from pathlib import Path
 from PyQt5 import QtWidgets, QtCore
 
 from job_dialog import Ui_JobDialog
+from exceptions import InternalError
 
 
 class FileDialog(QtWidgets.QFileDialog):
@@ -92,6 +93,10 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         # that in the case of "cancel" the original list is not changed.
         self.job_names = self.parent_gui.job_names.copy()
 
+        # Initialize the job types. When the editor exits (close() method), the types are set
+        # according to the entries in "job_names" (either "video" or "image").
+        self.job_types = None
+
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         self.button_remove_jobs.clicked.connect(self.remove_job_list)
@@ -99,6 +104,10 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         # Populate the job list widget with the current job list.
         self.populate_job_list()
+
+        # If the job list is empty, open the input file dialog.
+        if not self.job_names:
+            self.add_jobs()
 
     def populate_job_list(self):
         """
@@ -174,7 +183,22 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         :return: -
         """
 
+        # Set the job types of all current jobs on the list.
+        self.job_types = []
+        for job in self.job_names:
+            if os.path.isfile(job):
+                self.job_types.append('video')
+            elif os.path.isdir(job):
+                self.job_types.append('image')
+            else:
+                raise InternalError("Cannot decide if input file is video or image directory")
+
+        # Update the job list and reset the current job index to the first entry.
         self.parent_gui.job_names = self.job_names
+        self.parent_gui.job_types = self.job_types
+        self.parent_gui.job_number = len(self.job_names)
+        self.parent_gui.job_index = 0
+        self.parent_gui.update_status()
         self.close()
 
     def reject(self):

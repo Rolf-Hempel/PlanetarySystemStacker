@@ -86,6 +86,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         self.ui.actionQuit.triggered.connect(self.closeEvent)
 
+        self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
         self.ui.pushButton_start.clicked.connect(self.play)
         self.ui.actionLoad_video_directory.triggered.connect(self.load_video_directory)
         self.ui.actionEdit_configuration.triggered.connect(self.edit_configuration)
@@ -119,6 +120,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Initialize status variables
         self.automatic = self.ui.box_automatic.isChecked()
+        self.busy = False
         self.job_number = 0
         self.job_index = 0
         self.job_names = []
@@ -130,7 +132,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Initialize the "backwards" combobox: The user can only go back to those program steps
         # which have been executed already.
-        self.set_previous_actions_button(self.activity)
+        self.set_previous_actions_button()
 
         # Deactivate GUI elements which do not make sense yet.
         self.activate_gui_elements(
@@ -234,6 +236,23 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Open the job editor widget.
         self.display_widget(JobEditor(self))
 
+    def go_back(self):
+        task = self.ui.comboBox_back.currentText()
+        print ("Go back to task: " + task)
+
+        # If the end of the job queue was reached, reverse the last job index increment.
+        if self.job_index == self.job_number:
+            self.job_index -= 1
+
+        if task in ['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
+                    'Set alignment points', 'Compute frame qualities',
+                    'Stack frames', 'Save stacked image']:
+            self.work_next_task(task)
+        elif task == 'Previous job':
+            self.job_index -= 1
+            self.work_next_task("Read frames")
+
+
     def play(self):
         """
         This method is invoked when the "Start / Cont." button is pressed.
@@ -252,14 +271,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
+        # Make sure not to process an empty job list, or a job index out of range.
+        if not self.job_names or self.job_index >= self.job_number:
+            return
+
         self.activity = next_activity
-
-        # Depending on the current activity, the "previous action button" presents different
-        # choices. One can only go back to activities which have been performed already.
-        self.set_previous_actions_button(self.activity)
-
-        # Activate / Deactivate GUI elements depending on the current situation.
-        self.update_status()
 
         # Start workflow activities. When a workflow method terminates, it invokes this method on
         # the GUI thread, with "next_activity" denoting the next step in the processing chain.
@@ -268,20 +284,24 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             # GUI interaction. Start the workflow action immediately.
             self.signal_frames.emit(self.job_names[self.job_index],
                                     self.job_types[self.job_index], False)
+            self.busy = True
         if self.activity == "Rank frames":
             # If batch mode is deselected, start GUI activity.
             if not self.automatic:
                 pass
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit()
+            self.busy = True
         elif self.activity == "Align frames":
             if not self.automatic:
                 pass
             self.signal_align_frames.emit(True, 0, 0, 0, 0)
+            self.busy = True
         elif self.activity == "Set ROI":
             if not self.automatic:
                 pass
-            self.signal_set_roi.emit()
+            self.signal_set_roi.emit(400, 700, 300, 800)
+            self.busy = True
         elif self.activity == "Set alignment points":
             if not self.automatic:
                 pass
@@ -290,24 +310,32 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             if not self.automatic:
                 pass
             self.signal_compute_frame_qualities.emit()
+            self.busy = True
         elif self.activity == "Stack frames":
             if not self.automatic:
                 pass
             self.signal_stack_frames.emit()
+            self.busy = True
         elif self.activity == "Save stacked image":
             if not self.automatic:
                 pass
             self.signal_save_stacked_image.emit()
+            self.busy = True
         elif self.activity == "Next job":
-            # If there are more jobs on the batch list, increment the job counter and reset the
-            # "self.activity" variable to the beginning of the processing workflow.
             self.job_index += 1
             if self.job_index < self.job_number:
+                # If the end of the queue is not reached yet, start with reading frames of next job.
                 self.activity = "Read frames"
                 if not self.automatic:
                     pass
                 self.signal_frames.emit(self.job_names[self.job_index],
                                         self.job_types[self.job_index], False)
+            else:
+                # End of queue reached, give control back to the user.
+                self.busy = False
+
+        # Activate / Deactivate GUI elements depending on the current situation.
+        self.update_status()
 
     def show_current_progress_widgets(self, show):
         """
@@ -324,7 +352,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.ui.progressBar_current.hide()
             self.ui.label_current_progress.hide()
 
-    def show_batch_progress_widgets(self, show):
+    def show_batch_progress_widgets(self, show, value=0):
         """
         Show or hide the GUI widgets showing the progress of the batch.
 
@@ -334,50 +362,52 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         if show:
             self.ui.progressBar_batch.show()
+            self.ui.progressBar_batch.setValue(value)
             self.ui.label_batch_progress.show()
         else:
             self.ui.progressBar_batch.hide()
             self.ui.label_batch_progress.hide()
 
-    def set_previous_actions_button(self, next_activity):
+    def set_previous_actions_button(self):
         """
         Initialize the "backwards" combobox: The user can only go back to those program steps
         which have been executed already.
 
-        :param next_activity: The next step in the processing workflow.
         :return: -
         """
 
+        self.ui.comboBox_back.currentTextChanged.disconnect(self.go_back)
         self.ui.comboBox_back.clear()
-        if self.job_index > 1:
+        if self.job_index > 0:
             self.ui.comboBox_back.addItem('Previous job')
-        if next_activity == "Read frames":
+        if self.activity == "Read frames":
             self.ui.comboBox_back.addItems(['Read frames'])
-        elif next_activity == "Rank frames":
+        elif self.activity == "Rank frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames'])
-        elif next_activity == "Align frames":
+        elif self.activity == "Align frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames'])
-        elif next_activity == "Set ROI":
+        elif self.activity == "Set ROI":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
                                             'Set ROI'])
-        elif next_activity == "Set alignment points":
+        elif self.activity == "Set alignment points":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
                                             'Set ROI', 'Set alignment points'])
-        elif next_activity == "Compute frame qualities":
+        elif self.activity == "Compute frame qualities":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Set alignment points', 'Compute frame qualities'])
-        elif next_activity == "Stack frames":
+        elif self.activity == "Stack frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Set alignment points', 'Compute frame qualities',
                                             'Stack frames'])
-        elif next_activity == "Save stacked image":
+        elif self.activity == "Save stacked image":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Set alignment points', 'Compute frame qualities',
                                             'Stack frames', 'Save stacked image'])
-        elif next_activity == "Next job":
+        elif self.activity == "Next job":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Set alignment points', 'Compute frame qualities',
                                             'Stack frames', 'Save stacked image'])
+        self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
 
     def update_status(self):
         """
@@ -386,19 +416,28 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
+        # Depending on the current activity, the "previous action button" presents different
+        # choices. One can only go back to activities which have been performed already.
+        self.set_previous_actions_button()
+
         # In batch mode: Deactivate most buttons and menu entries.
-        if self.automatic:
+        if self.busy:
             self.activate_gui_elements([self.ui.comboBox_back, self.ui.pushButton_start,
                                         self.ui.pushButton_next_job, self.ui.menuFile], False)
         # In manual mode, activate most buttons and menu entries.
         else:
-            self.activate_gui_elements([self.ui.pushButton_start, self.ui.menuFile], True)
-            # self.activate_gui_elements([self.ui.comboBox_back], self.job_index > 0)
+            self.activate_gui_elements([self.ui.menuFile], True)
+            if self.job_index < self.job_number:
+                self.activate_gui_elements([self.ui.pushButton_start], True)
+            self.activate_gui_elements([self.ui.comboBox_back],
+                                       self.job_index > 0 or self.activity != "Read frames")
             self.activate_gui_elements([self.ui.pushButton_next_job],
                                         self.job_index < self.job_number - 1)
 
         self.show_current_progress_widgets(self.job_number > 0)
         self.show_batch_progress_widgets(self.job_number > 1)
+        if self.job_number > 0:
+            self.ui.progressBar_batch.setValue(int(100*self.job_index/self.job_number))
 
     def activate_gui_elements(self, elements, enable):
         """

@@ -65,13 +65,12 @@ class StackFrames(object):
         self.align_frames = align_frames
         self.alignment_points = alignment_points
         self.my_timer = my_timer
-        self.my_timer.create('Stacking: AP initialization')
-        self.my_timer.create('Stacking: Initialize background blending')
-        self.my_timer.create('Stacking: compute AP shifts')
-        self.my_timer.create('Stacking: remapping and adding')
-        self.my_timer.create('Stacking: computing background')
-        self.my_timer.create('Stacking: merging AP buffers')
+        for name in ['Stacking: AP initialization', 'Stacking: Initialize background blending',
+                     'Stacking: compute AP shifts', 'Stacking: remapping and adding',
+                     'Stacking: computing background', 'Stacking: merging AP buffers']:
+            self.my_timer.create_no_check(name)
 
+        self.my_timer.start('Stacking: AP initialization')
         # Allocate work space for image buffer and the image converted for output.
         # [dim_y, dim_x] is the size of the intersection of all frames.
         self.dim_y = self.align_frames.intersection_shape[0][1] - \
@@ -446,7 +445,7 @@ class StackFrames(object):
         # a background computed as the average of globally shifted best frames. The background
         # should only shine through outside AP patches.
         if self.fraction_stacking_holes > 0:
-            self.my_timer.create('Stacking: blending APs with background')
+            self.my_timer.create_no_check('Stacking: blending APs with background')
 
             # blend the AP buffer with the background.
             if self.frames.color:

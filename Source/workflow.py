@@ -43,8 +43,7 @@ class Workflow(QtCore.QObject):
         self.main_gui = main_gui
         self.configuration = main_gui.configuration
 
-        # Initalize the timer object used to measure execution times of program sections.
-        self.my_timer = timer()
+        self.my_timer = None
 
         self.frames = None
         self.rank_frames = None
@@ -62,11 +61,10 @@ class Workflow(QtCore.QObject):
         mkl_set_num_threads(2)
         print("Number of threads used by mkl: " + str(mkl_get_max_threads()))
 
-    @QtCore.pyqtSlot()
+    @QtCore.pyqtSlot(str, str, bool)
     def execute_frames(self, input_name, input_type, convert_to_grayscale):
-
-        # Images can either be extracted from a video file or a batch of single photographs. Select
-        # the example for the test run.
+        # Images can either be extracted from a video file or a batch of single photographs. In the
+        # first case, input_type is set to 'video', in the second case to 'image'.
 
         # For video file input, the Frames constructor expects the video file name for "names".
         if input_type == 'video':
@@ -83,6 +81,9 @@ class Workflow(QtCore.QObject):
             "***********************************************************************************\n"
             + "Start processing " + str(input_name) +
             "\n***********************************************************************************")
+
+        # Initalize the timer object used to measure execution times of program sections.
+        self.my_timer = timer()
         self.my_timer.create('Execution over all')
 
         # Read the frames.
@@ -114,7 +115,7 @@ class Workflow(QtCore.QObject):
 
         # Rank the frames by their overall local contrast.
         print("+++ Start ranking images")
-        self.my_timer.create('Ranking images')
+        self.my_timer.create_no_check('Ranking images')
         self.rank_frames = RankFrames(self.frames, self.configuration)
         self.rank_frames.frame_score()
         self.my_timer.stop('Ranking images')
@@ -122,7 +123,7 @@ class Workflow(QtCore.QObject):
 
         self.work_next_task_signal.emit("Align frames")
 
-    @QtCore.pyqtSlot()
+    @QtCore.pyqtSlot(bool, int, int, int, int)
     def execute_align_frames(self, auto_execution, x_low_opt, x_high_opt, y_low_opt, y_high_opt):
 
         # Initialize the frame alignment object.
@@ -135,7 +136,8 @@ class Workflow(QtCore.QObject):
             # is compared to the whole image frame. In batch mode, variable "auto_execution" is
             # set to "True", and the automatic patch computation is the only option.
             if auto_execution or self.configuration.align_frames_automation:
-                self.my_timer.create('Select optimal alignment patch')
+
+                self.my_timer.create_no_check('Select optimal alignment patch')
                 (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = \
                     self.align_frames.select_alignment_rect(
                         self.configuration.align_frames_rectangle_scale_factor)
@@ -150,7 +152,7 @@ class Workflow(QtCore.QObject):
 
         # Align all frames globally relative to the frame with the highest score.
         print("+++ Start aligning all frames")
-        self.my_timer.create('Global frame alignment')
+        self.my_timer.create_no_check('Global frame alignment')
         try:
             self.align_frames.align_frames()
         except NotSupportedError as e:
@@ -168,7 +170,7 @@ class Workflow(QtCore.QObject):
 
         # Compute the average frame.
         print("+++ Start computing average frame")
-        self.my_timer.create('Compute reference frame')
+        self.my_timer.create_no_check('Compute reference frame')
         self.align_frames.average_frame()
         self.my_timer.stop('Compute reference frame')
         print("Average frame computed from the best " + str(
@@ -176,11 +178,11 @@ class Workflow(QtCore.QObject):
 
         self.work_next_task_signal.emit("Set ROI")
 
-    @QtCore.pyqtSlot()
+    @QtCore.pyqtSlot(int, int, int, int)
     def execute_set_roi(self, y_min, y_max, x_min, x_max):
 
         print("+++ Start setting ROI and computing new average frame")
-        self.my_timer.create('Setting ROI and new reference')
+        self.my_timer.create_no_check('Setting ROI and new reference')
         self.align_frames.set_roi(y_min, y_max, x_min, x_max)
         self.my_timer.stop('Setting ROI and new reference')
 
@@ -190,14 +192,14 @@ class Workflow(QtCore.QObject):
     def execute_set_alignment_points(self):
 
         # Initialize the AlignmentPoints object.
-        self.my_timer.create('Initialize alignment point object')
+        self.my_timer.create_no_check('Initialize alignment point object')
         self.alignment_points = AlignmentPoints(self.configuration, self.frames, self.rank_frames,
                                            self.align_frames)
         self.my_timer.stop('Initialize alignment point object')
 
         # Create alignment points, and create an image with wll alignment point boxes and patches.
         print("+++ Start creating alignment points")
-        self.my_timer.create('Create alignment points')
+        self.my_timer.create_no_check('Create alignment points')
 
         # If a ROI is selected, alignment points are created in the ROI window only.
         self.alignment_points.create_ap_grid()
@@ -210,13 +212,13 @@ class Workflow(QtCore.QObject):
               ", aps dropped because too little structure: " + str(
             self.alignment_points.alignment_points_dropped_structure))
 
-        self.work_next_task_signal.emit("Compute frames qualities")
+        self.work_next_task_signal.emit("Compute frame qualities")
 
     @QtCore.pyqtSlot()
     def execute_compute_frame_qualities(self):
 
         # For each alignment point rank frames by their quality.
-        self.my_timer.create('Rank frames at alignment points')
+        self.my_timer.create_no_check('Rank frames at alignment points')
         print("+++ Start ranking frames at alignment points")
         self.alignment_points.compute_frame_qualities()
         self.my_timer.stop('Rank frames at alignment points')
@@ -244,7 +246,8 @@ class Workflow(QtCore.QObject):
     def execute_save_stacked_image(self):
 
         # Save the stacked image as 16bit int (color or mono).
-        self.my_timer.create('Saving the final image')
+        print("+++ Start saving the final image")
+        self.my_timer.create_no_check('Saving the final image')
         self.frames.save_image(self.stacked_image_name, self.stack_frames.stacked_image,
                                color=self.frames.color)
         self.my_timer.stop('Saving the final image')
