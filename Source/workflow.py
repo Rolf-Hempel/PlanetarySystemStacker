@@ -39,6 +39,7 @@ from miscellaneous import Miscellaneous
 class Workflow(QtCore.QObject):
 
     work_next_task_signal = QtCore.pyqtSignal(str)
+    work_current_progress_signal = QtCore.pyqtSignal(str, int)
 
     def __init__(self, main_gui):
         super(Workflow, self).__init__()
@@ -96,6 +97,7 @@ class Workflow(QtCore.QObject):
             # Currently set to stdout, redirect to file now.
             else:
                 try:
+                    self.stdout_saved = sys.stdout
                     sys.stdout = open(self.configuration.protocol_filename, 'a+')
                     self.output_redirected = True
                 except IOError:
@@ -129,7 +131,8 @@ class Workflow(QtCore.QObject):
         self.my_timer.create('Read all frames')
         try:
             self.frames = Frames(self.configuration, names, type=input_type,
-                            convert_to_grayscale=convert_to_grayscale)
+                            convert_to_grayscale=convert_to_grayscale,
+                            progress_signal=self.work_current_progress_signal)
             if self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.protocol("Number of images read: " + str(self.frames.number) +
                             ", image shape: " + str(self.frames.shape), self.stacked_image_log_file,

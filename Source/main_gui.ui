@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>938</width>
+    <width>1015</width>
     <height>697</height>
    </rect>
   </property>
@@ -32,7 +32,7 @@
      </spacer>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="tool_line" stretch="0,3,5,12,3,3,12,12">
+     <layout class="QHBoxLayout" name="tool_line" stretch="0,3,5,12,3,3,12,1">
       <item>
        <widget class="QFrame" name="control_area">
         <property name="sizePolicy">
@@ -47,9 +47,18 @@
         <property name="frameShadow">
          <enum>QFrame::Raised</enum>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_3">
+        <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,0,0,0,0,0">
+         <property name="rightMargin">
+          <number>9</number>
+         </property>
          <item>
           <widget class="QComboBox" name="comboBox_back">
+           <property name="minimumSize">
+            <size>
+             <width>120</width>
+             <height>0</height>
+            </size>
+           </property>
            <property name="editable">
             <bool>false</bool>
            </property>
@@ -124,6 +133,12 @@
       </item>
       <item>
        <widget class="QLabel" name="label_current_progress">
+        <property name="minimumSize">
+         <size>
+          <width>130</width>
+          <height>0</height>
+         </size>
+        </property>
         <property name="text">
          <string/>
         </property>
@@ -191,7 +206,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>938</width>
+     <width>1015</width>
      <height>21</height>
     </rect>
    </property>

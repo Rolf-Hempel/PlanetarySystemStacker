@@ -83,9 +83,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Write the program version into the window title.
         self.setWindowTitle(self.configuration.global_parameters_version)
 
-
+        # Connect GUI events with methods of this class.
         self.ui.actionQuit.triggered.connect(self.closeEvent)
-
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
         self.ui.pushButton_start.clicked.connect(self.play)
         self.ui.box_automatic.stateChanged.connect(self.automatic_changed)
@@ -94,12 +93,12 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.actionLoad_config.triggered.connect(self.load_config_file)
         self.ui.actionSave_config.triggered.connect(self.save_config_file)
 
-
         # Create the workflow thread and start it.
         self.thread = QtCore.QThread()
         self.workflow = Workflow(self)
         self.workflow.moveToThread(self.thread)
         self.workflow.work_next_task_signal.connect(self.work_next_task)
+        self.workflow.work_current_progress_signal.connect(self.set_current_progress)
         # self.workflow.set_status_signal.connect(self.set_status)
         # self.workflow.set_error_signal.connect(self.show_error_message)
         self.thread.start()
@@ -299,6 +298,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         self.activity = next_activity
 
+        # Deactivate the current progress widgets. They are reactivated when the workflow thread
+        # sends a progress signal.
+        self.show_current_progress_widgets(False)
+
         # Start workflow activities. When a workflow method terminates, it invokes this method on
         # the GUI thread, with "next_activity" denoting the next step in the processing chain.
         if self.activity == "Read frames":
@@ -380,6 +383,22 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         else:
             self.ui.progressBar_current.hide()
             self.ui.label_current_progress.hide()
+
+    @QtCore.pyqtSlot(str, int)
+    def set_current_progress(self, activity, percent):
+        """
+        Triggered by signal "work_current_progress_signal" on the workflow thread, show the progress
+        of the current activity in a progress bar on the main GUI.
+
+        :param activity: Textual description of the current activity.
+        :param percent: Fraction of task finished (in %)
+        :return: -
+        """
+
+        self.show_current_progress_widgets(True)
+        self.ui.label_current_progress.setText(activity)
+        self.ui.progressBar_current.setValue(percent)
+
 
     def show_batch_progress_widgets(self, show, value=0):
         """
@@ -466,7 +485,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.activate_gui_elements([self.ui.pushButton_next_job],
                                         self.job_index < self.job_number - 1)
 
-        self.show_current_progress_widgets(self.job_number > 0)
+        # self.show_current_progress_widgets(self.job_number > 0)
         self.show_batch_progress_widgets(self.job_number > 1)
         if self.job_number > 0:
             self.ui.progressBar_batch.setValue(int(100*self.job_index/self.job_number))

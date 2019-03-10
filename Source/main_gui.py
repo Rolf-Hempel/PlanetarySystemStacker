@@ -2,17 +2,16 @@
 
 # Form implementation generated from reading ui file 'main_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12
+# Created by: PyQt5 UI code generator 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(938, 697)
+        MainWindow.resize(1015, 697)
         MainWindow.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -32,8 +31,10 @@ class Ui_MainWindow(object):
         self.control_area.setFrameShadow(QtWidgets.QFrame.Raised)
         self.control_area.setObjectName("control_area")
         self.horizontalLayout_3 = QtWidgets.QHBoxLayout(self.control_area)
+        self.horizontalLayout_3.setContentsMargins(-1, -1, 9, -1)
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
         self.comboBox_back = QtWidgets.QComboBox(self.control_area)
+        self.comboBox_back.setMinimumSize(QtCore.QSize(120, 0))
         self.comboBox_back.setEditable(False)
         self.comboBox_back.setCurrentText("")
         self.comboBox_back.setObjectName("comboBox_back")
@@ -58,6 +59,7 @@ class Ui_MainWindow(object):
         spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.tool_line.addItem(spacerItem2)
         self.label_current_progress = QtWidgets.QLabel(self.centralwidget)
+        self.label_current_progress.setMinimumSize(QtCore.QSize(130, 0))
         self.label_current_progress.setText("")
         self.label_current_progress.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_current_progress.setObjectName("label_current_progress")
@@ -84,11 +86,12 @@ class Ui_MainWindow(object):
         self.tool_line.setStretch(4, 3)
         self.tool_line.setStretch(5, 3)
         self.tool_line.setStretch(6, 12)
-        self.tool_line.setStretch(7, 12)
+        self.tool_line.setStretch(7, 1)
         self.verticalLayout_2.addLayout(self.tool_line)
+        self.verticalLayout_2.setStretch(0, 100)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 938, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1015, 21))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -159,5 +162,4 @@ class Ui_MainWindow(object):
         self.actionQuit.setText(_translate("MainWindow", "Quit"))
         self.actionEdit_configuration.setText(_translate("MainWindow", "Edit stacking config"))
         self.actionEdit_postproc_config.setText(_translate("MainWindow", "Edit postproc config"))
-
 

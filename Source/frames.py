@@ -39,7 +39,8 @@ class Frames(object):
 
     """
 
-    def __init__(self, configuration, names, type='video', convert_to_grayscale=False):
+    def __init__(self, configuration, names, type='video', convert_to_grayscale=False,
+                 progress_signal=None):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
@@ -49,6 +50,9 @@ class Frames(object):
                       all images.
         :param type: Either "video" or "image".
         :param convert_to_grayscale: If "True", convert frames to grayscale if they are RGB.
+        :param progress_signal: Either None (no progress signalling), or a signal with the signature
+                                (str, int) with the current activity (str) and the progress in
+                                percent (int).
         """
 
         self.configuration = configuration
@@ -56,14 +60,26 @@ class Frames(object):
         if type == 'image':
             # Use scipy.misc to read in image files. If "convert_to_grayscale" is True, convert
             # pixel values to 32bit floats.
+            self.number = len(names)
+            signal_step_size = max(int(self.number / 10), 1)
             if convert_to_grayscale:
                 self.frames = [misc.imread(path, mode='F') for path in names]
             else:
-                self.frames = [cv2.imread(path, -1) for path in names]
-                if self.frames[0].dtype == 'uint16':
-                    conversion_factor = np.float32(1. / 255.)
-                    self.frames = [frame*conversion_factor for frame in self.frames]
-            self.number = len(names)
+                self.frames = []
+                conversion_factor = np.float32(1. / 255.)
+                for frame_index, path in enumerate(names):
+                    # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                    if progress_signal is not None and frame_index % signal_step_size == 0:
+                        progress_signal.emit("Read all frames",
+                                             int((frame_index / self.number) * 100.))
+                    # Read the next frame, and scale it to the range [0., 1.] if necessary.
+                    frame = cv2.imread(path, -1)
+                    if frame.dtype == 'uint16':
+                        frame = frame * conversion_factor
+                    self.frames.append(frame)
+
+                if progress_signal is not None:
+                    progress_signal.emit("Read all frames", 100)
             self.shape = self.frames[0].shape
 
             # Test if all images have the same shape. If not, raise an exception.
@@ -79,7 +95,12 @@ class Frames(object):
             cap = cv2.VideoCapture(names)
             self.number = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.frames = []
+            signal_step_size = max(int(self.number / 10), 1)
             for frame_index in range(self.number):
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if progress_signal is not None and frame_index%signal_step_size == 0:
+                    progress_signal.emit("Read all frames", int((frame_index/self.number)*100.))
+                # Read the next frame.
                 ret, frame = cap.read()
                 if ret:
                     if convert_to_grayscale:
@@ -89,6 +110,8 @@ class Frames(object):
                 else:
                     raise IOError("Error in reading video frame")
             cap.release()
+            if progress_signal is not None:
+                progress_signal.emit("Read all frames", 100)
             self.shape = self.frames[0].shape
         else:
             raise TypeError("Image type not supported")
@@ -211,7 +234,8 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'image'
     if type == 'image':
-        names = glob.glob('Images/2012_*.tif')
+        # names = glob.glob('Images/2012_*.tif')
+        names = glob.glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
     else:
         names = 'Videos/short_video.avi'
 
@@ -219,7 +243,7 @@ if __name__ == "__main__":
     configuration = Configuration()
 
     try:
-        frames = Frames(configuration, names, type=type, convert_to_grayscale=True)
+        frames = Frames(configuration, names, type=type, convert_to_grayscale=False)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
