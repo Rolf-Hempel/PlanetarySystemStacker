@@ -22,11 +22,13 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import cv2
 import os
+import sys
 import numpy as np
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
 from time import time
+from datetime import datetime
 
 from exceptions import DivideByZeroError
 
@@ -621,6 +623,30 @@ class Miscellaneous(object):
                         lineType)
             out.write(rgb_frame)
         out.release()
+
+    @staticmethod
+    def protocol(string, logfile, precede_with_timestamp=True):
+        """
+        Print a message (optionally plus time stamp) to standard output. If it is requested to store
+        a logfile with the stacked image, write the string to that file as well.
+
+        :param string: Message to be printed after the time stamp
+        :param logfile: logfile or None (no logging)
+        :return: -
+        """
+
+        # Precede the text with a time stamp and print it to stdout. Note that stdout may be
+        # redirected to a file.
+        if precede_with_timestamp:
+            output_string = '{0} {1}'.format(datetime.now().strftime("%H-%M-%S.%f")[:-5], string)
+        else:
+            output_string = string
+        print (output_string)
+        sys.stdout.flush()
+
+        # If a logfile per stacked image was requested, write the string to that file as well.
+        if logfile:
+            logfile.write(output_string + "\n")
 
 
 if __name__ == "__main__":

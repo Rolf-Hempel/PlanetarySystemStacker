@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import os
+import sys
 import ctypes
 
 from PyQt5 import QtCore
@@ -32,6 +33,7 @@ from rank_frames import RankFrames
 from alignment_points import AlignmentPoints
 from stack_frames import StackFrames
 from timer import timer
+from miscellaneous import Miscellaneous
 
 
 class Workflow(QtCore.QObject):
@@ -51,7 +53,12 @@ class Workflow(QtCore.QObject):
         self.alignment_points = None
         self.stack_frames = None
         self.stacked_image_name = None
-        self.stacked_image_log = None
+        self.stacked_image_log_name = None
+        self.stacked_image_log_file = None
+        self.stdout_saved = None
+        self.output_redirected = False
+        self.protocol_file = None
+
 
         mkl_rt = ctypes.CDLL('mkl_rt.dll')
         mkl_get_max_threads = mkl_rt.mkl_get_max_threads
@@ -71,35 +78,65 @@ class Workflow(QtCore.QObject):
         if input_type == 'video':
             names = input_name
             self.stacked_image_name = os.path.splitext(input_name)[0] + '_pss.tiff'
-            self.stacked_image_log = os.path.splitext(input_name)[0] + '_log.txt'
+            self.stacked_image_log_name = os.path.splitext(input_name)[0] + '_log.txt'
         # For single image input, the Frames constructor expects a list of image file names for
         # "names".
         else:
             names = os.listdir(input_name)
             names = [os.path.join(input_name, name) for name in names]
             self.stacked_image_name = input_name + '_pss.tiff'
-            self.stacked_image_log = input_name + '_log.txt'
+            self.stacked_image_log_name = input_name + '_log.txt'
 
-        print(
-            "\n" +
-            "***********************************************************************************\n"
-            + "Start processing " + str(input_name) +
-            "\n***********************************************************************************")
+        # Redirect stdout to a file if requested.
+        if self.configuration.global_parameters_write_protocol_to_file != self.output_redirected:
+            # Output currently redirected. Reset to stdout.
+            if self.output_redirected:
+                sys.stdout = self.stdout_saved
+                self.output_redirected = False
+            # Currently set to stdout, redirect to file now.
+            else:
+                try:
+                    sys.stdout = open(self.configuration.protocol_filename, 'a+')
+                    self.output_redirected = True
+                except IOError:
+                    pass
+
+        # Create logfile if requested to store the log with the stacked file.
+        if self.stacked_image_log_file:
+            self.stacked_image_log_file.close()
+        if self.configuration.global_parameters_store_protocol_with_result:
+            self.stacked_image_log_file = open(self.stacked_image_log_name, "w+")
+        else:
+            self.stacked_image_log_file = None
+
+        # Write a header to stdout and optionally to the logfile.
+        if self.configuration.global_parameters_protocol_level > 0:
+            decorator_line = (len(input_name)+28)*"*"
+            Miscellaneous.protocol(decorator_line, self.stacked_image_log_file,
+                                   precede_with_timestamp=False)
+            Miscellaneous.protocol("Start processing " + input_name, self.stacked_image_log_file)
+            Miscellaneous.protocol(decorator_line, self.stacked_image_log_file,
+                                   precede_with_timestamp=False)
+
 
         # Initalize the timer object used to measure execution times of program sections.
         self.my_timer = timer()
         self.my_timer.create('Execution over all')
 
         # Read the frames.
-        print("+++ Start reading frames")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start reading frames +++", self.stacked_image_log_file)
         self.my_timer.create('Read all frames')
         try:
             self.frames = Frames(self.configuration, names, type=input_type,
                             convert_to_grayscale=convert_to_grayscale)
-            print("Number of images read: " + str(self.frames.number))
-            print("Image shape: " + str(self.frames.shape))
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol("Number of images read: " + str(self.frames.number) +
+                            ", image shape: " + str(self.frames.shape), self.stacked_image_log_file,
+                            precede_with_timestamp=False)
         except Exception as e:
-            print("Error: " + str(e))
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("Error: " + str(e), self.stacked_image_log_file)
             exit()
         self.my_timer.stop('Read all frames')
 
@@ -107,7 +144,10 @@ class Workflow(QtCore.QObject):
         # version of the frames. If the original frames are in RGB, the monochrome channel can be
         # selected via a configuration parameter. Add a list of monochrome images for all frames to
         # the "Frames" object.
-        print("+++ Start creating blurred monochrome images and Laplacians")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol(
+                "+++ Start creating blurred monochrome images and Laplacians +++",
+                self.stacked_image_log_file)
         self.my_timer.create('Blurred monochrome images and Laplacians')
         self.frames.add_monochrome(self.configuration.frames_mono_channel)
         self.my_timer.stop('Blurred monochrome images and Laplacians')
@@ -118,12 +158,16 @@ class Workflow(QtCore.QObject):
     def execute_rank_frames(self):
 
         # Rank the frames by their overall local contrast.
-        print("+++ Start ranking images")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start ranking images +++", self.stacked_image_log_file)
         self.my_timer.create_no_check('Ranking images')
         self.rank_frames = RankFrames(self.frames, self.configuration)
         self.rank_frames.frame_score()
         self.my_timer.stop('Ranking images')
-        print("Index of best frame: " + str(self.rank_frames.frame_ranks_max_index))
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol(
+                "Index of best frame: " + str(self.rank_frames.frame_ranks_max_index),
+                self.stacked_image_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Align frames")
 
@@ -131,6 +175,9 @@ class Workflow(QtCore.QObject):
     def execute_align_frames(self, auto_execution, x_low_opt, x_high_opt, y_low_opt, y_high_opt):
 
         # Initialize the frame alignment object.
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Initializing frame alignment +++",
+                                   self.stacked_image_log_file)
         self.align_frames = AlignFrames(self.frames, self.rank_frames, self.configuration)
 
         if self.configuration.align_frames_mode == "Surface":
@@ -146,46 +193,65 @@ class Workflow(QtCore.QObject):
                     self.align_frames.select_alignment_rect(
                         self.configuration.align_frames_rectangle_scale_factor)
                 self.my_timer.stop('Select optimal alignment patch')
+                if self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol("Alignment rectangle, computed automatically: " +
+                                       str(y_low_opt) + "<y<" + str(y_high_opt) +
+                                       ", " + str(x_low_opt) + "<x<" +
+                                       str(x_high_opt), self.stacked_image_log_file,
+                                       precede_with_timestamp=False)
 
             # As an alternative, set the coordinates of the rectangular patch explicitly.
             else:
                 self.align_frames.set_alignment_rect(y_low_opt, y_high_opt, x_low_opt, x_high_opt)
-
-            print("Alignment rectangle, y_low: " + str(y_low_opt) + ", y_high: " + str(
-                y_high_opt) + ", x_low: " + str(x_low_opt) + ", x_high: " + str(x_high_opt))
+                if self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol("Alignment rectangle, set by the user: " +
+                                       str(y_low_opt) + "<y<" + str(y_high_opt) +
+                                       ", " + str(x_low_opt) + "<x<" +
+                                       str(x_high_opt), self.stacked_image_log_file,
+                                       precede_with_timestamp=False)
 
         # Align all frames globally relative to the frame with the highest score.
-        print("+++ Start aligning all frames")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start aligning all frames +++", self.stacked_image_log_file)
         self.my_timer.create_no_check('Global frame alignment')
         try:
             self.align_frames.align_frames()
         except NotSupportedError as e:
-            print("Error: " + e.message)
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("Error: " + e.message, self.stacked_image_log_file)
             exit()
         except InternalError as e:
-            print("Warning: " + e.message)
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("Warning: " + e.message, self.stacked_image_log_file)
         self.my_timer.stop('Global frame alignment')
 
-        print("Intersection, y_low: " + str(
-            self.align_frames.intersection_shape[0][0]) + ", y_high: " + str(
-            self.align_frames.intersection_shape[0][1]) + ", x_low: " + str(
-            self.align_frames.intersection_shape[1][0]) + ", x_high: " + str(
-            self.align_frames.intersection_shape[1][1]))
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol("Pixel range common to all frames: " + str(
+                self.align_frames.intersection_shape[0][0]) + "<y<" + str(
+                self.align_frames.intersection_shape[0][1]) + ", " + str(
+                self.align_frames.intersection_shape[1][0]) + "<x<" + str(
+                self.align_frames.intersection_shape[1][1]), self.stacked_image_log_file,
+                precede_with_timestamp=False)
 
         # Compute the average frame.
-        print("+++ Start computing average frame")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start computing the average frame +++",
+                                   self.stacked_image_log_file)
         self.my_timer.create_no_check('Compute reference frame')
         self.align_frames.average_frame()
         self.my_timer.stop('Compute reference frame')
-        print("Average frame computed from the best " + str(
-            self.align_frames.average_frame_number) + " frames.")
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol("The average frame was computed using the best " + str(
+                self.align_frames.average_frame_number) + " frames.", self.stacked_image_log_file,
+                precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Set ROI")
 
     @QtCore.pyqtSlot(int, int, int, int)
     def execute_set_roi(self, y_min, y_max, x_min, x_max):
-
-        print("+++ Start setting ROI and computing new average frame")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start setting a ROI and computing a new average frame +++",
+                                   self.stacked_image_log_file)
         self.my_timer.create_no_check('Setting ROI and new reference')
         self.align_frames.set_roi(y_min, y_max, x_min, x_max)
         self.my_timer.stop('Setting ROI and new reference')
@@ -202,19 +268,23 @@ class Workflow(QtCore.QObject):
         self.my_timer.stop('Initialize alignment point object')
 
         # Create alignment points, and create an image with wll alignment point boxes and patches.
-        print("+++ Start creating alignment points")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start creating alignment points +++",
+                                   self.stacked_image_log_file)
         self.my_timer.create_no_check('Create alignment points')
 
         # If a ROI is selected, alignment points are created in the ROI window only.
         self.alignment_points.create_ap_grid()
 
         self.my_timer.stop('Create alignment points')
-        print("Number of alignment points selected: " + str(
-            len(self.alignment_points.alignment_points)) +
-              ", aps dropped because too dim: " + str(
-            self.alignment_points.alignment_points_dropped_dim) +
-              ", aps dropped because too little structure: " + str(
-            self.alignment_points.alignment_points_dropped_structure))
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol("Number of alignment points selected: " + str(
+                len(self.alignment_points.alignment_points)) +
+                  ", aps dropped because too dim: " + str(
+                self.alignment_points.alignment_points_dropped_dim) +
+                  ", aps dropped because too little structure: " + str(
+                self.alignment_points.alignment_points_dropped_structure),
+                self.stacked_image_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Compute frame qualities")
 
@@ -223,7 +293,9 @@ class Workflow(QtCore.QObject):
 
         # For each alignment point rank frames by their quality.
         self.my_timer.create_no_check('Rank frames at alignment points')
-        print("+++ Start ranking frames at alignment points")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start ranking all frames at all alignment points +++",
+                                   self.stacked_image_log_file)
         self.alignment_points.compute_frame_qualities()
         self.my_timer.stop('Rank frames at alignment points')
 
@@ -237,11 +309,14 @@ class Workflow(QtCore.QObject):
                                    self.alignment_points, self.my_timer)
 
         # Stack all frames.
-        print("+++ Start stacking frames")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start stacking frames +++", self.stacked_image_log_file)
         self.stack_frames.stack_frames()
 
         # Merge the stacked alignment point buffers into a single image.
-        print("+++ Start merging alignment patches")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start merging all alignment patches and the background +++",
+                                   self.stacked_image_log_file)
         self.stack_frames.merge_alignment_point_buffers()
 
         self.work_next_task_signal.emit("Save stacked image")
@@ -250,10 +325,16 @@ class Workflow(QtCore.QObject):
     def execute_save_stacked_image(self):
 
         # Save the stacked image as 16bit int (color or mono).
-        print("+++ Start saving the final image")
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start saving the stacked image +++",
+                                   self.stacked_image_log_file)
         self.my_timer.create_no_check('Saving the final image')
         self.frames.save_image(self.stacked_image_name, self.stack_frames.stacked_image,
                                color=self.frames.color, avoid_overwriting=False)
         self.my_timer.stop('Saving the final image')
 
         self.work_next_task_signal.emit("Next job")
+
+        # If a logfile was created, close it.
+        if self.stacked_image_log_file:
+            self.stacked_image_log_file.close()
