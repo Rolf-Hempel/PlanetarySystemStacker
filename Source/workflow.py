@@ -51,6 +51,7 @@ class Workflow(QtCore.QObject):
         self.alignment_points = None
         self.stack_frames = None
         self.stacked_image_name = None
+        self.stacked_image_log = None
 
         mkl_rt = ctypes.CDLL('mkl_rt.dll')
         mkl_get_max_threads = mkl_rt.mkl_get_max_threads
@@ -69,12 +70,15 @@ class Workflow(QtCore.QObject):
         # For video file input, the Frames constructor expects the video file name for "names".
         if input_type == 'video':
             names = input_name
+            self.stacked_image_name = os.path.splitext(input_name)[0] + '_pss.tiff'
+            self.stacked_image_log = os.path.splitext(input_name)[0] + '_log.txt'
         # For single image input, the Frames constructor expects a list of image file names for
         # "names".
         else:
             names = os.listdir(input_name)
             names = [os.path.join(input_name, name) for name in names]
-        self.stacked_image_name = input_name + '.stacked.tiff'
+            self.stacked_image_name = input_name + '_pss.tiff'
+            self.stacked_image_log = input_name + '_log.txt'
 
         print(
             "\n" +
@@ -249,7 +253,7 @@ class Workflow(QtCore.QObject):
         print("+++ Start saving the final image")
         self.my_timer.create_no_check('Saving the final image')
         self.frames.save_image(self.stacked_image_name, self.stack_frames.stacked_image,
-                               color=self.frames.color)
+                               color=self.frames.color, avoid_overwriting=False)
         self.my_timer.stop('Saving the final image')
 
         self.work_next_task_signal.emit("Next job")

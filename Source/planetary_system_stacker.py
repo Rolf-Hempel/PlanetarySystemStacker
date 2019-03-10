@@ -88,6 +88,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
         self.ui.pushButton_start.clicked.connect(self.play)
+        self.ui.box_automatic.stateChanged.connect(self.automatic_changed)
         self.ui.actionLoad_video_directory.triggered.connect(self.load_video_directory)
         self.ui.actionEdit_configuration.triggered.connect(self.edit_configuration)
         self.ui.actionLoad_config.triggered.connect(self.load_config_file)
@@ -147,6 +148,16 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # necessary.
         if not self.configuration.config_file_exists:
             self.edit_configuration()
+
+    def automatic_changed(self):
+        """
+        If the user checks / unchecks the "Automatic" checkbox, change the corresponding status
+        variable.
+
+        :return: -
+        """
+
+        self.automatic = not self.automatic
 
     def edit_configuration(self):
         """
@@ -237,17 +248,28 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.display_widget(JobEditor(self))
 
     def go_back(self):
+        """
+        Repeat processing steps as specified via the choice of the "comboBox_back" button. The user
+        can either repeat steps of the current job, or go back to the previous job.
+
+        :return: -
+        """
+
+        # Get the choice of the combobox button.
         task = self.ui.comboBox_back.currentText()
-        print ("Go back to task: " + task)
+        print ("\n+++ Repeating from task: " + task)
 
         # If the end of the job queue was reached, reverse the last job index increment.
-        if self.job_index == self.job_number:
+        if self.job_index == self.job_number and self.job_index>0:
             self.job_index -= 1
 
+        # Restart from the specified task within the current job.
         if task in ['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                     'Set alignment points', 'Compute frame qualities',
                     'Stack frames', 'Save stacked image']:
             self.work_next_task(task)
+
+        # Go back to the previous job and start with the first task.
         elif task == 'Previous job':
             self.job_index -= 1
             self.work_next_task("Read frames")
@@ -288,7 +310,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         if self.activity == "Rank frames":
             # If batch mode is deselected, start GUI activity.
             if not self.automatic:
-                pass
+                self.place_holder_manual_activity('Rank frames')
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit()
             self.busy = True
@@ -337,6 +359,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Activate / Deactivate GUI elements depending on the current situation.
         self.update_status()
 
+    def place_holder_manual_activity(self, activity):
+        # Ask the user for confirmation.
+        quit_msg = "This is a placeholder for the manual activity " + activity + \
+                   ". press OK when you want to continue with the workflow."
+        QtWidgets.QMessageBox.question(self, 'Message', quit_msg,
+                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+
     def show_current_progress_widgets(self, show):
         """
         Show or hide the GUI widgets showing the progress of the current job.
@@ -378,7 +407,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         self.ui.comboBox_back.currentTextChanged.disconnect(self.go_back)
         self.ui.comboBox_back.clear()
-        if self.job_index > 0:
+        self.ui.comboBox_back.addItem('Go back to:')
+        if self.job_index > 0 and self.job_number > 1:
             self.ui.comboBox_back.addItem('Previous job')
         if self.activity == "Read frames":
             self.ui.comboBox_back.addItems(['Read frames'])
@@ -407,7 +437,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
                                             'Set alignment points', 'Compute frame qualities',
                                             'Stack frames', 'Save stacked image'])
+        self.ui.comboBox_back.setCurrentIndex(0)
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
+
 
     def update_status(self):
         """

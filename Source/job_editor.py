@@ -198,6 +198,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.parent_gui.job_types = self.job_types
         self.parent_gui.job_number = len(self.job_names)
         self.parent_gui.job_index = 0
+        self.parent_gui.activity = "Read frames"
         self.parent_gui.update_status()
         self.close()
 

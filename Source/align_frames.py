@@ -371,7 +371,7 @@ class AlignFrames(object):
             raise WrongOrderingError("Method 'set_roi' is called before 'align_frames'")
 
         # On the first call, keep a copy of the full mean frame and original intersection shape.
-        if not self.mean_frame_original:
+        if self.mean_frame_original is None:
             self.mean_frame_original = self.mean_frame.copy()
             self.intersection_shape_original = self.intersection_shape.copy()
 

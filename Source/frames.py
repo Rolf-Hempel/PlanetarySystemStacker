@@ -21,12 +21,13 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import glob
+import os
 from pathlib import Path
 
 import cv2
 import matplotlib.pyplot as plt
-from scipy import misc
 import numpy as np
+from scipy import misc
 
 from configuration import Configuration
 from exceptions import TypeError, ShapeError, ArgumentError
@@ -157,36 +158,44 @@ class Frames(object):
                 ::self.configuration.align_frames_sampling_stride], cv2.CV_32F) for frame in
                                                   self.frames_mono_blurred]
 
-    def save_image(self, filename, image, color=False):
+    def save_image(self, filename, image, color=False, avoid_overwriting=True):
         """
         Save an image to a file.
 
         :param filename: Name of the file where the image is to be written
         :param image: ndarray object containing the image data
         :param color: If True, a three channel RGB image is to be saved. Otherwise, monochrome.
+        :param avoid_overwriting: If True, append a string to the input name if necessary so that
+                                  it does not match any existing file. If False, overwrite
+                                  an existing file.
         :return: -
         """
 
-        # If a file or directory with the given name already exists, append the word "_file".
-        if Path(filename).is_dir():
-            while True:
-                filename += '_file'
-                if not Path(filename).exists():
-                    break
-            filename += '.jpg'
-        # If it is a file, try to append "_copy.tiff" to its basename. If it still exists, repeat.
-        elif Path(filename).is_file():
-            suffix = Path(filename).suffix
-            while True:
-                p = Path(filename)
-                filename = Path.joinpath(p.parents[0], p.stem + '_copy' + suffix)
-                if not Path(filename).exists():
-                    break
-        else:
-            # If the file name is new and has no suffix, add ".tiff".
-            suffix = Path(filename).suffix
-            if not suffix:
-                filename += '.tiff'
+        if avoid_overwriting:
+            # If a file or directory with the given name already exists, append the word "_file".
+            if Path(filename).is_dir():
+                while True:
+                    filename += '_file'
+                    if not Path(filename).exists():
+                        break
+                filename += '.jpg'
+            # If it is a file, try to append "_copy.tiff" to its basename. If it still exists, repeat.
+            elif Path(filename).is_file():
+                suffix = Path(filename).suffix
+                while True:
+                    p = Path(filename)
+                    filename = Path.joinpath(p.parents[0], p.stem + '_copy' + suffix)
+                    if not Path(filename).exists():
+                        break
+            else:
+                # If the file name is new and has no suffix, add ".tiff".
+                suffix = Path(filename).suffix
+                if not suffix:
+                    filename += '.tiff'
+
+        # Don't care if a file with the given name exists. Overwrite it if necessary.
+        elif os.path.exists(filename):
+            os.remove(filename)
 
         # Write the image to the file. Before writing, convert the internal RGB representation into
         # the BGR representation assumed by OpenCV.
@@ -200,7 +209,7 @@ if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
-    type = 'video'
+    type = 'image'
     if type == 'image':
         names = glob.glob('Images/2012_*.tif')
     else:
@@ -227,3 +236,13 @@ if __name__ == "__main__":
 
     plt.imshow(frames.frames_mono[0], cmap='Greys_r')
     plt.show()
+
+    if type == 'video':
+        stacked_image_name = os.path.splitext(names)[0] + '_pss.tiff'
+    # For single image input, the Frames constructor expects a list of image file names for
+    # "names".
+    else:
+        image_dir = 'Images'
+        stacked_image_name = image_dir + '_pss.tiff'
+
+    frames.save_image(stacked_image_name, frames.frames_mono[0], avoid_overwriting=False)
