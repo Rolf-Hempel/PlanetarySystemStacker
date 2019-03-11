@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>840</width>
-    <height>535</height>
+    <width>900</width>
+    <height>530</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,6 +16,11 @@
   <layout class="QGridLayout" name="gridLayout">
    <item row="1" column="0">
     <widget class="QPushButton" name="button_add_jobs">
+     <property name="toolTip">
+      <string>Select video files and / or directories containing image files.
+Each entry is executed as a job, either in batch mode (automatic) or manually.
+When the list is okay, confirm with pressing the &quot;OK&quot; button.</string>
+     </property>
      <property name="text">
       <string>Add job(s)</string>
      </property>
@@ -43,6 +48,9 @@
    </item>
    <item row="1" column="1">
     <widget class="QPushButton" name="button_remove_jobs">
+     <property name="toolTip">
+      <string>Select one or more items in the list. Press this button to remove them from the list.</string>
+     </property>
      <property name="text">
       <string>Remove selected job(s)</string>
      </property>

@@ -33,6 +33,7 @@ from main_gui import Ui_MainWindow
 from configuration import Configuration
 from configuration_editor import ConfigurationEditor
 from job_editor import JobEditor
+from miscellaneous import Miscellaneous
 from workflow import Workflow
 
 
@@ -65,6 +66,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
 
+        # Make sure that the progress widgets retain their size when hidden.
+        size_policy = self.ui.label_current_progress.sizePolicy()
+        size_policy.setRetainSizeWhenHidden(True)
+        self.ui.label_current_progress.setSizePolicy(size_policy)
+        size_policy = self.ui.progressBar_current.sizePolicy()
+        size_policy.setRetainSizeWhenHidden(True)
+        self.ui.progressBar_current.setSizePolicy(size_policy)
+
         # Create configuration object and set configuration parameters to standard values.
         self.configuration = Configuration()
 
@@ -87,6 +96,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.actionQuit.triggered.connect(self.closeEvent)
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
         self.ui.pushButton_start.clicked.connect(self.play)
+        self.ui.pushButton_next_job.clicked.connect(self.go_next)
         self.ui.box_automatic.stateChanged.connect(self.automatic_changed)
         self.ui.actionLoad_video_directory.triggered.connect(self.load_video_directory)
         self.ui.actionEdit_configuration.triggered.connect(self.edit_configuration)
@@ -99,6 +109,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.workflow.moveToThread(self.thread)
         self.workflow.work_next_task_signal.connect(self.work_next_task)
         self.workflow.work_current_progress_signal.connect(self.set_current_progress)
+        self.workflow.set_status_bar_signal.connect(self.set_status_bar)
         # self.workflow.set_status_signal.connect(self.set_status)
         # self.workflow.set_error_signal.connect(self.show_error_message)
         self.thread.start()
@@ -147,6 +158,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # necessary.
         if not self.configuration.config_file_exists:
             self.edit_configuration()
+
+        # Tell the user to begin with specifying jobs to be executed.
+        self.set_status_bar(
+            "Specify video(s) or dir(s) with image files to be stacked (menu: File / Open).")
 
     def automatic_changed(self):
         """
@@ -256,7 +271,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Get the choice of the combobox button.
         task = self.ui.comboBox_back.currentText()
-        print ("\n+++ Repeating from task: " + task)
+        Miscellaneous.protocol("\n+++ Repeating from task: " + task + " +++",
+                               self.workflow.stacked_image_log_file)
 
         # If the end of the job queue was reached, reverse the last job index increment.
         if self.job_index == self.job_number and self.job_index>0:
@@ -277,11 +293,19 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     def play(self):
         """
         This method is invoked when the "Start / Cont." button is pressed.
-        :return:
+        :return: -
         """
 
         # Start the next task.
         self.work_next_task(self.activity)
+
+    def go_next(self):
+        """
+        This method is invoked when the "Next Job" button is pressed.
+        :return: -
+        """
+
+        self.work_next_task("Next job")
 
     def work_next_task(self, next_activity):
         """
@@ -313,6 +337,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         if self.activity == "Rank frames":
             # If batch mode is deselected, start GUI activity.
             if not self.automatic:
+                self.set_status_bar("Processing " + self.job_names[self.job_index] + ".")
                 self.place_holder_manual_activity('Rank frames')
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit()
@@ -471,10 +496,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # choices. One can only go back to activities which have been performed already.
         self.set_previous_actions_button()
 
-        # In batch mode: Deactivate most buttons and menu entries.
+        # While a computation is going on: Deactivate most buttons and menu entries.
         if self.busy:
             self.activate_gui_elements([self.ui.comboBox_back, self.ui.pushButton_start,
                                         self.ui.pushButton_next_job, self.ui.menuFile], False)
+            self.ui.statusBar.showMessage("Busy")
         # In manual mode, activate most buttons and menu entries.
         else:
             self.activate_gui_elements([self.ui.menuFile], True)
@@ -484,8 +510,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                        self.job_index > 0 or self.activity != "Read frames")
             self.activate_gui_elements([self.ui.pushButton_next_job],
                                         self.job_index < self.job_number - 1)
+            self.ui.statusBar.showMessage("")
 
-        # self.show_current_progress_widgets(self.job_number > 0)
         self.show_batch_progress_widgets(self.job_number > 1)
         if self.job_number > 0:
             self.ui.progressBar_batch.setValue(int(100*self.job_index/self.job_number))
@@ -501,6 +527,17 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         for element in elements:
             element.setEnabled(enable)
+
+    @QtCore.pyqtSlot(str)
+    def set_status_bar(self, message):
+        """
+        Set the text in the status bar to "message".
+
+        :param message: Text to be displayed
+        :return: -
+        """
+
+        self.ui.statusBar.showMessage(message)
 
     def closeEvent(self, evnt):
         """

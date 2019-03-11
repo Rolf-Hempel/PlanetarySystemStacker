@@ -40,6 +40,7 @@ class Workflow(QtCore.QObject):
 
     work_next_task_signal = QtCore.pyqtSignal(str)
     work_current_progress_signal = QtCore.pyqtSignal(str, int)
+    set_status_bar_signal = QtCore.pyqtSignal(str)
 
     def __init__(self, main_gui):
         super(Workflow, self).__init__()
@@ -72,6 +73,10 @@ class Workflow(QtCore.QObject):
 
     @QtCore.pyqtSlot(str, str, bool)
     def execute_frames(self, input_name, input_type, convert_to_grayscale):
+
+        # Update the status bar in the main GUI.
+        self.input_name = input_name
+        self.set_status_bar_signal.emit("Processing " + self.input_name + ", reading frames.")
         # Images can either be extracted from a video file or a batch of single photographs. In the
         # first case, input_type is set to 'video', in the second case to 'image'.
 
@@ -134,7 +139,8 @@ class Workflow(QtCore.QObject):
                             convert_to_grayscale=convert_to_grayscale,
                             progress_signal=self.work_current_progress_signal)
             if self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.protocol("Number of images read: " + str(self.frames.number) +
+                Miscellaneous.protocol(
+                            "           Number of images read: " + str(self.frames.number) +
                             ", image shape: " + str(self.frames.shape), self.stacked_image_log_file,
                             precede_with_timestamp=False)
         except Exception as e:
@@ -160,6 +166,7 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot()
     def execute_rank_frames(self):
 
+        self.set_status_bar_signal.emit("Processing " + self.input_name + ", ranking frames.")
         # Rank the frames by their overall local contrast.
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start ranking images +++", self.stacked_image_log_file)
@@ -169,7 +176,7 @@ class Workflow(QtCore.QObject):
         self.my_timer.stop('Ranking images')
         if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol(
-                "Index of best frame: " + str(self.rank_frames.frame_ranks_max_index),
+                "           Index of best frame: " + str(self.rank_frames.frame_ranks_max_index),
                 self.stacked_image_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Align frames")
@@ -177,6 +184,7 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot(bool, int, int, int, int)
     def execute_align_frames(self, auto_execution, x_low_opt, x_high_opt, y_low_opt, y_high_opt):
 
+        self.set_status_bar_signal.emit("Processing " + self.input_name + ", aligning frames.")
         # Initialize the frame alignment object.
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Initializing frame alignment +++",
@@ -197,7 +205,8 @@ class Workflow(QtCore.QObject):
                         self.configuration.align_frames_rectangle_scale_factor)
                 self.my_timer.stop('Select optimal alignment patch')
                 if self.configuration.global_parameters_protocol_level > 1:
-                    Miscellaneous.protocol("Alignment rectangle, computed automatically: " +
+                    Miscellaneous.protocol(
+                                       "           Alignment rectangle, computed automatically: " +
                                        str(y_low_opt) + "<y<" + str(y_high_opt) +
                                        ", " + str(x_low_opt) + "<x<" +
                                        str(x_high_opt), self.stacked_image_log_file,
@@ -207,7 +216,7 @@ class Workflow(QtCore.QObject):
             else:
                 self.align_frames.set_alignment_rect(y_low_opt, y_high_opt, x_low_opt, x_high_opt)
                 if self.configuration.global_parameters_protocol_level > 1:
-                    Miscellaneous.protocol("Alignment rectangle, set by the user: " +
+                    Miscellaneous.protocol("           Alignment rectangle, set by the user: " +
                                        str(y_low_opt) + "<y<" + str(y_high_opt) +
                                        ", " + str(x_low_opt) + "<x<" +
                                        str(x_high_opt), self.stacked_image_log_file,
@@ -229,7 +238,7 @@ class Workflow(QtCore.QObject):
         self.my_timer.stop('Global frame alignment')
 
         if self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol("Pixel range common to all frames: " + str(
+            Miscellaneous.protocol("           Pixel range common to all frames: " + str(
                 self.align_frames.intersection_shape[0][0]) + "<y<" + str(
                 self.align_frames.intersection_shape[0][1]) + ", " + str(
                 self.align_frames.intersection_shape[1][0]) + "<x<" + str(
@@ -244,7 +253,8 @@ class Workflow(QtCore.QObject):
         self.align_frames.average_frame()
         self.my_timer.stop('Compute reference frame')
         if self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol("The average frame was computed using the best " + str(
+            Miscellaneous.protocol(
+                "           The average frame was computed using the best " + str(
                 self.align_frames.average_frame_number) + " frames.", self.stacked_image_log_file,
                 precede_with_timestamp=False)
 
@@ -252,6 +262,8 @@ class Workflow(QtCore.QObject):
 
     @QtCore.pyqtSlot(int, int, int, int)
     def execute_set_roi(self, y_min, y_max, x_min, x_max):
+
+        self.set_status_bar_signal.emit("Processing " + self.input_name + ", setting the ROI.")
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start setting a ROI and computing a new average frame +++",
                                    self.stacked_image_log_file)
@@ -264,6 +276,8 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot()
     def execute_set_alignment_points(self):
 
+        self.set_status_bar_signal.emit("Processing " + self.input_name +
+                                        ", creating alignment points.")
         # Initialize the AlignmentPoints object.
         self.my_timer.create_no_check('Initialize alignment point object')
         self.alignment_points = AlignmentPoints(self.configuration, self.frames, self.rank_frames,
@@ -281,7 +295,7 @@ class Workflow(QtCore.QObject):
 
         self.my_timer.stop('Create alignment points')
         if self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol("Number of alignment points selected: " + str(
+            Miscellaneous.protocol("           Number of alignment points selected: " + str(
                 len(self.alignment_points.alignment_points)) +
                   ", aps dropped because too dim: " + str(
                 self.alignment_points.alignment_points_dropped_dim) +
@@ -294,6 +308,8 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot()
     def execute_compute_frame_qualities(self):
 
+        self.set_status_bar_signal.emit("Processing " + self.input_name +
+                                        ", ranking all frames at all alignment points.")
         # For each alignment point rank frames by their quality.
         self.my_timer.create_no_check('Rank frames at alignment points')
         if self.configuration.global_parameters_protocol_level > 0:
@@ -307,6 +323,7 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot()
     def execute_stack_frames(self):
 
+        self.set_status_bar_signal.emit("Processing " + self.input_name + ", stacking frames.")
         # Allocate StackFrames object.
         self.stack_frames = StackFrames(self.configuration, self.frames, self.align_frames,
                                    self.alignment_points, self.my_timer)
@@ -316,6 +333,7 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol("+++ Start stacking frames +++", self.stacked_image_log_file)
         self.stack_frames.stack_frames()
 
+        self.set_status_bar_signal.emit("Processing " + self.input_name + ", merging AP patches.")
         # Merge the stacked alignment point buffers into a single image.
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start merging all alignment patches and the background +++",
@@ -327,6 +345,7 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot()
     def execute_save_stacked_image(self):
 
+        self.set_status_bar_signal.emit("Processing " + self.input_name + ", saving result.")
         # Save the stacked image as 16bit int (color or mono).
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start saving the stacked image +++",

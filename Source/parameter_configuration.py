@@ -12,7 +12,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_ConfigurationDialog(object):
     def setupUi(self, ConfigurationDialog):
         ConfigurationDialog.setObjectName("ConfigurationDialog")
-        ConfigurationDialog.resize(906, 524)
+        ConfigurationDialog.resize(900, 530)
         font = QtGui.QFont()
         font.setPointSize(10)
         ConfigurationDialog.setFont(font)
@@ -285,8 +285,7 @@ class Ui_ConfigurationDialog(object):
         self.afafp_label_parameter.setToolTip(_translate("ConfigurationDialog", "The reference frame for the multipoint alignment is computed as the average of the best frames. This value specifies the number of frames to be used."))
         self.afafp_label_parameter.setText(_translate("ConfigurationDialog", "Percentage of best frames for\n"
 "reference frame computation"))
-        self.gpspwr_checkBox.setToolTip(_translate("ConfigurationDialog", "Check this option if only rigid transformation should be applied to the color image.\n"
-"Usually this leads to a less accurate match."))
+        self.gpspwr_checkBox.setToolTip(_translate("ConfigurationDialog", "Check if for each job the corresponding protocol section should be stored along with the stacked image."))
         self.gpspwr_checkBox.setText(_translate("ConfigurationDialog", "Store protocol with results"))
         self.apbt_label_parameter.setToolTip(_translate("ConfigurationDialog", "In the automatic construction of alignment point grids, points are discarded if no pixels in the surrounding box are bright enough.\n"
 "Higher values result in more points to be discarded. If the value is too low, unreliable alignment points are included."))
@@ -298,13 +297,13 @@ class Ui_ConfigurationDialog(object):
         self.afrsf_label_parameter.setText(_translate("ConfigurationDialog", "Stabilization patch size\n"
 "(% of frame size)"))
         self.apfp_label_display.setText(_translate("ConfigurationDialog", "TextLabel"))
+        self.gppl_label_parameter.setToolTip(_translate("ConfigurationDialog", "Level of detail of protocol: 0 for nothing, 1 for major steps only, 2 for detailed info."))
         self.gppl_label_parameter.setText(_translate("ConfigurationDialog", "Protocol detail level"))
         self.apst_label_display.setText(_translate("ConfigurationDialog", "TextLabel"))
         self.label.setToolTip(_translate("ConfigurationDialog", "Parameters used in the first matching phase. In this phase, the color image\n"
 "is rotated, shifted and stretched to match the B/W image."))
         self.label.setText(_translate("ConfigurationDialog", "Frame-related Parameters"))
-        self.gpwptf_checkBox.setToolTip(_translate("ConfigurationDialog", "If the input color image matches the B/W image very accurately already (and has the same shape), the rigid transformation step can be skipped.\n"
-"In this case only the optical flow is computed for fine-tuning."))
+        self.gpwptf_checkBox.setToolTip(_translate("ConfigurationDialog", "Append a protocol of this program execution to the text file \"PlanetarySystemStacker.log\" in the user\'s home directory."))
         self.gpwptf_checkBox.setText(_translate("ConfigurationDialog", "Write protocol to file"))
         self.label_2.setToolTip(_translate("ConfigurationDialog", "Parameters used in the second (fine-tuning) phase. In each pixel the color image\n"
 "is warped such that it exactly matches the B/W image."))

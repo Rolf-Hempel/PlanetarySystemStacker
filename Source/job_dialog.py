@@ -12,7 +12,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_JobDialog(object):
     def setupUi(self, JobDialog):
         JobDialog.setObjectName("JobDialog")
-        JobDialog.resize(840, 535)
+        JobDialog.resize(900, 530)
         self.gridLayout = QtWidgets.QGridLayout(JobDialog)
         self.gridLayout.setObjectName("gridLayout")
         self.button_add_jobs = QtWidgets.QPushButton(JobDialog)
@@ -40,7 +40,11 @@ class Ui_JobDialog(object):
     def retranslateUi(self, JobDialog):
         _translate = QtCore.QCoreApplication.translate
         JobDialog.setWindowTitle(_translate("JobDialog", "Manage Job List"))
+        self.button_add_jobs.setToolTip(_translate("JobDialog", "Select video files and / or directories containing image files.\n"
+"Each entry is executed as a job, either in batch mode (automatic) or manually.\n"
+"When the list is okay, confirm with pressing the \"OK\" button."))
         self.button_add_jobs.setText(_translate("JobDialog", "Add job(s)"))
+        self.button_remove_jobs.setToolTip(_translate("JobDialog", "Select one or more items in the list. Press this button to remove them from the list."))
         self.button_remove_jobs.setText(_translate("JobDialog", "Remove selected job(s)"))
 
 

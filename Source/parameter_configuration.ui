@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>906</width>
-    <height>524</height>
+    <width>900</width>
+    <height>530</height>
    </rect>
   </property>
   <property name="font">
@@ -157,8 +157,7 @@ reference frame computation</string>
    <item row="10" column="0">
     <widget class="QCheckBox" name="gpspwr_checkBox">
      <property name="toolTip">
-      <string>Check this option if only rigid transformation should be applied to the color image.
-Usually this leads to a less accurate match.</string>
+      <string>Check if for each job the corresponding protocol section should be stored along with the stacked image.</string>
      </property>
      <property name="text">
       <string>Store protocol with results</string>
@@ -229,6 +228,9 @@ Higher values result in more points to be discarded. If the value is too low, un
        <horstretch>0</horstretch>
        <verstretch>0</verstretch>
       </sizepolicy>
+     </property>
+     <property name="toolTip">
+      <string>Level of detail of protocol: 0 for nothing, 1 for major steps only, 2 for detailed info.</string>
      </property>
      <property name="text">
       <string>Protocol detail level</string>
@@ -326,8 +328,7 @@ is rotated, shifted and stretched to match the B/W image.</string>
    <item row="9" column="0">
     <widget class="QCheckBox" name="gpwptf_checkBox">
      <property name="toolTip">
-      <string>If the input color image matches the B/W image very accurately already (and has the same shape), the rigid transformation step can be skipped.
-In this case only the optical flow is computed for fine-tuning.</string>
+      <string>Append a protocol of this program execution to the text file &quot;PlanetarySystemStacker.log&quot; in the user's home directory.</string>
      </property>
      <property name="text">
       <string>Write protocol to file</string>
