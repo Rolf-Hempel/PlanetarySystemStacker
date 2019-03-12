@@ -294,6 +294,7 @@ class Workflow(QtCore.QObject):
         self.alignment_points.create_ap_grid()
 
         self.my_timer.stop('Create alignment points')
+
         if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol("           Number of alignment points selected: " + str(
                 len(self.alignment_points.alignment_points)) +

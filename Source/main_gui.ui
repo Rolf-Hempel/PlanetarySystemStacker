@@ -19,7 +19,7 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2" stretch="100,0">
     <item>
-     <spacer name="verticalSpacer">
+     <spacer name="vertical_spacer">
       <property name="orientation">
        <enum>Qt::Vertical</enum>
       </property>

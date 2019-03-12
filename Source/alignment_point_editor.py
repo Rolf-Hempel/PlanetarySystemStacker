@@ -569,11 +569,6 @@ class CommandCreateApGrid(QtWidgets.QUndoCommand):
         self.old_ap_list = self.photo_editor.aps.alignment_points
         # Create the new AP grid.
         self.photo_editor.aps.create_ap_grid()
-        print("Number of alignment points selected: " + str(
-            len(self.photo_editor.aps.alignment_points)) + ", aps dropped because too dim: " + str(
-            self.photo_editor.aps.alignment_points_dropped_dim) +
-            ", aps dropped because too little structure: " + str(
-            self.photo_editor.aps.alignment_points_dropped_structure))
         # Copy the new list of APs.
         self.new_ap_list = self.photo_editor.aps.alignment_points
         for ap in self.new_ap_list:
@@ -675,7 +670,7 @@ class CommandReplace(QtWidgets.QUndoCommand):
         self.photo_editor._scene.update()
 
 
-class AlignmentPointEditorWidget(QtWidgets.QWidget):
+class AlignmentPointEditorWidget(QtWidgets.QFrame):
     """
     This widget implements the AP viewer, to be used as part of the application GUI.
     """
@@ -691,11 +686,13 @@ class AlignmentPointEditorWidget(QtWidgets.QWidget):
         """
 
         super(AlignmentPointEditorWidget, self).__init__()
+        self.setFrameShape(QtWidgets.QFrame.Panel)
+        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.setObjectName("alignment_point_editor")
         self.mean_frame = align_frames.mean_frame
         self.configuration = configuration
         self.aps = alignment_points
         self.viewer = AlignmentPointEditor(self, self.aps)
-        self.viewer.setMinimumSize(800, 600)
 
         self.btnLoad = QtWidgets.QToolButton(self)
         self.btnLoad.setText('Load image')
@@ -831,9 +828,7 @@ if __name__ == '__main__':
     # Compute the reference frame by averaging the best frames.
     average = align_frames.average_frame()
 
-    # Initialize the AlignmentPoints object. This includes the computation of the average frame
-    # against which the alignment point shifts are measured.
-
+    # Initialize the AlignmentPoints object.
     alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
     end = time()
     print('Elapsed time in computing average frame: {}'.format(end - start))
@@ -848,7 +843,12 @@ if __name__ == '__main__':
     window.showMaximized()
     app.exec_()
 
-    print ("After AP editing, number of APs: " + str(len(alignment_points.alignment_points)))
+    print("After AP editing, number of APs: " + str(
+        len(alignment_points.alignment_points)) + ", aps dropped because too dim: " + str(
+        alignment_points.alignment_points_dropped_dim) + ", aps dropped because too little "
+                                                              "structure: " + str(
+        alignment_points.alignment_points_dropped_structure))
+
     count_updates = 0
     for ap in alignment_points.alignment_points:
         if ap['reference_box'] is not None:

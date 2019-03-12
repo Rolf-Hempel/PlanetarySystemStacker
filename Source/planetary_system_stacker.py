@@ -33,6 +33,8 @@ from main_gui import Ui_MainWindow
 from configuration import Configuration
 from configuration_editor import ConfigurationEditor
 from job_editor import JobEditor
+from alignment_points import AlignmentPoints
+from alignment_point_editor import AlignmentPointEditorWidget
 from miscellaneous import Miscellaneous
 from workflow import Workflow
 
@@ -157,11 +159,15 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # been set so far), open the configuration editor GUI to let the user make adjustments if
         # necessary.
         if not self.configuration.config_file_exists:
+            # Tell the user to begin with changing / confirming config parameters.
+            self.set_status_bar(
+                'Adapt configuration to your needs and / or confirm by pressing "OK".')
             self.edit_configuration()
 
-        # Tell the user to begin with specifying jobs to be executed.
-        self.set_status_bar(
-            "Specify video(s) or dir(s) with image files to be stacked (menu: File / Open).")
+        else:
+            # Tell the user to begin with specifying jobs to be executed.
+            self.set_status_bar(
+                "Specify video(s) or dir(s) with image files to be stacked (menu: File / Open).")
 
     def automatic_changed(self):
         """
@@ -183,7 +189,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Display the configuration editor widget in the central QFrame.
         self.display_widget(ConfigurationEditor(self))
 
-    def display_widget(self, widget, display=True):
+    def display_widget(self, widget, display=True, remove_spacer=False):
         """
         Display a widget in the central main GUI location, or remove it from there.
 
@@ -334,7 +340,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.signal_frames.emit(self.job_names[self.job_index],
                                     self.job_types[self.job_index], False)
             self.busy = True
-        if self.activity == "Rank frames":
+        elif self.activity == "Rank frames":
             # If batch mode is deselected, start GUI activity.
             if not self.automatic:
                 self.set_status_bar("Processing " + self.job_names[self.job_index] + ".")
@@ -353,9 +359,31 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.signal_set_roi.emit(400, 700, 300, 800)
             self.busy = True
         elif self.activity == "Set alignment points":
-            if not self.automatic:
-                pass
-            self.signal_set_alignment_points.emit()
+            if self.automatic:
+                self.signal_set_alignment_points.emit()
+            else:
+                self.busy = False
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("+++ Start creating alignment points +++",
+                                           self.workflow.stacked_image_log_file)
+                # Initialize the AlignmentPoints object.
+                self.workflow.my_timer.create_no_check('Initialize alignment point object')
+                self.workflow.alignment_points = AlignmentPoints(self.workflow.configuration,
+                                                                 self.workflow.frames,
+                                                                 self.workflow.rank_frames,
+                                                                 self.workflow.align_frames)
+                self.workflow.my_timer.stop('Initialize alignment point object')
+                # Open the alignment point editor.
+                apew = AlignmentPointEditorWidget(self.workflow.configuration,
+                                                               self.workflow.align_frames,
+                                                               self.workflow.alignment_points)
+                policy = apew.sizePolicy()
+                policy.setVerticalPolicy(QtWidgets.QSizePolicy.MinimumExpanding)
+                apew.setSizePolicy(policy)
+                self.display_widget(apew)
+
+
+                self.activity = "Compute frame qualities"
         elif self.activity == "Compute frame qualities":
             if not self.automatic:
                 pass
