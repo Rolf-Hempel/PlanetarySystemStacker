@@ -189,7 +189,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Display the configuration editor widget in the central QFrame.
         self.display_widget(ConfigurationEditor(self))
 
-    def display_widget(self, widget, display=True, remove_spacer=False):
+    def display_widget(self, widget, display=True, vertical_spacer=True):
         """
         Display a widget in the central main GUI location, or remove it from there.
 
@@ -199,17 +199,33 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
+        if vertical_spacer:
+            self.ui.label_placeholder.show()
+        else:
+            self.ui.label_placeholder.hide()
         if display:
+            self.ui.label_placeholder = widget
             if self.widget_saved:
-                self.ui.verticalLayout_2.removeWidget(self.widget_saved)
-                self.widget_saved.close()
+                self.widget_saved.hide()
+                self.widget_saved.setParent(None)
             self.widget_saved = widget
             self.ui.verticalLayout_2.insertWidget(0, widget)
         else:
             if self.widget_saved:
-                self.ui.verticalLayout_2.removeWidget(self.widget_saved)
-                self.widget_saved.close()
+                self.widget_saved.hide()
+                self.widget_saved.setParent(None)
                 self.widget_saved = None
+        # if display:
+        #     if self.widget_saved:
+        #         self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+        #         self.widget_saved.close()
+        #     self.widget_saved = widget
+        #     self.ui.verticalLayout_2.insertWidget(0, widget)
+        # else:
+        #     if self.widget_saved:
+        #         self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+        #         self.widget_saved.close()
+        #         self.widget_saved = None
 
     def load_config_file(self):
         """

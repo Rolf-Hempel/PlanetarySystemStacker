@@ -2,24 +2,35 @@
 
 # Form implementation generated from reading ui file 'main_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12
+# Created by: PyQt5 UI code generator 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1015, 697)
+        MainWindow.resize(1015, 824)
         MainWindow.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
         self.verticalLayout_2 = QtWidgets.QVBoxLayout(self.centralwidget)
         self.verticalLayout_2.setObjectName("verticalLayout_2")
-        spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout_2.addItem(spacerItem)
+        self.stackedWidget = QtWidgets.QStackedWidget(self.centralwidget)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(100)
+        sizePolicy.setHeightForWidth(self.stackedWidget.sizePolicy().hasHeightForWidth())
+        self.stackedWidget.setSizePolicy(sizePolicy)
+        self.stackedWidget.setObjectName("stackedWidget")
+        self.page_with_spacer = QtWidgets.QWidget()
+        self.page_with_spacer.setObjectName("page_with_spacer")
+        self.stackedWidget.addWidget(self.page_with_spacer)
+        self.page_without_spacer = QtWidgets.QWidget()
+        self.page_without_spacer.setObjectName("page_without_spacer")
+        self.stackedWidget.addWidget(self.page_without_spacer)
+        self.verticalLayout_2.addWidget(self.stackedWidget)
         self.tool_line = QtWidgets.QHBoxLayout()
         self.tool_line.setObjectName("tool_line")
         self.control_area = QtWidgets.QFrame(self.centralwidget)
@@ -51,14 +62,14 @@ class Ui_MainWindow(object):
         self.pushButton_next_job = QtWidgets.QPushButton(self.control_area)
         self.pushButton_next_job.setObjectName("pushButton_next_job")
         self.horizontalLayout_3.addWidget(self.pushButton_next_job)
-        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout_3.addItem(spacerItem1)
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout_3.addItem(spacerItem)
         self.box_automatic = QtWidgets.QCheckBox(self.control_area)
         self.box_automatic.setObjectName("box_automatic")
         self.horizontalLayout_3.addWidget(self.box_automatic)
         self.tool_line.addWidget(self.control_area)
-        spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.tool_line.addItem(spacerItem2)
+        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.tool_line.addItem(spacerItem1)
         self.label_current_progress = QtWidgets.QLabel(self.centralwidget)
         self.label_current_progress.setMinimumSize(QtCore.QSize(130, 0))
         self.label_current_progress.setText("")
@@ -69,8 +80,8 @@ class Ui_MainWindow(object):
         self.progressBar_current.setProperty("value", 0)
         self.progressBar_current.setObjectName("progressBar_current")
         self.tool_line.addWidget(self.progressBar_current)
-        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.tool_line.addItem(spacerItem3)
+        spacerItem2 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.tool_line.addItem(spacerItem2)
         self.label_batch_progress = QtWidgets.QLabel(self.centralwidget)
         self.label_batch_progress.setAlignment(QtCore.Qt.AlignRight|QtCore.Qt.AlignTrailing|QtCore.Qt.AlignVCenter)
         self.label_batch_progress.setObjectName("label_batch_progress")
@@ -79,8 +90,8 @@ class Ui_MainWindow(object):
         self.progressBar_batch.setProperty("value", 0)
         self.progressBar_batch.setObjectName("progressBar_batch")
         self.tool_line.addWidget(self.progressBar_batch)
-        spacerItem4 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.tool_line.addItem(spacerItem4)
+        spacerItem3 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.tool_line.addItem(spacerItem3)
         self.tool_line.setStretch(1, 3)
         self.tool_line.setStretch(2, 5)
         self.tool_line.setStretch(3, 12)
@@ -140,6 +151,7 @@ class Ui_MainWindow(object):
         self.menubar.addAction(self.menuEdit.menuAction())
 
         self.retranslateUi(MainWindow)
+        self.stackedWidget.setCurrentIndex(1)
         self.comboBox_back.setCurrentIndex(-1)
         QtCore.QMetaObject.connectSlotsByName(MainWindow)
 
@@ -163,5 +175,4 @@ class Ui_MainWindow(object):
         self.actionQuit.setText(_translate("MainWindow", "Quit"))
         self.actionEdit_configuration.setText(_translate("MainWindow", "Edit stacking config"))
         self.actionEdit_postproc_config.setText(_translate("MainWindow", "Edit postproc config"))
-
 

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>1015</width>
-    <height>697</height>
+    <height>824</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -19,17 +19,19 @@
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout_2" stretch="100,0">
     <item>
-     <spacer name="vertical_spacer">
-      <property name="orientation">
-       <enum>Qt::Vertical</enum>
+     <widget class="QStackedWidget" name="stackedWidget">
+      <property name="sizePolicy">
+       <sizepolicy hsizetype="Preferred" vsizetype="Expanding">
+        <horstretch>0</horstretch>
+        <verstretch>100</verstretch>
+       </sizepolicy>
       </property>
-      <property name="sizeHint" stdset="0">
-       <size>
-        <width>20</width>
-        <height>40</height>
-       </size>
+      <property name="currentIndex">
+       <number>1</number>
       </property>
-     </spacer>
+      <widget class="QWidget" name="page_with_spacer"/>
+      <widget class="QWidget" name="page_without_spacer"/>
+     </widget>
     </item>
     <item>
      <layout class="QHBoxLayout" name="tool_line" stretch="0,3,5,12,3,3,12,1">
