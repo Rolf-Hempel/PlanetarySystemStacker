@@ -674,10 +674,11 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame):
     """
     This widget implements the AP viewer, to be used as part of the application GUI.
     """
-    def __init__(self, configuration, align_frames, alignment_points):
+    def __init__(self, parent_gui, configuration, align_frames, alignment_points):
         """
         Initialization of the widget.
 
+        :param parent_gui: Parent GUI object
         :param image: Background image on which the APs are superimposed. Usually, the mean frame is
                       used for this purpose.
         :param configuration: Configuration object with parameters
@@ -689,6 +690,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame):
         self.setFrameShape(QtWidgets.QFrame.Panel)
         self.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.setObjectName("alignment_point_editor")
+        self.parent_gui = parent_gui
         self.mean_frame = align_frames.mean_frame
         self.configuration = configuration
         self.aps = alignment_points
@@ -734,6 +736,11 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame):
         self.viewer.fitInView()
 
     def done(self):
+        # Reset the busy status of the higher-level GUI (to enable the "play" button) and
+        # update the status of the higher-level GUI (if a reference to it was passed in "init").
+        if self.parent_gui is not None:
+            self.parent_gui.busy = False
+            self.parent_gui.update_status()
         # Close the Window.
         self.close()
 
@@ -838,7 +845,7 @@ if __name__ == '__main__':
     # plt.show()
 
     app = QtWidgets.QApplication(sys.argv)
-    window = AlignmentPointEditorWidget(configuration, align_frames, alignment_points)
+    window = AlignmentPointEditorWidget(None, configuration, align_frames, alignment_points)
     window.setMinimumSize(800,600)
     window.showMaximized()
     app.exec_()

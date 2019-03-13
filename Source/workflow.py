@@ -263,13 +263,14 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot(int, int, int, int)
     def execute_set_roi(self, y_min, y_max, x_min, x_max):
 
-        self.set_status_bar_signal.emit("Processing " + self.input_name + ", setting the ROI.")
-        if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start setting a ROI and computing a new average frame +++",
-                                   self.stacked_image_log_file)
-        self.my_timer.create_no_check('Setting ROI and new reference')
-        self.align_frames.set_roi(y_min, y_max, x_min, x_max)
-        self.my_timer.stop('Setting ROI and new reference')
+        if y_max > y_min and x_max > x_min:
+            self.set_status_bar_signal.emit("Processing " + self.input_name + ", setting the ROI.")
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("+++ Start setting a ROI and computing a new average frame +++",
+                                       self.stacked_image_log_file)
+            self.my_timer.create_no_check('Setting ROI and new reference')
+            self.align_frames.set_roi(y_min, y_max, x_min, x_max)
+            self.my_timer.stop('Setting ROI and new reference')
 
         self.work_next_task_signal.emit("Set alignment points")
 

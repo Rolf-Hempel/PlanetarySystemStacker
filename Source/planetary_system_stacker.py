@@ -22,7 +22,7 @@ Part of this module (in class "AlignmentPointEditor" was copied from
 https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview
 
 """
-
+from time import sleep
 import sys
 from pathlib import Path
 
@@ -189,7 +189,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Display the configuration editor widget in the central QFrame.
         self.display_widget(ConfigurationEditor(self))
 
-    def display_widget(self, widget, display=True, vertical_spacer=True):
+    def display_widget(self, widget, display=True):
         """
         Display a widget in the central main GUI location, or remove it from there.
 
@@ -199,33 +199,17 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
-        if vertical_spacer:
-            self.ui.label_placeholder.show()
-        else:
-            self.ui.label_placeholder.hide()
         if display:
-            self.ui.label_placeholder = widget
             if self.widget_saved:
-                self.widget_saved.hide()
-                self.widget_saved.setParent(None)
+                self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+                self.widget_saved.close()
             self.widget_saved = widget
             self.ui.verticalLayout_2.insertWidget(0, widget)
         else:
             if self.widget_saved:
-                self.widget_saved.hide()
-                self.widget_saved.setParent(None)
+                self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+                self.widget_saved.close()
                 self.widget_saved = None
-        # if display:
-        #     if self.widget_saved:
-        #         self.ui.verticalLayout_2.removeWidget(self.widget_saved)
-        #         self.widget_saved.close()
-        #     self.widget_saved = widget
-        #     self.ui.verticalLayout_2.insertWidget(0, widget)
-        # else:
-        #     if self.widget_saved:
-        #         self.ui.verticalLayout_2.removeWidget(self.widget_saved)
-        #         self.widget_saved.close()
-        #         self.widget_saved = None
 
     def load_config_file(self):
         """
@@ -372,13 +356,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         elif self.activity == "Set ROI":
             if not self.automatic:
                 pass
-            self.signal_set_roi.emit(400, 700, 300, 800)
+            # self.signal_set_roi.emit(400, 700, 300, 800)
+            self.signal_set_roi.emit(0, 0, 0, 0)
             self.busy = True
         elif self.activity == "Set alignment points":
             if self.automatic:
                 self.signal_set_alignment_points.emit()
             else:
-                self.busy = False
+                # self.busy = False
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("+++ Start creating alignment points +++",
                                            self.workflow.stacked_image_log_file)
@@ -390,16 +375,16 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                                                  self.workflow.align_frames)
                 self.workflow.my_timer.stop('Initialize alignment point object')
                 # Open the alignment point editor.
-                apew = AlignmentPointEditorWidget(self.workflow.configuration,
+                apew = AlignmentPointEditorWidget(self, self.workflow.configuration,
                                                                self.workflow.align_frames,
                                                                self.workflow.alignment_points)
-                policy = apew.sizePolicy()
-                policy.setVerticalPolicy(QtWidgets.QSizePolicy.MinimumExpanding)
-                apew.setSizePolicy(policy)
+
+                # This is a workaround to make sure the window fills the available space.
+                apew.setMinimumHeight(self.ui.centralwidget.height()-75)
                 self.display_widget(apew)
-
-
+                apew.viewer.setFocus()
                 self.activity = "Compute frame qualities"
+
         elif self.activity == "Compute frame qualities":
             if not self.automatic:
                 pass
