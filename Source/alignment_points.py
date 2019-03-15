@@ -309,7 +309,7 @@ class AlignmentPoints(object):
         alignment_point['graphics_item'] = None
 
         # Allocate buffers and fill alignment point box with mean frame.
-        AlignmentPoints.allocate_ap_buffers(alignment_point, self.mean_frame, self.frames.color)
+        AlignmentPoints.set_reference_box(alignment_point, self.mean_frame)
 
         return alignment_point
 
@@ -461,14 +461,29 @@ class AlignmentPoints(object):
         return ap
 
     @staticmethod
-    def allocate_ap_buffers(alignment_point, mean_frame, color):
+    def set_reference_box(alignment_point, mean_frame):
         """
         For APs which have been changed in the AP editor, buffers have been invalidated. They have
         to be re-computed after AP editing is done.
 
         :param alignment_point: Alignment_point object
         :param mean_frame: Average frame
-        :param color: True, if stacking is to be done for color frames. False for monochrome case.
+        :return: -
+        """
+
+        # Cut out the reference box from the mean frame, used in alignment.
+        box = mean_frame[alignment_point['box_y_low']:alignment_point['box_y_high'],
+              alignment_point['box_x_low']:alignment_point['box_x_high']]
+        alignment_point['reference_box'] = box
+
+    @staticmethod
+    def initialize_ap_stacking_buffer(alignment_point, color):
+        """
+        In the stacking initialization, for each AP a stacking buffer has to be allocated.
+
+        :param alignment_point: Alignment_point object
+        :param color: True, if stacking is to be done for color frames. False for
+        monochrome case.
         :return: -
         """
 
@@ -481,13 +496,7 @@ class AlignmentPoints(object):
         else:
             alignment_point['stacking_buffer'] = zeros(
                 [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
-                 alignment_point['patch_x_high'] - alignment_point['patch_x_low']],
-                dtype=float32)
-
-        # Cut out the reference box from the mean frame, used in alignment.
-        box = mean_frame[alignment_point['box_y_low']:alignment_point['box_y_high'],
-              alignment_point['box_x_low']:alignment_point['box_x_high']]
-        alignment_point['reference_box'] = box
+                 alignment_point['patch_x_high'] - alignment_point['patch_x_low']], dtype=float32)
 
     def find_alignment_points(self, y_low, y_high, x_low, x_high):
         """

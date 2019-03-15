@@ -736,6 +736,12 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame):
         self.viewer.fitInView()
 
     def done(self):
+        # On exit from the alignment point editor, allocate buffers for APs which have been
+        # changed during editing.
+        for ap in self.aps.alignment_points:
+            if ap['reference_box'] is None:
+                self.aps.set_reference_box(ap, self.mean_frame)
+
         # Reset the busy status of the higher-level GUI (to enable the "play" button) and
         # update the status of the higher-level GUI (if a reference to it was passed in "init").
         if self.parent_gui is not None:
@@ -861,7 +867,7 @@ if __name__ == '__main__':
         if ap['reference_box'] is not None:
             continue
         count_updates += 1
-        AlignmentPoints.allocate_ap_buffers(ap, align_frames.mean_frame, frames.color)
+        AlignmentPoints.set_reference_box(ap, align_frames.mean_frame)
     print ("Buffers allocated for " + str(count_updates) + " alignment points.")
     sys.exit()
 

@@ -79,6 +79,10 @@ class StackFrames(object):
                 self.align_frames.intersection_shape[1][0]
         self.number_pixels = self.dim_y * self.dim_x
 
+        # If the AP stacking buffers have been used already, reset them.
+        for ap in self.alignment_points.alignment_points:
+            AlignmentPoints.initialize_ap_stacking_buffer(ap, self.frames.color)
+
         # The arrays for the stacked image and the summation buffer need to accommodate three
         # color channels in the case of color images.
         if self.frames.color:

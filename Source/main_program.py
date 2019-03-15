@@ -183,7 +183,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
     else:
         # Open the alignment point editor.
         app = QtWidgets.QApplication(sys.argv)
-        alignment_point_editor = AlignmentPointEditorWidget(configuration, align_frames,
+        alignment_point_editor = AlignmentPointEditorWidget(None, configuration, align_frames,
                                                             alignment_points)
         alignment_point_editor.setMinimumSize(800, 600)
         alignment_point_editor.showMaximized()
@@ -195,7 +195,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
             if ap['reference_box'] is not None:
                 continue
             count_updates += 1
-            AlignmentPoints.allocate_ap_buffers(ap, align_frames.mean_frame, frames.color)
+            AlignmentPoints.set_reference_box(ap, align_frames.mean_frame)
         print("Buffers allocated for " + str(count_updates) + " alignment points.")
 
     # Produce an overview image showing all alignment points.
