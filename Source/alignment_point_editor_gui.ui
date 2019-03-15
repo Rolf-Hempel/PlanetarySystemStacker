@@ -33,6 +33,9 @@
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
       <widget class="QPushButton" name="btnLoad">
+       <property name="toolTip">
+        <string>Load the average frame as background for alignment point editing.</string>
+       </property>
        <property name="text">
         <string>Load Image</string>
        </property>
@@ -40,6 +43,9 @@
      </item>
      <item>
       <widget class="QPushButton" name="btnApGrid">
+       <property name="toolTip">
+        <string>Create an alignment point grid automatically.</string>
+       </property>
        <property name="text">
         <string>Create AP Grid</string>
        </property>
@@ -47,6 +53,9 @@
      </item>
      <item>
       <widget class="QPushButton" name="btnUndo">
+       <property name="toolTip">
+        <string>Undo the last step.</string>
+       </property>
        <property name="text">
         <string>Undo</string>
        </property>
@@ -54,15 +63,31 @@
      </item>
      <item>
       <widget class="QPushButton" name="btnRedo">
+       <property name="toolTip">
+        <string>Redo the last step.</string>
+       </property>
        <property name="text">
         <string>Redo</string>
        </property>
       </widget>
      </item>
      <item>
-      <widget class="QPushButton" name="btnDone">
+      <spacer name="horizontalSpacer_2">
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="sizeHint" stdset="0">
+        <size>
+         <width>40</width>
+         <height>20</height>
+        </size>
+       </property>
+      </spacer>
+     </item>
+     <item>
+      <widget class="QLabel" name="label">
        <property name="text">
-        <string>Done</string>
+        <string>Use the editor to create / modify alignemnt points. Confirm by pressing 'OK'</string>
        </property>
       </widget>
      </item>
@@ -78,6 +103,16 @@
         </size>
        </property>
       </spacer>
+     </item>
+     <item>
+      <widget class="QDialogButtonBox" name="buttonBox">
+       <property name="toolTip">
+        <string>Confirm the current AP selection.</string>
+       </property>
+       <property name="standardButtons">
+        <set>QDialogButtonBox::Ok</set>
+       </property>
+      </widget>
      </item>
     </layout>
    </item>

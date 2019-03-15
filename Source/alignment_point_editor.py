@@ -711,7 +711,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         self.btnApGrid.clicked.connect(self.viewer.createApGrid)
         self.btnUndo.clicked.connect(self.viewer.undoStack.undo)
         self.btnRedo.clicked.connect(self.viewer.undoStack.redo)
-        self.btnDone.clicked.connect(self.done)
+        self.buttonBox.accepted.connect(self.done)
         self.shape_y = None
         self.shape_x = None
 

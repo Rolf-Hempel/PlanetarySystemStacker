@@ -181,8 +181,8 @@ class Workflow(QtCore.QObject):
 
         self.work_next_task_signal.emit("Align frames")
 
-    @QtCore.pyqtSlot(bool, int, int, int, int)
-    def execute_align_frames(self, auto_execution, x_low_opt, x_high_opt, y_low_opt, y_high_opt):
+    @QtCore.pyqtSlot(int, int, int, int)
+    def execute_align_frames(self, y_low_opt, y_high_opt, x_low_opt, x_high_opt):
 
         self.set_status_bar_signal.emit("Processing " + self.input_name + ", aligning frames.")
         # Initialize the frame alignment object.
@@ -192,6 +192,19 @@ class Workflow(QtCore.QObject):
         self.align_frames = AlignFrames(self.frames, self.rank_frames, self.configuration)
 
         if self.configuration.align_frames_mode == "Surface":
+
+            auto_execution = False
+            if y_low_opt == 0 and y_high_opt == 0 and x_low_opt==0 and x_high_opt == 0:
+                auto_execution = True
+            elif (y_high_opt - y_low_opt) / self.frames.shape[0] < \
+                self.configuration.align_frames_min_stabilization_patch_fraction or \
+                (x_high_opt - x_low_opt) / self.frames.shape[1] < \
+                self.configuration.align_frames_min_stabilization_patch_fraction:
+                Miscellaneous.protocol("           Stabilization patch selected manually is "
+                                       "too small, switch to automatic mode",
+                                       self.stacked_image_log_file, precede_with_timestamp=False)
+                auto_execution = True
+
 
             # Compute the local rectangular patch in the image where the L gradient is highest
             # in both x and y direction. The scale factor specifies how much smaller the patch
@@ -214,6 +227,15 @@ class Workflow(QtCore.QObject):
 
             # As an alternative, set the coordinates of the rectangular patch explicitly.
             else:
+                # The image displayed in the stabilization patch editor was shrunk on all four
+                # sides by a number of pixels given by the alignment search width parameter.
+                # Therefore, the resulting coordinates of the stabilization patch have to be
+                # corrected by this offset now.
+                y_low_opt += self.configuration.align_frames_search_width
+                y_high_opt += self.configuration.align_frames_search_width
+                x_low_opt += self.configuration.align_frames_search_width
+                x_high_opt += self.configuration.align_frames_search_width
+
                 self.align_frames.set_alignment_rect(y_low_opt, y_high_opt, x_low_opt, x_high_opt)
                 if self.configuration.global_parameters_protocol_level > 1:
                     Miscellaneous.protocol("           Alignment rectangle, set by the user: " +

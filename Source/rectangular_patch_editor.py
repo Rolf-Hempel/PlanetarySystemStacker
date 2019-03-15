@@ -336,7 +336,7 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
         if self.y_low is not None:
             return (self.y_low, self.y_high, self.x_low, self.x_high)
         else:
-            return None
+            return (0, 0, 0, 0)
 
 
 class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor):
@@ -345,13 +345,16 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
     stabilization patch and the ROI rectangle.
     """
 
-    def __init__(self, parent_gui, frame):
+    def __init__(self, parent_gui, frame, signal_finished):
         """
         Initialization of the widget.
 
         :param parent_gui: Parent GUI object
         :param frame: Background image on which the patch is superimposed. Usually, the mean frame
                       is used for this purpose.
+        :param signal_finished: Qt signal with signature (int, int, int, int) sending the
+                                coordinate bounds (y_low, y_high, x_low, x_high) of the patch
+                                selected, or (0, 0, 0, 0) if unsuccessful.
         """
 
         super(RectangularPatchEditorWidget, self).__init__(parent_gui)
@@ -359,6 +362,7 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
 
         self.parent_gui = parent_gui
         self.frame = frame
+        self.signal_finished = signal_finished
         print ("Shape: " + str(frame.shape))
 
         self.viewer = RectangularPatchEditor(self)
@@ -397,13 +401,15 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
             self.y_low, self.y_high, self.x_low, self.x_high = self.viewer.selection_rectangle()
 
         # If the patch was selected successfully, send the patch bounds to the workflow thread.
+        # If it was not successful, send (0, 0, 0, 0).
         if self.parent_gui is not None:
             if self.y_low is not None:
-                self.parent_gui.signal_align_frames.emit(False, self.y_low, self.y_high,
+                self.signal_finished.emit(self.y_low, self.y_high,
                                                          self.x_low, self.x_high)
-            # If the patch is not valid, do frame alignment in automatic mode.
+            # If the patch is not valid, do frame alignment in automatic mode. This is done if
+            # all bounds are zero.
             else:
-                self.parent_gui.signal_align_frames.emit(True, 0, 0, 0, 0)
+                self.signal_finished.emit(0, 0, 0, 0)
 
         # Close the Window.
         self.close()
@@ -416,7 +422,7 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
         """
 
         # No rectangle was selected. Continue the workflow in automatic mode.
-        self.parent_gui.signal_align_frames.emit(True, 0, 0, 0, 0)
+        self.signal_finished.emit(0, 0, 0, 0)
         self.close()
 
 

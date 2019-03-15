@@ -50,7 +50,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
     signal_frames = QtCore.pyqtSignal(str, str, bool)
     signal_rank_frames = QtCore.pyqtSignal()
-    signal_align_frames = QtCore.pyqtSignal(bool, int, int, int, int)
+    signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
     signal_set_roi = QtCore.pyqtSignal(int, int, int, int)
     signal_set_alignment_points = QtCore.pyqtSignal()
     signal_compute_frame_qualities = QtCore.pyqtSignal()
@@ -341,39 +341,59 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.signal_frames.emit(self.job_names[self.job_index],
                                     self.job_types[self.job_index], False)
             self.busy = True
+
         elif self.activity == "Rank frames":
+
             # If batch mode is deselected, start GUI activity.
             if not self.automatic:
                 self.set_status_bar("Processing " + self.job_names[self.job_index] + ".")
                 self.place_holder_manual_activity('Rank frames')
+
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit()
             self.busy = True
+
         elif self.activity == "Align frames":
+
+            # If manual stabilization patch was requested in 'Surface' mode, invoke the
+            # patch editor.
             if not self.automatic and not self.configuration.align_frames_automation and \
                     self.configuration.align_frames_mode == 'Surface':
                 border = self.configuration.align_frames_search_width
+
+                # When the editor is finished, it sends a signal (last argument) to the workflow
+                # thread with the four coordinate index bounds.
                 rpew = RectangularPatchEditorWidget(self, self.workflow.frames.frames_mono[
-                                                self.workflow.rank_frames.frame_ranks_max_index][
-                                                            border:-border, border:-border])
+                    self.workflow.rank_frames.frame_ranks_max_index][border:-border,
+                    border:-border], self.signal_align_frames)
+
                 # This is a workaround to make sure the window fills the available space.
                 rpew.setMinimumHeight(self.ui.centralwidget.height() - 75)
                 self.display_widget(rpew)
                 rpew.viewer.setFocus()
+
             else:
-                self.signal_align_frames.emit(True, 0, 0, 0, 0)
+                # If all index bounds are set to zero, the stabilization patch is computed
+                # automatically by the workflow thread.
+                self.signal_align_frames.emit(0, 0, 0, 0)
+
             self.busy = True
+
         elif self.activity == "Set ROI":
             if not self.automatic:
                 pass
             # self.signal_set_roi.emit(400, 700, 300, 800)
             self.signal_set_roi.emit(0, 0, 0, 0)
             self.busy = True
+
         elif self.activity == "Set alignment points":
+            # In automatic mode, compute the AP grid automatically in the workflow thread. In this
+            # case, the AlignmentPoints object is created there as well.
             if self.automatic:
                 self.signal_set_alignment_points.emit()
             else:
-                # self.busy = False
+                # If the APs are created interactively, create the AlignmentPoints object here, but
+                # assign it to the workflow object.
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("+++ Start creating alignment points +++",
                                            self.workflow.stacked_image_log_file)
@@ -393,6 +413,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 apew.setMinimumHeight(self.ui.centralwidget.height()-75)
                 self.display_widget(apew)
                 apew.viewer.setFocus()
+
                 self.activity = "Compute frame qualities"
 
         elif self.activity == "Compute frame qualities":
