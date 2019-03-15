@@ -35,6 +35,7 @@ from alignment_points import AlignmentPoints
 from configuration import Configuration
 from frames import Frames
 from rank_frames import RankFrames
+from alignment_point_editor_gui import Ui_alignment_point_editor
 
 
 class GraphicsScene(QtWidgets.QGraphicsScene):
@@ -374,7 +375,7 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         self._photo = QtWidgets.QGraphicsPixmapItem()
         self._scene.addItem(self._photo)
         self.setScene(self._scene)
-        # Initialize the udo stack.
+        # Initialize the undo stack.
         self.undoStack = QtWidgets.QUndoStack(self)
 
         self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
@@ -586,6 +587,7 @@ class CommandCreateApGrid(QtWidgets.QUndoCommand):
         for ap in self.photo_editor.aps.alignment_points:
             self.photo_editor._scene.addItem(ap['graphics_item'])
         self.photo_editor._scene.update()
+        self.photo_editor.setFocus()
 
     def undo(self):
         # Restore the old AP list.
@@ -599,6 +601,7 @@ class CommandCreateApGrid(QtWidgets.QUndoCommand):
         for ap in self.photo_editor.aps.alignment_points:
             self.photo_editor._scene.addItem(ap['graphics_item'])
         self.photo_editor._scene.update()
+        self.photo_editor.setFocus()
 
 
 class CommandAdd(QtWidgets.QUndoCommand):
@@ -616,11 +619,13 @@ class CommandAdd(QtWidgets.QUndoCommand):
         self.aps.add_alignment_point(self.ap)
         self.photo_editor._scene.addItem(self.ap['graphics_item'])
         self.photo_editor._scene.update()
+        self.photo_editor.setFocus()
 
     def undo(self):
         self.photo_editor._scene.removeItem(self.ap['graphics_item'])
         self.aps.remove_alignment_points([self.ap])
         self.photo_editor._scene.update()
+        self.photo_editor.setFocus()
 
 
 class CommandRemove(QtWidgets.QUndoCommand):
@@ -638,12 +643,14 @@ class CommandRemove(QtWidgets.QUndoCommand):
             self.photo_editor._scene.removeItem(ap['graphics_item'])
         self.aps.remove_alignment_points(self.ap_list)
         self.photo_editor._scene.update()
+        self.photo_editor.setFocus()
 
     def undo(self):
         for ap in self.ap_list:
             self.aps.add_alignment_point(ap)
             self.photo_editor._scene.addItem(ap['graphics_item'])
         self.photo_editor._scene.update()
+        self.photo_editor.setFocus()
 
 
 class CommandReplace(QtWidgets.QUndoCommand):
@@ -662,19 +669,21 @@ class CommandReplace(QtWidgets.QUndoCommand):
         self.aps.replace_alignment_point(self.ap_old, self.ap_new)
         self.photo_editor._scene.addItem(self.ap_new['graphics_item'])
         self.photo_editor._scene.update()
+        self.photo_editor.setFocus()
 
     def undo(self):
         self.photo_editor._scene.removeItem(self.ap_new['graphics_item'])
         self.aps.replace_alignment_point(self.ap_new, self.ap_old)
         self.photo_editor._scene.addItem(self.ap_old['graphics_item'])
         self.photo_editor._scene.update()
+        self.photo_editor.setFocus()
 
 
-class AlignmentPointEditorWidget(QtWidgets.QFrame):
+class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
     """
     This widget implements the AP viewer, to be used as part of the application GUI.
     """
-    def __init__(self, parent_gui, configuration, align_frames, alignment_points):
+    def __init__(self, parent_gui, configuration, align_frames, alignment_points, parent=None):
         """
         Initialization of the widget.
 
@@ -686,44 +695,25 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame):
         :param alignment_points: Alignment point object
         """
 
+        # QtWidgets.QFrame.__init__(self, parent)
         super(AlignmentPointEditorWidget, self).__init__()
-        self.setFrameShape(QtWidgets.QFrame.Panel)
-        self.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.setObjectName("alignment_point_editor")
+        self.setupUi(self)
+
         self.parent_gui = parent_gui
         self.mean_frame = align_frames.mean_frame
         self.configuration = configuration
         self.aps = alignment_points
-        self.viewer = AlignmentPointEditor(self, self.aps)
 
-        self.btnLoad = QtWidgets.QToolButton(self)
-        self.btnLoad.setText('Load image')
+        self.viewer = AlignmentPointEditor(self, self.aps)
+        self.verticalLayout.insertWidget(0, self.viewer)
+
         self.btnLoad.clicked.connect(self.loadImage)
-        self.btnApGrid = QtWidgets.QToolButton(self)
-        self.btnApGrid.setText('Create AP Grid')
         self.btnApGrid.clicked.connect(self.viewer.createApGrid)
-        self.btnUndo = QtWidgets.QToolButton(self)
-        self.btnUndo.setText('Undo')
         self.btnUndo.clicked.connect(self.viewer.undoStack.undo)
-        self.btnRedo = QtWidgets.QToolButton(self)
-        self.btnRedo.setText('Redo')
         self.btnRedo.clicked.connect(self.viewer.undoStack.redo)
-        self.btnDone = QtWidgets.QToolButton(self)
-        self.btnDone.setText('Done')
         self.btnDone.clicked.connect(self.done)
         self.shape_y = None
         self.shape_x = None
-        # Arrange layout.
-        VBlayout = QtWidgets.QVBoxLayout(self)
-        VBlayout.addWidget(self.viewer)
-        HBlayout = QtWidgets.QHBoxLayout()
-        HBlayout.setAlignment(QtCore.Qt.AlignLeft)
-        HBlayout.addWidget(self.btnLoad)
-        HBlayout.addWidget(self.btnApGrid)
-        HBlayout.addWidget(self.btnUndo)
-        HBlayout.addWidget(self.btnRedo)
-        HBlayout.addWidget(self.btnDone)
-        VBlayout.addLayout(HBlayout)
 
     def loadImage(self):
         """
@@ -734,6 +724,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame):
 
         self.viewer.setPhoto(self.mean_frame)
         self.viewer.fitInView()
+        self.viewer.setFocus()
 
     def done(self):
         # On exit from the alignment point editor, allocate buffers for APs which have been

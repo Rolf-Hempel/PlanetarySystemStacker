@@ -33,6 +33,7 @@ from main_gui import Ui_MainWindow
 from configuration import Configuration
 from configuration_editor import ConfigurationEditor
 from job_editor import JobEditor
+from rectangular_patch_editor import RectangularPatchEditorWidget
 from alignment_points import AlignmentPoints
 from alignment_point_editor import AlignmentPointEditorWidget
 from miscellaneous import Miscellaneous
@@ -349,9 +350,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.signal_rank_frames.emit()
             self.busy = True
         elif self.activity == "Align frames":
-            if not self.automatic:
-                pass
-            self.signal_align_frames.emit(True, 0, 0, 0, 0)
+            if not self.automatic and not self.configuration.align_frames_automation and \
+                    self.configuration.align_frames_mode == 'Surface':
+                border = self.configuration.align_frames_search_width
+                rpew = RectangularPatchEditorWidget(self, self.workflow.frames.frames_mono[
+                                                self.workflow.rank_frames.frame_ranks_max_index][
+                                                            border:-border, border:-border])
+                # This is a workaround to make sure the window fills the available space.
+                rpew.setMinimumHeight(self.ui.centralwidget.height() - 75)
+                self.display_widget(rpew)
+                rpew.viewer.setFocus()
+            else:
+                self.signal_align_frames.emit(True, 0, 0, 0, 0)
             self.busy = True
         elif self.activity == "Set ROI":
             if not self.automatic:

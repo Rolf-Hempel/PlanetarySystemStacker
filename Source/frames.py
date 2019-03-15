@@ -131,9 +131,6 @@ class Frames(object):
         self.frames_mono_blurred_laplacian = None
         self.used_alignment_points = None
 
-        # Initialize the alignment point lists for all frames.
-        self.reset_alignment_point_lists()
-
     def reset_alignment_point_lists(self):
         """
         Every frame keeps a list with the alignment points for which this frame is among the

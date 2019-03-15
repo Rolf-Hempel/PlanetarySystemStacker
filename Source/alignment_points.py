@@ -76,9 +76,6 @@ class AlignmentPoints(object):
         # Initialize the number of frames to be stacked at each AP.
         self.stack_size = None
 
-        # Reset the list of alignment points registered with each frame.
-        self.frames.reset_alignment_point_lists()
-
     @staticmethod
     def ap_locations(num_pixels, half_box_width, search_width, step_size, even):
         """
@@ -616,6 +613,8 @@ class AlignmentPoints(object):
                     alignment_point['frame_qualities'].append(
                         frame[y_low:y_high, x_low:x_high].var())
 
+        # Initialize the alignment point lists for all frames.
+        self.frames.reset_alignment_point_lists()
         # For each alignment point sort the computed quality ranks in descending order.
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):
             alignment_point['best_frame_indices'] = [b[0] for b in sorted(
