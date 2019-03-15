@@ -363,7 +363,6 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
         self.parent_gui = parent_gui
         self.frame = frame
         self.signal_finished = signal_finished
-        print ("Shape: " + str(frame.shape))
 
         self.viewer = RectangularPatchEditor(self)
         self.verticalLayout.insertWidget(0, self.viewer)
