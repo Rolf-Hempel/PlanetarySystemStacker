@@ -77,14 +77,13 @@ class AlignmentPoints(object):
         self.stack_size = None
 
     @staticmethod
-    def ap_locations(num_pixels, half_box_width, search_width, step_size, even):
+    def ap_locations(num_pixels, min_boundary_distance, step_size, even):
         """
         Compute optimal alignment patch coordinates in one coordinate direction. Place boundary
         neighbors as close as possible to the boundary.
 
         :param num_pixels: Number of pixels in the given coordinate direction
-        :param half_box_width: Half-width of the alignment boxes
-        :param search_width: Maximum search width for alignment point matching
+        :param min_boundary_distance: Minimum distance of an AP from the boundary
         :param step_size: Distance of alignment boxes
         :param even: If True, compute locations for even row indices. Otherwise, for odd ones.
         :return: List of alignment point coordinates in the given direction
@@ -93,26 +92,26 @@ class AlignmentPoints(object):
         # The number of interior alignment boxes in general is not an integer. Round to the next
         # higher number.
         num_interior_odd = int(
-            ceil(float(num_pixels - 2 * (half_box_width + search_width)) / float(step_size)))
+            ceil(float(num_pixels - 2 * min_boundary_distance) / float(step_size)))
         # Because alignment points are arranged in a staggered grid, in even rows there is one point
         # more.
         num_interior_even = num_interior_odd + 1
 
         # The precise distance between alignment points will differ slightly from the specified
         # step_size. Compute the exact distance. Integer locations will be rounded later.
-        distance_corrected = float(num_pixels - 2 * half_box_width - 2 * search_width) / float(
+        distance_corrected = float(num_pixels - 2 * min_boundary_distance) / float(
             num_interior_odd)
 
         # Compute the AP locations, separately for even and odd rows.
         if even:
             locations = []
             for i in range(num_interior_even):
-                locations.append(int(search_width + half_box_width + i * distance_corrected))
+                locations.append(int(min_boundary_distance + i * distance_corrected))
         else:
             locations = []
             for i in range(num_interior_odd):
                 locations.append(int(
-                    search_width + half_box_width + 0.5 * distance_corrected +
+                    min_boundary_distance + 0.5 * distance_corrected +
                     i * distance_corrected))
         return locations
 
@@ -142,12 +141,15 @@ class AlignmentPoints(object):
         # value (0 < value < 256)
         contrast_threshold = self.configuration.alignment_points_contrast_threshold
 
+        # Compute the minimum distance of an AP from the boundary.
+        min_boundary_distance = max(half_box_width + search_width, half_patch_width)
+
         # Compute y and x coordinate locations of alignemnt points. Note that the grid is staggered.
-        ap_locations_y = self.ap_locations(self.num_pixels_y, half_box_width, search_width,
+        ap_locations_y = self.ap_locations(self.num_pixels_y, min_boundary_distance,
                                            step_size, True)
-        ap_locations_x_even = self.ap_locations(self.num_pixels_x, half_box_width, search_width,
+        ap_locations_x_even = self.ap_locations(self.num_pixels_x, min_boundary_distance,
                                                 step_size, True)
-        ap_locations_x_odd = self.ap_locations(self.num_pixels_x, half_box_width, search_width,
+        ap_locations_x_odd = self.ap_locations(self.num_pixels_x, min_boundary_distance,
                                                step_size, False)
 
         # Reset the alignment point list, and initialize counters for APs which are dropped because

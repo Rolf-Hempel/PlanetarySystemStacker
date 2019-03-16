@@ -66,11 +66,14 @@ class ConfigurationParameters(object):
         self.align_frames_rectangle_scale_factor = 3.
         self.align_frames_search_width = 20
         self.align_frames_average_frame_percent = 5
-        self.alignment_points_half_box_width = 20
         self.alignment_points_search_width = 10
+        self.alignment_points_frame_percent = 10
+        self.set_defaults_ap_editing()
+
+    def set_defaults_ap_editing(self):
+        self.alignment_points_half_box_width = 20
         self.alignment_points_structure_threshold = 0.05
         self.alignment_points_brightness_threshold = 10
-        self.alignment_points_frame_percent = 10
 
     def copy_from_config_object(self, configuration_object):
         self.hidden_parameters_current_dir = configuration_object.hidden_parameters_current_dir

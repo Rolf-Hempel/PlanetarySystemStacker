@@ -32,7 +32,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 from exceptions import InternalError, NotSupportedError
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
-from configuration import Configuration
+from configuration import Configuration, ConfigurationParameters
 from frames import Frames
 from rank_frames import RankFrames
 from alignment_point_editor_gui import Ui_alignment_point_editor
@@ -704,8 +704,22 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         self.configuration = configuration
         self.aps = alignment_points
 
+        # Create the viewer frame and insert it into the window.
         self.viewer = AlignmentPointEditor(self, self.aps)
-        self.verticalLayout.insertWidget(0, self.viewer)
+        self.horizontalLayout_2.insertWidget(0, self.viewer)
+        self.horizontalLayout_2.setStretch(1,0)
+
+        # Initialize sliders and their value labels.
+        self.initialize_widgets_and_local_parameters(
+            self.configuration.alignment_points_half_box_width,
+            self.configuration.alignment_points_structure_threshold,
+            self.configuration.alignment_points_brightness_threshold)
+
+        # Connect events with activities.
+        self.aphbw_slider_value.valueChanged['int'].connect(self.aphbw_changed)
+        self.apst_slider_value.valueChanged['int'].connect(self.apst_changed)
+        self.apbt_slider_value.valueChanged['int'].connect(self.apbt_changed)
+        self.restore_standard_values.clicked.connect(self.restore_standard_parameters)
 
         self.btnLoad.clicked.connect(self.loadImage)
         self.btnApGrid.clicked.connect(self.viewer.createApGrid)
@@ -714,6 +728,63 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         self.buttonBox.accepted.connect(self.done)
         self.shape_y = None
         self.shape_x = None
+
+    def initialize_widgets_and_local_parameters(self, half_box_width, structure_threshold,
+                                                brightness_threshold):
+        """
+        Initialize GUI widgets with current configuration parameter values.
+
+        :param half_box_width: Half the width of a standard alignment box.
+        :param structure_threshold: Minimum structure value for an alignment point
+                                    (between 0. and 1.)
+        :param brightness_threshold: The brightest pixel must be brighter than this value
+                                     (0 < value <256)
+        :return: -
+        """
+
+        self.aphbw_slider_value.setValue(half_box_width * 2)
+        self.aphbw_label_display.setText(str(half_box_width * 2))
+        self.apst_slider_value.setValue(int(round(structure_threshold * 100)))
+        self.apst_label_display.setText(str(structure_threshold))
+        self.apbt_slider_value.setValue(brightness_threshold)
+        self.apbt_label_display.setText(str(brightness_threshold))
+
+
+    def aphbw_changed(self, value):
+        self.configuration.alignment_points_half_box_width = int(value / 2)
+        self.configuration.set_derived_parameters()
+
+    def apst_changed(self, value):
+        self.configuration.alignment_points_structure_threshold = value / 100.
+        self.apst_label_display.setText(str(self.configuration.alignment_points_structure_threshold))
+
+    def apbt_changed(self, value):
+        self.configuration.alignment_points_brightness_threshold = value
+
+    def restore_standard_parameters(self):
+        """
+        Reset configuration parameters and GUI widget settings to standard values.
+
+        :return: -
+        """
+
+        # Create a ConfigurationParameters object with standard values for the three AP parameters.
+        config_parameters = ConfigurationParameters()
+        config_parameters.set_defaults_ap_editing()
+
+        # Reset configuration parameters to standard values.
+        self.configuration.alignment_points_half_box_width = \
+            config_parameters.alignment_points_half_box_width
+        self.configuration.alignment_points_structure_threshold = \
+            config_parameters.alignment_points_structure_threshold
+        self.configuration.alignment_points_brightness_threshold = \
+            config_parameters.alignment_points_brightness_threshold
+
+        # Initialize sliders and their value labels.
+        self.initialize_widgets_and_local_parameters(
+            self.configuration.alignment_points_half_box_width,
+            self.configuration.alignment_points_structure_threshold,
+            self.configuration.alignment_points_brightness_threshold)
 
     def loadImage(self):
         """

@@ -318,6 +318,11 @@ class Workflow(QtCore.QObject):
 
         self.my_timer.stop('Create alignment points')
 
+        self.work_next_task_signal.emit("Compute frame qualities")
+
+    @QtCore.pyqtSlot()
+    def execute_compute_frame_qualities(self):
+
         if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol("           Number of alignment points selected: " + str(
                 len(self.alignment_points.alignment_points)) +
@@ -326,11 +331,6 @@ class Workflow(QtCore.QObject):
                   ", aps dropped because too little structure: " + str(
                 self.alignment_points.alignment_points_dropped_structure),
                 self.stacked_image_log_file, precede_with_timestamp=False)
-
-        self.work_next_task_signal.emit("Compute frame qualities")
-
-    @QtCore.pyqtSlot()
-    def execute_compute_frame_qualities(self):
 
         self.set_status_bar_signal.emit("Processing " + self.input_name +
                                         ", ranking all frames at all alignment points.")
