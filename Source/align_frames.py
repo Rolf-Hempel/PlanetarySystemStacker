@@ -407,11 +407,6 @@ class AlignFrames(object):
             self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
             self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
 
-        # On the first call, keep a copy of the global offset lists.
-            if not self.ROI_set:
-                self.dy_original = self.dy.copy()
-                self.dx_original = self.dx.copy()
-
         self.ROI_set = True
 
         self.mean_frame = self.mean_frame_original[y_min:y_max, x_min:x_max]
@@ -420,9 +415,8 @@ class AlignFrames(object):
 
     def reset_roi(self):
         """
-        After a ROI has been set, reset the ROI to the full frame. Restore the mean frame,
-        the intersection shape and the global offsets to their original values. If no ROI has been
-        set, do nothing.
+        After a ROI has been set, reset the ROI to the full frame. Restore the mean frame and
+        the intersection shape to their original values. If no ROI has been set, do nothing.
 
         :return: -
         """
@@ -430,8 +424,6 @@ class AlignFrames(object):
         if self.ROI_set:
             self.mean_frame = self.mean_frame_original
             self.intersection_shape = self.intersection_shape_original
-            self.dy = self.dy_original
-            self.dx = self.dx_original
 
     def write_stabilized_video(self, name, fps, stabilized=True):
         """
