@@ -14,29 +14,20 @@
    <string>Manage Job List</string>
   </property>
   <layout class="QGridLayout" name="gridLayout">
-   <item row="1" column="0">
-    <widget class="QPushButton" name="button_add_jobs">
-     <property name="toolTip">
-      <string>Select video files and / or directories containing image files.
-Each entry is executed as a job, either in batch mode (automatic) or manually.
-When the list is okay, confirm with pressing the &quot;OK&quot; button.</string>
-     </property>
-     <property name="text">
-      <string>Add job(s)</string>
-     </property>
-    </widget>
-   </item>
    <item row="1" column="2">
-    <widget class="QDialogButtonBox" name="buttonBox">
+    <spacer name="horizontalSpacer">
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
      </property>
-    </widget>
+    </spacer>
    </item>
-   <item row="0" column="0" colspan="3">
+   <item row="0" column="0" colspan="6">
     <widget class="QListWidget" name="job_list_widget">
      <property name="sizePolicy">
       <sizepolicy hsizetype="Expanding" vsizetype="MinimumExpanding">
@@ -67,6 +58,48 @@ When the list is okay, confirm with pressing the &quot;OK&quot; button.</string>
       <string>Remove selected job(s)</string>
      </property>
     </widget>
+   </item>
+   <item row="1" column="5">
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="0">
+    <widget class="QPushButton" name="button_add_jobs">
+     <property name="toolTip">
+      <string>Select video files and / or directories containing image files.
+Each entry is executed as a job, either in batch mode (automatic) or manually.
+When the list is okay, confirm with pressing the &quot;OK&quot; button.</string>
+     </property>
+     <property name="text">
+      <string>Add job(s)</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="3">
+    <widget class="QLabel" name="messageLabel">
+     <property name="text">
+      <string>Add / remove video files or image directories, confirm with 'OK'</string>
+     </property>
+    </widget>
+   </item>
+   <item row="1" column="4">
+    <spacer name="horizontalSpacer_2">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
+     </property>
+     <property name="sizeHint" stdset="0">
+      <size>
+       <width>40</width>
+       <height>20</height>
+      </size>
+     </property>
+    </spacer>
    </item>
   </layout>
  </widget>

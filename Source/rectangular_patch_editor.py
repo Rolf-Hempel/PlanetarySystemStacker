@@ -345,13 +345,14 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
     stabilization patch and the ROI rectangle.
     """
 
-    def __init__(self, parent_gui, frame, signal_finished):
+    def __init__(self, parent_gui, frame, message, signal_finished):
         """
         Initialization of the widget.
 
         :param parent_gui: Parent GUI object
         :param frame: Background image on which the patch is superimposed. Usually, the mean frame
                       is used for this purpose.
+        :param message: Message to tell the user what to do.
         :param signal_finished: Qt signal with signature (int, int, int, int) sending the
                                 coordinate bounds (y_low, y_high, x_low, x_high) of the patch
                                 selected, or (0, 0, 0, 0) if unsuccessful.
@@ -362,11 +363,13 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
 
         self.parent_gui = parent_gui
         self.frame = frame
+        self.message = message
         self.signal_finished = signal_finished
 
         self.viewer = RectangularPatchEditor(self)
         self.verticalLayout.insertWidget(0, self.viewer)
 
+        self.messageLabel.setText(self.message)
         self.buttonLoad.clicked.connect(self.loadImage)
         self.buttonBox.accepted.connect(self.done)
         self.buttonBox.rejected.connect(self.reject)
@@ -518,7 +521,9 @@ if __name__ == '__main__':
     # border = 100
 
     app = QtWidgets.QApplication(sys.argv)
-    window = RectangularPatchEditorWidget(None, average[border:-border, border:-border])
+    window = RectangularPatchEditorWidget(None, average[border:-border, border:-border],
+            "With the left mouse button pressed, draw a rectangular patch "
+            "to be used for frame alignment.", None)
     window.setMinimumSize(800, 600)
     window.showMaximized()
     app.exec_()

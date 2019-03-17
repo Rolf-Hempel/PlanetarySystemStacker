@@ -42,7 +42,7 @@
      </spacer>
     </item>
     <item>
-     <layout class="QHBoxLayout" name="tool_line" stretch="0,3,5,12,3,3,12,1">
+     <layout class="QHBoxLayout" name="tool_line" stretch="0,3,5,12,3,3,12,1,0">
       <item>
        <widget class="QFrame" name="control_area">
         <property name="sizePolicy">
@@ -57,7 +57,7 @@
         <property name="frameShadow">
          <enum>QFrame::Raised</enum>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,0,0,0,0,0">
+        <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,0,0,0,0">
          <property name="rightMargin">
           <number>9</number>
          </property>
@@ -88,13 +88,6 @@
            <property name="icon">
             <iconset theme="SP_MediaPlay">
              <normaloff>C:/Python35/Lib/site-packages/pyqt5_tools</normaloff>C:/Python35/Lib/site-packages/pyqt5_tools</iconset>
-           </property>
-          </widget>
-         </item>
-         <item>
-          <widget class="QPushButton" name="pushButton_stop">
-           <property name="text">
-            <string>Stop</string>
            </property>
           </widget>
          </item>
@@ -206,6 +199,13 @@
          </size>
         </property>
        </spacer>
+      </item>
+      <item>
+       <widget class="QPushButton" name="pushButton_quit">
+        <property name="text">
+         <string>Quit</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </item>

@@ -100,6 +100,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
         self.ui.pushButton_start.clicked.connect(self.play)
         self.ui.pushButton_next_job.clicked.connect(self.go_next)
+        self.ui.pushButton_quit.clicked.connect(self.close)
         self.ui.box_automatic.stateChanged.connect(self.automatic_changed)
         self.ui.actionLoad_video_directory.triggered.connect(self.load_video_directory)
         self.ui.actionEdit_configuration.triggered.connect(self.edit_configuration)
@@ -150,7 +151,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Deactivate GUI elements which do not make sense yet.
         self.activate_gui_elements(
-            [self.ui.comboBox_back, self.ui.pushButton_start, self.ui.pushButton_stop,
+            [self.ui.comboBox_back, self.ui.pushButton_start,
              self.ui.pushButton_next_job, self.ui.actionSave, self.ui.actionSave_as,
              self.ui.actionEdit_postproc_config], False)
         self.show_current_progress_widgets(False)
@@ -355,7 +356,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         elif self.activity == "Align frames":
 
-            # If manual stabilization patch was requested in 'Surface' mode, invoke the
+            # If manual stabilization patch selection was requested in 'Surface' mode, invoke the
             # patch editor.
             if not self.automatic and not self.configuration.align_frames_automation and \
                     self.configuration.align_frames_mode == 'Surface':
@@ -365,7 +366,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # thread with the four coordinate index bounds.
                 rpew = RectangularPatchEditorWidget(self, self.workflow.frames.frames_mono[
                     self.workflow.rank_frames.frame_ranks_max_index][border:-border,
-                    border:-border], self.signal_align_frames)
+                    border:-border], "With the left mouse button pressed, draw a rectangular patch "
+                                     "to be used for frame alignment.", self.signal_align_frames)
 
                 # This is a workaround to make sure the window fills the available space.
                 rpew.setMinimumHeight(self.ui.centralwidget.height() - 75)
@@ -380,10 +382,26 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.busy = True
 
         elif self.activity == "Set ROI":
+
+            # Reset the ROI, if one was defined before.
+            self.workflow.align_frames.reset_roi()
+
             if not self.automatic:
-                pass
-            # self.signal_set_roi.emit(400, 700, 300, 800)
-            self.signal_set_roi.emit(0, 0, 0, 0)
+
+                # When the editor is finished, it sends a signal (last argument) to the workflow
+                # thread with the four coordinate index bounds.
+                rpew = RectangularPatchEditorWidget(self, self.workflow.align_frames.mean_frame,
+                    "Set the ROI by opening a rectangle with the left mouse button,"
+                    " or just press 'OK' (no ROI)", self.signal_set_roi)
+
+                # This is a workaround to make sure the window fills the available space.
+                rpew.setMinimumHeight(self.ui.centralwidget.height() - 75)
+                self.display_widget(rpew)
+                rpew.viewer.setFocus()
+
+            else:
+                # If all index bounds are set to zero, no ROI is selected.
+                self.signal_set_roi.emit(0, 0, 0, 0)
             self.busy = True
 
         elif self.activity == "Set alignment points":
@@ -560,21 +578,52 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         if self.busy:
             self.activate_gui_elements([self.ui.comboBox_back, self.ui.pushButton_start,
                                         self.ui.pushButton_next_job, self.ui.menuFile], False)
-            self.ui.statusBar.showMessage("Busy")
-        # In manual mode, activate most buttons and menu entries.
+            self.ui.statusBar.showMessage("Busy processing " + self.workflow.input_name)
+        # In manual mode, activate buttons and menu entries. Update the status bar.
         else:
             self.activate_gui_elements([self.ui.menuFile], True)
+            activated_buttons = []
             if self.job_index < self.job_number:
-                self.activate_gui_elements([self.ui.pushButton_start], True)
-            self.activate_gui_elements([self.ui.comboBox_back],
-                                       self.job_index > 0 or self.activity != "Read frames")
-            self.activate_gui_elements([self.ui.pushButton_next_job],
-                                        self.job_index < self.job_number - 1)
-            self.ui.statusBar.showMessage("")
+                activated_buttons.append(self.ui.pushButton_start)
+            if self.job_index > 0 or self.activity != "Read frames":
+                activated_buttons.append(self.ui.comboBox_back)
+            if self.job_index < self.job_number - 1:
+                activated_buttons.append(self.ui.pushButton_next_job)
+            if activated_buttons:
+                self.activate_gui_elements(activated_buttons, True)
+                message = "To continue, press '" + \
+                          self.button_get_description(activated_buttons[0]) + "'"
+                if len(activated_buttons) > 1:
+                    for button in activated_buttons[1:]:
+                        message += ", or '" + self.button_get_description(button) + "'"
+                message += ", or exit the program with 'Quit'"
+                self.ui.statusBar.showMessage(message)
+            else:
+                self.ui.statusBar.showMessage("Load new jobs, or quit.")
 
         self.show_batch_progress_widgets(self.job_number > 1)
         if self.job_number > 0:
             self.ui.progressBar_batch.setValue(int(100*self.job_index/self.job_number))
+
+    def button_get_description(self, element):
+        """
+        Get the textual description of a button. Different methods must be used for "pushButton" and
+        comboBoxes.
+
+        :param element: Button object
+        :return: Text written on the button (string)
+        """
+
+        try:
+            description = element.text()
+            return description
+        except:
+            pass
+        try:
+            description = element.currentText()
+            return description
+        except:
+            return ""
 
     def activate_gui_elements(self, elements, enable):
         """
@@ -599,26 +648,40 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         self.ui.statusBar.showMessage(message)
 
-    def closeEvent(self, evnt):
+    def closeEvent(self, event=None):
         """
         This event is triggered when the user closes the main window by clicking on the cross in
-        the window corner.
+        the window corner, or selects 'Quit' in the file menu.
 
-        :param evnt: event object
+        :param event: event object
         :return: -
         """
 
-        # Store the geometry of main window, so it is placed the same at next program start.
-        if self.windowState() != QtCore.Qt.WindowMaximized:
-            (x0, y0, width, height) = self.geometry().getRect()
-            self.configuration.hidden_parameters_main_window_x0 = x0
-            self.configuration.hidden_parameters_main_window_y0 = y0
-            self.configuration.hidden_parameters_main_window_width = width
-            self.configuration.hidden_parameters_main_window_height = height
+        # Ask the user for confirmation.
+        quit_msg = "Are you sure you want to exit?"
+        reply = QtWidgets.QMessageBox.question(self, 'Message', quit_msg,
+                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                                               QtWidgets.QMessageBox.No)
+        # Positive reply: Do it.
+        if reply == QtWidgets.QMessageBox.Yes:
+            if event:
+                event.accept()
 
-        # Write the current configuration to the ".ini" file in the user's home directory.
-        self.configuration.write_config()
-        sys.exit(0)
+            # Store the geometry of main window, so it is placed the same at next program start.
+            if self.windowState() != QtCore.Qt.WindowMaximized:
+                (x0, y0, width, height) = self.geometry().getRect()
+                self.configuration.hidden_parameters_main_window_x0 = x0
+                self.configuration.hidden_parameters_main_window_y0 = y0
+                self.configuration.hidden_parameters_main_window_width = width
+                self.configuration.hidden_parameters_main_window_height = height
+
+            # Write the current configuration to the ".ini" file in the user's home directory.
+            self.configuration.write_config()
+            sys.exit(0)
+        else:
+            # No confirmation by the user: Don't stop program execution.
+            if event:
+                event.ignore()
 
 
 if __name__ == "__main__":

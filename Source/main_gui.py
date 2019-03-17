@@ -2,12 +2,11 @@
 
 # Form implementation generated from reading ui file 'main_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12
+# Created by: PyQt5 UI code generator 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -50,9 +49,6 @@ class Ui_MainWindow(object):
         self.pushButton_start.setIcon(icon)
         self.pushButton_start.setObjectName("pushButton_start")
         self.horizontalLayout_3.addWidget(self.pushButton_start)
-        self.pushButton_stop = QtWidgets.QPushButton(self.control_area)
-        self.pushButton_stop.setObjectName("pushButton_stop")
-        self.horizontalLayout_3.addWidget(self.pushButton_stop)
         self.pushButton_next_job = QtWidgets.QPushButton(self.control_area)
         self.pushButton_next_job.setObjectName("pushButton_next_job")
         self.horizontalLayout_3.addWidget(self.pushButton_next_job)
@@ -86,6 +82,9 @@ class Ui_MainWindow(object):
         self.tool_line.addWidget(self.progressBar_batch)
         spacerItem4 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.tool_line.addItem(spacerItem4)
+        self.pushButton_quit = QtWidgets.QPushButton(self.centralwidget)
+        self.pushButton_quit.setObjectName("pushButton_quit")
+        self.tool_line.addWidget(self.pushButton_quit)
         self.tool_line.setStretch(1, 3)
         self.tool_line.setStretch(2, 5)
         self.tool_line.setStretch(3, 12)
@@ -153,10 +152,10 @@ class Ui_MainWindow(object):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Planetary System Stacker"))
         self.pushButton_start.setText(_translate("MainWindow", "Start / Cont."))
-        self.pushButton_stop.setText(_translate("MainWindow", "Stop"))
         self.pushButton_next_job.setText(_translate("MainWindow", "Next Job"))
         self.box_automatic.setText(_translate("MainWindow", "Automatic"))
         self.label_batch_progress.setText(_translate("MainWindow", "Batch progress"))
+        self.pushButton_quit.setText(_translate("MainWindow", "Quit"))
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.menuEdit.setTitle(_translate("MainWindow", "Edit"))
         self.actionLoad_video_directory.setText(_translate("MainWindow", "Open"))
@@ -169,5 +168,4 @@ class Ui_MainWindow(object):
         self.actionQuit.setText(_translate("MainWindow", "Quit"))
         self.actionEdit_configuration.setText(_translate("MainWindow", "Edit stacking config"))
         self.actionEdit_postproc_config.setText(_translate("MainWindow", "Edit postproc config"))
-
 

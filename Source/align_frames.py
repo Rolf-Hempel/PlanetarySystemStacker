@@ -399,6 +399,17 @@ class AlignFrames(object):
 
         return self.mean_frame
 
+    def reset_roi(self):
+        """
+        After a ROI has been set, reset the ROI to the full frame. Restore the mean frame and
+        the intersection shape to their original values. If no ROI has been set, do nothing.
+
+        :return: -
+        """
+
+        if self.mean_frame_original is not None:
+            self.mean_frame = self.mean_frame_original
+            self.intersection_shape = self.intersection_shape_original
 
     def write_stabilized_video(self, name, fps, stabilized=True):
         """
