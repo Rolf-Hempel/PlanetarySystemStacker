@@ -24,6 +24,7 @@ from time import time, sleep
 from collections import OrderedDict
 
 from exceptions import ArgumentError
+from miscellaneous import Miscellaneous
 
 
 class timer(object):
@@ -144,6 +145,17 @@ class timer(object):
 
             print("{0:40} {1:8.3f}".format(name, self.counters[name][0]))
         print("--------------------------------------------------")
+
+    def protocol(self, logfile):
+        Miscellaneous.protocol("", logfile, precede_with_timestamp=False)
+        Miscellaneous.protocol("--------------------------------------------------\n"
+                               "           Status of time counters:", logfile)
+        for name in self.counters.keys():
+            Miscellaneous.protocol(
+                "           {0:40} {1:8.3f}".format(name, self.counters[name][0]), logfile,
+                precede_with_timestamp=False)
+        Miscellaneous.protocol("           --------------------------------------------------\n",
+                               logfile, precede_with_timestamp=False)
 
 
 if __name__ == "__main__":

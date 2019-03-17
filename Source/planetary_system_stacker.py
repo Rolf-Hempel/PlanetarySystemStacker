@@ -151,7 +151,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Deactivate GUI elements which do not make sense yet.
         self.activate_gui_elements(
-            [self.ui.comboBox_back, self.ui.pushButton_start,
+            [self.ui.box_automatic, self.ui.comboBox_back, self.ui.pushButton_start,
              self.ui.pushButton_next_job, self.ui.actionSave, self.ui.actionSave_as,
              self.ui.actionEdit_postproc_config], False)
         self.show_current_progress_widgets(False)

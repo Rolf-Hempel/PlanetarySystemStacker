@@ -386,8 +386,13 @@ class Workflow(QtCore.QObject):
         self.frames.save_image(self.stacked_image_name, self.stack_frames.stacked_image,
                                color=self.frames.color, avoid_overwriting=False)
         self.my_timer.stop('Saving the final image')
+        self.my_timer.stop('Execution over all')
 
         self.work_next_task_signal.emit("Next job")
+
+        # Print timing info for this job.
+        if self.configuration.global_parameters_protocol_level > 0:
+            self.my_timer.protocol(self.stacked_image_log_file)
 
         # If a logfile was created, close it.
         if self.stacked_image_log_file:
