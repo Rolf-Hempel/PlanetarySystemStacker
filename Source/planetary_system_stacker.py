@@ -667,6 +667,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             if event:
                 event.accept()
 
+            # If there is a image log file still open, close it.
+            if self.workflow.stacked_image_log_file:
+                self.workflow.stacked_image_log_file.close()
+
             # Store the geometry of main window, so it is placed the same at next program start.
             if self.windowState() != QtCore.Qt.WindowMaximized:
                 (x0, y0, width, height) = self.geometry().getRect()

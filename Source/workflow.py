@@ -394,6 +394,3 @@ class Workflow(QtCore.QObject):
         if self.configuration.global_parameters_protocol_level > 0:
             self.my_timer.protocol(self.stacked_image_log_file)
 
-        # If a logfile was created, close it.
-        if self.stacked_image_log_file:
-            self.stacked_image_log_file.close()
