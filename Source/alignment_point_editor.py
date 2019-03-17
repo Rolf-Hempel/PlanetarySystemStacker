@@ -920,7 +920,7 @@ if __name__ == '__main__':
     # plt.show()
 
     app = QtWidgets.QApplication(sys.argv)
-    window = AlignmentPointEditorWidget(None, configuration, align_frames, alignment_points)
+    window = AlignmentPointEditorWidget(None, configuration, align_frames, alignment_points, None)
     window.setMinimumSize(800,600)
     window.showMaximized()
     app.exec_()
