@@ -683,7 +683,8 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
     """
     This widget implements the AP viewer, to be used as part of the application GUI.
     """
-    def __init__(self, parent_gui, configuration, align_frames, alignment_points, parent=None):
+    def __init__(self, parent_gui, configuration, align_frames, alignment_points, signal_finished,
+                 parent=None):
         """
         Initialization of the widget.
 
@@ -693,6 +694,8 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         :param configuration: Configuration object with parameters
         :param align_frames: AlignFrames object with global shift information for all frames
         :param alignment_points: Alignment point object
+        :param signal_finished: Qt signal telling the workflow thread that the APs have been
+                                created successfully
         """
 
         # QtWidgets.QFrame.__init__(self, parent)
@@ -703,6 +706,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         self.mean_frame = align_frames.mean_frame
         self.configuration = configuration
         self.aps = alignment_points
+        self.signal_finished = signal_finished
 
         # Create the viewer frame and insert it into the window.
         self.viewer = AlignmentPointEditor(self, self.aps)
@@ -809,6 +813,9 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         if self.parent_gui is not None:
             self.parent_gui.busy = False
             self.parent_gui.update_status()
+
+            # Tell the workflow thread that the APs have been created successfully.
+            self.signal_finished.emit()
         # Close the Window.
         self.close()
 

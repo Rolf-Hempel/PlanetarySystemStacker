@@ -22,6 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import glob
 from math import ceil
+import copy
 
 import matplotlib.pyplot as plt
 from scipy import ndimage
@@ -69,6 +70,8 @@ class AlignFrames(object):
         self.dev_r_list = None
         self.failed_index_list = None
         self.dy = self.dx = None
+        self.dy_original = self.dx_original = None
+        self.ROI_set = False
 
     def select_alignment_rect(self, scale_factor):
         """
@@ -360,6 +363,8 @@ class AlignFrames(object):
         indices in this method refer to the shape of the intersection of all frames, i.e., the
         shape of the full mean frame. In general, the original frames are somewhat larger.
 
+        If all four index bounds are zero, set the ROI to the full frame.
+
         :param y_min: Lower y pixel bound
         :param y_max: Upper y pixel bound
         :param x_min: Lower x pixel bound
@@ -371,11 +376,18 @@ class AlignFrames(object):
             raise WrongOrderingError("Method 'set_roi' is called before 'align_frames'")
 
         # On the first call, keep a copy of the full mean frame and original intersection shape.
-        if self.mean_frame_original is None:
+        if not self.ROI_set:
             self.mean_frame_original = self.mean_frame.copy()
             self.intersection_shape_original = self.intersection_shape.copy()
 
-        if y_min < 0 or y_max > self.intersection_shape_original[0][1] - \
+        if y_min==0 and y_max==0 and x_min==0 and x_max==0:
+            y_min = 0
+            y_max = self.intersection_shape_original[0][1] - \
+                self.intersection_shape_original[0][0]
+            x_min = 0
+            x_max = self.intersection_shape_original[1][1] - \
+                self.intersection_shape_original[1][0]
+        elif y_min < 0 or y_max > self.intersection_shape_original[0][1] - \
                 self.intersection_shape_original[0][0] or \
                 x_min < 0 or x_max > self.intersection_shape_original[1][1] - \
                 self.intersection_shape_original[1][0] or \
@@ -395,21 +407,31 @@ class AlignFrames(object):
             self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
             self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
 
+        # On the first call, keep a copy of the global offset lists.
+            if not self.ROI_set:
+                self.dy_original = self.dy.copy()
+                self.dx_original = self.dx.copy()
+
+        self.ROI_set = True
+
         self.mean_frame = self.mean_frame_original[y_min:y_max, x_min:x_max]
 
         return self.mean_frame
 
     def reset_roi(self):
         """
-        After a ROI has been set, reset the ROI to the full frame. Restore the mean frame and
-        the intersection shape to their original values. If no ROI has been set, do nothing.
+        After a ROI has been set, reset the ROI to the full frame. Restore the mean frame,
+        the intersection shape and the global offsets to their original values. If no ROI has been
+        set, do nothing.
 
         :return: -
         """
 
-        if self.mean_frame_original is not None:
+        if self.ROI_set:
             self.mean_frame = self.mean_frame_original
             self.intersection_shape = self.intersection_shape_original
+            self.dy = self.dy_original
+            self.dx = self.dx_original
 
     def write_stabilized_video(self, name, fps, stabilized=True):
         """

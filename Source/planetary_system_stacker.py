@@ -323,7 +323,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :param next_activity: Activity to be performed next.
         :return: -
         """
-
+        if next_activity == "Compute frame qualities":
+            print ("Compute frame qualities triggered")
         # Make sure not to process an empty job list, or a job index out of range.
         if not self.job_names or self.job_index >= self.job_number:
             return
@@ -425,14 +426,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # Open the alignment point editor.
                 apew = AlignmentPointEditorWidget(self, self.workflow.configuration,
                                                                self.workflow.align_frames,
-                                                               self.workflow.alignment_points)
+                                                               self.workflow.alignment_points,
+                                                               self.signal_set_alignment_points)
 
                 # This is a workaround to make sure the window fills the available space.
                 apew.setMinimumHeight(self.ui.centralwidget.height()-75)
                 self.display_widget(apew)
                 apew.viewer.setFocus()
-
-                self.activity = "Compute frame qualities"
 
         elif self.activity == "Compute frame qualities":
             if not self.automatic:

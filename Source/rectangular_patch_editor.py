@@ -321,10 +321,10 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
         :return: -
         """
 
-        self.y_low = y_low
-        self.y_high = y_high
-        self.x_low = x_low
-        self.x_high = x_high
+        self.y_low = max(0, y_low)
+        self.y_high = min(self.shape_y, y_high)
+        self.x_low = max(0, x_low)
+        self.x_high = min(self.shape_x, x_high)
 
     def selection_rectangle(self):
         """
