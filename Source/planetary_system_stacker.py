@@ -113,7 +113,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.workflow.moveToThread(self.thread)
         self.workflow.work_next_task_signal.connect(self.work_next_task)
         self.workflow.work_current_progress_signal.connect(self.set_current_progress)
-        self.workflow.set_status_bar_signal.connect(self.set_status_bar)
+        self.workflow.set_status_bar_signal.connect(self.write_status_bar)
         # self.workflow.set_status_signal.connect(self.set_status)
         # self.workflow.set_error_signal.connect(self.show_error_message)
         self.thread.start()
@@ -162,14 +162,15 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # necessary.
         if not self.configuration.config_file_exists:
             # Tell the user to begin with changing / confirming config parameters.
-            self.set_status_bar(
-                'Adapt configuration to your needs and / or confirm by pressing "OK".')
+            self.write_status_bar(
+                'Adapt configuration to your needs and / or confirm by pressing "OK".', 'red')
             self.edit_configuration()
 
         else:
             # Tell the user to begin with specifying jobs to be executed.
-            self.set_status_bar(
-                "Specify video(s) or dir(s) with image files to be stacked (menu: File / Open).")
+            self.write_status_bar(
+                "Specify video(s) or dir(s) with image files to be stacked (menu: File / Open).",
+                'red')
 
     def automatic_changed(self):
         """
@@ -348,7 +349,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
             # If batch mode is deselected, start GUI activity.
             if not self.automatic:
-                self.set_status_bar("Processing " + self.job_names[self.job_index] + ".")
+                self.write_status_bar("Processing " + self.job_names[self.job_index] + ".", "black")
                 self.place_holder_manual_activity('Rank frames')
 
             # Now start the corresponding action on the workflow thread.
@@ -577,11 +578,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # While a computation is going on: Deactivate most buttons and menu entries.
         if self.busy:
             self.activate_gui_elements([self.ui.comboBox_back, self.ui.pushButton_start,
-                                        self.ui.pushButton_next_job, self.ui.menuFile], False)
-            self.ui.statusBar.showMessage("Busy processing " + self.workflow.input_name)
+                                        self.ui.pushButton_next_job, self.ui.menuFile,
+                                        self.ui.menuEdit], False)
+            self.write_status_bar("Busy processing " + self.job_names[self.job_index], "black")
+
         # In manual mode, activate buttons and menu entries. Update the status bar.
         else:
-            self.activate_gui_elements([self.ui.menuFile], True)
+            self.activate_gui_elements([self.ui.menuFile, self.ui.menuEdit], True)
             activated_buttons = []
             if self.job_index < self.job_number:
                 activated_buttons.append(self.ui.pushButton_start)
@@ -597,9 +600,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                     for button in activated_buttons[1:]:
                         message += ", or '" + self.button_get_description(button) + "'"
                 message += ", or exit the program with 'Quit'"
-                self.ui.statusBar.showMessage(message)
+                self.write_status_bar(message, "red")
             else:
-                self.ui.statusBar.showMessage("Load new jobs, or quit.")
+                self.write_status_bar("Load new jobs, or quit.", "red")
+                # self.ui.statusBar.setStyleSheet('color: red')
 
         self.show_batch_progress_widgets(self.job_number > 1)
         if self.job_number > 0:
@@ -637,16 +641,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         for element in elements:
             element.setEnabled(enable)
 
-    @QtCore.pyqtSlot(str)
-    def set_status_bar(self, message):
+    @QtCore.pyqtSlot(str, str)
+    def write_status_bar(self, message, color):
         """
         Set the text in the status bar to "message".
 
         :param message: Text to be displayed
+        :param color: Color in which the text is to be displayed (string)
         :return: -
         """
 
         self.ui.statusBar.showMessage(message)
+        self.ui.statusBar.setStyleSheet('color: ' + color)
 
     def closeEvent(self, event=None):
         """

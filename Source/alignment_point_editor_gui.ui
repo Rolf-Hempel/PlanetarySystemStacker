@@ -284,16 +284,6 @@ values</string>
    <item>
     <layout class="QHBoxLayout" name="horizontalLayout">
      <item>
-      <widget class="QPushButton" name="btnLoad">
-       <property name="toolTip">
-        <string>Load the average frame as background for alignment point editing.</string>
-       </property>
-       <property name="text">
-        <string>Load Image</string>
-       </property>
-      </widget>
-     </item>
-     <item>
       <widget class="QPushButton" name="btnApGrid">
        <property name="toolTip">
         <string>Create an alignment point grid automatically.</string>
@@ -337,7 +327,7 @@ values</string>
       </spacer>
      </item>
      <item>
-      <widget class="QLabel" name="label">
+      <widget class="QLabel" name="label_message">
        <property name="text">
         <string>Use the editor to create / modify alignemnt points. Confirm by pressing 'OK'</string>
        </property>

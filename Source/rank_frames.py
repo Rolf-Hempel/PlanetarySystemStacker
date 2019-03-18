@@ -22,7 +22,8 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import glob
 from time import time
-from numpy import mean
+import numpy as np
+import matplotlib.pyplot as plt
 
 from configuration import Configuration
 from frames import Frames
@@ -142,3 +143,40 @@ if __name__ == "__main__":
         print("Frame no. " + str(index) + ", Rank: " + str(rank) + ", quality: " +
               str(frame_quality))
     print('Elapsed time in ranking frames: {}'.format(end - start))
+
+    print ("")
+    num_frames = len(rank_frames.frame_ranks)
+    frame_percent = 10
+    num_frames_stacked = max(1, int(round(num_frames*frame_percent/100.)))
+    print ("Percent of frames to be stacked: ", str(frame_percent), ", numnber: "
+           + str(num_frames_stacked))
+    quality_cutoff = rank_frames.frame_ranks[rank_frames.quality_sorted_indices[num_frames_stacked]]
+    print ("Quality cutoff: ", str(quality_cutoff))
+
+    # Plot the frame qualities in chronological order.
+    ax1 = plt.subplot(211)
+
+    x = np.array(rank_frames.frame_ranks)
+    plt.ylabel('Frame number')
+    plt.gca().invert_yaxis()
+    y = np.array(range(num_frames))
+    x_cutoff = np.full((num_frames,), quality_cutoff)
+    plt.xlabel('Quality')
+    line1, = plt.plot(x, y, lw=1)
+    line2, = plt.plot(x_cutoff, y, lw=1)
+    plt.grid(True)
+
+    # Plot the frame qualities ordered by by value.
+    ax2 = plt.subplot(212)
+
+    x = np.array([rank_frames.frame_ranks[i] for i in rank_frames.quality_sorted_indices])
+    plt.ylabel('Frame rank')
+    plt.gca().invert_yaxis()
+    y = np.array(range(num_frames))
+    y_cutoff = np.full((num_frames,), num_frames_stacked)
+    plt.xlabel('Quality')
+    line3, = plt.plot(x, y, lw=1)
+    line4, = plt.plot(x, y_cutoff, lw=1)
+    plt.grid(True)
+
+    plt.show()

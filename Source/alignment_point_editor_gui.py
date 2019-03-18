@@ -2,11 +2,12 @@
 
 # Form implementation generated from reading ui file 'alignment_point_editor_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.12
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_alignment_point_editor(object):
     def setupUi(self, alignment_point_editor):
@@ -122,9 +123,6 @@ class Ui_alignment_point_editor(object):
         self.verticalLayout_2.addLayout(self.horizontalLayout_2)
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
-        self.btnLoad = QtWidgets.QPushButton(alignment_point_editor)
-        self.btnLoad.setObjectName("btnLoad")
-        self.horizontalLayout.addWidget(self.btnLoad)
         self.btnApGrid = QtWidgets.QPushButton(alignment_point_editor)
         self.btnApGrid.setObjectName("btnApGrid")
         self.horizontalLayout.addWidget(self.btnApGrid)
@@ -136,9 +134,9 @@ class Ui_alignment_point_editor(object):
         self.horizontalLayout.addWidget(self.btnRedo)
         spacerItem4 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem4)
-        self.label = QtWidgets.QLabel(alignment_point_editor)
-        self.label.setObjectName("label")
-        self.horizontalLayout.addWidget(self.label)
+        self.label_message = QtWidgets.QLabel(alignment_point_editor)
+        self.label_message.setObjectName("label_message")
+        self.horizontalLayout.addWidget(self.label_message)
         spacerItem5 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
         self.horizontalLayout.addItem(spacerItem5)
         self.buttonBox = QtWidgets.QDialogButtonBox(alignment_point_editor)
@@ -174,14 +172,13 @@ class Ui_alignment_point_editor(object):
         self.restore_standard_values.setText(_translate("alignment_point_editor", "Restore\n"
 "standard\n"
 "values"))
-        self.btnLoad.setToolTip(_translate("alignment_point_editor", "Load the average frame as background for alignment point editing."))
-        self.btnLoad.setText(_translate("alignment_point_editor", "Load Image"))
         self.btnApGrid.setToolTip(_translate("alignment_point_editor", "Create an alignment point grid automatically."))
         self.btnApGrid.setText(_translate("alignment_point_editor", "Create AP Grid"))
         self.btnUndo.setToolTip(_translate("alignment_point_editor", "Undo the last step."))
         self.btnUndo.setText(_translate("alignment_point_editor", "Undo"))
         self.btnRedo.setToolTip(_translate("alignment_point_editor", "Redo the last step."))
         self.btnRedo.setText(_translate("alignment_point_editor", "Redo"))
-        self.label.setText(_translate("alignment_point_editor", "Use the editor to create / modify alignemnt points. Confirm by pressing \'OK\'"))
+        self.label_message.setText(_translate("alignment_point_editor", "Use the editor to create / modify alignemnt points. Confirm by pressing \'OK\'"))
         self.buttonBox.setToolTip(_translate("alignment_point_editor", "Confirm the current AP selection."))
+
 

@@ -97,6 +97,8 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         # according to the entries in "job_names" (either "video" or "image").
         self.job_types = None
 
+        self.messageLabel.setStyleSheet('color: red')
+
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         self.button_remove_jobs.clicked.connect(self.remove_job_list)

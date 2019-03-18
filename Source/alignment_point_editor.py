@@ -284,9 +284,9 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         super(AlignmentPointGraphicsItem, self).__init__()
 
         # Set the color and transparency of the filling.
-        self.color_surface = QtGui.QColor(0, 255, 0, 20)
+        self.color_surface = QtGui.QColor(255, 255, 0, 60)
 
-        # Set the color of the bouding rectangle.
+        # Set the color of the bouding rectangle and central dot.
         self.color_boundary = QtGui.QColor(255, 0, 0)
         self.y = ap["y"]
         self.x = ap["x"]
@@ -295,14 +295,14 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         self.patch_x_low = ap["patch_x_low"]
         self.patch_x_high = ap["patch_x_high"]
         self.pen_boundary = QtGui.QPen(self.color_boundary)
-        self.pen_boundary.setWidth(1)
+        self.pen_boundary.setWidth(-1)
         self.width_x = self.patch_x_high - self.patch_x_low
         self.width_x_external = self.width_x + self.pen_boundary.width()
         self.width_y = self.patch_y_high - self.patch_y_low
         self.width_y_external = self.width_y + self.pen_boundary.width()
 
         # Set the size of the central dot.
-        self.dot_width = max(1, int(self.width_x / 50))
+        self.dot_width = max(1, int(self.width_x / 30))
 
     def boundingRect(self):
         return QtCore.QRectF(self.patch_x_low, self.patch_y_low, self.width_x_external,
@@ -362,11 +362,13 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
     The "cntrl" key is used to switch between the two modes.
     """
 
-    def __init__(self, parent, alignment_points):
-        super(AlignmentPointEditor, self).__init__(parent)
+    resized = QtCore.pyqtSignal()
+
+    def __init__(self, image, alignment_points):
+        super(AlignmentPointEditor, self).__init__()
         self._zoom = 0
         self._empty = True
-        self.image = None
+        self.image = image
         self.shape_y = None
         self.shape_x = None
         # Initialize the scene. This object handles mouse events if not in drag mode.
@@ -388,8 +390,17 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         self.drag_mode = True
         # Initialize the alignment point object.
         self.aps = alignment_points
+
+        # Load the image, and connect it to resizing of this window.
+        self.setPhoto(self.image)
+        self.resized.connect(self.fitInView)
+
         # Set the focus on the viewer, so the key event is caught.
         self.setFocus()
+
+    def resizeEvent(self, event):
+        self.resized.emit()
+        return super(AlignmentPointEditor, self).resizeEvent(event)
 
     def hasPhoto(self):
         return not self._empty
@@ -709,7 +720,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         self.signal_finished = signal_finished
 
         # Create the viewer frame and insert it into the window.
-        self.viewer = AlignmentPointEditor(self, self.aps)
+        self.viewer = AlignmentPointEditor(self.mean_frame, self.aps)
         self.horizontalLayout_2.insertWidget(0, self.viewer)
         self.horizontalLayout_2.setStretch(1,0)
 
@@ -725,7 +736,6 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         self.apbt_slider_value.valueChanged['int'].connect(self.apbt_changed)
         self.restore_standard_values.clicked.connect(self.restore_standard_parameters)
 
-        self.btnLoad.clicked.connect(self.loadImage)
         self.btnApGrid.clicked.connect(self.viewer.createApGrid)
         self.btnUndo.clicked.connect(self.viewer.undoStack.undo)
         self.btnRedo.clicked.connect(self.viewer.undoStack.redo)
@@ -752,6 +762,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         self.apst_label_display.setText(str(structure_threshold))
         self.apbt_slider_value.setValue(brightness_threshold)
         self.apbt_label_display.setText(str(brightness_threshold))
+        self.label_message.setStyleSheet('color: red')
 
 
     def aphbw_changed(self, value):
@@ -789,17 +800,6 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
             self.configuration.alignment_points_half_box_width,
             self.configuration.alignment_points_structure_threshold,
             self.configuration.alignment_points_brightness_threshold)
-
-    def loadImage(self):
-        """
-        Load the average frame picture into the alignment point viewer.
-
-        :return: -
-        """
-
-        self.viewer.setPhoto(self.mean_frame)
-        self.viewer.fitInView()
-        self.viewer.setFocus()
 
     def done(self):
         # On exit from the alignment point editor, allocate buffers for APs which have been

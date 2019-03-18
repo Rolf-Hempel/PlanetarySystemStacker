@@ -152,11 +152,13 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
     The "cntrl" key is used to switch between the two modes.
     """
 
-    def __init__(self, parent):
-        super(RectangularPatchEditor, self).__init__(parent)
+    resized = QtCore.pyqtSignal()
+
+    def __init__(self, image):
+        super(RectangularPatchEditor, self).__init__()
         self._zoom = 0
         self._empty = True
-        self.image = None
+        self.image = image
         self.shape_y = None
         self.shape_x = None
 
@@ -182,8 +184,15 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.drag_mode = True
 
+        self.setPhoto(self.image)
+        self.resized.connect(self.fitInView)
+
         # Set the focus on the viewer.
         self.setFocus()
+
+    def resizeEvent(self, event):
+        self.resized.emit()
+        return super(RectangularPatchEditor, self).resizeEvent(event)
 
     def hasPhoto(self):
         return not self._empty
@@ -366,11 +375,11 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
         self.message = message
         self.signal_finished = signal_finished
 
-        self.viewer = RectangularPatchEditor(self)
+        self.viewer = RectangularPatchEditor(self.frame)
         self.verticalLayout.insertWidget(0, self.viewer)
 
         self.messageLabel.setText(self.message)
-        self.buttonLoad.clicked.connect(self.loadImage)
+        self.messageLabel.setStyleSheet('color: red')
         self.buttonBox.accepted.connect(self.done)
         self.buttonBox.rejected.connect(self.reject)
         self.shape_y = None
@@ -379,17 +388,6 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
         self.y_high = None
         self.x_low = None
         self.x_high = None
-
-    def loadImage(self):
-        """
-        Load the average frame picture into the alignment point viewer.
-
-        :return: -
-        """
-
-        self.viewer.setPhoto(self.frame)
-        self.viewer.fitInView()
-        self.viewer.setFocus()
 
     def done(self):
         """

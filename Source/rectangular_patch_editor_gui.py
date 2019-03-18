@@ -2,11 +2,12 @@
 
 # Form implementation generated from reading ui file 'rectangular_patch_editor_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.12
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_rectangular_patch_editor(object):
     def setupUi(self, rectangular_patch_editor):
@@ -24,16 +25,11 @@ class Ui_rectangular_patch_editor(object):
         self.verticalLayout.setObjectName("verticalLayout")
         self.horizontalLayout = QtWidgets.QHBoxLayout()
         self.horizontalLayout.setObjectName("horizontalLayout")
-        self.buttonLoad = QtWidgets.QPushButton(rectangular_patch_editor)
-        self.buttonLoad.setObjectName("buttonLoad")
-        self.horizontalLayout.addWidget(self.buttonLoad)
-        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout.addItem(spacerItem)
         self.messageLabel = QtWidgets.QLabel(rectangular_patch_editor)
         self.messageLabel.setObjectName("messageLabel")
         self.horizontalLayout.addWidget(self.messageLabel)
-        spacerItem1 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
-        self.horizontalLayout.addItem(spacerItem1)
+        spacerItem = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)
+        self.horizontalLayout.addItem(spacerItem)
         self.buttonBox = QtWidgets.QDialogButtonBox(rectangular_patch_editor)
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
@@ -46,6 +42,6 @@ class Ui_rectangular_patch_editor(object):
     def retranslateUi(self, rectangular_patch_editor):
         _translate = QtCore.QCoreApplication.translate
         rectangular_patch_editor.setWindowTitle(_translate("rectangular_patch_editor", "Frame"))
-        self.buttonLoad.setText(_translate("rectangular_patch_editor", "Load image"))
         self.messageLabel.setText(_translate("rectangular_patch_editor", "Message to be displayed"))
+
 
