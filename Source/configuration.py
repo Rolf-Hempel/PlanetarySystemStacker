@@ -403,6 +403,10 @@ class Configuration(object):
         # of their width.
         self.alignment_points_step_size = int(
             round((self.alignment_points_half_patch_width * 5) / 3))
+        # Initialze the number of frames to be stacked. It will be computed from the corresponding
+        # percentage. The user, however, can override this value with a (more precise) figure
+        # during the workflow.
+        self.alignment_points_frame_number = None
 
     def write_config(self, file_name=None):
         """

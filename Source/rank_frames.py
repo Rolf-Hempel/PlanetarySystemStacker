@@ -164,9 +164,11 @@ if __name__ == "__main__":
     plt.xlabel('Quality')
     line1, = plt.plot(x, y, lw=1)
     line2, = plt.plot(x_cutoff, y, lw=1)
+    index = 37
+    plt.scatter(x[index], y[index], s=20)
     plt.grid(True)
 
-    # Plot the frame qualities ordered by by value.
+    # Plot the frame qualities ordered by value.
     ax2 = plt.subplot(212)
 
     x = np.array([rank_frames.frame_ranks[i] for i in rank_frames.quality_sorted_indices])
@@ -177,6 +179,8 @@ if __name__ == "__main__":
     plt.xlabel('Quality')
     line3, = plt.plot(x, y, lw=1)
     line4, = plt.plot(x, y_cutoff, lw=1)
+    index = 37
+    plt.scatter(x[index], y[index], s=20)
     plt.grid(True)
 
     plt.show()
