@@ -122,13 +122,6 @@
      </property>
     </widget>
    </item>
-   <item row="0" column="0" rowspan="4" colspan="3">
-    <widget class="QLabel" name="label_frame_viewer">
-     <property name="text">
-      <string>Frame viewer placeholder</string>
-     </property>
-    </widget>
-   </item>
    <item row="0" column="3" rowspan="2">
     <widget class="QLabel" name="label_matplotlib">
      <property name="text">

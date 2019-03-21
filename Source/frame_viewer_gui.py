@@ -2,12 +2,11 @@
 
 # Form implementation generated from reading ui file 'frame_viewer_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12
+# Created by: PyQt5 UI code generator 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 
 class Ui_frame_viewer(object):
     def setupUi(self, frame_viewer):
@@ -70,9 +69,6 @@ class Ui_frame_viewer(object):
         self.pushButton_stop = QtWidgets.QPushButton(frame_viewer)
         self.pushButton_stop.setObjectName("pushButton_stop")
         self.grid_layout.addWidget(self.pushButton_stop, 4, 1, 1, 1)
-        self.label_frame_viewer = QtWidgets.QLabel(frame_viewer)
-        self.label_frame_viewer.setObjectName("label_frame_viewer")
-        self.grid_layout.addWidget(self.label_frame_viewer, 0, 0, 4, 3)
         self.label_matplotlib = QtWidgets.QLabel(frame_viewer)
         self.label_matplotlib.setObjectName("label_matplotlib")
         self.grid_layout.addWidget(self.label_matplotlib, 0, 3, 2, 1)
@@ -93,7 +89,5 @@ class Ui_frame_viewer(object):
         self.pushButton_set_stacking_limit.setText(_translate("frame_viewer", "Set limit to current frame"))
         self.pushButton_play.setText(_translate("frame_viewer", "Play"))
         self.pushButton_stop.setText(_translate("frame_viewer", "Stop"))
-        self.label_frame_viewer.setText(_translate("frame_viewer", "Frame viewer placeholder"))
         self.label_matplotlib.setText(_translate("frame_viewer", "Matplotlib placeholder"))
-
 

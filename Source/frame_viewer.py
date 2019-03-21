@@ -22,26 +22,27 @@ Part of this module (in class "AlignmentPointEditor" was copied from
 https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview
 
 """
+# The following PyQt5 imports must precede any matplotlib imports. This is a workaround
+# for a Matplotlib 2.2.2 bug.
+
+from PyQt5 import QtCore, QtGui, QtWidgets
+
+import matplotlib
+matplotlib.use('qt5agg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+from matplotlib.figure import Figure
+
 import glob
 import sys
 from time import time
 
 import numpy as np
-from PyQt5 import QtCore, QtGui, QtWidgets
 
-from exceptions import InternalError, NotSupportedError
-from align_frames import AlignFrames
-from alignment_points import AlignmentPoints
 from configuration import Configuration
 from frames import Frames
 from rank_frames import RankFrames
-from alignment_point_editor import SelectionRectangleGraphicsItem
 from frame_viewer_gui import Ui_frame_viewer
-
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
-from matplotlib.figure import Figure
-
 
 class MatplotlibWidget(Canvas):
     """
@@ -55,6 +56,8 @@ class MatplotlibWidget(Canvas):
         self.setParent(parent)
         self.configuration = configuration
         self.rank_frames = rank_frames
+        self.line_chronological = None
+        self.line_quality = None
         self.dot = None
         self.line_quality_cutoff = None
 
@@ -65,7 +68,18 @@ class MatplotlibWidget(Canvas):
 
         self.fig, self.ax = plt.subplots()
         self.ax.invert_xaxis()
-        plt.subplots_adjust(left=0.23, right=0.98, top=0.98, bottom=0.12)
+        plt.subplots_adjust(left=0.23, right=0.95, top=0.98, bottom=0.12)
+
+    def renew_plot(self, index, frame_ordering):
+        self.ax.clear()
+        self.ax.invert_xaxis()
+        self.line_chronological = None
+        self.line_quality = None
+        self.dot = None
+        self.line_quality_cutoff = None
+        self.plot_data(frame_ordering)
+        self.plot_cutoff_lines(frame_ordering)
+        self.plot_dot(index)
 
     def plot_data(self, frame_ordering):
         """
@@ -77,21 +91,26 @@ class MatplotlibWidget(Canvas):
         self.ax.set_ylim(0, self.rank_frames.number+1)
         self.y = np.array(range(1, self.rank_frames.number + 1))
         if frame_ordering == "chronological":
+            if self.line_chronological is not None:
+                self.line_chronological.remove()
             self.x = np.array(self.rank_frames.frame_ranks)
-            plt.ylabel('Frame number')
+            plt.ylabel('Frame numbers ordered chronologically')
             plt.gca().invert_yaxis()
             plt.xlabel('Quality')
-            line1, = plt.plot(self.x, self.y, lw=1)
+            self.line_chronological, = plt.plot(self.x, self.y, lw=1)
             plt.grid(True)
         else:
+            if self.line_quality is not None:
+                self.line_quality.remove()
             self.x = np.array([self.rank_frames.frame_ranks[i]
                           for i in self.rank_frames.quality_sorted_indices])
-            plt.ylabel('Frame rank')
+            plt.ylabel('Frame numbers ordered by quality')
             plt.gca().invert_yaxis()
             plt.xlabel('Quality')
-            line3, = plt.plot(self.x, self.y, lw=1)
+            self.line_quality, = plt.plot(self.x, self.y, lw=1)
             plt.grid(True)
         self.fig.canvas.draw()
+        self.fig.canvas.flush_events()
 
     def plot_cutoff_lines(self, frame_ordering):
         if frame_ordering == "chronological":
@@ -284,24 +303,28 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.frames = rank_frames.frames_mono
         self.rank_frames = rank_frames
 
-        self.label_frame_viewer = FrameViewer(self.frames)
-        self.label_frame_viewer.setObjectName("framewiever")
-        self.grid_layout.addWidget(self.label_frame_viewer, 0, 0, 4, 3)
+        self.frame_viewer = FrameViewer(self.frames)
+        self.frame_viewer.setObjectName("framewiever")
+        self.grid_layout.addWidget(self.frame_viewer, 0, 0, 4, 3)
 
         self.number_frames = len(self.frames)
         self.frame_percent = self.configuration.alignment_points_frame_percent
         self.frame_ranks = rank_frames.frame_ranks
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
-        self.frame_index = 0
+        self.quality_index = 0
+        self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index]+1
         self.frame_ordering = "quality"
 
         # Initialization of GUI elements
         self.slider_frames.setMinimum(1)
         self.slider_frames.setMaximum(self.number_frames)
-        self.slider_frames.setValue(self.frame_index+1)
-        self.spinBox_chronological.setValue(self.rank_frames.quality_sorted_indices[self.frame_index]+1)
-        self.spinBox_quality.setValue(self.frame_index+1)
-        # self.spinBox_quality.setValue(self.rank_frames.quality_sorted_indices.index(self.frame_index)+1)
+        self.slider_frames.setValue(self.quality_index+1)
+        self.spinBox_chronological.setValue(self.quality_index)
+        self.spinBox_quality.setValue(self.quality_index+1)
+        self.spinBox_chronological.setMinimum(1)
+        self.spinBox_chronological.setMaximum(self.number_frames)
+        self.spinBox_quality.setMinimum(1)
+        self.spinBox_quality.setMaximum(self.number_frames)
         self.radioButton_quality.setChecked(True)
 
         self.spinBox_percentage_frames.setValue(
@@ -313,7 +336,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.spinBox_number_frames.setValue(self.configuration.alignment_points_frame_number)
 
         self.matplotlib_widget = MatplotlibWidget(self.configuration, self.rank_frames,
-                                                  self.frame_ordering, self.frame_index)
+                                                  self.frame_ordering, self.quality_index)
 
         self.grid_layout.addWidget(Canvas(self.matplotlib_widget.fig), 0, 3, 2, 1)
 
@@ -338,9 +361,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.pushButton_play.clicked.connect(self.pushbutton_play_clicked)
         self.pushButton_stop.clicked.connect(self.pushbutton_stop_clicked)
 
-        self.matplotlib_widget.plot_data(self.frame_ordering)
-        self.matplotlib_widget.plot_cutoff_lines(self.frame_ordering)
-        self.matplotlib_widget.plot_dot(self.frame_index)
+        self.matplotlib_widget.renew_plot(self.quality_index, self.frame_ordering)
 
     def slider_frames_changed(self):
         index = self.slider_frames.value()-1
@@ -358,6 +379,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.spinBox_quality.setValue(self.quality_index + 1)
         self.spinBox_chronological.blockSignals(False)
         self.spinBox_quality.blockSignals(False)
+        self.frame_viewer.setPhoto(self.frame_index)
 
     def spinbox_number_frames_changed(self):
         pass
@@ -366,7 +388,14 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         pass
 
     def radiobutton_quality_changed(self):
-        pass
+        if self.frame_ordering == "quality":
+            self.frame_ordering = "chronological"
+            self.slider_frames.setValue(self.frame_index+1)
+            self.matplotlib_widget.renew_plot(self.frame_index, self.frame_ordering)
+        else:
+            self.frame_ordering = "quality"
+            self.slider_frames.setValue(self.quality_index+1)
+            self.matplotlib_widget.renew_plot(self.quality_index, self.frame_ordering)
 
     def spinbox_chronological_changed(self):
         self.frame_index = self.spinBox_chronological.value()-1
@@ -382,6 +411,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
             self.matplotlib_widget.plot_dot(self.frame_index)
         self.slider_frames.blockSignals(False)
         self.spinBox_quality.blockSignals(False)
+        self.frame_viewer.setPhoto(self.frame_index)
 
     def spinbox_quality_changed(self):
         self.quality_index = self.spinBox_quality.value()-1
@@ -397,6 +427,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
             self.matplotlib_widget.plot_dot(self.frame_index)
         self.slider_frames.blockSignals(False)
         self.spinBox_chronological.blockSignals(False)
+        self.frame_viewer.setPhoto(self.frame_index)
 
     def pushbutton_set_stacking_limit_clicked(self):
         pass
@@ -405,7 +436,34 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         pass
 
     def pushbutton_play_clicked(self):
-        pass
+        self.spinBox_chronological.blockSignals(True)
+        self.spinBox_quality.blockSignals(True)
+        self.slider_frames.blockSignals(True)
+        self.spinBox_chronological.setDisabled(True)
+        self.spinBox_quality.setDisabled(True)
+        self.slider_frames.setDisabled(True)
+        if self.frame_ordering == "quality":
+            while self.quality_index < self.number_frames-1:
+                self.quality_index += 1
+                self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index]
+                self.spinBox_chronological.setValue(self.frame_index+1)
+                self.spinBox_quality.setValue(self.quality_index+1)
+                self.slider_frames.setValue(self.quality_index+1)
+                self.frame_viewer.setPhoto(self.frame_index)
+        else:
+            while self.frame_index < self.number_frames-1:
+                self.frame_index += 1
+                self.quality_index = self.rank_frames.quality_sorted_indices.index(self.frame_index)
+                self.spinBox_chronological.setValue(self.frame_index+1)
+                self.spinBox_quality.setValue(self.quality_index+1)
+                self.slider_frames.setValue(self.quality_index+1)
+                self.frame_viewer.setPhoto(self.frame_index)
+        self.spinBox_chronological.blockSignals(False)
+        self.spinBox_quality.blockSignals(False)
+        self.slider_frames.blockSignals(False)
+        self.spinBox_chronological.setDisabled(False)
+        self.spinBox_quality.setDisabled(False)
+        self.slider_frames.setDisabled(False)
 
     def done(self):
         """
