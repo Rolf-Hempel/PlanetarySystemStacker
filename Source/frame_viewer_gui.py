@@ -2,11 +2,12 @@
 
 # Form implementation generated from reading ui file 'frame_viewer_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.12
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_frame_viewer(object):
     def setupUi(self, frame_viewer):
@@ -40,12 +41,15 @@ class Ui_frame_viewer(object):
         self.label_number_frames.setObjectName("label_number_frames")
         self.gridLayout_3.addWidget(self.label_number_frames, 0, 0, 1, 1)
         self.spinBox_number_frames = QtWidgets.QSpinBox(self.groupBox_stacking_fraction)
+        self.spinBox_number_frames.setMinimum(1)
         self.spinBox_number_frames.setObjectName("spinBox_number_frames")
         self.gridLayout_3.addWidget(self.spinBox_number_frames, 0, 1, 1, 1)
         self.label_percentage_frames = QtWidgets.QLabel(self.groupBox_stacking_fraction)
         self.label_percentage_frames.setObjectName("label_percentage_frames")
         self.gridLayout_3.addWidget(self.label_percentage_frames, 1, 0, 1, 1)
         self.spinBox_percentage_frames = QtWidgets.QSpinBox(self.groupBox_stacking_fraction)
+        self.spinBox_percentage_frames.setMinimum(1)
+        self.spinBox_percentage_frames.setMaximum(100)
         self.spinBox_percentage_frames.setObjectName("spinBox_percentage_frames")
         self.gridLayout_3.addWidget(self.spinBox_percentage_frames, 1, 1, 1, 1)
         self.pushButton_set_stacking_limit = QtWidgets.QPushButton(self.groupBox_stacking_fraction)
@@ -90,4 +94,5 @@ class Ui_frame_viewer(object):
         self.pushButton_play.setText(_translate("frame_viewer", "Play"))
         self.pushButton_stop.setText(_translate("frame_viewer", "Stop"))
         self.label_matplotlib.setText(_translate("frame_viewer", "Matplotlib placeholder"))
+
 

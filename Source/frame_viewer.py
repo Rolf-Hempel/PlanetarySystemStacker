@@ -28,6 +28,7 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 import matplotlib
+
 matplotlib.use('qt5agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -35,7 +36,7 @@ from matplotlib.figure import Figure
 
 import glob
 import sys
-from time import time
+from time import time, sleep
 
 import numpy as np
 
@@ -44,13 +45,23 @@ from frames import Frames
 from rank_frames import RankFrames
 from frame_viewer_gui import Ui_frame_viewer
 
+
 class MatplotlibWidget(Canvas):
     """
     This widget creates a plot of frame qualities, either sorted chronologically or by quality.
 
     """
 
-    def __init__(self, configuration, rank_frames, frame_ordering, frame_index, parent=None):
+    def __init__(self, configuration, rank_frames, parent=None):
+        """
+        Initialize the widget.
+
+        :param configuration: Configuration object with parameters
+        :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
+                            1. being optimal) for all frames
+        :param parent: Parent object
+        """
+
         super(MatplotlibWidget, self).__init__(Figure())
 
         self.setParent(parent)
@@ -61,34 +72,49 @@ class MatplotlibWidget(Canvas):
         self.dot = None
         self.line_quality_cutoff = None
 
-        self.quality_cutoff = self.rank_frames.frame_ranks[self.rank_frames.quality_sorted_indices[
-            self.configuration.alignment_points_frame_number]]
-
         plt.rcParams.update({'font.size': 8})
 
         self.fig, self.ax = plt.subplots()
         self.ax.invert_xaxis()
         plt.subplots_adjust(left=0.23, right=0.95, top=0.98, bottom=0.12)
 
-    def renew_plot(self, index, frame_ordering):
+    def renew_plot(self, index, frame_ordering, alignment_points_frame_number):
+        """
+        Update the complete plot, including the quality line, the cutoff line, and the dot at the
+        position of the current frame.
+
+        :param index: Index of the current frame (relative to the selected order)
+        :param frame_ordering: Ordering of frames, either "chronological" or "quality"
+        :param alignment_points_frame_number: Number of frames to be stacked at each AP.
+        :return: -
+        """
+
         self.ax.clear()
+
+        # The quality axis starts with 1. (highest quality).
         self.ax.invert_xaxis()
+
+        # Remember objects drawn into the plot.
         self.line_chronological = None
         self.line_quality = None
         self.dot = None
         self.line_quality_cutoff = None
+
+        # Plot the new data.
         self.plot_data(frame_ordering)
-        self.plot_cutoff_lines(frame_ordering)
+        self.plot_cutoff_lines(frame_ordering, alignment_points_frame_number)
         self.plot_dot(index)
 
     def plot_data(self, frame_ordering):
         """
-        Plot the data, including a dot for the current frame.
+        Plot the quality line. Frames (y axis) are ordered as specified with parameter
+         "frame_ordering".
 
+        :param frame_ordering: Ordering of frames, either "chronological" or "quality"
         :return: -
         """
 
-        self.ax.set_ylim(0, self.rank_frames.number+1)
+        self.ax.set_ylim(0, self.rank_frames.number + 1)
         self.y = np.array(range(1, self.rank_frames.number + 1))
         if frame_ordering == "chronological":
             if self.line_chronological is not None:
@@ -97,42 +123,56 @@ class MatplotlibWidget(Canvas):
             plt.ylabel('Frame numbers ordered chronologically')
             plt.gca().invert_yaxis()
             plt.xlabel('Quality')
-            self.line_chronological, = plt.plot(self.x, self.y, lw=1)
+            self.line_chronological, = plt.plot(self.x, self.y, lw=1, color='blue')
             plt.grid(True)
         else:
             if self.line_quality is not None:
                 self.line_quality.remove()
-            self.x = np.array([self.rank_frames.frame_ranks[i]
-                          for i in self.rank_frames.quality_sorted_indices])
+            self.x = np.array(
+                [self.rank_frames.frame_ranks[i] for i in self.rank_frames.quality_sorted_indices])
             plt.ylabel('Frame numbers ordered by quality')
             plt.gca().invert_yaxis()
             plt.xlabel('Quality')
-            self.line_quality, = plt.plot(self.x, self.y, lw=1)
+            self.line_quality, = plt.plot(self.x, self.y, lw=1, color='green')
             plt.grid(True)
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
-    def plot_cutoff_lines(self, frame_ordering):
+    def plot_cutoff_lines(self, frame_ordering, alignment_points_frame_number):
+        """
+        Plot a horizontal (if frames are ordered by quality) or vertical (if frames are ordered
+        chronologically) line to separate frames to be stacked from the other ones.
+
+        :param frame_ordering: Ordering of frames, either "chronological" or "quality"
+        :param alignment_points_frame_number: Number of frames to be stacked at each AP.
+        :return: -
+        """
         if frame_ordering == "chronological":
             if self.line_quality_cutoff is not None:
                 self.line_quality_cutoff.remove()
             quality_cutoff = self.rank_frames.frame_ranks[
-                self.rank_frames.quality_sorted_indices[
-                    self.configuration.alignment_points_frame_number]]
+                self.rank_frames.quality_sorted_indices[alignment_points_frame_number]]
             x_cutoff = np.full((self.rank_frames.number,), quality_cutoff)
-            self.line_quality_cutoff, = plt.plot(x_cutoff, self.y, lw=1)
+            self.line_quality_cutoff, = plt.plot(x_cutoff, self.y, lw=1, color='orange')
         else:
             if self.line_quality_cutoff is not None:
                 self.line_quality_cutoff.remove()
-            y_cutoff = np.full((self.rank_frames.number,), self.configuration.alignment_points_frame_number)
-            self.line_quality_cutoff, = plt.plot(self.x, y_cutoff, lw=1)
+            y_cutoff = np.full((self.rank_frames.number,), alignment_points_frame_number)
+            self.line_quality_cutoff, = plt.plot(self.x, y_cutoff, lw=1, color='orange')
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
     def plot_dot(self, frame_index):
+        """
+        Plot a dot on the quality line at the position of the current frame.
+
+        :param frame_index: Frame index
+        :return: -
+        """
+
         if self.dot is not None:
             self.dot.remove()
-        self.dot = plt.scatter(self.x[frame_index], self.y[frame_index], s=20)
+        self.dot = plt.scatter(self.x[frame_index], self.y[frame_index], s=20, color='red')
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 
@@ -277,8 +317,8 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
 class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
     """
-    This widget implements a rectangular patch editor, to be used for the selection of the
-    stabilization patch and the ROI rectangle.
+    This widget implements a frame viewer together with control elements to visualize frame
+    qualities, and to manipulate the stack limits.
     """
 
     def __init__(self, parent_gui, configuration, rank_frames, signal_finished):
@@ -286,57 +326,81 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         Initialization of the widget.
 
         :param parent_gui: Parent GUI object
-        :param frame: Background image on which the patch is superimposed. Usually, the mean frame
-                      is used for this purpose.
-        :param message: Message to tell the user what to do.
-        :param signal_finished: Qt signal with signature (int, int, int, int) sending the
-                                coordinate bounds (y_low, y_high, x_low, x_high) of the patch
-                                selected, or (0, 0, 0, 0) if unsuccessful.
+        :param configuration: Configuration object with parameters
+        :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
+                            1. being optimal) for all frames
+        :param signal_finished: Qt signal with signature () telling the parent GUI when the user
+                                closes the viewer.
         """
 
         super(FrameViewerWidget, self).__init__(parent_gui)
         self.setupUi(self)
 
+        # Keep references to upper level objects.
         self.parent_gui = parent_gui
         self.configuration = configuration
         self.signal_finished = signal_finished
         self.frames = rank_frames.frames_mono
         self.rank_frames = rank_frames
 
+        # Set up the frame viewer and put it in the upper left corner.
         self.frame_viewer = FrameViewer(self.frames)
         self.frame_viewer.setObjectName("framewiever")
         self.grid_layout.addWidget(self.frame_viewer, 0, 0, 4, 3)
 
+        # Initialize variables. The values for "alignment_point_frame_number" and
+        # "alignment_points_frame_percent" are held as copies in this object. Only if the user
+        # presses "OK" at the end, the values are copied back into the configuration object.
         self.number_frames = len(self.frames)
-        self.frame_percent = self.configuration.alignment_points_frame_percent
+        self.alignment_points_frame_number = self.configuration.alignment_points_frame_number
+        self.alignment_points_frame_percent = self.configuration.alignment_points_frame_percent
+        if self.alignment_points_frame_number is None or 0 < self.alignment_points_frame_number \
+                <= self.number_frames:
+            self.alignment_points_frame_number = max(1, int(
+                round(self.number_frames * self.alignment_points_frame_percent / 100.)))
         self.frame_ranks = rank_frames.frame_ranks
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
+
+        # Be careful: Indices are counted from 0, while widget contents are counted from 1 (to make
+        # it easier for the user.
         self.quality_index = 0
-        self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index]+1
+        self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index] + 1
+
+        # Start with ordering frames by quality. This can be changed by the user using a radio
+        # button.
         self.frame_ordering = "quality"
+
+        # Initialize a variable for communication with the frame_player object later.
+        self.run_player = False
+
+        # Create the frame player thread and start it. The player displays frames in succession.
+        # It is pushed on a different thread because otherwise the user could not stop it before it
+        # finishes.
+        self.player_thread = QtCore.QThread()
+        self.frame_player = FramePlayer(self)
+        self.frame_player.moveToThread(self.player_thread)
+        self.frame_player.set_photo_signal.connect(self.frame_viewer.setPhoto)
+        self.player_thread.start()
 
         # Initialization of GUI elements
         self.slider_frames.setMinimum(1)
         self.slider_frames.setMaximum(self.number_frames)
-        self.slider_frames.setValue(self.quality_index+1)
+        self.slider_frames.setValue(self.quality_index + 1)
         self.spinBox_chronological.setValue(self.quality_index)
-        self.spinBox_quality.setValue(self.quality_index+1)
+        self.spinBox_quality.setValue(self.quality_index + 1)
         self.spinBox_chronological.setMinimum(1)
         self.spinBox_chronological.setMaximum(self.number_frames)
         self.spinBox_quality.setMinimum(1)
         self.spinBox_quality.setMaximum(self.number_frames)
         self.radioButton_quality.setChecked(True)
 
-        self.spinBox_percentage_frames.setValue(
-            self.configuration.alignment_points_frame_percent)
-        if self.configuration.alignment_points_frame_number is None or 0 < \
-                self.configuration.alignment_points_frame_number <= self.number_frames:
-            self.configuration.alignment_points_frame_number = max(1, int(
-                round(self.number_frames * self.frame_percent / 100.)))
-        self.spinBox_number_frames.setValue(self.configuration.alignment_points_frame_number)
+        self.spinBox_number_frames.setMaximum(self.number_frames)
+        self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
 
-        self.matplotlib_widget = MatplotlibWidget(self.configuration, self.rank_frames,
-                                                  self.frame_ordering, self.quality_index)
+        self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
+
+        # Create the Matplotlib widget showing the quality lines.
+        self.matplotlib_widget = MatplotlibWidget(self.configuration, self.rank_frames)
 
         self.grid_layout.addWidget(Canvas(self.matplotlib_widget.fig), 0, 3, 2, 1)
 
@@ -349,6 +413,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.grid_layout.setRowStretch(2, 0)
         self.grid_layout.setRowStretch(3, 0)
 
+        # Connect signals with slots.
         self.buttonBox.accepted.connect(self.done)
         self.buttonBox.rejected.connect(self.reject)
         self.slider_frames.valueChanged.connect(self.slider_frames_changed)
@@ -357,64 +422,130 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.radioButton_quality.toggled.connect(self.radiobutton_quality_changed)
         self.spinBox_chronological.valueChanged.connect(self.spinbox_chronological_changed)
         self.spinBox_quality.valueChanged.connect(self.spinbox_quality_changed)
-        self.pushButton_set_stacking_limit.clicked.connect(self.pushbutton_set_stacking_limit_clicked)
-        self.pushButton_play.clicked.connect(self.pushbutton_play_clicked)
+        self.pushButton_set_stacking_limit.clicked.connect(
+            self.pushbutton_set_stacking_limit_clicked)
+        self.pushButton_play.clicked.connect(self.frame_player.play)
         self.pushButton_stop.clicked.connect(self.pushbutton_stop_clicked)
 
-        self.matplotlib_widget.renew_plot(self.quality_index, self.frame_ordering)
+        # Initialize the Matplotlib widget contents.
+        self.matplotlib_widget.renew_plot(self.quality_index, self.frame_ordering,
+                                          self.alignment_points_frame_number)
 
     def slider_frames_changed(self):
-        index = self.slider_frames.value()-1
+        """
+        The frames slider is changed by the user.
+
+        :return: -
+        """
+
+        # Again, please note the difference between indexing and GUI displays.
+        index = self.slider_frames.value() - 1
+
+        # Differentiate between frame ordering (by quality or chronologically).
         if self.frame_ordering == "quality":
             self.frame_index = self.rank_frames.quality_sorted_indices[index]
             self.quality_index = index
+
+            # Plot a dot on the quality line at the position of the current frame.
             self.matplotlib_widget.plot_dot(self.quality_index)
         else:
             self.frame_index = index
             self.quality_index = self.rank_frames.quality_sorted_indices.index(self.frame_index)
             self.matplotlib_widget.plot_dot(self.frame_index)
+
+        # Block signals temporarily to avoid feedback loops. Then update widget contents.
         self.spinBox_chronological.blockSignals(True)
         self.spinBox_quality.blockSignals(True)
-        self.spinBox_chronological.setValue(self.frame_index+1)
+        self.spinBox_chronological.setValue(self.frame_index + 1)
         self.spinBox_quality.setValue(self.quality_index + 1)
         self.spinBox_chronological.blockSignals(False)
         self.spinBox_quality.blockSignals(False)
         self.frame_viewer.setPhoto(self.frame_index)
 
     def spinbox_number_frames_changed(self):
-        pass
+        """
+        The user has changed the number of frames to be stacked at each AP.
+
+        :return: -
+        """
+
+        self.alignment_points_frame_number = self.spinBox_number_frames.value()
+        self.alignment_points_frame_percent = int(
+            round(self.alignment_points_frame_number * 100. / self.number_frames))
+        self.spinBox_percentage_frames.blockSignals(True)
+        self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
+        self.spinBox_percentage_frames.blockSignals(False)
+        self.matplotlib_widget.plot_cutoff_lines(self.frame_ordering,
+                                                 self.alignment_points_frame_number)
 
     def spinbox_percentage_frames_changed(self):
-        pass
+        """
+        The user has changed the percentage of frames to be stacked at each AP.
+
+        :return:
+        """
+
+        self.alignment_points_frame_percent = self.spinBox_percentage_frames.value()
+        self.alignment_points_frame_number = int(
+            round(self.number_frames * self.alignment_points_frame_percent / 100.))
+        self.spinBox_number_frames.blockSignals(True)
+        self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
+        self.spinBox_number_frames.blockSignals(False)
+        self.matplotlib_widget.plot_cutoff_lines(self.frame_ordering,
+                                                 self.alignment_points_frame_number)
 
     def radiobutton_quality_changed(self):
+        """
+        Toggle back and forth between frame ordering modes. The frame slider is updated to reflect
+        the index of the current frame in the new ordering scheme. The Matplotlib widget changes
+        its appearance.
+
+        :return: -
+        """
+
         if self.frame_ordering == "quality":
             self.frame_ordering = "chronological"
-            self.slider_frames.setValue(self.frame_index+1)
-            self.matplotlib_widget.renew_plot(self.frame_index, self.frame_ordering)
+            self.slider_frames.setValue(self.frame_index + 1)
+            self.matplotlib_widget.renew_plot(self.frame_index, self.frame_ordering,
+                                              self.alignment_points_frame_number)
         else:
             self.frame_ordering = "quality"
-            self.slider_frames.setValue(self.quality_index+1)
-            self.matplotlib_widget.renew_plot(self.quality_index, self.frame_ordering)
+            self.slider_frames.setValue(self.quality_index + 1)
+            self.matplotlib_widget.renew_plot(self.quality_index, self.frame_ordering,
+                                              self.alignment_points_frame_number)
 
     def spinbox_chronological_changed(self):
-        self.frame_index = self.spinBox_chronological.value()-1
+        """
+        The user has selected a new frame to be displayed by entering its chronological frame index.
+        All other widgets which depend on the current frame index are changed.
+
+        :return: -
+        """
+
+        self.frame_index = self.spinBox_chronological.value() - 1
         self.quality_index = self.rank_frames.quality_sorted_indices.index(self.frame_index)
         self.slider_frames.blockSignals(True)
         self.spinBox_quality.blockSignals(True)
-        self.spinBox_quality.setValue(self.quality_index+1)
+        self.spinBox_quality.setValue(self.quality_index + 1)
         if self.frame_ordering == "quality":
-            self.slider_frames.setValue(self.quality_index+1)
+            self.slider_frames.setValue(self.quality_index + 1)
             self.matplotlib_widget.plot_dot(self.quality_index)
         else:
-            self.slider_frames.setValue(self.frame_index+1)
+            self.slider_frames.setValue(self.frame_index + 1)
             self.matplotlib_widget.plot_dot(self.frame_index)
         self.slider_frames.blockSignals(False)
         self.spinBox_quality.blockSignals(False)
         self.frame_viewer.setPhoto(self.frame_index)
 
     def spinbox_quality_changed(self):
-        self.quality_index = self.spinBox_quality.value()-1
+        """
+        The user has selected a new frame to be displayed by entering its quality index.
+        All other widgets which depend on the current frame index are changed.
+
+        :return:
+        """
+
+        self.quality_index = self.spinBox_quality.value() - 1
         self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index]
         self.slider_frames.blockSignals(True)
         self.spinBox_chronological.blockSignals(True)
@@ -430,40 +561,27 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.frame_viewer.setPhoto(self.frame_index)
 
     def pushbutton_set_stacking_limit_clicked(self):
-        pass
+        """
+        The current frame defines the stacking limit. Compute the corresponding stack limit
+        variables and update the widgets. Since the signals are not deactivated before updating
+        the widgets, the Matplotlib widget gets updated as well.
+        :return:
+        """
+        self.alignment_points_frame_number = self.quality_index + 1
+        self.alignment_points_frame_percent = int(
+            round(self.alignment_points_frame_number * 100. / self.number_frames))
+        self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
+        self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
 
     def pushbutton_stop_clicked(self):
-        pass
+        """
+        When the frame player is running, it periodically checks this variable. If it is set to
+        False, the player stops.
 
-    def pushbutton_play_clicked(self):
-        self.spinBox_chronological.blockSignals(True)
-        self.spinBox_quality.blockSignals(True)
-        self.slider_frames.blockSignals(True)
-        self.spinBox_chronological.setDisabled(True)
-        self.spinBox_quality.setDisabled(True)
-        self.slider_frames.setDisabled(True)
-        if self.frame_ordering == "quality":
-            while self.quality_index < self.number_frames-1:
-                self.quality_index += 1
-                self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index]
-                self.spinBox_chronological.setValue(self.frame_index+1)
-                self.spinBox_quality.setValue(self.quality_index+1)
-                self.slider_frames.setValue(self.quality_index+1)
-                self.frame_viewer.setPhoto(self.frame_index)
-        else:
-            while self.frame_index < self.number_frames-1:
-                self.frame_index += 1
-                self.quality_index = self.rank_frames.quality_sorted_indices.index(self.frame_index)
-                self.spinBox_chronological.setValue(self.frame_index+1)
-                self.spinBox_quality.setValue(self.quality_index+1)
-                self.slider_frames.setValue(self.quality_index+1)
-                self.frame_viewer.setPhoto(self.frame_index)
-        self.spinBox_chronological.blockSignals(False)
-        self.spinBox_quality.blockSignals(False)
-        self.slider_frames.blockSignals(False)
-        self.spinBox_chronological.setDisabled(False)
-        self.spinBox_quality.setDisabled(False)
-        self.slider_frames.setDisabled(False)
+        :return:
+        """
+
+        self.frame_player.run_player = False
 
     def done(self):
         """
@@ -491,8 +609,101 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         """
 
         # Send a completion message.
-        self.signal_finished.emit()
+        if self.parent_gui is not None:
+            self.signal_finished.emit()
+
+        # Close the Window.
         self.close()
+
+
+class FramePlayer(QtCore.QObject):
+    """
+    This class implements a video player using the FrameViewer and the control elements of the
+    FrameViewerWidget. The player is started by the widget on a separate thread. This way the user
+    can instruct the GUI to stop the running player.
+
+    """
+    set_photo_signal = QtCore.pyqtSignal(int)
+
+    def __init__(self, frame_viewer_widget):
+        super(FramePlayer, self).__init__()
+
+        # Store a reference on the frame viewer widget and create a list of GUI elements. This makes
+        # it easier to perform the same operation on all elements.
+        self.frame_viewer_widget = frame_viewer_widget
+        self.frame_viewer_widget_elements = [self.frame_viewer_widget.spinBox_chronological,
+                                             self.frame_viewer_widget.spinBox_quality,
+                                             self.frame_viewer_widget.slider_frames,
+                                             self.frame_viewer_widget.pushButton_play]
+
+        # Initialize a variable used to stop the player in the GUI thread.
+        self.run_player = False
+
+    def play(self):
+        """
+        Start the player.
+        :return: -
+        """
+
+        # Block signals from GUI elements to avoid cross-talk, and disable them to prevent unwanted
+        # user interaction.
+        for element in self.frame_viewer_widget_elements:
+            element.blockSignals(True)
+            element.setDisabled(True)
+
+        # Set the plaer running.
+        self.run_player = True
+
+        # The frames are ordered by their quality.
+        if self.frame_viewer_widget.frame_ordering == "quality":
+
+            # The player stops when the end of the video is reached, or when the "run_player"
+            # variable is set to False in the GUI thread.
+            while self.frame_viewer_widget.quality_index < self.frame_viewer_widget.number_frames\
+                    - 1 and self.run_player:
+                self.frame_viewer_widget.quality_index += 1
+                self.frame_viewer_widget.frame_index = \
+                self.frame_viewer_widget.rank_frames.quality_sorted_indices[
+                    self.frame_viewer_widget.quality_index]
+                self.frame_viewer_widget.spinBox_chronological.setValue(
+                    self.frame_viewer_widget.frame_index + 1)
+                self.frame_viewer_widget.spinBox_quality.setValue(
+                    self.frame_viewer_widget.quality_index + 1)
+                self.frame_viewer_widget.slider_frames.setValue(
+                    self.frame_viewer_widget.quality_index + 1)
+                self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
+                self.frame_viewer_widget.matplotlib_widget.plot_dot(
+                    self.frame_viewer_widget.quality_index)
+
+                # Insert a short pause to keep the video from running too fast.
+                sleep(0.1)
+                self.frame_viewer_widget.update()
+        else:
+            # The same for chronological frame ordering.
+            while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.number_frames -\
+                    1 and self.run_player:
+                self.frame_viewer_widget.frame_index += 1
+                self.frame_viewer_widget.quality_index = \
+                    self.frame_viewer_widget.rank_frames.quality_sorted_indices.index(
+                    self.frame_viewer_widget.frame_index)
+                self.frame_viewer_widget.spinBox_chronological.setValue(
+                    self.frame_viewer_widget.frame_index + 1)
+                self.frame_viewer_widget.spinBox_quality.setValue(
+                    self.frame_viewer_widget.quality_index + 1)
+                self.frame_viewer_widget.slider_frames.setValue(
+                    self.frame_viewer_widget.frame_index + 1)
+                self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
+                self.frame_viewer_widget.matplotlib_widget.plot_dot(
+                    self.frame_viewer_widget.frame_index)
+                sleep(0.1)
+                self.frame_viewer_widget.update()
+
+        self.run_player = False
+
+        # Re-set the GUI elements to their normal state.
+        for element in self.frame_viewer_widget_elements:
+            element.blockSignals(False)
+            element.setDisabled(False)
 
 
 if __name__ == '__main__':
@@ -500,9 +711,9 @@ if __name__ == '__main__':
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob('Images/2012*.tif')
-        # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
-        # names = glob.glob('Images/Example-3*.jpg')
+        names = glob.glob(
+            'Images/2012*.tif')  # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')  # names
+        # = glob.glob('Images/Example-3*.jpg')
     else:
         names = 'Videos/another_short_video.avi'
     print(names)
@@ -544,9 +755,8 @@ if __name__ == '__main__':
     window.showMaximized()
     app.exec_()
 
-    print ("Percentage of frames to be stacked: " +
-           str(configuration.alignment_points_frame_percent) + ", number of frames: " +
-           str(configuration.alignment_points_frame_number))
+    print("Percentage of frames to be stacked: " + str(
+        configuration.alignment_points_frame_percent) + ", number of frames: " + str(
+        configuration.alignment_points_frame_number))
 
     sys.exit()
-

@@ -153,6 +153,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.activate_gui_elements(
             [self.ui.box_automatic, self.ui.comboBox_back, self.ui.pushButton_start,
              self.ui.pushButton_next_job, self.ui.actionSave, self.ui.actionSave_as,
+             self.ui.actionLoad_postproc_config, self.ui.actionSave_postproc_config,
              self.ui.actionEdit_postproc_config], False)
         self.show_current_progress_widgets(False)
         self.show_batch_progress_widgets(False)
