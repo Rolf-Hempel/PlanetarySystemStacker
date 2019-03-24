@@ -386,10 +386,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
             if not self.automatic:
 
+                # Reset the ROI, if one was defined before.
+                self.workflow.align_frames.reset_roi()
+
                 # When the frame viewer is finished, it sends a signal which invokes this same
                 # method on the main thread.
                 fvw = FrameViewerWidget(self, self.workflow.configuration,
-                                        self.workflow.rank_frames,
+                                        self.workflow.rank_frames, self.workflow.align_frames,
                                         self.workflow.stacked_image_log_file,
                                         self.workflow.work_next_task_signal, "Set ROI")
 

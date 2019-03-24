@@ -43,8 +43,10 @@ import numpy as np
 from configuration import Configuration
 from frames import Frames
 from rank_frames import RankFrames
+from align_frames import AlignFrames
 from frame_viewer_gui import Ui_frame_viewer
 from miscellaneous import Miscellaneous
+from exceptions import NotSupportedError, InternalError
 
 
 class MatplotlibWidget(Canvas):
@@ -187,14 +189,17 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
     resized = QtCore.pyqtSignal()
 
-    def __init__(self, frames):
+    def __init__(self, frames, align_frames):
         super(FrameViewer, self).__init__()
         self._zoom = 0
         self._empty = True
 
         self.frames = frames
-        self.shape_y = self.frames[0].shape[0]
-        self.shape_x = self.frames[0].shape[1]
+        self.align_frames = align_frames
+        # self.shape_y = self.align_frames.intersection_shape[0][1] - \
+        #                self.align_frames.intersection_shape[0][0]
+        # self.shape_x = self.align_frames.intersection_shape[1][1] - \
+        #                self.align_frames.intersection_shape[1][0]
         self.frame_index = 0
 
         # Initialize the scene. This object handles mouse events if not in drag mode.
@@ -255,7 +260,16 @@ class FrameViewer(QtWidgets.QGraphicsView):
         :return: -
         """
 
-        self.image = self.frames[index]
+        self.image = self.frames[index][self.align_frames.intersection_shape[0][0] -
+                                          self.align_frames.frame_shifts[index][0]:
+                                          self.align_frames.intersection_shape[0][1] -
+                                          self.align_frames.frame_shifts[index][0],
+                                          self.align_frames.intersection_shape[1][0] -
+                                          self.align_frames.frame_shifts[index][1]:
+                                          self.align_frames.intersection_shape[1][1] -
+                                          self.align_frames.frame_shifts[index][1]]
+
+
         # Convert the float32 monochrome image into uint8 format.
         image_uint8 = self.image.astype(np.uint8)
         self.shape_y = image_uint8.shape[0]
@@ -322,7 +336,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
     qualities, and to manipulate the stack limits.
     """
 
-    def __init__(self, parent_gui, configuration, rank_frames, stacked_image_log_file,
+    def __init__(self, parent_gui, configuration, rank_frames, align_frames, stacked_image_log_file,
                  signal_finished, signal_payload):
         """
         Initialization of the widget.
@@ -331,6 +345,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         :param configuration: Configuration object with parameters
         :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
                             1. being optimal) for all frames
+        :param align_frames: AlignFrames object with global shift information for all frames
         :param stacked_image_log_file: Log file to be stored with results, or None.
         :param signal_finished: Qt signal with signature (str) to trigger the next activity when
                                 the viewer exits.
@@ -348,9 +363,10 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.signal_payload = signal_payload
         self.frames = rank_frames.frames_mono
         self.rank_frames = rank_frames
+        self.align_frames = align_frames
 
         # Set up the frame viewer and put it in the upper left corner.
-        self.frame_viewer = FrameViewer(self.frames)
+        self.frame_viewer = FrameViewer(self.frames, self.align_frames)
         self.frame_viewer.setObjectName("framewiever")
         self.grid_layout.addWidget(self.frame_viewer, 0, 0, 4, 3)
 
@@ -771,8 +787,35 @@ if __name__ == '__main__':
         [rank_frames.frame_ranks[i] for i in rank_frames.quality_sorted_indices]))
     print("Sorted index list: " + str(rank_frames.quality_sorted_indices))
 
+    # Initialize the frame alignment object.
+    align_frames = AlignFrames(frames, rank_frames, configuration)
+
+    if configuration.align_frames_mode == "Surface":
+        # Select the local rectangular patch in the image where the L gradient is highest in both x
+        # and y direction. The scale factor specifies how much smaller the patch is compared to the
+        # whole image frame.
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
+            configuration.align_frames_rectangle_scale_factor)
+
+        print("optimal alignment rectangle, y_low: " + str(y_low_opt) + ", y_high: " +
+              str(y_high_opt) + ", x_low: " + str(x_low_opt) + ", x_high: " + str(x_high_opt))
+
+    # Align all frames globally relative to the frame with the highest score.
+    try:
+        align_frames.align_frames()
+    except NotSupportedError as e:
+        print("Error: " + e.message)
+        exit()
+    except InternalError as e:
+        print("Warning: " + e.message)
+
+    print("Intersection, y_low: " + str(align_frames.intersection_shape[0][0]) + ", y_high: "
+          + str(align_frames.intersection_shape[0][1]) + ", x_low: " \
+          + str(align_frames.intersection_shape[1][0]) + ", x_high: " \
+          + str(align_frames.intersection_shape[1][1]))
+
     app = QtWidgets.QApplication(sys.argv)
-    window = FrameViewerWidget(None, configuration, rank_frames, None, None)
+    window = FrameViewerWidget(None, configuration, rank_frames, align_frames, None, None, None)
     window.setMinimumSize(800, 600)
     window.showMaximized()
     app.exec_()
