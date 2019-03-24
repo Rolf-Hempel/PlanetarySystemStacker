@@ -44,6 +44,7 @@ from configuration import Configuration
 from frames import Frames
 from rank_frames import RankFrames
 from frame_viewer_gui import Ui_frame_viewer
+from miscellaneous import Miscellaneous
 
 
 class MatplotlibWidget(Canvas):
@@ -321,7 +322,8 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
     qualities, and to manipulate the stack limits.
     """
 
-    def __init__(self, parent_gui, configuration, rank_frames, signal_finished):
+    def __init__(self, parent_gui, configuration, rank_frames, stacked_image_log_file,
+                 signal_finished, signal_payload):
         """
         Initialization of the widget.
 
@@ -329,8 +331,10 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         :param configuration: Configuration object with parameters
         :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
                             1. being optimal) for all frames
-        :param signal_finished: Qt signal with signature () telling the parent GUI when the user
-                                closes the viewer.
+        :param stacked_image_log_file: Log file to be stored with results, or None.
+        :param signal_finished: Qt signal with signature (str) to trigger the next activity when
+                                the viewer exits.
+        :param signal_payload: Payload of "signal_finished" (str).
         """
 
         super(FrameViewerWidget, self).__init__(parent_gui)
@@ -339,7 +343,9 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         # Keep references to upper level objects.
         self.parent_gui = parent_gui
         self.configuration = configuration
+        self.stacked_image_log_file = stacked_image_log_file
         self.signal_finished = signal_finished
+        self.signal_payload = signal_payload
         self.frames = rank_frames.frames_mono
         self.rank_frames = rank_frames
 
@@ -590,15 +596,30 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         :return: -
         """
 
-        # Save the (potentially changed) stack size.
-        self.configuration.alignment_points_frame_percent = self.spinBox_percentage_frames.value()
-        self.configuration.alignment_points_frame_number = self.spinBox_number_frames.value()
+        # Check if a new stack size was selected.
+        if (self.configuration.alignment_points_frame_number != \
+                self.spinBox_number_frames.value() and \
+                self.configuration.alignment_points_frame_number is not None) or \
+                self.configuration.alignment_points_frame_percent != \
+                self.spinBox_percentage_frames.value():
+            # Save the (potentially changed) stack size.
+            self.configuration.alignment_points_frame_percent = \
+                self.spinBox_percentage_frames.value()
+            self.configuration.alignment_points_frame_number = self.spinBox_number_frames.value()
+
+            # Write the stack size change into the protocol.
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol("           The user has selected a new stack size: " +
+                    str(self.configuration.alignment_points_frame_number) + " frames (" +
+                    str(self.configuration.alignment_points_frame_percent) + "% of all frames).",
+                    self.stacked_image_log_file, precede_with_timestamp=False)
 
         # Send a completion message.
         if self.parent_gui is not None:
-            self.signal_finished.emit()
+            self.signal_finished.emit(self.signal_payload)
 
         # Close the Window.
+        plt.close()
         self.close()
 
     def reject(self):
@@ -610,9 +631,10 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
 
         # Send a completion message.
         if self.parent_gui is not None:
-            self.signal_finished.emit()
+            self.signal_finished.emit(self.signal_payload)
 
         # Close the Window.
+        plt.close()
         self.close()
 
 
@@ -750,7 +772,7 @@ if __name__ == '__main__':
     print("Sorted index list: " + str(rank_frames.quality_sorted_indices))
 
     app = QtWidgets.QApplication(sys.argv)
-    window = FrameViewerWidget(None, configuration, rank_frames, None)
+    window = FrameViewerWidget(None, configuration, rank_frames, None, None)
     window.setMinimumSize(800, 600)
     window.showMaximized()
     app.exec_()

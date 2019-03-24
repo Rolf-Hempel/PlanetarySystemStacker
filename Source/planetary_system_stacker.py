@@ -34,6 +34,7 @@ from configuration import Configuration
 from configuration_editor import ConfigurationEditor
 from job_editor import JobEditor
 from rectangular_patch_editor import RectangularPatchEditorWidget
+from frame_viewer import FrameViewerWidget
 from alignment_points import AlignmentPoints
 from alignment_point_editor import AlignmentPointEditorWidget
 from miscellaneous import Miscellaneous
@@ -140,9 +141,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.job_index = 0
         self.job_names = []
         self.job_types = []
-        self.activities = ['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
-                           'Set alignment points', 'Compute frame qualities', 'Stack frames',
-                           'Save stacked image', 'Next job']
         self.activity = 'Read frames'
 
         # Initialize the "backwards" combobox: The user can only go back to those program steps
@@ -282,7 +280,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Get the choice of the combobox button.
         task = self.ui.comboBox_back.currentText()
-        Miscellaneous.protocol("\n+++ Repeating from task: " + task + " +++",
+        Miscellaneous.protocol("", self.workflow.stacked_image_log_file,
+                               precede_with_timestamp=False)
+        Miscellaneous.protocol("+++ Repeating from task: " + task + " +++",
                                self.workflow.stacked_image_log_file)
 
         # If the end of the job queue was reached, reverse the last job index increment.
@@ -290,7 +290,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.job_index -= 1
 
         # Restart from the specified task within the current job.
-        if task in ['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
+        if task in ['Read frames', 'Rank frames', 'Align frames', 'Select stack size', 'Set ROI',
                     'Set alignment points', 'Compute frame qualities',
                     'Stack frames', 'Save stacked image']:
             self.work_next_task(task)
@@ -326,8 +326,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :param next_activity: Activity to be performed next.
         :return: -
         """
-        if next_activity == "Compute frame qualities":
-            print ("Compute frame qualities triggered")
+
         # Make sure not to process an empty job list, or a job index out of range.
         if not self.job_names or self.job_index >= self.job_number:
             return
@@ -381,6 +380,26 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # automatically by the workflow thread.
                 self.signal_align_frames.emit(0, 0, 0, 0)
 
+            self.busy = True
+
+        elif self.activity == "Select stack size":
+
+            if not self.automatic:
+
+                # When the frame viewer is finished, it sends a signal which invokes this same
+                # method on the main thread.
+                fvw = FrameViewerWidget(self, self.workflow.configuration,
+                                        self.workflow.rank_frames,
+                                        self.workflow.stacked_image_log_file,
+                                        self.workflow.work_next_task_signal, "Set ROI")
+
+                self.display_widget(fvw)
+                fvw.frame_viewer.setFocus()
+
+            else:
+                # In automatic mode, nothing is to be done in the workflow thread. Start the next
+                # activity on the main thread immediately.
+                self.workflow.work_next_task_signal.emit("Set ROI")
             self.busy = True
 
         elif self.activity == "Set ROI":
@@ -535,27 +554,33 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames'])
         elif self.activity == "Align frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames'])
+        elif self.activity == "Select stack size":
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
+                                            'Select stack size'])
         elif self.activity == "Set ROI":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                            'Set ROI'])
+                                            'Select stack size', 'Set ROI'])
         elif self.activity == "Set alignment points":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                            'Set ROI', 'Set alignment points'])
+                                            'Select stack size', 'Set ROI', 'Set alignment points'])
         elif self.activity == "Compute frame qualities":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
-                                            'Set alignment points', 'Compute frame qualities'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
+                                            'Select stack size', 'Set ROI', 'Set alignment points',
+                                            'Compute frame qualities'])
         elif self.activity == "Stack frames":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
-                                            'Set alignment points', 'Compute frame qualities',
-                                            'Stack frames'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
+                                            'Select stack size', 'Set ROI', 'Set alignment points',
+                                            'Compute frame qualities', 'Stack frames'])
         elif self.activity == "Save stacked image":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
-                                            'Set alignment points', 'Compute frame qualities',
-                                            'Stack frames', 'Save stacked image'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
+                                            'Select stack size', 'Set ROI', 'Set alignment points',
+                                            'Compute frame qualities', 'Stack frames',
+                                            'Save stacked image'])
         elif self.activity == "Next job":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames', 'Set ROI',
-                                            'Set alignment points', 'Compute frame qualities',
-                                            'Stack frames', 'Save stacked image'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
+                                            'Select stack size', 'Set ROI', 'Set alignment points',
+                                            'Compute frame qualities', 'Stack frames',
+                                            'Save stacked image'])
         self.ui.comboBox_back.setCurrentIndex(0)
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
 

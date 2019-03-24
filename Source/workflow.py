@@ -281,7 +281,7 @@ class Workflow(QtCore.QObject):
                 self.align_frames.average_frame_number) + " frames.", self.stacked_image_log_file,
                 precede_with_timestamp=False)
 
-        self.work_next_task_signal.emit("Set ROI")
+        self.work_next_task_signal.emit("Select stack size")
 
     @QtCore.pyqtSlot(int, int, int, int)
     def execute_set_roi(self, y_min, y_max, x_min, x_max):
