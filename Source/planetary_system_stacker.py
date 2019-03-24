@@ -129,11 +129,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.signal_stack_frames.connect(self.workflow.execute_stack_frames)
         self.signal_save_stacked_image.connect(self.workflow.execute_save_stacked_image)
 
-        # Insert the photo viewer into the main GUI.
-        # self.ImageWindow = PhotoViewer(self)
-        # self.ImageWindow.setObjectName("ImageWindow")
-        # self.ui.verticalLayout_3.insertWidget(1, self.ImageWindow, stretch=1)
-
         # Initialize status variables
         self.automatic = self.ui.box_automatic.isChecked()
         self.busy = False
@@ -293,11 +288,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         if task in ['Read frames', 'Rank frames', 'Align frames', 'Select stack size', 'Set ROI',
                     'Set alignment points', 'Compute frame qualities',
                     'Stack frames', 'Save stacked image']:
+            # Make sure to remove any active interaction widget.
+            self.display_widget(None, display=False)
             self.work_next_task(task)
 
         # Go back to the previous job and start with the first task.
         elif task == 'Previous job':
             self.job_index -= 1
+            self.display_widget(None, display=False)
             self.work_next_task("Read frames")
 
 
@@ -349,9 +347,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         elif self.activity == "Rank frames":
 
             # If batch mode is deselected, start GUI activity.
-            if not self.automatic:
-                self.write_status_bar("Processing " + self.job_names[self.job_index] + ".", "black")
-                self.place_holder_manual_activity('Rank frames')
+            # if not self.automatic:
+            #     self.write_status_bar("Processing " + self.job_names[self.job_index] + ".", "black")
+            #     self.place_holder_manual_activity('Rank frames')
 
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit()
@@ -601,7 +599,16 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # While a computation is going on: Deactivate most buttons and menu entries.
         if self.busy:
-            self.activate_gui_elements([self.ui.comboBox_back, self.ui.pushButton_start,
+            # For tasks with interactive GUI elements, activate the "Go back to:" button. During
+            # the interaction, the status line shows the "busy" status, and the workflow is
+            # suspended. By pressing "Go back to:", however, the user can restart from a previous
+            # task.
+            if self.activity not in ['Align frames', 'Select stack size', 'Set ROI',
+                                     'Set alignment points']:
+                self.activate_gui_elements([self.ui.comboBox_back], False)
+            else:
+                self.activate_gui_elements([self.ui.comboBox_back], True)
+            self.activate_gui_elements([self.ui.pushButton_start,
                                         self.ui.pushButton_next_job, self.ui.menuFile,
                                         self.ui.menuEdit], False)
             self.write_status_bar("Busy processing " + self.job_names[self.job_index], "black")
