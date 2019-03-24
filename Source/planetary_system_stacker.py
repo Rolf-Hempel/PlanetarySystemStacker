@@ -209,6 +209,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 self.widget_saved.close()
             self.widget_saved = widget
             self.ui.verticalLayout_2.insertWidget(0, widget)
+            self.ui.verticalLayout_2.setStretch(1, 0)
         else:
             if self.widget_saved:
                 self.ui.verticalLayout_2.removeWidget(self.widget_saved)
@@ -372,8 +373,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                     border:-border], "With the left mouse button pressed, draw a rectangular patch "
                                      "to be used for frame alignment.", self.signal_align_frames)
 
-                # This is a workaround to make sure the window fills the available space.
-                rpew.setMinimumHeight(self.ui.centralwidget.height() - 75)
                 self.display_widget(rpew)
                 rpew.viewer.setFocus()
 
@@ -397,8 +396,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                     "Set the ROI by opening a rectangle with the left mouse button,"
                     " or just press 'OK' (no ROI)", self.signal_set_roi)
 
-                # This is a workaround to make sure the window fills the available space.
-                rpew.setMinimumHeight(self.ui.centralwidget.height() - 75)
                 self.display_widget(rpew)
                 rpew.viewer.setFocus()
 
@@ -431,8 +428,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                                                self.workflow.alignment_points,
                                                                self.signal_set_alignment_points)
 
-                # This is a workaround to make sure the window fills the available space.
-                apew.setMinimumHeight(self.ui.centralwidget.height()-75)
                 self.display_widget(apew)
                 apew.viewer.setFocus()
 
