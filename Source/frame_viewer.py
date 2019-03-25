@@ -33,6 +33,7 @@ matplotlib.use('qt5agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
+from matplotlib import patches
 
 import glob
 import sys
@@ -74,6 +75,7 @@ class MatplotlibWidget(Canvas):
         self.line_quality = None
         self.dot = None
         self.line_quality_cutoff = None
+        self.patch_quality_cutoff = None
 
         plt.rcParams.update({'font.size': 8})
 
@@ -93,6 +95,8 @@ class MatplotlibWidget(Canvas):
         """
 
         self.ax.clear()
+        self.line_quality_cutoff = None
+        self.patch_quality_cutoff = None
 
         # The quality axis starts with 1. (highest quality).
         self.ax.invert_xaxis()
@@ -153,15 +157,28 @@ class MatplotlibWidget(Canvas):
         if frame_ordering == "chronological":
             if self.line_quality_cutoff is not None:
                 self.line_quality_cutoff.remove()
+            if self.patch_quality_cutoff is not None:
+                self.patch_quality_cutoff.remove()
             quality_cutoff = self.rank_frames.frame_ranks[
                 self.rank_frames.quality_sorted_indices[alignment_points_frame_number]]
             x_cutoff = np.full((self.rank_frames.number,), quality_cutoff)
             self.line_quality_cutoff, = plt.plot(x_cutoff, self.y, lw=1, color='orange')
+            width = 1. - quality_cutoff
+            height = self.rank_frames.number - 1
+            xy = (quality_cutoff, 1.)
         else:
             if self.line_quality_cutoff is not None:
                 self.line_quality_cutoff.remove()
+            if self.patch_quality_cutoff is not None:
+                self.patch_quality_cutoff.remove()
             y_cutoff = np.full((self.rank_frames.number,), alignment_points_frame_number)
             self.line_quality_cutoff, = plt.plot(self.x, y_cutoff, lw=1, color='orange')
+            width = 1. - self.x[-1]
+            height = alignment_points_frame_number
+            xy = (self.x[-1], 0.)
+        self.patch_quality_cutoff = patches.Rectangle(xy, width, height, linewidth=None,
+                                                      facecolor=(0.5, 0.2, 0., 0.15))
+        self.ax.add_patch(self.patch_quality_cutoff)
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 

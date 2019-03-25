@@ -2,11 +2,12 @@
 
 # Form implementation generated from reading ui file 'main_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.12
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -147,10 +148,15 @@ class Ui_MainWindow(object):
     def retranslateUi(self, MainWindow):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Planetary System Stacker"))
+        self.comboBox_back.setToolTip(_translate("MainWindow", "Repeat starting from an earlier processing phase, or go back to the previous job."))
+        self.pushButton_start.setToolTip(_translate("MainWindow", "Start or continue job execution."))
         self.pushButton_start.setText(_translate("MainWindow", "Start / Cont."))
+        self.pushButton_next_job.setToolTip(_translate("MainWindow", "Skip the remaining phases of the current job and start with the next one."))
         self.pushButton_next_job.setText(_translate("MainWindow", "Next Job"))
+        self.box_automatic.setToolTip(_translate("MainWindow", "Continue in automatic (batch) mode."))
         self.box_automatic.setText(_translate("MainWindow", "Automatic"))
         self.label_batch_progress.setText(_translate("MainWindow", "Batch progress"))
+        self.pushButton_quit.setToolTip(_translate("MainWindow", "Exit the program. The current configuration will be saved for the next run."))
         self.pushButton_quit.setText(_translate("MainWindow", "Quit"))
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.menuEdit.setTitle(_translate("MainWindow", "Edit"))
@@ -164,4 +170,5 @@ class Ui_MainWindow(object):
         self.actionQuit.setText(_translate("MainWindow", "Quit"))
         self.actionEdit_configuration.setText(_translate("MainWindow", "Edit stacking config"))
         self.actionEdit_postproc_config.setText(_translate("MainWindow", "Edit postproc config"))
+
 

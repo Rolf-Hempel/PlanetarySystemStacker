@@ -178,7 +178,7 @@ class Ui_alignment_point_editor(object):
         self.btnUndo.setText(_translate("alignment_point_editor", "Undo"))
         self.btnRedo.setToolTip(_translate("alignment_point_editor", "Redo the last step."))
         self.btnRedo.setText(_translate("alignment_point_editor", "Redo"))
-        self.label_message.setText(_translate("alignment_point_editor", "Use the editor to create / modify alignemnt points. Confirm by pressing \'OK\'"))
+        self.label_message.setText(_translate("alignment_point_editor", "Use the editor to create / modify alignemnt points. Confirm by pressing \'OK\'."))
         self.buttonBox.setToolTip(_translate("alignment_point_editor", "Confirm the current AP selection."))
 
 

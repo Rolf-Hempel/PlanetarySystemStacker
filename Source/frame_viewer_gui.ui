@@ -25,6 +25,9 @@
      <layout class="QGridLayout" name="gridLayout_2">
       <item row="1" column="0">
        <widget class="QRadioButton" name="radioButton_quality">
+        <property name="toolTip">
+         <string>Frames are ordered by their overall sharpness.</string>
+        </property>
         <property name="text">
          <string>By quality</string>
         </property>
@@ -32,16 +35,27 @@
       </item>
       <item row="0" column="0">
        <widget class="QRadioButton" name="radioButton_chronological">
+        <property name="toolTip">
+         <string>Frames are ordered chronologically.</string>
+        </property>
         <property name="text">
          <string>Chronological</string>
         </property>
        </widget>
       </item>
       <item row="0" column="1">
-       <widget class="QSpinBox" name="spinBox_chronological"/>
+       <widget class="QSpinBox" name="spinBox_chronological">
+        <property name="toolTip">
+         <string>Enter a value or use the spin box arrows to select a (chronological) frame index.</string>
+        </property>
+       </widget>
       </item>
       <item row="1" column="1">
-       <widget class="QSpinBox" name="spinBox_quality"/>
+       <widget class="QSpinBox" name="spinBox_quality">
+        <property name="toolTip">
+         <string>Enter a value or use the spin box arrows to select a (quality) frame index.</string>
+        </property>
+       </widget>
       </item>
      </layout>
     </widget>
@@ -61,6 +75,9 @@
       </item>
       <item row="0" column="1">
        <widget class="QSpinBox" name="spinBox_number_frames">
+        <property name="toolTip">
+         <string>Enter a value or use the spin box arrows to set the number of frames to be stacked.</string>
+        </property>
         <property name="minimum">
          <number>1</number>
         </property>
@@ -75,6 +92,9 @@
       </item>
       <item row="1" column="1">
        <widget class="QSpinBox" name="spinBox_percentage_frames">
+        <property name="toolTip">
+         <string>Enter a value or use the spin box arrows to set the percentage of frames to be stacked.</string>
+        </property>
         <property name="minimum">
          <number>1</number>
         </property>
@@ -91,6 +111,9 @@
           <height>0</height>
          </size>
         </property>
+        <property name="toolTip">
+         <string>Adjust the number of best frames to be stacked at each alignment point such that the current frame is the worst one to be included.</string>
+        </property>
         <property name="text">
          <string>Set limit to current frame</string>
         </property>
@@ -101,6 +124,9 @@
    </item>
    <item row="4" column="3">
     <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="toolTip">
+      <string>Exit the viewer. Press 'OK' to save the stack size, or 'cancel' to discard changes.</string>
+     </property>
      <property name="standardButtons">
       <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
      </property>
@@ -108,6 +134,10 @@
    </item>
    <item row="4" column="0">
     <widget class="QSlider" name="slider_frames">
+     <property name="toolTip">
+      <string>Use the slider to select the frame to be displayed. As an alternative,
+you can select the frame with the 'frame sorting' spinboxes.</string>
+     </property>
      <property name="maximum">
       <number>1000</number>
      </property>
@@ -121,6 +151,9 @@
    </item>
    <item row="4" column="2">
     <widget class="QPushButton" name="pushButton_play">
+     <property name="toolTip">
+      <string>Start a frame display video. Frames are ordered as selected in the 'frame sorting' section.</string>
+     </property>
      <property name="text">
       <string>Play</string>
      </property>
@@ -128,6 +161,9 @@
    </item>
    <item row="4" column="1">
     <widget class="QPushButton" name="pushButton_stop">
+     <property name="toolTip">
+      <string>Stop the frame display video.</string>
+     </property>
      <property name="text">
       <string>Stop</string>
      </property>

@@ -53,6 +53,9 @@
      </item>
      <item>
       <widget class="QDialogButtonBox" name="buttonBox">
+       <property name="toolTip">
+        <string>Press 'OK' to save the selection and exit, or 'cancel' to discard the selection.</string>
+       </property>
        <property name="standardButtons">
         <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
        </property>

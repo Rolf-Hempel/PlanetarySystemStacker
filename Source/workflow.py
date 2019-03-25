@@ -158,6 +158,7 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol(
                 "+++ Start creating blurred monochrome images and Laplacians +++",
                 self.stacked_image_log_file)
+        self.set_status_bar_processing_phase("computing Gaussians / Laplacians")
         self.my_timer.create('Blurred monochrome images and Laplacians')
         self.frames.add_monochrome(self.configuration.frames_mono_channel)
         self.my_timer.stop('Blurred monochrome images and Laplacians')
@@ -172,7 +173,8 @@ class Workflow(QtCore.QObject):
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start ranking images +++", self.stacked_image_log_file)
         self.my_timer.create_no_check('Ranking images')
-        self.rank_frames = RankFrames(self.frames, self.configuration)
+        self.rank_frames = RankFrames(self.frames, self.configuration,
+                                      self.work_current_progress_signal)
         self.rank_frames.frame_score()
         self.my_timer.stop('Ranking images')
         if self.configuration.global_parameters_protocol_level > 1:
@@ -190,7 +192,8 @@ class Workflow(QtCore.QObject):
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Initializing frame alignment +++",
                                    self.stacked_image_log_file)
-        self.align_frames = AlignFrames(self.frames, self.rank_frames, self.configuration)
+        self.align_frames = AlignFrames(self.frames, self.rank_frames, self.configuration,
+                                        progress_signal=self.work_current_progress_signal)
 
         if self.configuration.align_frames_mode == "Surface":
 
@@ -312,7 +315,7 @@ class Workflow(QtCore.QObject):
             # Initialize the AlignmentPoints object.
             self.my_timer.create_no_check('Initialize alignment point object')
             self.alignment_points = AlignmentPoints(self.configuration, self.frames, self.rank_frames,
-                                               self.align_frames)
+                self.align_frames, progress_signal=self.work_current_progress_signal)
             self.my_timer.stop('Initialize alignment point object')
 
             # Create alignment points, and create an image with wll alignment point boxes and patches.

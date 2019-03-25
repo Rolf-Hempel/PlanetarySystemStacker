@@ -61,6 +61,9 @@
    </item>
    <item row="1" column="5">
     <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="toolTip">
+      <string>Press 'OK' to save changes and exit the job editor, or 'Cancel' to exit without saving.</string>
+     </property>
      <property name="orientation">
       <enum>Qt::Horizontal</enum>
      </property>
@@ -84,7 +87,7 @@ When the list is okay, confirm with pressing the &quot;OK&quot; button.</string>
    <item row="1" column="3">
     <widget class="QLabel" name="messageLabel">
      <property name="text">
-      <string>Add / remove video files or image directories, confirm with 'OK'</string>
+      <string>Add / remove video files or image directories, confirm with 'OK'.</string>
      </property>
     </widget>
    </item>

@@ -2,11 +2,12 @@
 
 # Form implementation generated from reading ui file 'job_dialog.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.12
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_JobDialog(object):
     def setupUi(self, JobDialog):
@@ -54,9 +55,11 @@ class Ui_JobDialog(object):
         JobDialog.setWindowTitle(_translate("JobDialog", "Manage Job List"))
         self.button_remove_jobs.setToolTip(_translate("JobDialog", "Select one or more items in the list. Press this button to remove them from the list."))
         self.button_remove_jobs.setText(_translate("JobDialog", "Remove selected job(s)"))
+        self.buttonBox.setToolTip(_translate("JobDialog", "Press \'OK\' to save changes and exit the job editor, or \'Cancel\' to exit without saving."))
         self.button_add_jobs.setToolTip(_translate("JobDialog", "Select video files and / or directories containing image files.\n"
 "Each entry is executed as a job, either in batch mode (automatic) or manually.\n"
 "When the list is okay, confirm with pressing the \"OK\" button."))
         self.button_add_jobs.setText(_translate("JobDialog", "Add job(s)"))
-        self.messageLabel.setText(_translate("JobDialog", "Add / remove video files or image directories, confirm with \'OK\'"))
+        self.messageLabel.setText(_translate("JobDialog", "Add / remove video files or image directories, confirm with \'OK\'."))
+
 

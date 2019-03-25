@@ -39,12 +39,15 @@ class RankFrames(object):
 
     """
 
-    def __init__(self, frames, configuration):
+    def __init__(self, frames, configuration, progress_signal=None):
         """
         Initialize the object and instance variables.
 
         :param frames: Frames object with all video frames
         :param configuration: Configuration object with parameters
+        :param progress_signal: Either None (no progress signalling), or a signal with the signature
+                                (str, int) with the current activity (str) and the progress in
+                                percent (int).
         """
 
         self.number = frames.number
@@ -57,6 +60,8 @@ class RankFrames(object):
         self.frame_ranks = []
         self.frame_ranks_max_index = None
         self.frame_ranks_max_value = None
+        self.progress_signal = progress_signal
+        self.signal_step_size = max(int(self.number / 10), 1)
 
     def frame_score(self):
         """
@@ -77,13 +82,21 @@ class RankFrames(object):
 
         # For all frames compute the quality with the selected method.
         if method != Miscellaneous.local_contrast_laplace:
-            for frame in self.frames_mono_blurred:
+            for frame_index, frame in enumerate(self.frames_mono_blurred):
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                    self.progress_signal.emit("Rank all frames",
+                                              int((frame_index / self.number) * 100.))
                 self.frame_ranks.append(method(frame, self.configuration.rank_frames_pixel_stride))
         else:
-            for frame in self.frames_mono_blurred_laplacian:
+            for frame_index, frame in enumerate(self.frames_mono_blurred_laplacian):
                 # self.frame_ranks.append(mean((frame - frame.mean())**2))
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                    self.progress_signal.emit("Rank all frames",
+                                              int((frame_index / self.number) * 100.))
                 self.frame_ranks.append(frame.var())
 
+        if self.progress_signal is not None:
+            self.progress_signal.emit("Rank all frames", 100)
         # Sort the frame indices in descending order of quality.
         self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),
                                                             key=lambda i: i[1], reverse=True)]

@@ -56,12 +56,13 @@ class Frames(object):
         """
 
         self.configuration = configuration
+        self.progress_signal = progress_signal
 
         if type == 'image':
             # Use scipy.misc to read in image files. If "convert_to_grayscale" is True, convert
             # pixel values to 32bit floats.
             self.number = len(names)
-            signal_step_size = max(int(self.number / 10), 1)
+            self.signal_step_size = max(int(self.number / 10), 1)
             if convert_to_grayscale:
                 self.frames = [misc.imread(path, mode='F') for path in names]
             else:
@@ -69,8 +70,8 @@ class Frames(object):
                 conversion_factor = np.float32(1. / 255.)
                 for frame_index, path in enumerate(names):
                     # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                    if progress_signal is not None and frame_index % signal_step_size == 0:
-                        progress_signal.emit("Read all frames",
+                    if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
+                        self.progress_signal.emit("Read all frames",
                                              int((frame_index / self.number) * 100.))
                     # Read the next frame, and scale it to the range [0., 1.] if necessary.
                     frame = cv2.imread(path, -1)
@@ -78,8 +79,8 @@ class Frames(object):
                         frame = frame * conversion_factor
                     self.frames.append(frame)
 
-                if progress_signal is not None:
-                    progress_signal.emit("Read all frames", 100)
+                if self.progress_signal is not None:
+                    self.progress_signal.emit("Read all frames", 100)
             self.shape = self.frames[0].shape
 
             # Test if all images have the same shape. If not, raise an exception.
@@ -95,11 +96,11 @@ class Frames(object):
             cap = cv2.VideoCapture(names)
             self.number = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
             self.frames = []
-            signal_step_size = max(int(self.number / 10), 1)
+            self.signal_step_size = max(int(self.number / 10), 1)
             for frame_index in range(self.number):
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if progress_signal is not None and frame_index%signal_step_size == 0:
-                    progress_signal.emit("Read all frames", int((frame_index/self.number)*100.))
+                if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
+                    self.progress_signal.emit("Read all frames", int((frame_index/self.number)*100.))
                 # Read the next frame.
                 ret, frame = cap.read()
                 if ret:
@@ -110,8 +111,8 @@ class Frames(object):
                 else:
                     raise IOError("Error in reading video frame")
             cap.release()
-            if progress_signal is not None:
-                progress_signal.emit("Read all frames", 100)
+            if self.progress_signal is not None:
+                self.progress_signal.emit("Read all frames", 100)
             self.shape = self.frames[0].shape
         else:
             raise TypeError("Image type not supported")
@@ -155,28 +156,66 @@ class Frames(object):
         :return: -
         """
 
+        # if self.color:
+        #     colors = ['red', 'green', 'blue', 'panchromatic']
+        #     if not color in colors:
+        #         raise ArgumentError("Invalid color selected for channel extraction")
+        #     elif color == 'panchromatic':
+        #         self.frames_mono = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in self.frames]
+        #     else:
+        #         self.frames_mono = [frame[:, :, colors.index(color)] for frame in self.frames]
+        # else:
+        #     self.frames_mono = self.frames
+        #
+        # # Add versions of all frames with Gaussian blur added.
+        # self.frames_mono_blurred = [cv2.GaussianBlur(frame, (
+        #     self.configuration.frames_gauss_width, self.configuration.frames_gauss_width),
+        #                                              0) for frame in self.frames_mono]
+        #
+        # if self.configuration.rank_frames_method == "Laplace":
+        #     # Add the Laplacians of down-sampled blurred images.
+        #     self.frames_mono_blurred_laplacian = [cv2.Laplacian(
+        #         frame[::self.configuration.align_frames_sampling_stride,
+        #         ::self.configuration.align_frames_sampling_stride], cv2.CV_32F) for frame in
+        #                                           self.frames_mono_blurred]
+
+
         if self.color:
             colors = ['red', 'green', 'blue', 'panchromatic']
             if not color in colors:
                 raise ArgumentError("Invalid color selected for channel extraction")
-            elif color == 'panchromatic':
-                self.frames_mono = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in self.frames]
-            else:
-                self.frames_mono = [frame[:, :, colors.index(color)] for frame in self.frames]
+            self.frames_mono = []
         else:
             self.frames_mono = self.frames
 
-        # Add versions of all frames with Gaussian blur added.
-        self.frames_mono_blurred = [cv2.GaussianBlur(frame, (
-            self.configuration.frames_gauss_width, self.configuration.frames_gauss_width),
-                                                     0) for frame in self.frames_mono]
+        self.frames_mono_blurred = []
+        self.frames_mono_blurred_laplacian = []
 
-        if self.configuration.rank_frames_method == "Laplace":
-            # Add the Laplacians of down-sampled blurred images.
-            self.frames_mono_blurred_laplacian = [cv2.Laplacian(
-                frame[::self.configuration.align_frames_sampling_stride,
-                ::self.configuration.align_frames_sampling_stride], cv2.CV_32F) for frame in
-                                                  self.frames_mono_blurred]
+        for frame_index, frame in enumerate(self.frames):
+            # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+            if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                self.progress_signal.emit("Gaussians / Laplacians",
+                                          int((frame_index / self.number) * 100.))
+            if self.color:
+                if color == 'panchromatic':
+                    frame_mono = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                else:
+                    frame_mono = frame[:, :, colors.index(color)]
+                self.frames_mono.append(frame_mono)
+
+            # Add a version of the frame with Gaussian blur added.
+            frame_mono_blurred = cv2.GaussianBlur(self.frames_mono[frame_index], (
+                self.configuration.frames_gauss_width, self.configuration.frames_gauss_width), 0)
+            self.frames_mono_blurred.append(frame_mono_blurred)
+
+            # Add the Laplacian of the down-sampled blurred image.
+            if self.configuration.rank_frames_method == "Laplace":
+                self.frames_mono_blurred_laplacian.append(cv2.Laplacian(
+                    frame_mono_blurred[::self.configuration.align_frames_sampling_stride,
+                    ::self.configuration.align_frames_sampling_stride], cv2.CV_32F))
+
+        if self.progress_signal is not None:
+            self.progress_signal.emit("Gaussians / Laplacians", 100)
 
     def save_image(self, filename, image, color=False, avoid_overwriting=True):
         """

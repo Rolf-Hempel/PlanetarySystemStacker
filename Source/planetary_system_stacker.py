@@ -367,8 +367,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # thread with the four coordinate index bounds.
                 rpew = RectangularPatchEditorWidget(self, self.workflow.frames.frames_mono[
                     self.workflow.rank_frames.frame_ranks_max_index][border:-border,
-                    border:-border], "With the left mouse button pressed, draw a rectangular patch "
-                                     "to be used for frame alignment.", self.signal_align_frames)
+                    border:-border], "With 'ctrl' and the left mouse button pressed, draw a "
+                                     "rectangular patch to be used for frame alignment. Or just "
+                                     "press 'OK / Cancel' (automatic selection).",
+                                      self.signal_align_frames)
 
                 self.display_widget(rpew)
                 rpew.viewer.setFocus()
@@ -413,8 +415,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # When the editor is finished, it sends a signal (last argument) to the workflow
                 # thread with the four coordinate index bounds.
                 rpew = RectangularPatchEditorWidget(self, self.workflow.align_frames.mean_frame,
-                    "Set the ROI by opening a rectangle with the left mouse button,"
-                    " or just press 'OK' (no ROI)", self.signal_set_roi)
+                    "With 'crtl' and the left mouse button pressed, draw a rectangle to set the ROI,"
+                    " or just press 'OK' (no ROI).", self.signal_set_roi)
 
                 self.display_widget(rpew)
                 rpew.viewer.setFocus()
@@ -630,7 +632,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 if len(activated_buttons) > 1:
                     for button in activated_buttons[1:]:
                         message += ", or '" + self.button_get_description(button) + "'"
-                message += ", or exit the program with 'Quit'"
+                message += ", or exit the program with 'Quit'."
                 self.write_status_bar(message, "red")
             else:
                 self.write_status_bar("Load new jobs, or quit.", "red")

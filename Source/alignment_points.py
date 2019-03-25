@@ -46,7 +46,7 @@ class AlignmentPoints(object):
 
     """
 
-    def __init__(self, configuration, frames, rank_frames, align_frames):
+    def __init__(self, configuration, frames, rank_frames, align_frames, progress_signal=None):
         """
         Initialize the AlignmentPoints object and compute the mean frame.
 
@@ -55,12 +55,17 @@ class AlignmentPoints(object):
         :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
                             1. being optimal) for all frames
         :param align_frames: AlignFrames object with global shift information for all frames
+        :param progress_signal: Either None (no progress signalling), or a signal with the signature
+                                (str, int) with the current activity (str) and the progress in
+                                percent (int).
         """
 
         self.configuration = configuration
         self.frames = frames
         self.rank_frames = rank_frames
         self.align_frames = align_frames
+        self.progress_signal = progress_signal
+        self.signal_step_size = max(int(self.align_frames.number / 10), 1)
         self.mean_frame = align_frames.mean_frame
         self.num_pixels_y = self.mean_frame.shape[0]
         self.num_pixels_x = self.mean_frame.shape[1]
@@ -577,7 +582,10 @@ class AlignmentPoints(object):
                 self.configuration.alignment_points_rank_method != "Laplace":
             # There are no stored Laplacians, or they cannot be used for the specified method.
             # Cycle through all alignment points:
-            for alignment_point in self.alignment_points:
+            for ap_index, alignment_point in enumerate(self.alignment_points):
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and ap_index % self.signal_step_size == 0:
+                    self.progress_signal.emit("Rank frames at APs", int((ap_index / self.align_frames.number) * 100.))
                 alignment_point['frame_qualities'] = []
                 # Cycle through all frames. Use the blurred monochrome image for ranking.
                 for frame_index, frame in enumerate(self.frames.frames_mono_blurred):
@@ -600,7 +608,11 @@ class AlignmentPoints(object):
             # Sampled-down Laplacians of all blurred frames have been computed in
             # "frames.add_monochrome". Cut out boxes around alignment points from those objects,
             # rather than computing new Laplacians. Cycle through all alignment points:
-            for alignment_point in self.alignment_points:
+            for ap_index, alignment_point in enumerate(self.alignment_points):
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and ap_index % self.signal_step_size == 0:
+                    self.progress_signal.emit("Rank frames at APs",
+                                              int((ap_index / self.align_frames.number) * 100.))
                 alignment_point['frame_qualities'] = []
                 # Cycle through all frames. Use the blurred monochrome image for ranking.
                 for frame_index, frame in enumerate(self.frames.frames_mono_blurred_laplacian):
@@ -618,6 +630,9 @@ class AlignmentPoints(object):
                     # Compute the frame quality and append it to the list for this alignment point.
                     alignment_point['frame_qualities'].append(
                         frame[y_low:y_high, x_low:x_high].var())
+
+        if self.progress_signal is not None:
+            self.progress_signal.emit("Rank frames at APs", 100)
 
         # Initialize the alignment point lists for all frames.
         self.frames.reset_alignment_point_lists()

@@ -56,6 +56,9 @@
              <height>0</height>
             </size>
            </property>
+           <property name="toolTip">
+            <string>Repeat starting from an earlier processing phase, or go back to the previous job.</string>
+           </property>
            <property name="editable">
             <bool>false</bool>
            </property>
@@ -69,6 +72,9 @@
          </item>
          <item>
           <widget class="QPushButton" name="pushButton_start">
+           <property name="toolTip">
+            <string>Start or continue job execution.</string>
+           </property>
            <property name="text">
             <string>Start / Cont.</string>
            </property>
@@ -80,6 +86,9 @@
          </item>
          <item>
           <widget class="QPushButton" name="pushButton_next_job">
+           <property name="toolTip">
+            <string>Skip the remaining phases of the current job and start with the next one.</string>
+           </property>
            <property name="text">
             <string>Next Job</string>
            </property>
@@ -100,6 +109,9 @@
          </item>
          <item>
           <widget class="QCheckBox" name="box_automatic">
+           <property name="toolTip">
+            <string>Continue in automatic (batch) mode.</string>
+           </property>
            <property name="text">
             <string>Automatic</string>
            </property>
@@ -189,6 +201,9 @@
       </item>
       <item>
        <widget class="QPushButton" name="pushButton_quit">
+        <property name="toolTip">
+         <string>Exit the program. The current configuration will be saved for the next run.</string>
+        </property>
         <property name="text">
          <string>Quit</string>
         </property>

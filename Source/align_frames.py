@@ -43,7 +43,7 @@ class AlignFrames(object):
 
     """
 
-    def __init__(self, frames, rank_frames, configuration):
+    def __init__(self, frames, rank_frames, configuration, progress_signal=None):
         """
         Initialize the AlignFrames object with info from the objects "frames" and "rank_frames".
 
@@ -51,6 +51,9 @@ class AlignFrames(object):
         :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
                             1. being optimal) for all frames
         :param configuration: Configuration object with parameters
+        :param progress_signal: Either None (no progress signalling), or a signal with the signature
+                                (str, int) with the current activity (str) and the progress in
+                                percent (int).
         """
 
         self.frames = frames.frames
@@ -64,6 +67,8 @@ class AlignFrames(object):
         self.mean_frame = None
         self.mean_frame_original = None
         self.configuration = configuration
+        self.progress_signal = progress_signal
+        self.signal_step_size = max(int(self.number / 10), 1)
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
         self.frame_ranks_max_index = rank_frames.frame_ranks_max_index
         self.x_low_opt = self.x_high_opt = self.y_low_opt = self.y_high_opt = None
@@ -178,6 +183,10 @@ class AlignFrames(object):
 
         for idx, frame in enumerate(self.frames_mono_blurred):
 
+            # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+            if self.progress_signal is not None and idx % self.signal_step_size == 0:
+                self.progress_signal.emit("Align all frames", int((idx / self.number) * 100.))
+
             # For the sharpest frame the displacement is 0 because it is used as the reference.
             if idx == self.frame_ranks_max_index:
                 self.frame_shifts.append([0, 0])
@@ -284,6 +293,8 @@ class AlignFrames(object):
                                                 self.frame_ranks_max_index][
                                                 self.y_low_opt:self.y_high_opt,
                                                 self.x_low_opt:self.x_high_opt]
+        if self.progress_signal is not None:
+            self.progress_signal.emit("Align all frames", 100)
 
         # Compute the shape of the area contained in all frames in the form [[y_low, y_high],
         # [x_low, x_high]]

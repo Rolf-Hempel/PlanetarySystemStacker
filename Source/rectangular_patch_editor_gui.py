@@ -43,5 +43,6 @@ class Ui_rectangular_patch_editor(object):
         _translate = QtCore.QCoreApplication.translate
         rectangular_patch_editor.setWindowTitle(_translate("rectangular_patch_editor", "Frame"))
         self.messageLabel.setText(_translate("rectangular_patch_editor", "Message to be displayed"))
+        self.buttonBox.setToolTip(_translate("rectangular_patch_editor", "Press \'OK\' to save the selection and exit, or \'cancel\' to discard the selection."))
 
 

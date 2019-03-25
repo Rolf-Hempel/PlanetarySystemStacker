@@ -329,7 +329,7 @@ values</string>
      <item>
       <widget class="QLabel" name="label_message">
        <property name="text">
-        <string>Use the editor to create / modify alignemnt points. Confirm by pressing 'OK'</string>
+        <string>Use the editor to create / modify alignemnt points. Confirm by pressing 'OK'.</string>
        </property>
       </widget>
      </item>
