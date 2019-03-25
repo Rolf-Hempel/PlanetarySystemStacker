@@ -360,7 +360,8 @@ class Workflow(QtCore.QObject):
         self.set_status_bar_processing_phase("stacking frames")
         # Allocate StackFrames object.
         self.stack_frames = StackFrames(self.configuration, self.frames, self.align_frames,
-                                   self.alignment_points, self.my_timer)
+                                   self.alignment_points, self.my_timer,
+                                   progress_signal=self.work_current_progress_signal)
 
         # Stack all frames.
         if self.configuration.global_parameters_protocol_level > 0:

@@ -44,7 +44,8 @@ class StackFrames(object):
 
     """
 
-    def __init__(self, configuration, frames, align_frames, alignment_points, my_timer):
+    def __init__(self, configuration, frames, align_frames, alignment_points, my_timer,
+                 progress_signal=None):
         """
         Initialze the StackFrames object. In particular, allocate empty numpy arrays used in the
         stacking process for buffering and the final stacked image. The size of all those objects
@@ -55,6 +56,9 @@ class StackFrames(object):
         :param align_frames: AlignFrames object with global shift information for all frames
         :param alignment_points: AlignmentPoints object with information of all alignment points
         :param my_timer: Timer object for accumulating times spent in specific code sections
+        :param progress_signal: Either None (no progress signalling), or a signal with the signature
+                                (str, int) with the current activity (str) and the progress in
+                                percent (int).
         """
 
         # Suppress warnings about precision loss in skimage file format conversions.
@@ -65,6 +69,8 @@ class StackFrames(object):
         self.align_frames = align_frames
         self.alignment_points = alignment_points
         self.my_timer = my_timer
+        self.progress_signal = progress_signal
+        self.signal_step_size = max(int(self.frames.number / 10), 1)
         for name in ['Stacking: AP initialization', 'Stacking: Initialize background blending',
                      'Stacking: compute AP shifts', 'Stacking: remapping and adding',
                      'Stacking: computing background', 'Stacking: merging AP buffers']:
@@ -272,6 +278,11 @@ class StackFrames(object):
         # Go through the list of all frames.
         for frame_index, frame in enumerate(self.frames.frames):
 
+            # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+            if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                self.progress_signal.emit("Stack frames", int((frame_index / self.frames.number)
+                                                                  * 100.))
+
             # Look up the constant shifts of the given frame with respect to the mean frame.
             dy = self.align_frames.dy[frame_index]
             dx = self.align_frames.dx[frame_index]
@@ -342,6 +353,9 @@ class StackFrames(object):
                                                     self.align_frames.dx[frame_index]:
                                                     self.dim_x + self.align_frames.dx[frame_index]]
                 self.my_timer.stop('Stacking: computing background')
+
+        if self.progress_signal is not None:
+            self.progress_signal.emit("Stack frames", 100)
 
         # If a background image is being computed, divide the buffer by the number of contributions.
         if self.number_stacking_holes > 0:
