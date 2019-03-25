@@ -440,9 +440,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # Initialize the AlignmentPoints object.
                 self.workflow.my_timer.create_no_check('Initialize alignment point object')
                 self.workflow.alignment_points = AlignmentPoints(self.workflow.configuration,
-                                                                 self.workflow.frames,
-                                                                 self.workflow.rank_frames,
-                                                                 self.workflow.align_frames)
+                    self.workflow.frames, self.workflow.rank_frames, self.workflow.align_frames,
+                    progress_signal=self.workflow.work_current_progress_signal)
                 self.workflow.my_timer.stop('Initialize alignment point object')
                 # Open the alignment point editor.
                 apew = AlignmentPointEditorWidget(self, self.workflow.configuration,

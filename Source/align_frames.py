@@ -193,7 +193,6 @@ class AlignFrames(object):
 
             # For all other frames: Compute the global shift, using the "blurred" monochrome image.
             else:
-                frame = self.frames_mono_blurred[idx]
 
                 if self.configuration.align_frames_mode == "Planet":
                     # In Planetary mode the shift of the "center of gravity" of the image is
