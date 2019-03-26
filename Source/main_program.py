@@ -184,7 +184,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
         # Open the alignment point editor.
         app = QtWidgets.QApplication(sys.argv)
         alignment_point_editor = AlignmentPointEditorWidget(None, configuration, align_frames,
-                                                            alignment_points)
+                                                            alignment_points, None)
         alignment_point_editor.setMinimumSize(800, 600)
         alignment_point_editor.showMaximized()
         app.exec_()
@@ -254,9 +254,9 @@ if __name__ == "__main__":
     # input_type = 'image'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
     convert_to_grayscale = False
-    automatic_ap_creation = False
-    # roi = None
-    roi = (400, 700, 300, 800)
+    automatic_ap_creation = True
+    roi = None
+    # roi = (400, 700, 300, 800)
     ####################################### Specify test case end ##################################
 
     # Redirect standard output to a file if requested.

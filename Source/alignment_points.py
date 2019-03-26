@@ -65,7 +65,6 @@ class AlignmentPoints(object):
         self.rank_frames = rank_frames
         self.align_frames = align_frames
         self.progress_signal = progress_signal
-        self.signal_step_size = max(int(self.align_frames.number / 10), 1)
         self.mean_frame = align_frames.mean_frame
         self.num_pixels_y = self.mean_frame.shape[0]
         self.num_pixels_x = self.mean_frame.shape[1]
@@ -578,6 +577,11 @@ class AlignmentPoints(object):
                 "Ranking method " + self.configuration.alignment_points_rank_method +
                 " not supported")
 
+        # Compute the frequency of progress signals in the computational loop.
+        if self.progress_signal is not None:
+            self.signal_loop_length = max(len(self.alignment_points), 1)
+            self.signal_step_size = max(int(round(len(self.alignment_points) / 10)), 1)
+
         if self.configuration.rank_frames_method != "Laplace" or \
                 self.configuration.alignment_points_rank_method != "Laplace":
             # There are no stored Laplacians, or they cannot be used for the specified method.
@@ -585,7 +589,8 @@ class AlignmentPoints(object):
             for ap_index, alignment_point in enumerate(self.alignment_points):
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                 if self.progress_signal is not None and ap_index % self.signal_step_size == 0:
-                    self.progress_signal.emit("Rank frames at APs", int((ap_index / self.align_frames.number) * 100.))
+                    self.progress_signal.emit("Rank frames at APs",
+                                              int((ap_index / self.signal_loop_length) * 100.))
                 alignment_point['frame_qualities'] = []
                 # Cycle through all frames. Use the blurred monochrome image for ranking.
                 for frame_index, frame in enumerate(self.frames.frames_mono_blurred):
@@ -612,7 +617,7 @@ class AlignmentPoints(object):
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                 if self.progress_signal is not None and ap_index % self.signal_step_size == 0:
                     self.progress_signal.emit("Rank frames at APs",
-                                              int((ap_index / self.align_frames.number) * 100.))
+                                              int((ap_index / self.signal_loop_length) * 100.))
                 alignment_point['frame_qualities'] = []
                 # Cycle through all frames. Use the blurred monochrome image for ranking.
                 for frame_index, frame in enumerate(self.frames.frames_mono_blurred_laplacian):

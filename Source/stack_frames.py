@@ -71,6 +71,7 @@ class StackFrames(object):
         self.my_timer = my_timer
         self.progress_signal = progress_signal
         self.signal_step_size = max(int(self.frames.number / 10), 1)
+        self.shift_distribution = None
         for name in ['Stacking: AP initialization', 'Stacking: Initialize background blending',
                      'Stacking: compute AP shifts', 'Stacking: remapping and adding',
                      'Stacking: computing background', 'Stacking: merging AP buffers']:
@@ -275,6 +276,10 @@ class StackFrames(object):
         # First find out if there are holes between AP patches.
         self.prepare_for_stack_blending()
 
+        # Initialize the array for shift distribution statistics.
+        self.shift_distribution = np.full((self.configuration.alignment_points_search_width*2,), 0,
+                                          dtype=np.int)
+
         # Go through the list of all frames.
         for frame_index, frame in enumerate(self.frames.frames):
 
@@ -296,6 +301,9 @@ class StackFrames(object):
                 [shift_y, shift_x] = self.alignment_points.compute_shift_alignment_point(
                     frame_index, alignment_point_index,
                     de_warp=self.configuration.alignment_points_de_warp)
+
+                # Increment the counter corresponding to the 2D warp shift.
+                self.shift_distribution[int(round(np.sqrt(shift_y**2 + shift_x**2)))] += 1
 
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
