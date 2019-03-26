@@ -365,8 +365,15 @@ class Workflow(QtCore.QObject):
 
         # Stack all frames.
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start stacking frames +++", self.stacked_image_log_file)
+            Miscellaneous.protocol("+++ Start stacking " + str(self.alignment_points.stack_size) +
+                                   " frames +++", self.stacked_image_log_file)
         self.stack_frames.stack_frames()
+
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol("\n           Distribution of shifts at alignment points:",
+                                   self.stacked_image_log_file, precede_with_timestamp=False)
+            Miscellaneous.protocol(self.stack_frames.print_shift_table() + "\n",
+                                   self.stacked_image_log_file, precede_with_timestamp=False)
 
         self.set_status_bar_processing_phase("merging AP patches")
         # Merge the stacked alignment point buffers into a single image.

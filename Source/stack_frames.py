@@ -519,8 +519,41 @@ class StackFrames(object):
         weights[box_low_offset:box_high_offset] = 1.
         # Ramping down between upper box and patch borders.
         if patch_high_offset > box_high_offset:
-            weights[box_high_offset:patch_high_offset] = np.arange(patch_high - box_high, 0, -1) / np.float32(patch_high - box_high + 1)
+            weights[box_high_offset:patch_high_offset] = np.arange(patch_high - box_high, 0, -1) /\
+                                                         np.float32(patch_high - box_high + 1)
         return weights
+
+    def print_shift_table(self):
+        """
+        Print a table giving for each shift (in pixels) the number of occurrences. The table ends at
+        the last non-zero entry.
+
+        :param shifts: 1D Numpy array (int) with counts for each shift size.
+        :return: String with three lines to be printed to the protocol file(s)
+        """
+
+        # Find the last non-zero entry in the array.
+        max_index = [index for index, item in enumerate(self.shift_distribution) if item != 0][-1] \
+                    + 1
+
+        # Initialize the three table lines.
+        s =    "           Shift (pixels):"
+        line = "           ---------------"
+        t =    "           Count:         "
+
+        # Extend the three table lines up to the max index.
+        for index in range(max_index):
+            s += "|{:6d} ".format(index)
+            line += "--------"
+            t += "|{:6d} ".format(self.shift_distribution[index])
+
+        # Finish the three table lines.
+        s += "|"
+        line += "-"
+        t += "|"
+
+        # Return the three lines to be printed to the protocol.
+        return s + "\n" + line + "\n" + t
 
 
 if __name__ == "__main__":
