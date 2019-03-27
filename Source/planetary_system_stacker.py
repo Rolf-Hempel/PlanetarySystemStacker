@@ -37,6 +37,7 @@ from rectangular_patch_editor import RectangularPatchEditorWidget
 from frame_viewer import FrameViewerWidget
 from alignment_points import AlignmentPoints
 from alignment_point_editor import AlignmentPointEditorWidget
+from shift_distribution_viewer import ShiftDistributionViewerWidget
 from miscellaneous import Miscellaneous
 from workflow import Workflow
 
@@ -463,9 +464,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.signal_stack_frames.emit()
             self.busy = True
         elif self.activity == "Save stacked image":
-            if not self.automatic:
-                pass
-            self.signal_save_stacked_image.emit()
+            if self.automatic:
+                self.signal_save_stacked_image.emit()
+            else:
+                sdv = ShiftDistributionViewerWidget(self,
+                                                    self.workflow.stack_frames.shift_distribution,
+                                                    self.signal_save_stacked_image)
+                self.display_widget(sdv)
             self.busy = True
         elif self.activity == "Next job":
             self.job_index += 1

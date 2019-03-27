@@ -528,7 +528,6 @@ class StackFrames(object):
         Print a table giving for each shift (in pixels) the number of occurrences. The table ends at
         the last non-zero entry.
 
-        :param shifts: 1D Numpy array (int) with counts for each shift size.
         :return: String with three lines to be printed to the protocol file(s)
         """
 

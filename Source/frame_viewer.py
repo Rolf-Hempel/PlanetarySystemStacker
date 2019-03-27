@@ -213,10 +213,6 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
         self.frames = frames
         self.align_frames = align_frames
-        # self.shape_y = self.align_frames.intersection_shape[0][1] - \
-        #                self.align_frames.intersection_shape[0][0]
-        # self.shape_x = self.align_frames.intersection_shape[1][1] - \
-        #                self.align_frames.intersection_shape[1][0]
         self.frame_index = 0
 
         # Initialize the scene. This object handles mouse events if not in drag mode.
