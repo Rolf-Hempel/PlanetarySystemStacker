@@ -281,7 +281,8 @@ class StackFrames(object):
                                           dtype=np.int)
 
         # Go through the list of all frames.
-        for frame_index, frame in enumerate(self.frames.frames):
+        for frame_index in range(self.frames.number):
+            frame = self.frames.frames(frame_index)
 
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
             if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
@@ -619,8 +620,8 @@ if __name__ == "__main__":
         my_timer.stop('Select optimal alignment patch')
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
             x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
-        reference_frame_with_alignment_points = align_frames.frames_mono[
-            align_frames.frame_ranks_max_index].copy()
+        reference_frame_with_alignment_points = frames.frames_mono(
+            align_frames.frame_ranks_max_index).copy()
         reference_frame_with_alignment_points[y_low_opt,
         x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
                                 x_low_opt:x_high_opt] = 255

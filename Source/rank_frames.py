@@ -53,9 +53,7 @@ class RankFrames(object):
         self.number = frames.number
         self.shape = frames.shape
         self.configuration = configuration
-        self.frames_mono = frames.frames_mono
-        self.frames_mono_blurred = frames.frames_mono_blurred
-        self.frames_mono_blurred_laplacian = frames.frames_mono_blurred_laplacian
+        self.frames = frames
         self.quality_sorted_indices = None
         self.frame_ranks = []
         self.frame_ranks_max_index = None
@@ -82,13 +80,15 @@ class RankFrames(object):
 
         # For all frames compute the quality with the selected method.
         if method != Miscellaneous.local_contrast_laplace:
-            for frame_index, frame in enumerate(self.frames_mono_blurred):
+            for frame_index in range(self.frames.number):
+                frame = self.frames.frames_mono_blurred(frame_index)
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
                     self.progress_signal.emit("Rank all frames",
                                               int((frame_index / self.number) * 100.))
                 self.frame_ranks.append(method(frame, self.configuration.rank_frames_pixel_stride))
         else:
-            for frame_index, frame in enumerate(self.frames_mono_blurred_laplacian):
+            for frame_index in range(self.frames.number):
+                frame = self.frames.frames_mono_blurred_laplacian(frame_index)
                 # self.frame_ranks.append(mean((frame - frame.mean())**2))
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
                     self.progress_signal.emit("Rank all frames",

@@ -30,7 +30,7 @@ import numpy as np
 from scipy import misc
 
 from configuration import Configuration
-from exceptions import TypeError, ShapeError, ArgumentError
+from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError
 
 
 class Frames(object):
@@ -64,9 +64,9 @@ class Frames(object):
             self.number = len(names)
             self.signal_step_size = max(int(self.number / 10), 1)
             if convert_to_grayscale:
-                self.frames = [misc.imread(path, mode='F') for path in names]
+                self.frames_original = [misc.imread(path, mode='F') for path in names]
             else:
-                self.frames = []
+                self.frames_original = []
                 conversion_factor = np.float32(1. / 255.)
                 for frame_index, path in enumerate(names):
                     # After every "signal_step_size"th frame, send a progress signal to the main GUI.
@@ -77,14 +77,14 @@ class Frames(object):
                     frame = cv2.imread(path, -1)
                     if frame.dtype == 'uint16':
                         frame = frame * conversion_factor
-                    self.frames.append(frame)
+                    self.frames_original.append(frame)
 
                 if self.progress_signal is not None:
                     self.progress_signal.emit("Read all frames", 100)
-            self.shape = self.frames[0].shape
+            self.shape = self.frames_original[0].shape
 
             # Test if all images have the same shape. If not, raise an exception.
-            for image in self.frames:
+            for image in self.frames_original:
                 if image.shape != self.shape:
                     raise ShapeError("Images have different size")
                 elif len(self.shape) != len(image.shape):
@@ -95,7 +95,7 @@ class Frames(object):
             # conversion from RGB to BGR in OpenCV input.
             cap = cv2.VideoCapture(names)
             self.number = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-            self.frames = []
+            self.frames_original = []
             self.signal_step_size = max(int(self.number / 10), 1)
             for frame_index in range(self.number):
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
@@ -105,15 +105,15 @@ class Frames(object):
                 ret, frame = cap.read()
                 if ret:
                     if convert_to_grayscale:
-                        self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
+                        self.frames_original.append(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
                     else:
-                        self.frames.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                        self.frames_original.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
                 else:
                     raise IOError("Error in reading video frame")
             cap.release()
             if self.progress_signal is not None:
                 self.progress_signal.emit("Read all frames", 100)
-            self.shape = self.frames[0].shape
+            self.shape = self.frames_original[0].shape
         else:
             raise TypeError("Image type not supported")
 
@@ -127,10 +127,68 @@ class Frames(object):
 
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
         # Laplacians.
-        self.frames_mono = None
-        self.frames_mono_blurred = None
-        self.frames_mono_blurred_laplacian = None
+        self.frames_monochrome = None
+        self.frames_monochrome_blurred = None
+        self.frames_monochrome_blurred_laplacian = None
         self.used_alignment_points = None
+
+    def frames(self, index):
+        """
+        Look up the original frame object with a given index.
+
+        :param index: Frame index
+        :return: Frame with index "index".
+        """
+
+        if not 0<=index<self.number:
+            raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+        return self.frames_original[index]
+
+    def frames_mono(self, index):
+        """
+        Look up the monochrome version of the frame object with a given index.
+
+        :param index: Frame index
+        :return: Monochrome frame with index "index".
+        """
+
+        if not 0 <= index < self.number:
+            raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+        if self.frames_monochrome is not None:
+            return self.frames_monochrome[index]
+        else:
+            raise WrongOrderingError("Attempt to look up a monochrome frame before computing it")
+
+    def frames_mono_blurred(self, index):
+        """
+        Look up a Gaussian-blurred frame object with a given index.
+
+        :param index: Frame index
+        :return: Gaussian-blurred frame with index "index".
+        """
+
+        if not 0 <= index < self.number:
+            raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+        if self.frames_monochrome_blurred is not None:
+            return self.frames_monochrome_blurred[index]
+        else:
+            raise WrongOrderingError("Attempt to look up a Gaussian-blurred frame version before"
+                                     " computing it")
+
+    def frames_mono_blurred_laplacian(self, index):
+        """
+        Look up a Laplacian-of-Gaussian of a frame object with a given index.
+
+        :param index: Frame index
+        :return: LoG of a frame with index "index".
+        """
+
+        if not 0 <= index < self.number:
+            raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+        if self.frames_monochrome_blurred_laplacian is not None:
+            return self.frames_monochrome_blurred_laplacian[index]
+        else:
+            raise WrongOrderingError("Attempt to look up a LoG frame version before computing it")
 
     def reset_alignment_point_lists(self):
         """
@@ -184,14 +242,14 @@ class Frames(object):
             colors = ['red', 'green', 'blue', 'panchromatic']
             if not color in colors:
                 raise ArgumentError("Invalid color selected for channel extraction")
-            self.frames_mono = []
+            self.frames_monochrome = []
         else:
-            self.frames_mono = self.frames
+            self.frames_monochrome = self.frames_original
 
-        self.frames_mono_blurred = []
-        self.frames_mono_blurred_laplacian = []
+        self.frames_monochrome_blurred = []
+        self.frames_monochrome_blurred_laplacian = []
 
-        for frame_index, frame in enumerate(self.frames):
+        for frame_index, frame in enumerate(self.frames_original):
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
             if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
                 self.progress_signal.emit("Gaussians / Laplacians",
@@ -201,17 +259,17 @@ class Frames(object):
                     frame_mono = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
                 else:
                     frame_mono = frame[:, :, colors.index(color)]
-                self.frames_mono.append(frame_mono)
+                self.frames_monochrome.append(frame_mono)
 
             # Add a version of the frame with Gaussian blur added.
-            frame_mono_blurred = cv2.GaussianBlur(self.frames_mono[frame_index], (
+            frame_monochrome_blurred = cv2.GaussianBlur(self.frames_monochrome[frame_index], (
                 self.configuration.frames_gauss_width, self.configuration.frames_gauss_width), 0)
-            self.frames_mono_blurred.append(frame_mono_blurred)
+            self.frames_monochrome_blurred.append(frame_monochrome_blurred)
 
             # Add the Laplacian of the down-sampled blurred image.
             if self.configuration.rank_frames_method == "Laplace":
-                self.frames_mono_blurred_laplacian.append(cv2.Laplacian(
-                    frame_mono_blurred[::self.configuration.align_frames_sampling_stride,
+                self.frames_monochrome_blurred_laplacian.append(cv2.Laplacian(
+                    frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
                     ::self.configuration.align_frames_sampling_stride], cv2.CV_32F))
 
         if self.progress_signal is not None:
@@ -294,7 +352,7 @@ if __name__ == "__main__":
         print("Error: " + e.message)
         exit()
 
-    plt.imshow(frames.frames_mono[0], cmap='Greys_r')
+    plt.imshow(frames.frames_mono(0), cmap='Greys_r')
     plt.show()
 
     if type == 'video':
@@ -305,4 +363,4 @@ if __name__ == "__main__":
         image_dir = 'Images'
         stacked_image_name = image_dir + '_pss.tiff'
 
-    frames.save_image(stacked_image_name, frames.frames_mono[0], avoid_overwriting=False)
+    frames.save_image(stacked_image_name, frames.frames_mono(0), avoid_overwriting=False)

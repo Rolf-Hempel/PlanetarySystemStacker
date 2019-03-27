@@ -593,7 +593,8 @@ class AlignmentPoints(object):
                                               int((ap_index / self.signal_loop_length) * 100.))
                 alignment_point['frame_qualities'] = []
                 # Cycle through all frames. Use the blurred monochrome image for ranking.
-                for frame_index, frame in enumerate(self.frames.frames_mono_blurred):
+                for frame_index in range(self.frames.number):
+                    frame = self.frames.frames_mono_blurred(frame_index)
                     # Compute patch bounds within the current frame.
                     y_low = max(0,
                                 alignment_point['patch_y_low'] + self.align_frames.dy[frame_index])
@@ -620,7 +621,8 @@ class AlignmentPoints(object):
                                               int((ap_index / self.signal_loop_length) * 100.))
                 alignment_point['frame_qualities'] = []
                 # Cycle through all frames. Use the blurred monochrome image for ranking.
-                for frame_index, frame in enumerate(self.frames.frames_mono_blurred_laplacian):
+                for frame_index in range(self.frames.number):
+                    frame = self.frames.frames_mono_blurred_laplacian(frame_index)
                     # Compute patch bounds within the current frame.
                     y_low = int(max(0, alignment_point['patch_y_low'] + self.align_frames.dy[
                         frame_index]) / self.configuration.align_frames_sampling_stride)
@@ -701,7 +703,7 @@ class AlignmentPoints(object):
             if self.configuration.alignment_points_method == 'Subpixel':
                 # Cut out the alignment box from the given frame. Take into account the offsets
                 # explained above.
-                box_in_frame = self.frames.frames_mono_blurred[frame_index][y_low + dy:y_high + dy,
+                box_in_frame = self.frames.frames_mono_blurred(frame_index)[y_low + dy:y_high + dy,
                                x_low + dx:x_high + dx]
                 shift_pixel, error, diffphase = register_translation(
                     reference_box, box_in_frame, 10, space='real')
@@ -710,7 +712,7 @@ class AlignmentPoints(object):
             elif self.configuration.alignment_points_method == 'CrossCorrelation':
                 # Cut out the alignment box from the given frame. Take into account the offsets
                 # explained above.
-                box_in_frame = self.frames.frames_mono_blurred[frame_index][y_low + dy:y_high + dy,
+                box_in_frame = self.frames.frames_mono_blurred(frame_index)[y_low + dy:y_high + dy,
                                x_low + dx:x_high + dx]
                 shift_pixel = Miscellaneous.translation(reference_box,
                                                         box_in_frame, box_in_frame.shape)
@@ -718,7 +720,7 @@ class AlignmentPoints(object):
             # Use a local search (see method "search_local_match" below.
             elif self.configuration.alignment_points_method == 'RadialSearch':
                 shift_pixel, dev_r = Miscellaneous.search_local_match(
-                    reference_box, self.frames.frames_mono_blurred[frame_index],
+                    reference_box, self.frames.frames_mono_blurred(frame_index),
                     y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride,
@@ -727,7 +729,7 @@ class AlignmentPoints(object):
             # Use the steepest descent search method.
             elif self.configuration.alignment_points_method == 'SteepestDescent':
                 shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(
-                    reference_box, self.frames.frames_mono_blurred[frame_index],
+                    reference_box, self.frames.frames_mono_blurred(frame_index),
                     y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride)
@@ -850,8 +852,8 @@ if __name__ == "__main__":
         print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
             x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
-        reference_frame_with_alignment_points = align_frames.frames_mono[
-            align_frames.frame_ranks_max_index].copy()
+        reference_frame_with_alignment_points = frames.frames_mono(
+            align_frames.frame_ranks_max_index).copy()
         reference_frame_with_alignment_points[y_low_opt,
         x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
                                 x_low_opt:x_high_opt] = 255

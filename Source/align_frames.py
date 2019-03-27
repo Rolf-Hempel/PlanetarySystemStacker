@@ -22,7 +22,6 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import glob
 from math import ceil
-import copy
 
 import matplotlib.pyplot as plt
 from scipy import ndimage
@@ -56,10 +55,7 @@ class AlignFrames(object):
                                 percent (int).
         """
 
-        self.frames = frames.frames
-        self.frames_mono = frames.frames_mono
-        self.frames_mono_blurred = frames.frames_mono_blurred
-        self.number = frames.number
+        self.frames = frames
         self.shape = frames.shape
         self.frame_shifts = None
         self.intersection_shape = None
@@ -68,7 +64,7 @@ class AlignFrames(object):
         self.mean_frame_original = None
         self.configuration = configuration
         self.progress_signal = progress_signal
-        self.signal_step_size = max(int(self.number / 10), 1)
+        self.signal_step_size = max(int(self.frames.number / 10), 1)
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
         self.frame_ranks_max_index = rank_frames.frame_ranks_max_index
         self.x_low_opt = self.x_high_opt = self.y_low_opt = self.y_high_opt = None
@@ -112,7 +108,7 @@ class AlignFrames(object):
                 #     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
                 #     x_low:x_high], self.configuration.quality_area_pixel_stride)
                 new_quality = Miscellaneous.quality_measure_alternative(
-                    self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
+                    self.frames.frames_mono_blurred(self.frame_ranks_max_index)[y_low:y_high,
                     x_low:x_high],
                     black_threshold=self.configuration.align_frames_rectangle_black_threshold)
                 if new_quality > quality:
@@ -153,7 +149,7 @@ class AlignFrames(object):
 
             # From the sharpest frame cut out the alignment rectangle. The shifts of all other frames
             #  will be computed relativ to this patch.
-            self.reference_window = self.frames_mono_blurred[self.frame_ranks_max_index][
+            self.reference_window = self.frames.frames_mono_blurred(self.frame_ranks_max_index)[
                                     self.y_low_opt:self.y_high_opt,
                                     self.x_low_opt:self.x_high_opt]
             self.reference_window_shape = self.reference_window.shape
@@ -161,7 +157,7 @@ class AlignFrames(object):
         elif self.configuration.align_frames_mode == "Planet":
             # For "Planetary" mode compute the center of gravity for the reference image.
             cog_real = ndimage.measurements.center_of_mass(
-                self.frames_mono_blurred[self.frame_ranks_max_index])
+                self.frames.frames_mono_blurred(self.frame_ranks_max_index))
             cog_reference_y = int(round(cog_real[0]))
             cog_reference_x = int(round(cog_real[1]))
 
@@ -181,11 +177,12 @@ class AlignFrames(object):
         # point for the next step. This reduces the search radius if frames are drifting.
         dy_min_cum = dx_min_cum = 0
 
-        for idx, frame in enumerate(self.frames_mono_blurred):
+        for idx in range(self.frames.number):
+            frame = self.frames.frames_mono_blurred(idx)
 
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
             if self.progress_signal is not None and idx % self.signal_step_size == 0:
-                self.progress_signal.emit("Align all frames", int((idx / self.number) * 100.))
+                self.progress_signal.emit("Align all frames", int((idx / self.frames.number) * 100.))
 
             # For the sharpest frame the displacement is 0 because it is used as the reference.
             if idx == self.frame_ranks_max_index:
@@ -210,8 +207,8 @@ class AlignFrames(object):
                 elif self.configuration.align_frames_method == "Translation":
                     # The shift is computed with cross-correlation. Cut out the alignment patch and
                     # compute its translation relative to the reference.
-                    frame_window = self.frames_mono_blurred[idx][self.y_low_opt:self.y_high_opt,
-                                   self.x_low_opt:self.x_high_opt]
+                    frame_window = self.frames.frames_mono_blurred(idx)[
+                                   self.y_low_opt:self.y_high_opt, self.x_low_opt:self.x_high_opt]
                     self.frame_shifts.append(
                         Miscellaneous.translation(self.reference_window, frame_window,
                                                   self.reference_window_shape))
@@ -288,8 +285,8 @@ class AlignFrames(object):
                     new_reference_window = True
                 # If the window was moved, update the "reference_window".
                 if new_reference_window:
-                    self.reference_window = self.frames_mono_blurred[
-                                                self.frame_ranks_max_index][
+                    self.reference_window = self.frames.frames_mono_blurred(
+                                                self.frame_ranks_max_index)[
                                                 self.y_low_opt:self.y_high_opt,
                                                 self.x_low_opt:self.x_high_opt]
         if self.progress_signal is not None:
@@ -327,7 +324,7 @@ class AlignFrames(object):
         # reference frame and current frame.
         self.dy = []
         self.dx = []
-        for idx in range(len(self.frames_mono_blurred)):
+        for idx in range(self.frames.number):
             self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
             self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
 
@@ -336,7 +333,7 @@ class AlignFrames(object):
             self.average_frame_number = average_frame_number
         else:
             self.average_frame_number = max(
-                ceil(self.number * self.configuration.align_frames_average_frame_percent / 100.), 1)
+                ceil(self.frames.number * self.configuration.align_frames_average_frame_percent / 100.), 1)
 
         shifts = [self.frame_shifts[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
 
@@ -356,7 +353,7 @@ class AlignFrames(object):
                                      self.intersection_shape[1][1] - self.intersection_shape[1][0]],
                                      dtype=float32)
             for idx in range(self.average_frame_number):
-                self.mean_frame += self.frames_mono[self.quality_sorted_indices[idx]] \
+                self.mean_frame += self.frames.frames_mono(self.quality_sorted_indices[idx]) \
                     [self.intersection_shape[0][0] - shifts[idx][0]:
                     self.intersection_shape[0][1] - shifts[idx][0],
                     self.intersection_shape[1][0] - shifts[idx][1]:
@@ -413,7 +410,7 @@ class AlignFrames(object):
         # Re-compute global offsets of current frame relative to reference frame.
         self.dy = []
         self.dx = []
-        for idx in range(len(self.frames_mono_blurred)):
+        for idx in range(self.frames.number):
             self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
             self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
 
@@ -453,7 +450,8 @@ class AlignFrames(object):
         if stabilized:
             # For each frame: cut out the shifted window with the intersection of all frames.
             # Append it to the list, and add its index to the list of index strings.
-            for idx, frame_mono in enumerate(self.frames_mono):
+            for idx in range(self.frames.number):
+                frame_mono = self.frames.frames_mono(idx)
                 frames_mono_stabilized.append(frame_mono[
                                               self.intersection_shape[0][0] -
                                               self.frame_shifts[idx][0]:
@@ -467,9 +465,11 @@ class AlignFrames(object):
             Miscellaneous.write_video(name, frames_mono_stabilized, frame_indices, 5)
         else:
             # Write the original frames (not stabilized) with index number insertions.
-            for idx in range(len(self.frames_mono)):
+            frames_mono = []
+            for idx in range(self.frames.number):
                 frame_indices.append(str(idx))
-            Miscellaneous.write_video(name, self.frames_mono, frame_indices, 5)
+                frames_mono.append(self.frames.frames_mono(idx))
+            Miscellaneous.write_video(name, frames_mono, frame_indices, 5)
 
 
 if __name__ == "__main__":
@@ -528,7 +528,7 @@ if __name__ == "__main__":
 
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
             x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
-        frame = align_frames.frames_mono_blurred[align_frames.frame_ranks_max_index].copy()
+        frame = frames.frames_mono_blurred(align_frames.frame_ranks_max_index).copy()
         frame[y_low_opt, x_low_opt:x_high_opt] = frame[y_high_opt - 1, x_low_opt:x_high_opt] = 255
         frame[y_low_opt:y_high_opt, x_low_opt] = frame[y_low_opt:y_high_opt, x_high_opt - 1] = 255
         plt.imshow(frame, cmap='Greys_r')
