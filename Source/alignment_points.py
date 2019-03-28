@@ -579,22 +579,26 @@ class AlignmentPoints(object):
 
         # Compute the frequency of progress signals in the computational loop.
         if self.progress_signal is not None:
-            self.signal_loop_length = max(len(self.alignment_points), 1)
-            self.signal_step_size = max(int(round(len(self.alignment_points) / 10)), 1)
+            self.signal_loop_length = max(self.frames.number, 1)
+            self.signal_step_size = max(int(round(self.frames.number / 10)), 1)
+
+        # Initialize a list which for each AP contains the qualities of all frames at this point.
+        for alignment_point in self.alignment_points:
+            alignment_point['frame_qualities'] = []
 
         if self.configuration.rank_frames_method != "Laplace" or \
                 self.configuration.alignment_points_rank_method != "Laplace":
             # There are no stored Laplacians, or they cannot be used for the specified method.
-            # Cycle through all alignment points:
-            for ap_index, alignment_point in enumerate(self.alignment_points):
+            # Cycle through all frames and alignment points:
+            for frame_index in range(self.frames.number):
+                frame = self.frames.frames_mono_blurred(frame_index)
+
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and ap_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
                     self.progress_signal.emit("Rank frames at APs",
-                                              int((ap_index / self.signal_loop_length) * 100.))
-                alignment_point['frame_qualities'] = []
-                # Cycle through all frames. Use the blurred monochrome image for ranking.
-                for frame_index in range(self.frames.number):
-                    frame = self.frames.frames_mono_blurred(frame_index)
+                                              int((frame_index / self.signal_loop_length) * 100.))
+
+                for ap_index, alignment_point in enumerate(self.alignment_points):
                     # Compute patch bounds within the current frame.
                     y_low = max(0,
                                 alignment_point['patch_y_low'] + self.align_frames.dy[frame_index])
@@ -613,16 +617,17 @@ class AlignmentPoints(object):
         else:
             # Sampled-down Laplacians of all blurred frames have been computed in
             # "frames.add_monochrome". Cut out boxes around alignment points from those objects,
-            # rather than computing new Laplacians. Cycle through all alignment points:
-            for ap_index, alignment_point in enumerate(self.alignment_points):
+            # rather than computing new Laplacians. Cycle through all frames and alignment points.
+            # Use the blurred monochrome image for ranking.
+            for frame_index in range(self.frames.number):
+                frame = self.frames.frames_mono_blurred_laplacian(frame_index)
+
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and ap_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
                     self.progress_signal.emit("Rank frames at APs",
-                                              int((ap_index / self.signal_loop_length) * 100.))
-                alignment_point['frame_qualities'] = []
-                # Cycle through all frames. Use the blurred monochrome image for ranking.
-                for frame_index in range(self.frames.number):
-                    frame = self.frames.frames_mono_blurred_laplacian(frame_index)
+                                              int((frame_index / self.signal_loop_length) * 100.))
+
+                for ap_index, alignment_point in enumerate(self.alignment_points):
                     # Compute patch bounds within the current frame.
                     y_low = int(max(0, alignment_point['patch_y_low'] + self.align_frames.dy[
                         frame_index]) / self.configuration.align_frames_sampling_stride)
@@ -655,7 +660,8 @@ class AlignmentPoints(object):
             for frame_index in alignment_point['best_frame_indices']:
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)
 
-    def compute_shift_alignment_point(self, frame_index, alignment_point_index, de_warp=True):
+    def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
+                                      de_warp=True):
         """
         Compute the [y, x] pixel shift vector at a given alignment point relative to the mean frame.
         Four different methods can be used to compute the shift values:
@@ -678,6 +684,7 @@ class AlignmentPoints(object):
         corresponding box in the reference frame. If at this point the box is shifted towards a
         higher coordinate value, this value is returned with a negative sign as the local shift.
 
+        :param frame_mono_blurred: Gaussian-blurred version of the frame with index "frame_index"
         :param frame_index: Index of the selected frame in the list of frames
         :param alignment_point_index: Index of the selected alignment point
         :param de_warp: If True, include local warp shift computation. If False, only apply
@@ -703,7 +710,7 @@ class AlignmentPoints(object):
             if self.configuration.alignment_points_method == 'Subpixel':
                 # Cut out the alignment box from the given frame. Take into account the offsets
                 # explained above.
-                box_in_frame = self.frames.frames_mono_blurred(frame_index)[y_low + dy:y_high + dy,
+                box_in_frame = frame_mono_blurred[y_low + dy:y_high + dy,
                                x_low + dx:x_high + dx]
                 shift_pixel, error, diffphase = register_translation(
                     reference_box, box_in_frame, 10, space='real')
@@ -712,25 +719,23 @@ class AlignmentPoints(object):
             elif self.configuration.alignment_points_method == 'CrossCorrelation':
                 # Cut out the alignment box from the given frame. Take into account the offsets
                 # explained above.
-                box_in_frame = self.frames.frames_mono_blurred(frame_index)[y_low + dy:y_high + dy,
-                               x_low + dx:x_high + dx]
+                box_in_frame = frame_mono_blurred[y_low + dy:y_high + dy,
+                                                  x_low + dx:x_high + dx]
                 shift_pixel = Miscellaneous.translation(reference_box,
                                                         box_in_frame, box_in_frame.shape)
 
             # Use a local search (see method "search_local_match" below.
             elif self.configuration.alignment_points_method == 'RadialSearch':
-                shift_pixel, dev_r = Miscellaneous.search_local_match(
-                    reference_box, self.frames.frames_mono_blurred(frame_index),
-                    y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                shift_pixel, dev_r = Miscellaneous.search_local_match(reference_box,
+                    frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride,
                     sub_pixel=self.configuration.alignment_points_local_search_subpixel)
 
             # Use the steepest descent search method.
             elif self.configuration.alignment_points_method == 'SteepestDescent':
-                shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(
-                    reference_box, self.frames.frames_mono_blurred(frame_index),
-                    y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(reference_box,
+                    frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride)
             else:

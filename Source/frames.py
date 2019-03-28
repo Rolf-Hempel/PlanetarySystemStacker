@@ -35,7 +35,21 @@ from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError
 
 class Frames(object):
     """
-        This object stores the image data of all frames.
+        This object stores the image data of all frames. Four versions of the original frames are
+        used throughout the data processing workflow. They are (re-)used in the folliwing phases:
+        1. Original (color) frames
+            - Frame stacking ("stack_frames.stack_frames")
+        2. Monochrome version of 1.
+            - Computing the average frame (only average frame subset, "align_frames.average_frame")
+        3. Gaussian blur added to 2.
+            - Aligning all frames ("align_frames.align_frames")
+            - Frame stacking ("stack_frames.stack_frames")
+        4. Down-sampled Laplacian of 3.
+            - Overall image ranking ("rank_frames.frame_score")
+            - Ranking frames at alignment points("alignment_points.compute_frame_qualities")
+
+        Currently all versions of all frames are stored during the entire workflow. As an
+        alternative, a non-buffered version should be added.
 
     """
 
@@ -140,8 +154,15 @@ class Frames(object):
         :return: Frame with index "index".
         """
 
+        # # Code for positioning at arbitrary index.
+        # # Check for valid frame number.
+        # if 0 <= index < self.number:
+        #     # Set frame position
+        #     cap.set(cv2.CAP_PROP_POS_FRAMES, index)
+
         if not 0<=index<self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+        # print ("Accessing frame " + str(index))
         return self.frames_original[index]
 
     def frames_mono(self, index):
@@ -155,6 +176,7 @@ class Frames(object):
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
         if self.frames_monochrome is not None:
+            # print("Accessing frame monochrome " + str(index))
             return self.frames_monochrome[index]
         else:
             raise WrongOrderingError("Attempt to look up a monochrome frame before computing it")
@@ -170,6 +192,7 @@ class Frames(object):
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
         if self.frames_monochrome_blurred is not None:
+            # print("Accessing frame with Gaussian blur " + str(index))
             return self.frames_monochrome_blurred[index]
         else:
             raise WrongOrderingError("Attempt to look up a Gaussian-blurred frame version before"
@@ -186,6 +209,7 @@ class Frames(object):
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
         if self.frames_monochrome_blurred_laplacian is not None:
+            # print("Accessing LoG number " + str(index))
             return self.frames_monochrome_blurred_laplacian[index]
         else:
             raise WrongOrderingError("Attempt to look up a LoG frame version before computing it")
@@ -213,30 +237,6 @@ class Frames(object):
         :param color: Either "red" or "green", "blue", or "panchromatic"
         :return: -
         """
-
-        # if self.color:
-        #     colors = ['red', 'green', 'blue', 'panchromatic']
-        #     if not color in colors:
-        #         raise ArgumentError("Invalid color selected for channel extraction")
-        #     elif color == 'panchromatic':
-        #         self.frames_mono = [cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY) for frame in self.frames]
-        #     else:
-        #         self.frames_mono = [frame[:, :, colors.index(color)] for frame in self.frames]
-        # else:
-        #     self.frames_mono = self.frames
-        #
-        # # Add versions of all frames with Gaussian blur added.
-        # self.frames_mono_blurred = [cv2.GaussianBlur(frame, (
-        #     self.configuration.frames_gauss_width, self.configuration.frames_gauss_width),
-        #                                              0) for frame in self.frames_mono]
-        #
-        # if self.configuration.rank_frames_method == "Laplace":
-        #     # Add the Laplacians of down-sampled blurred images.
-        #     self.frames_mono_blurred_laplacian = [cv2.Laplacian(
-        #         frame[::self.configuration.align_frames_sampling_stride,
-        #         ::self.configuration.align_frames_sampling_stride], cv2.CV_32F) for frame in
-        #                                           self.frames_mono_blurred]
-
 
         if self.color:
             colors = ['red', 'green', 'blue', 'panchromatic']

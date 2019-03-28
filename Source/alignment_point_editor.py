@@ -295,7 +295,7 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         self.patch_x_low = ap["patch_x_low"]
         self.patch_x_high = ap["patch_x_high"]
         self.pen_boundary = QtGui.QPen(self.color_boundary)
-        self.pen_boundary.setWidth(-1)
+        self.pen_boundary.setStyle(0)
         self.width_x = self.patch_x_high - self.patch_x_low
         self.width_x_external = self.width_x + self.pen_boundary.width()
         self.width_y = self.patch_y_high - self.patch_y_low
@@ -877,8 +877,8 @@ if __name__ == '__main__':
         print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
             x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
-        reference_frame_with_alignment_points = align_frames.frames_mono[
-            align_frames.frame_ranks_max_index].copy()
+        reference_frame_with_alignment_points = frames.frames_mono(
+            align_frames.frame_ranks_max_index).copy()
         reference_frame_with_alignment_points[y_low_opt,
         x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
                                 x_low_opt:x_high_opt] = 255

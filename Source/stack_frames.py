@@ -283,6 +283,7 @@ class StackFrames(object):
         # Go through the list of all frames.
         for frame_index in range(self.frames.number):
             frame = self.frames.frames(frame_index)
+            frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
 
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
             if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
@@ -300,7 +301,7 @@ class StackFrames(object):
                 # Compute the local warp shift for this frame.
                 self.my_timer.start('Stacking: compute AP shifts')
                 [shift_y, shift_x] = self.alignment_points.compute_shift_alignment_point(
-                    frame_index, alignment_point_index,
+                    frame_mono_blurred, frame_index, alignment_point_index,
                     de_warp=self.configuration.alignment_points_de_warp)
 
                 # Increment the counter corresponding to the 2D warp shift.

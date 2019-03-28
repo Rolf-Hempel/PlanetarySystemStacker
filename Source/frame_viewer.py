@@ -273,14 +273,14 @@ class FrameViewer(QtWidgets.QGraphicsView):
         :return: -
         """
 
-        self.image = self.frames[index][self.align_frames.intersection_shape[0][0] -
-                                          self.align_frames.frame_shifts[index][0]:
-                                          self.align_frames.intersection_shape[0][1] -
-                                          self.align_frames.frame_shifts[index][0],
-                                          self.align_frames.intersection_shape[1][0] -
-                                          self.align_frames.frame_shifts[index][1]:
-                                          self.align_frames.intersection_shape[1][1] -
-                                          self.align_frames.frame_shifts[index][1]]
+        self.image = self.frames.frames_mono(index)[self.align_frames.intersection_shape[0][0] -
+                                                    self.align_frames.frame_shifts[index][0]:
+                                                    self.align_frames.intersection_shape[0][1] -
+                                                    self.align_frames.frame_shifts[index][0],
+                                                    self.align_frames.intersection_shape[1][0] -
+                                                    self.align_frames.frame_shifts[index][1]:
+                                                    self.align_frames.intersection_shape[1][1] -
+                                                    self.align_frames.frame_shifts[index][1]]
 
 
         # Convert the float32 monochrome image into uint8 format.
@@ -349,13 +349,14 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
     qualities, and to manipulate the stack limits.
     """
 
-    def __init__(self, parent_gui, configuration, rank_frames, align_frames, stacked_image_log_file,
-                 signal_finished, signal_payload):
+    def __init__(self, parent_gui, configuration, frames, rank_frames, align_frames,
+                 stacked_image_log_file, signal_finished, signal_payload):
         """
         Initialization of the widget.
 
         :param parent_gui: Parent GUI object
         :param configuration: Configuration object with parameters
+        :param frames: Frames object with all video frames
         :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
                             1. being optimal) for all frames
         :param align_frames: AlignFrames object with global shift information for all frames
@@ -374,7 +375,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.stacked_image_log_file = stacked_image_log_file
         self.signal_finished = signal_finished
         self.signal_payload = signal_payload
-        self.frames = rank_frames.frames_mono
+        self.frames = frames
         self.rank_frames = rank_frames
         self.align_frames = align_frames
 
@@ -386,13 +387,12 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         # Initialize variables. The values for "alignment_point_frame_number" and
         # "alignment_points_frame_percent" are held as copies in this object. Only if the user
         # presses "OK" at the end, the values are copied back into the configuration object.
-        self.number_frames = len(self.frames)
         self.alignment_points_frame_number = self.configuration.alignment_points_frame_number
         self.alignment_points_frame_percent = self.configuration.alignment_points_frame_percent
         if self.alignment_points_frame_number is None or 0 < self.alignment_points_frame_number \
-                <= self.number_frames:
+                <= self.frames.number:
             self.alignment_points_frame_number = max(1, int(
-                round(self.number_frames * self.alignment_points_frame_percent / 100.)))
+                round(self.frames.number * self.alignment_points_frame_percent / 100.)))
         self.frame_ranks = rank_frames.frame_ranks
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
 
@@ -419,17 +419,17 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
 
         # Initialization of GUI elements
         self.slider_frames.setMinimum(1)
-        self.slider_frames.setMaximum(self.number_frames)
+        self.slider_frames.setMaximum(self.frames.number)
         self.slider_frames.setValue(self.quality_index + 1)
         self.spinBox_chronological.setValue(self.quality_index)
         self.spinBox_quality.setValue(self.quality_index + 1)
         self.spinBox_chronological.setMinimum(1)
-        self.spinBox_chronological.setMaximum(self.number_frames)
+        self.spinBox_chronological.setMaximum(self.frames.number)
         self.spinBox_quality.setMinimum(1)
-        self.spinBox_quality.setMaximum(self.number_frames)
+        self.spinBox_quality.setMaximum(self.frames.number)
         self.radioButton_quality.setChecked(True)
 
-        self.spinBox_number_frames.setMaximum(self.number_frames)
+        self.spinBox_number_frames.setMaximum(self.frames.number)
         self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
 
         self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
@@ -506,7 +506,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
 
         self.alignment_points_frame_number = self.spinBox_number_frames.value()
         self.alignment_points_frame_percent = int(
-            round(self.alignment_points_frame_number * 100. / self.number_frames))
+            round(self.alignment_points_frame_number * 100. / self.frames.number))
         self.spinBox_percentage_frames.blockSignals(True)
         self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
         self.spinBox_percentage_frames.blockSignals(False)
@@ -522,7 +522,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
 
         self.alignment_points_frame_percent = self.spinBox_percentage_frames.value()
         self.alignment_points_frame_number = int(
-            round(self.number_frames * self.alignment_points_frame_percent / 100.))
+            round(self.frames.number * self.alignment_points_frame_percent / 100.))
         self.spinBox_number_frames.blockSignals(True)
         self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
         self.spinBox_number_frames.blockSignals(False)
@@ -604,7 +604,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         """
         self.alignment_points_frame_number = self.quality_index + 1
         self.alignment_points_frame_percent = int(
-            round(self.alignment_points_frame_number * 100. / self.number_frames))
+            round(self.alignment_points_frame_number * 100. / self.frames.number))
         self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
         self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
 
@@ -710,7 +710,7 @@ class FramePlayer(QtCore.QObject):
 
             # The player stops when the end of the video is reached, or when the "run_player"
             # variable is set to False in the GUI thread.
-            while self.frame_viewer_widget.quality_index < self.frame_viewer_widget.number_frames\
+            while self.frame_viewer_widget.quality_index < self.frame_viewer_widget.frames.number \
                     - 1 and self.run_player:
                 self.frame_viewer_widget.quality_index += 1
                 self.frame_viewer_widget.frame_index = \
@@ -731,7 +731,7 @@ class FramePlayer(QtCore.QObject):
                 self.frame_viewer_widget.update()
         else:
             # The same for chronological frame ordering.
-            while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.number_frames -\
+            while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.frames.number -\
                     1 and self.run_player:
                 self.frame_viewer_widget.frame_index += 1
                 self.frame_viewer_widget.quality_index = \

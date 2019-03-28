@@ -100,6 +100,7 @@ class AlignFrames(object):
 
         # Compute for all locations in the frame the "quality measure" and find the place with
         # the maximum value.
+        best_frame_mono_blurred = self.frames.frames_mono_blurred(self.frame_ranks_max_index)
         for x_low in arange(border_width, dim_x - rect_x - border_width + 1, rect_x):
             x_high = x_low + rect_x
             for y_low in arange(border_width, dim_y - rect_y - border_width + 1, rect_y):
@@ -108,8 +109,7 @@ class AlignFrames(object):
                 #     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
                 #     x_low:x_high], self.configuration.quality_area_pixel_stride)
                 new_quality = Miscellaneous.quality_measure_alternative(
-                    self.frames.frames_mono_blurred(self.frame_ranks_max_index)[y_low:y_high,
-                    x_low:x_high],
+                    best_frame_mono_blurred[y_low:y_high, x_low:x_high],
                     black_threshold=self.configuration.align_frames_rectangle_black_threshold)
                 if new_quality > quality:
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
