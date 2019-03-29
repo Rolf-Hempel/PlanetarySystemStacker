@@ -20,9 +20,9 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import glob
+from glob import glob
 from time import time
-import numpy as np
+from numpy import array, full
 import matplotlib.pyplot as plt
 
 from configuration import Configuration
@@ -116,7 +116,7 @@ if __name__ == "__main__":
         # names = glob.glob('Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
-        names = glob.glob('Images/Mond_*.jpg')
+        names = glob('Images/Mond_*.jpg')
     else:
         names = 'Videos/short_video.avi'
         # names = 'Videos/Moon_Tile-024_043939.avi'
@@ -169,11 +169,11 @@ if __name__ == "__main__":
     # Plot the frame qualities in chronological order.
     ax1 = plt.subplot(211)
 
-    x = np.array(rank_frames.frame_ranks)
+    x = array(rank_frames.frame_ranks)
     plt.ylabel('Frame number')
     plt.gca().invert_yaxis()
-    y = np.array(range(num_frames))
-    x_cutoff = np.full((num_frames,), quality_cutoff)
+    y = array(range(num_frames))
+    x_cutoff = full((num_frames,), quality_cutoff)
     plt.xlabel('Quality')
     line1, = plt.plot(x, y, lw=1)
     line2, = plt.plot(x_cutoff, y, lw=1)
@@ -184,11 +184,11 @@ if __name__ == "__main__":
     # Plot the frame qualities ordered by value.
     ax2 = plt.subplot(212)
 
-    x = np.array([rank_frames.frame_ranks[i] for i in rank_frames.quality_sorted_indices])
+    x = array([rank_frames.frame_ranks[i] for i in rank_frames.quality_sorted_indices])
     plt.ylabel('Frame rank')
     plt.gca().invert_yaxis()
-    y = np.array(range(num_frames))
-    y_cutoff = np.full((num_frames,), num_frames_stacked)
+    y = array(range(num_frames))
+    y_cutoff = full((num_frames,), num_frames_stacked)
     plt.xlabel('Quality')
     line3, = plt.plot(x, y, lw=1)
     line4, = plt.plot(x, y_cutoff, lw=1)

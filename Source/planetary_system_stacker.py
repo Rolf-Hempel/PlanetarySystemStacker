@@ -22,8 +22,9 @@ Part of this module (in class "AlignmentPointEditor" was copied from
 https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview
 
 """
-from time import sleep
-import sys
+
+from sys import exit, argv
+from os import remove
 from pathlib import Path
 
 from PyQt5 import QtWidgets, QtCore
@@ -105,6 +106,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.pushButton_quit.clicked.connect(self.close)
         self.ui.box_automatic.stateChanged.connect(self.automatic_changed)
         self.ui.actionLoad_video_directory.triggered.connect(self.load_video_directory)
+        self.ui.actionSave.triggered.connect(self.save_result)
+        self.ui.actionSave_as.triggered.connect(self.save_result_as)
         self.ui.actionEdit_configuration.triggered.connect(self.edit_configuration)
         self.ui.actionLoad_config.triggered.connect(self.load_config_file)
         self.ui.actionSave_config.triggered.connect(self.save_config_file)
@@ -253,7 +256,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
             # If the config file exists, delete it first.
             if my_file.is_file():
-                os.remove(str(my_file))
+                remove(str(my_file))
             self.configuration.write_config(file_name=str(my_file))
 
     def load_video_directory(self):
@@ -488,6 +491,32 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Activate / Deactivate GUI elements depending on the current situation.
         self.update_status()
 
+    def save_result(self):
+        """
+        save the result as 16bit Tiff at the standard location.
+
+        :return: -
+        """
+
+        self.workflow.frames.save_image(self.workflow.stacked_image_name,
+                                        self.workflow.stack_frames.stacked_image,
+                                        color=self.workflow.frames.color, avoid_overwriting=False)
+
+    def save_result_as(self):
+        """
+        save the result as 16bit Tiff at a location selected by the user.
+
+        :return: -
+        """
+
+        options = QtWidgets.QFileDialog.Options()
+        filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
+            "Save result as 16bit Tiff image", self.workflow.stacked_image_name ,
+            "Image Files (*.tiff)", options=options)
+
+        self.workflow.frames.save_image(filename, self.workflow.stack_frames.stacked_image,
+                                        color=self.workflow.frames.color, avoid_overwriting=False)
+
     def place_holder_manual_activity(self, activity):
         # Ask the user for confirmation.
         quit_msg = "This is a placeholder for the manual activity " + activity + \
@@ -622,6 +651,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # In manual mode, activate buttons and menu entries. Update the status bar.
         else:
             self.activate_gui_elements([self.ui.menuFile, self.ui.menuEdit], True)
+            if self.activity == "Next job":
+                self.activate_gui_elements([self.ui.actionSave, self.ui.actionSave_as], True)
+            else:
+                self.activate_gui_elements([self.ui.actionSave, self.ui.actionSave_as], False)
             activated_buttons = []
             if self.job_index < self.job_number:
                 activated_buttons.append(self.ui.pushButton_start)
@@ -724,7 +757,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
             # Write the current configuration to the ".ini" file in the user's home directory.
             self.configuration.write_config()
-            sys.exit(0)
+            exit(0)
         else:
             # No confirmation by the user: Don't stop program execution.
             if event:
@@ -732,9 +765,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
 
 if __name__ == "__main__":
-    # The following four lines are a workaround to make PyInstaller work. Remove them when the
-    # PyInstaller issue is fixed. Additionally, the following steps are required to get the
-    # program running on Linux:
+    # The following steps are required to get the program running on Linux:
     #
     # - Add "export QT_XKB_CONFIG_ROOT=/usr/share/X11/xkb" to file .bashrc.
     #
@@ -744,17 +775,11 @@ if __name__ == "__main__":
     #   instead.
     #
     # To run the PyInstaller, open a Terminal in PyCharm and enter
-    # "pyinstaller moon_panorama_maker_windows.spec" on Windows, or
-    # "pyinstaller moon_panorama_maker_linux.spec" on Linux
+    # "pyinstaller planetary_system_stacker.spec" on Windows, or
+    # "pyinstaller planetary_system_stacker_linux.spec" on Linux
     #
-    import os
 
-    if getattr(sys, 'frozen', False):
-        here = os.path.dirname(sys.executable)
-        sys.path.insert(1, here)
-
-    app = QtWidgets.QApplication(sys.argv)
+    app = QtWidgets.QApplication(argv)
     myapp = PlanetarySystemStacker()
-    # myapp.setGeometry(200, 200, 1200, 800)
     myapp.show()
-    sys.exit(app.exec_())
+    exit(app.exec_())

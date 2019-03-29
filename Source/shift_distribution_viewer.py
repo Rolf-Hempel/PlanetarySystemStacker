@@ -20,10 +20,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import matplotlib
-matplotlib.use('qt5agg')
-
-import numpy as np
+from numpy import arange
 from PyQt5 import QtWidgets
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -60,16 +57,21 @@ class MatplotlibWidget(Canvas):
         :return: -
         """
 
-        # Find the last non-zero entry in the array.
-        max_index = [index for index, item in enumerate(shift_distribution) if item != 0][-1] + 1
+        # Find the last non-zero entry in the array. If no alignment points have been set,
+        # show a message in the widget title.
+        if max(shift_distribution) > 0:
+            max_index = [index for index, item in enumerate(shift_distribution) if item != 0][-1] + 1
+            plt.title('Frequency distribution of local warp sizes at alignment points')
+        else:
+            max_index = 1
+            plt.title('No alignment points, therefore no warp distribution')
 
-        pixels = np.arange(max_index)
+        pixels = arange(max_index)
 
         plt.bar(pixels, shift_distribution[:max_index], align='center')
         plt.xticks(pixels, pixels)
         plt.xlabel('Warp size (pixels)')
         plt.ylabel('Frequency')
-        plt.title('Frequency distribution of local warp sizes at alignment points')
         self.fig.canvas.draw()
         self.fig.canvas.flush_events()
 

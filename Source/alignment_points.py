@@ -20,11 +20,11 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import glob
-from math import ceil
+from glob import glob
 from time import time
 
 import matplotlib.pyplot as plt
+from math import ceil
 from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt
 from scipy import ndimage
 from skimage.feature import register_translation
@@ -805,7 +805,7 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob('Images/2012*.tif')
+        names = glob('Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:

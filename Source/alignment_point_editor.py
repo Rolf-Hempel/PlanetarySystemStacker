@@ -22,20 +22,20 @@ Part of this module (in class "AlignmentPointEditor" was copied from
 https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview
 
 """
-import glob
-import sys
+from glob import glob
+from sys import argv, exit
 from time import time
 
-import numpy as np
+from numpy import uint8
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from exceptions import InternalError, NotSupportedError
 from align_frames import AlignFrames
+from alignment_point_editor_gui import Ui_alignment_point_editor
 from alignment_points import AlignmentPoints
 from configuration import Configuration, ConfigurationParameters
+from exceptions import InternalError, NotSupportedError
 from frames import Frames
 from rank_frames import RankFrames
-from alignment_point_editor_gui import Ui_alignment_point_editor
 
 
 class GraphicsScene(QtWidgets.QGraphicsScene):
@@ -435,7 +435,7 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
 
         self.image = image
         # Convert the float32 monochrome image into uint8 format.
-        image_uint8 = self.image.astype(np.uint8)
+        image_uint8 = self.image.astype(uint8)
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
         qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
@@ -825,7 +825,7 @@ if __name__ == '__main__':
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob('Images/2012*.tif')
+        names = glob('Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
@@ -919,7 +919,7 @@ if __name__ == '__main__':
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()
 
-    app = QtWidgets.QApplication(sys.argv)
+    app = QtWidgets.QApplication(argv)
     window = AlignmentPointEditorWidget(None, configuration, align_frames, alignment_points, None)
     window.setMinimumSize(800,600)
     window.showMaximized()
@@ -938,5 +938,5 @@ if __name__ == '__main__':
         count_updates += 1
         AlignmentPoints.set_reference_box(ap, align_frames.mean_frame)
     print ("Buffers allocated for " + str(count_updates) + " alignment points.")
-    sys.exit()
+    exit()
 

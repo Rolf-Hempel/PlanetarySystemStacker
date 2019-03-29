@@ -25,29 +25,24 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 # The following PyQt5 imports must precede any matplotlib imports. This is a workaround
 # for a Matplotlib 2.2.2 bug.
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-
-import matplotlib
-
-matplotlib.use('qt5agg')
-import matplotlib.pyplot as plt
-from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
-from matplotlib.figure import Figure
-from matplotlib import patches
-
-import glob
-import sys
+from glob import glob
+from sys import argv, exit
 from time import time, sleep
 
-import numpy as np
+import matplotlib.pyplot as plt
+from numpy import array, full, uint8
+from PyQt5 import QtCore, QtGui, QtWidgets
+from matplotlib import patches
+from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
+from matplotlib.figure import Figure
 
-from configuration import Configuration
-from frames import Frames
-from rank_frames import RankFrames
 from align_frames import AlignFrames
-from frame_viewer_gui import Ui_frame_viewer
-from miscellaneous import Miscellaneous
+from configuration import Configuration
 from exceptions import NotSupportedError, InternalError
+from frame_viewer_gui import Ui_frame_viewer
+from frames import Frames
+from miscellaneous import Miscellaneous
+from rank_frames import RankFrames
 
 
 class MatplotlibWidget(Canvas):
@@ -122,11 +117,11 @@ class MatplotlibWidget(Canvas):
         """
 
         self.ax.set_ylim(0, self.rank_frames.number + 1)
-        self.y = np.array(range(1, self.rank_frames.number + 1))
+        self.y = array(range(1, self.rank_frames.number + 1))
         if frame_ordering == "chronological":
             if self.line_chronological is not None:
                 self.line_chronological.remove()
-            self.x = np.array(self.rank_frames.frame_ranks)
+            self.x = array(self.rank_frames.frame_ranks)
             plt.ylabel('Frame numbers ordered chronologically')
             plt.gca().invert_yaxis()
             plt.xlabel('Quality')
@@ -135,7 +130,7 @@ class MatplotlibWidget(Canvas):
         else:
             if self.line_quality is not None:
                 self.line_quality.remove()
-            self.x = np.array(
+            self.x = array(
                 [self.rank_frames.frame_ranks[i] for i in self.rank_frames.quality_sorted_indices])
             plt.ylabel('Frame numbers ordered by quality')
             plt.gca().invert_yaxis()
@@ -161,7 +156,7 @@ class MatplotlibWidget(Canvas):
                 self.patch_quality_cutoff.remove()
             quality_cutoff = self.rank_frames.frame_ranks[
                 self.rank_frames.quality_sorted_indices[alignment_points_frame_number]]
-            x_cutoff = np.full((self.rank_frames.number,), quality_cutoff)
+            x_cutoff = full((self.rank_frames.number,), quality_cutoff)
             self.line_quality_cutoff, = plt.plot(x_cutoff, self.y, lw=1, color='orange')
             width = 1. - quality_cutoff
             height = self.rank_frames.number - 1
@@ -171,7 +166,7 @@ class MatplotlibWidget(Canvas):
                 self.line_quality_cutoff.remove()
             if self.patch_quality_cutoff is not None:
                 self.patch_quality_cutoff.remove()
-            y_cutoff = np.full((self.rank_frames.number,), alignment_points_frame_number)
+            y_cutoff = full((self.rank_frames.number,), alignment_points_frame_number)
             self.line_quality_cutoff, = plt.plot(self.x, y_cutoff, lw=1, color='orange')
             width = 1. - self.x[-1]
             height = alignment_points_frame_number
@@ -284,7 +279,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
 
         # Convert the float32 monochrome image into uint8 format.
-        image_uint8 = self.image.astype(np.uint8)
+        image_uint8 = self.image.astype(uint8)
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
         qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
@@ -762,7 +757,7 @@ if __name__ == '__main__':
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob(
+        names = glob(
             'Images/2012*.tif')  # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')  # names
         # = glob.glob('Images/Example-3*.jpg')
     else:
@@ -827,8 +822,9 @@ if __name__ == '__main__':
           + str(align_frames.intersection_shape[1][0]) + ", x_high: " \
           + str(align_frames.intersection_shape[1][1]))
 
-    app = QtWidgets.QApplication(sys.argv)
-    window = FrameViewerWidget(None, configuration, rank_frames, align_frames, None, None, None)
+    app = QtWidgets.QApplication(argv)
+    window = FrameViewerWidget(None, configuration, frames, rank_frames, align_frames, None, None,
+                               None)
     window.setMinimumSize(800, 600)
     window.showMaximized()
     app.exec_()
@@ -837,4 +833,4 @@ if __name__ == '__main__':
         configuration.alignment_points_frame_percent) + ", number of frames: " + str(
         configuration.alignment_points_frame_number))
 
-    sys.exit()
+    exit()

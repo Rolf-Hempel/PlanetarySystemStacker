@@ -20,20 +20,21 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import os
 import sys
-import ctypes
+from ctypes import CDLL, byref, c_int
+from os import listdir
+from os.path import splitext, join
 
 from PyQt5 import QtCore
 
 from align_frames import AlignFrames
+from alignment_points import AlignmentPoints
 from exceptions import NotSupportedError, InternalError
 from frames import Frames
+from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
-from alignment_points import AlignmentPoints
 from stack_frames import StackFrames
 from timer import timer
-from miscellaneous import Miscellaneous
 
 
 class Workflow(QtCore.QObject):
@@ -62,11 +63,11 @@ class Workflow(QtCore.QObject):
         self.protocol_file = None
 
 
-        mkl_rt = ctypes.CDLL('mkl_rt.dll')
+        mkl_rt = CDLL('mkl_rt.dll')
         mkl_get_max_threads = mkl_rt.mkl_get_max_threads
 
         def mkl_set_num_threads(cores):
-            mkl_rt.mkl_set_num_threads(ctypes.byref(ctypes.c_int(cores)))
+            mkl_rt.mkl_set_num_threads(byref(c_int(cores)))
 
         mkl_set_num_threads(2)
         print("Number of threads used by mkl: " + str(mkl_get_max_threads()))
@@ -84,13 +85,13 @@ class Workflow(QtCore.QObject):
         # For video file input, the Frames constructor expects the video file name for "names".
         if input_type == 'video':
             names = input_name
-            self.stacked_image_name = os.path.splitext(input_name)[0] + '_pss.tiff'
-            self.stacked_image_log_name = os.path.splitext(input_name)[0] + '_log.txt'
+            self.stacked_image_name = splitext(input_name)[0] + '_pss.tiff'
+            self.stacked_image_log_name = splitext(input_name)[0] + '_log.txt'
         # For single image input, the Frames constructor expects a list of image file names for
         # "names".
         else:
-            names = os.listdir(input_name)
-            names = [os.path.join(input_name, name) for name in names]
+            names = listdir(input_name)
+            names = [join(input_name, name) for name in names]
             self.stacked_image_name = input_name + '_pss.tiff'
             self.stacked_image_log_name = input_name + '_log.txt'
 

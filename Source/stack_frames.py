@@ -20,12 +20,14 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import glob
-import warnings
+from glob import glob
+from warnings import filterwarnings
 
+from cv2 import GaussianBlur
 import matplotlib.pyplot as plt
-import numpy as np
-import cv2
+from numpy import int as np_int
+from numpy import zeros, full, empty, float32, int16, int32, newaxis, arange, count_nonzero, \
+    where, sqrt, logical_or
 from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
@@ -62,7 +64,7 @@ class StackFrames(object):
         """
 
         # Suppress warnings about precision loss in skimage file format conversions.
-        warnings.filterwarnings("ignore", category=UserWarning)
+        filterwarnings("ignore", category=UserWarning)
 
         self.configuration = configuration
         self.frames = frames
@@ -93,11 +95,11 @@ class StackFrames(object):
         # The arrays for the stacked image and the summation buffer need to accommodate three
         # color channels in the case of color images.
         if self.frames.color:
-            self.stacked_image_buffer = np.zeros([self.dim_y, self.dim_x, 3], dtype=np.float32)
-            self.stacked_image = np.zeros([self.dim_y, self.dim_x, 3], dtype=np.int16)
+            self.stacked_image_buffer = zeros([self.dim_y, self.dim_x, 3], dtype=float32)
+            self.stacked_image = zeros([self.dim_y, self.dim_x, 3], dtype=int16)
         else:
-            self.stacked_image_buffer = np.zeros([self.dim_y, self.dim_x], dtype=np.float32)
-            self.stacked_image = np.zeros([self.dim_y, self.dim_x], dtype=np.int16)
+            self.stacked_image_buffer = zeros([self.dim_y, self.dim_x], dtype=float32)
+            self.stacked_image = zeros([self.dim_y, self.dim_x], dtype=int16)
 
         # If the alignment point patches do not cover the entire frame, a background image must
         # be computed and blended in. At this point it is not yet clear if this is necessary.
@@ -108,8 +110,8 @@ class StackFrames(object):
         # contributing alignment patch images. Also, allocate a second buffer of same type and size
         # to accumulate the weights at each pixel. This buffer is used to normalize the image
         # buffer. The second buffer is initialized with a small value to avoid divide by zero.
-        self.number_single_frame_contributions = np.full([self.dim_y, self.dim_x], 0, dtype=np.int32)
-        self.sum_single_frame_weights = np.full([self.dim_y, self.dim_x], 0.0001, dtype=np.float32)
+        self.number_single_frame_contributions = full([self.dim_y, self.dim_x], 0, dtype=int32)
+        self.sum_single_frame_weights = full([self.dim_y, self.dim_x], 0.0001, dtype=float32)
 
         self.my_timer.stop('Stacking: AP initialization')
 
@@ -168,7 +170,7 @@ class StackFrames(object):
 
             # Compute the weights used in AP blending and store them with the AP.
             alignment_point['weights_yx'] = self.one_dim_weight(patch_y_low, patch_y_high,
-                    alignment_point['box_y_low'], alignment_point['box_y_high'])[:, np.newaxis] * \
+                    alignment_point['box_y_low'], alignment_point['box_y_high'])[:, newaxis] * \
                     self.one_dim_weight(patch_x_low, patch_x_high, alignment_point['box_x_low'],
                     alignment_point['box_x_high'])
 
@@ -177,7 +179,7 @@ class StackFrames(object):
             patch_x_low: patch_x_high] += single_stack_size_float * alignment_point['weights_yx']
 
         # Compute the fraction of pixels where no AP patch contributes.
-        self.number_stacking_holes = np.count_nonzero(
+        self.number_stacking_holes = count_nonzero(
             self.number_single_frame_contributions == 0)
         self.fraction_stacking_holes = self.number_stacking_holes / self.number_pixels
 
@@ -199,29 +201,29 @@ class StackFrames(object):
         #       (AP box) of a single AP.
         #   0.5 between those areas. After blurring the mask, values in these transition
         #       regions will show a smooth transition between APs and background.
-        mask_intermediate = np.where((self.number_single_frame_contributions == 0), 0., 0.5)
-        self.mask = np.where((
-        np.logical_or(self.number_single_frame_contributions > self.alignment_points.stack_size,
+        mask_intermediate = where((self.number_single_frame_contributions == 0), 0., 0.5)
+        self.mask = where((
+        logical_or(self.number_single_frame_contributions > self.alignment_points.stack_size,
                       self.sum_single_frame_weights > single_stack_size_float)), 1.,
                       mask_intermediate)
 
         # Apply a Gaussian blur to the mask to make transitions smoother.
         blur_width = self.configuration.stack_frames_gauss_width
-        self.mask = cv2.GaussianBlur(self.mask, (blur_width, blur_width), 0)
+        self.mask = GaussianBlur(self.mask, (blur_width, blur_width), 0)
 
         # The Gaussian blur might have created nonzero mask entries outside AP patches. Reset
         # them to zero to avoid artifacts.
-        self.mask = np.where((self.number_single_frame_contributions == 0), 0., self.mask)
+        self.mask = where((self.number_single_frame_contributions == 0), 0., self.mask)
 
         # Re-use the array "number_single_frame_contributions". It is set to 0 at all pixels
         # where a background is required. At all other locations it is set to 1.
-        self.number_single_frame_contributions = np.where((self.mask >= 1.), 1, 0)
+        self.number_single_frame_contributions = where((self.mask >= 1.), 1, 0)
 
         # Allocate a buffer for the background image.
         if self.frames.color:
-            self.averaged_background = np.zeros([self.dim_y, self.dim_x, 3], dtype=np.float32)
+            self.averaged_background = zeros([self.dim_y, self.dim_x, 3], dtype=float32)
         else:
-            self.averaged_background = np.zeros([self.dim_y, self.dim_x], dtype=np.float32)
+            self.averaged_background = zeros([self.dim_y, self.dim_x], dtype=float32)
 
         # If the fraction is below a certain limit, it is worthwhile to compute the background
         # image only where it is needed. Construct a list with patches where the background is
@@ -253,7 +255,7 @@ class StackFrames(object):
                         continue
 
                     # If the patch contains pixels where the background is used, add it to the list.
-                    if np.count_nonzero(
+                    if count_nonzero(
                             self.number_single_frame_contributions[patch_y_low:patch_y_high,
                             patch_x_low:patch_x_high] == 0) > 0:
                         background_patch = {}
@@ -277,8 +279,8 @@ class StackFrames(object):
         self.prepare_for_stack_blending()
 
         # Initialize the array for shift distribution statistics.
-        self.shift_distribution = np.full((self.configuration.alignment_points_search_width*2,), 0,
-                                          dtype=np.int)
+        self.shift_distribution = full((self.configuration.alignment_points_search_width*2,), 0,
+                                          dtype=np_int)
 
         # Go through the list of all frames.
         for frame_index in range(self.frames.number):
@@ -305,7 +307,7 @@ class StackFrames(object):
                     de_warp=self.configuration.alignment_points_de_warp)
 
                 # Increment the counter corresponding to the 2D warp shift.
-                self.shift_distribution[int(round(np.sqrt(shift_y**2 + shift_x**2)))] += 1
+                self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
 
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
@@ -454,7 +456,7 @@ class StackFrames(object):
             if self.frames.color:
                 self.stacked_image_buffer[patch_y_low:patch_y_high,
                 patch_x_low: patch_x_high, :] += alignment_point['stacking_buffer'] * \
-                                                 alignment_point['weights_yx'][:, :, np.newaxis]
+                                                 alignment_point['weights_yx'][:, :, newaxis]
             else:
                 self.stacked_image_buffer[
                 patch_y_low:patch_y_high,
@@ -463,7 +465,7 @@ class StackFrames(object):
 
         # Divide the global stacking buffer pixel-wise by the number of image contributions.
         if self.frames.color:
-            self.stacked_image_buffer /= self.sum_single_frame_weights[:, :, np.newaxis]
+            self.stacked_image_buffer /= self.sum_single_frame_weights[:, :, newaxis]
         else:
             self.stacked_image_buffer /= self.sum_single_frame_weights
 
@@ -478,7 +480,7 @@ class StackFrames(object):
             # blend the AP buffer with the background.
             if self.frames.color:
                 self.stacked_image_buffer = (self.stacked_image_buffer-self.averaged_background) * \
-                                            self.mask[:, :, np.newaxis] + self.averaged_background
+                                            self.mask[:, :, newaxis] + self.averaged_background
             else:
                 self.stacked_image_buffer = (self.stacked_image_buffer-self.averaged_background) * \
                                             self.mask + self.averaged_background
@@ -512,17 +514,17 @@ class StackFrames(object):
         box_high_offset = box_high - patch_low
 
         # Allocate weights array, length given by patch size.
-        weights = np.empty((patch_high_offset,), dtype=np.float32)
+        weights = empty((patch_high_offset,), dtype=float32)
 
         # Ramping up between lower patch and box borders.
         if box_low_offset > 0:
-            weights[0:box_low_offset] = np.arange(1 ,box_low_offset+1 , 1) / np.float32(box_low_offset+1)
+            weights[0:box_low_offset] = arange(1 ,box_low_offset+1 , 1) / float32(box_low_offset+1)
         # Box interior
         weights[box_low_offset:box_high_offset] = 1.
         # Ramping down between upper box and patch borders.
         if patch_high_offset > box_high_offset:
-            weights[box_high_offset:patch_high_offset] = np.arange(patch_high - box_high, 0, -1) /\
-                                                         np.float32(patch_high - box_high + 1)
+            weights[box_high_offset:patch_high_offset] = arange(patch_high - box_high, 0, -1) /\
+                                                         float32(patch_high - box_high + 1)
         return weights
 
     def print_shift_table(self):
@@ -534,27 +536,30 @@ class StackFrames(object):
         """
 
         # Find the last non-zero entry in the array.
-        max_index = [index for index, item in enumerate(self.shift_distribution) if item != 0][-1] \
-                    + 1
+        if max(self.shift_distribution) > 0:
+            max_index = [index for index, item in enumerate(self.shift_distribution) if item != 0][-1] \
+                        + 1
 
-        # Initialize the three table lines.
-        s =    "           Shift (pixels):"
-        line = "           ---------------"
-        t =    "           Count:         "
+            # Initialize the three table lines.
+            s =    "           Shift (pixels):"
+            line = "           ---------------"
+            t =    "           Count:         "
 
-        # Extend the three table lines up to the max index.
-        for index in range(max_index):
-            s += "|{:6d} ".format(index)
-            line += "--------"
-            t += "|{:6d} ".format(self.shift_distribution[index])
+            # Extend the three table lines up to the max index.
+            for index in range(max_index):
+                s += "|{:6d} ".format(index)
+                line += "--------"
+                t += "|{:6d} ".format(self.shift_distribution[index])
 
-        # Finish the three table lines.
-        s += "|"
-        line += "-"
-        t += "|"
+            # Finish the three table lines.
+            s += "|"
+            line += "-"
+            t += "|"
 
-        # Return the three lines to be printed to the protocol.
-        return s + "\n" + line + "\n" + t
+            # Return the three lines to be printed to the protocol.
+            return s + "\n" + line + "\n" + t
+        else:
+            return ""
 
 
 if __name__ == "__main__":
@@ -565,7 +570,7 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob('Images/2012*.tif')
+        names = glob('Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:

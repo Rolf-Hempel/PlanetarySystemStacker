@@ -20,13 +20,14 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import glob
-import os
+from glob import glob
+from os import path, remove
 from pathlib import Path
 
-import cv2
 import matplotlib.pyplot as plt
 import numpy as np
+from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
+    COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs
 from scipy import misc
 
 from configuration import Configuration
@@ -37,14 +38,14 @@ class Frames(object):
     """
         This object stores the image data of all frames. Four versions of the original frames are
         used throughout the data processing workflow. They are (re-)used in the folliwing phases:
-        1. Original (color) frames
+        1. Original (color) frames, type: uint8 / uint16
             - Frame stacking ("stack_frames.stack_frames")
-        2. Monochrome version of 1.
+        2. Monochrome version of 1., type: uint8 / uint16
             - Computing the average frame (only average frame subset, "align_frames.average_frame")
-        3. Gaussian blur added to 2.
+        3. Gaussian blur added to 2., type: type: uint8 / uint16
             - Aligning all frames ("align_frames.align_frames")
             - Frame stacking ("stack_frames.stack_frames")
-        4. Down-sampled Laplacian of 3.
+        4. Down-sampled Laplacian of 3., type: float32
             - Overall image ranking ("rank_frames.frame_score")
             - Ranking frames at alignment points("alignment_points.compute_frame_qualities")
 
@@ -88,7 +89,7 @@ class Frames(object):
                         self.progress_signal.emit("Read all frames",
                                              int((frame_index / self.number) * 100.))
                     # Read the next frame, and scale it to the range [0., 1.] if necessary.
-                    frame = cv2.imread(path, -1)
+                    frame = imread(path, -1)
                     if frame.dtype == 'uint16':
                         frame = frame * conversion_factor
                     self.frames_original.append(frame)
@@ -107,8 +108,8 @@ class Frames(object):
         elif type == 'video':
             # In case "video", use OpenCV to capture frames from video file. Revert the implicit
             # conversion from RGB to BGR in OpenCV input.
-            cap = cv2.VideoCapture(names)
-            self.number = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+            cap = VideoCapture(names)
+            self.number = int(cap.get(CAP_PROP_FRAME_COUNT))
             self.frames_original = []
             self.signal_step_size = max(int(self.number / 10), 1)
             for frame_index in range(self.number):
@@ -119,9 +120,9 @@ class Frames(object):
                 ret, frame = cap.read()
                 if ret:
                     if convert_to_grayscale:
-                        self.frames_original.append(cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY))
+                        self.frames_original.append(cvtColor(frame, COLOR_BGR2GRAY))
                     else:
-                        self.frames_original.append(cv2.cvtColor(frame, cv2.COLOR_BGR2RGB))
+                        self.frames_original.append(cvtColor(frame, COLOR_BGR2RGB))
                 else:
                     raise IOError("Error in reading video frame")
             cap.release()
@@ -256,21 +257,24 @@ class Frames(object):
                                           int((frame_index / self.number) * 100.))
             if self.color:
                 if color == 'panchromatic':
-                    frame_mono = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                    frame_mono = cvtColor(frame, COLOR_BGR2GRAY)
                 else:
                     frame_mono = frame[:, :, colors.index(color)]
                 self.frames_monochrome.append(frame_mono)
 
             # Add a version of the frame with Gaussian blur added.
-            frame_monochrome_blurred = cv2.GaussianBlur(self.frames_monochrome[frame_index], (
+            frame_monochrome_blurred = GaussianBlur(self.frames_monochrome[frame_index], (
                 self.configuration.frames_gauss_width, self.configuration.frames_gauss_width), 0)
             self.frames_monochrome_blurred.append(frame_monochrome_blurred)
 
             # Add the Laplacian of the down-sampled blurred image.
             if self.configuration.rank_frames_method == "Laplace":
-                self.frames_monochrome_blurred_laplacian.append(cv2.Laplacian(
+                self.frames_monochrome_blurred_laplacian.append(convertScaleAbs(Laplacian(
                     frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
-                    ::self.configuration.align_frames_sampling_stride], cv2.CV_32F))
+                    ::self.configuration.align_frames_sampling_stride], CV_32F)))
+                # self.frames_monochrome_blurred_laplacian.append(Laplacian(
+                #     frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
+                #     ::self.configuration.align_frames_sampling_stride], CV_32F))
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Gaussians / Laplacians", 100)
@@ -311,25 +315,25 @@ class Frames(object):
                     filename += '.tiff'
 
         # Don't care if a file with the given name exists. Overwrite it if necessary.
-        elif os.path.exists(filename):
-            os.remove(filename)
+        elif path.exists(filename):
+            remove(filename)
 
         # Write the image to the file. Before writing, convert the internal RGB representation into
         # the BGR representation assumed by OpenCV.
         if color:
-            cv2.imwrite(str(filename), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
+            imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
         else:
-            cv2.imwrite(str(filename), image)
+            imwrite(str(filename), image)
 
 
 if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
-    type = 'image'
+    type = 'video'
     if type == 'image':
         # names = glob.glob('Images/2012_*.tif')
-        names = glob.glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
+        names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
     else:
         names = 'Videos/short_video.avi'
 
@@ -356,7 +360,7 @@ if __name__ == "__main__":
     plt.show()
 
     if type == 'video':
-        stacked_image_name = os.path.splitext(names)[0] + '_pss.tiff'
+        stacked_image_name = path.splitext(names)[0] + '_pss.tiff'
     # For single image input, the Frames constructor expects a list of image file names for
     # "names".
     else:

@@ -20,8 +20,8 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import configparser
-import os.path
+from os.path import expanduser, join, isfile
+from configparser import ConfigParser
 
 from exceptions import IncompatibleVersionsError
 
@@ -51,7 +51,7 @@ class ConfigurationParameters(object):
         self.alignment_points_frame_percent = None
 
     def set_defaults(self):
-        self.hidden_parameters_current_dir = os.path.expanduser("~")
+        self.hidden_parameters_current_dir = expanduser("~")
         self.hidden_parameters_main_window_x0 = 100
         self.hidden_parameters_main_window_y0 = 100
         self.hidden_parameters_main_window_width = 1200
@@ -114,11 +114,11 @@ class Configuration(object):
 
         # The config file for persistent parameter storage is located in the user's home
         # directory, as is the detailed logfile.
-        self.home = os.path.expanduser("~")
-        self.config_filename = os.path.join(self.home, ".PlanetarySystemStacker.ini")
-        self.protocol_filename = os.path.join(self.home, "PlanetarySystemStacker.log")
+        self.home = expanduser("~")
+        self.config_filename = join(self.home, ".PlanetarySystemStacker.ini")
+        self.protocol_filename = join(self.home, "PlanetarySystemStacker.log")
 
-        self.config_file_exists = os.path.isfile(self.config_filename)
+        self.config_file_exists = isfile(self.config_filename)
 
         # If an existing config file is found, read it in.
         self.configuration_read = False
@@ -318,7 +318,7 @@ class Configuration(object):
         """
 
         # Create a ConfigParser object.
-        conf = configparser.ConfigParser()
+        conf = ConfigParser()
 
         # Copy all current parameters from the current configuration into the ConfigParser object.
         conf.add_section('Hidden parameters')
@@ -436,7 +436,7 @@ class Configuration(object):
         """
 
         # Allocate a new ConfigParser object.
-        conf = configparser.ConfigParser()
+        conf = ConfigParser()
 
         if not file_name:
             file_name = self.config_filename

@@ -20,7 +20,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import os
+from os.path import isfile, isdir, join
 from pathlib import Path
 
 from PyQt5 import QtWidgets, QtCore
@@ -57,7 +57,7 @@ class FileDialog(QtWidgets.QFileDialog):
         files = []
         for i in inds:
             if i.column() == 0:
-                files.append(os.path.join(str(self.directory().absolutePath()), str(i.data())))
+                files.append(join(str(self.directory().absolutePath()), str(i.data())))
         self.signal_dialog_ready.emit(files)
         self.close()
 
@@ -188,9 +188,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         # Set the job types of all current jobs on the list.
         self.job_types = []
         for job in self.job_names:
-            if os.path.isfile(job):
+            if isfile(job):
                 self.job_types.append('video')
-            elif os.path.isdir(job):
+            elif isdir(job):
                 self.job_types.append('image')
             else:
                 raise InternalError("Cannot decide if input file is video or image directory")

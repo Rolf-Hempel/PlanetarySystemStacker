@@ -148,8 +148,9 @@ class timer(object):
 
     def protocol(self, logfile):
         Miscellaneous.protocol("", logfile, precede_with_timestamp=False)
-        Miscellaneous.protocol("--------------------------------------------------\n"
-                               "           Status of time counters:", logfile)
+        Miscellaneous.protocol("           --------------------------------------------------\n"
+                               "           Status of time counters:", logfile,
+                               precede_with_timestamp=False)
         for name in self.counters.keys():
             Miscellaneous.protocol(
                 "           {0:40} {1:8.3f}".format(name, self.counters[name][0]), logfile,

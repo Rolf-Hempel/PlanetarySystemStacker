@@ -22,16 +22,15 @@ Part of this module (in class "AlignmentPointEditor" was copied from
 https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgraphicsview
 
 """
-import glob
-import sys
+from glob import glob
+from sys import argv, exit
 from time import time
 
-import numpy as np
+from numpy import uint8
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from exceptions import InternalError, NotSupportedError
 from align_frames import AlignFrames
-from alignment_points import AlignmentPoints
 from configuration import Configuration
 from frames import Frames
 from rank_frames import RankFrames
@@ -227,7 +226,7 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
 
         self.image = image
         # Convert the float32 monochrome image into uint8 format.
-        image_uint8 = self.image.astype(np.uint8)
+        image_uint8 = self.image.astype(uint8)
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
         qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
@@ -431,7 +430,7 @@ if __name__ == '__main__':
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob('Images/2012*.tif')
+        names = glob('Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
@@ -483,8 +482,8 @@ if __name__ == '__main__':
         print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
             x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
-        reference_frame_with_alignment_points = align_frames.frames_mono[
-            align_frames.frame_ranks_max_index].copy()
+        reference_frame_with_alignment_points = frames.frames_mono(
+            align_frames.frame_ranks_max_index).copy()
         reference_frame_with_alignment_points[y_low_opt,
         x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
                                 x_low_opt:x_high_opt] = 255
@@ -518,7 +517,7 @@ if __name__ == '__main__':
     border = configuration.align_frames_search_width
     # border = 100
 
-    app = QtWidgets.QApplication(sys.argv)
+    app = QtWidgets.QApplication(argv)
     window = RectangularPatchEditorWidget(None, average[border:-border, border:-border],
             "With 'crtl' and the left mouse button pressed, draw a rectangular patch "
             "to be used for frame alignment. Or just press 'OK / Cancel' (automatic selection).",
@@ -531,5 +530,5 @@ if __name__ == '__main__':
            str(border+window.y_high) + ", x_low: " + str(border+window.x_low) + ", x_high: "
            + str(border+window.x_high))
 
-    sys.exit()
+    exit()
 

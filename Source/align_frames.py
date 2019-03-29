@@ -20,12 +20,12 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import glob
-from math import ceil
+from glob import glob
 
 import matplotlib.pyplot as plt
+from math import ceil
+from numpy import arange, float32, zeros
 from scipy import ndimage
-from numpy import empty, mean, arange, float32, zeros, amax
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
@@ -477,7 +477,7 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob(
+        names = glob(
             'Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
