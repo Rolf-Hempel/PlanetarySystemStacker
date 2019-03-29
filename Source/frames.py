@@ -45,7 +45,7 @@ class Frames(object):
         3. Gaussian blur added to 2., type: type: uint8 / uint16
             - Aligning all frames ("align_frames.align_frames")
             - Frame stacking ("stack_frames.stack_frames")
-        4. Down-sampled Laplacian of 3., type: float32
+        4. Down-sampled Laplacian of 3., type: uint8
             - Overall image ranking ("rank_frames.frame_score")
             - Ranking frames at alignment points("alignment_points.compute_frame_qualities")
 
@@ -267,14 +267,20 @@ class Frames(object):
                 self.configuration.frames_gauss_width, self.configuration.frames_gauss_width), 0)
             self.frames_monochrome_blurred.append(frame_monochrome_blurred)
 
+            # Compute the scaling factor for "convertScaleAbs" depending on the data type of the
+            # monochrome image. The Laplacian is 8bit. If the monochrome image is 16bit, values
+            # have to be scaled down.
+            if frame_monochrome_blurred.dtype == np.uint8:
+                conversion_factor = 1.
+            elif frame_monochrome_blurred.dtype == np.uint16:
+                conversion_factor = 255.0 / 65535.0
+
             # Add the Laplacian of the down-sampled blurred image.
             if self.configuration.rank_frames_method == "Laplace":
                 self.frames_monochrome_blurred_laplacian.append(convertScaleAbs(Laplacian(
                     frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
-                    ::self.configuration.align_frames_sampling_stride], CV_32F)))
-                # self.frames_monochrome_blurred_laplacian.append(Laplacian(
-                #     frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
-                #     ::self.configuration.align_frames_sampling_stride], CV_32F))
+                    ::self.configuration.align_frames_sampling_stride], CV_32F),
+                    alpha=conversion_factor))
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Gaussians / Laplacians", 100)

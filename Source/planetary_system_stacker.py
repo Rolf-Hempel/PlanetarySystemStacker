@@ -514,8 +514,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             "Save result as 16bit Tiff image", self.workflow.stacked_image_name ,
             "Image Files (*.tiff)", options=options)
 
-        self.workflow.frames.save_image(filename, self.workflow.stack_frames.stacked_image,
-                                        color=self.workflow.frames.color, avoid_overwriting=False)
+        if filename and extension:
+            self.workflow.frames.save_image(filename, self.workflow.stack_frames.stacked_image,
+                                            color=self.workflow.frames.color,
+                                            avoid_overwriting=False)
 
     def place_holder_manual_activity(self, activity):
         # Ask the user for confirmation.
