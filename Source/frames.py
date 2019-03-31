@@ -83,16 +83,13 @@ class Frames(object):
                 self.frames_original = [misc.imread(path, mode='F') for path in names]
             else:
                 self.frames_original = []
-                conversion_factor = np.float32(1. / 255.)
                 for frame_index, path in enumerate(names):
                     # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                     if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
                         self.progress_signal.emit("Read all frames",
                                              int((frame_index / self.number) * 100.))
-                    # Read the next frame, and scale it to the range [0., 1.] if necessary.
+                    # Read the next frame.
                     frame = imread(path, -1)
-                    # if frame.dtype == 'uint16':
-                    #     frame = frame * conversion_factor
                     self.frames_original.append(frame)
 
                 if self.progress_signal is not None:
