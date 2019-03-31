@@ -23,6 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from glob import glob
 from os import path, remove
 from pathlib import Path
+from time import time
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -40,9 +41,9 @@ class Frames(object):
         used throughout the data processing workflow. They are (re-)used in the folliwing phases:
         1. Original (color) frames, type: uint8 / uint16
             - Frame stacking ("stack_frames.stack_frames")
-        2. Monochrome version of 1., type: uint8 / uint16
+        2. Monochrome version of 1., type: uint8
             - Computing the average frame (only average frame subset, "align_frames.average_frame")
-        3. Gaussian blur added to 2., type: type: uint8 / uint16
+        3. Gaussian blur added to 2., type: type: uint8
             - Aligning all frames ("align_frames.align_frames")
             - Frame stacking ("stack_frames.stack_frames")
         4. Down-sampled Laplacian of 3., type: uint8
@@ -90,20 +91,24 @@ class Frames(object):
                                              int((frame_index / self.number) * 100.))
                     # Read the next frame, and scale it to the range [0., 1.] if necessary.
                     frame = imread(path, -1)
-                    if frame.dtype == 'uint16':
-                        frame = frame * conversion_factor
+                    # if frame.dtype == 'uint16':
+                    #     frame = frame * conversion_factor
                     self.frames_original.append(frame)
 
                 if self.progress_signal is not None:
                     self.progress_signal.emit("Read all frames", 100)
             self.shape = self.frames_original[0].shape
+            dt0 = self.frames_original[0].dtype
 
-            # Test if all images have the same shape. If not, raise an exception.
+            # Test if all images have the same shape, color type and depth.
+            # If not, raise an exception.
             for image in self.frames_original:
                 if image.shape != self.shape:
                     raise ShapeError("Images have different size")
                 elif len(self.shape) != len(image.shape):
                     raise ShapeError("Mixing grayscale and color images not supported")
+                if image.dtype != dt0:
+                    raise TypeError("Images have different type")
 
         elif type == 'video':
             # In case "video", use OpenCV to capture frames from video file. Revert the implicit
@@ -129,8 +134,9 @@ class Frames(object):
             if self.progress_signal is not None:
                 self.progress_signal.emit("Read all frames", 100)
             self.shape = self.frames_original[0].shape
+            dt0 = self.frames_original[0].dtype
         else:
-            raise TypeError("Image type not supported")
+            raise TypeError("Image type " + type + " not supported")
 
         # Monochrome images are stored as 2D arrays, color images as 3D.
         if len(self.shape) == 2:
@@ -139,6 +145,14 @@ class Frames(object):
             self.color = True
         else:
             raise ShapeError("Image shape not supported")
+
+        # Set the depth value of all images to either 16 or 8 bits.
+        if dt0 == 'uint16':
+            self.depth = 16
+        elif dt0 == 'uint8':
+            self.depth = 8
+        else:
+            raise TypeError("Frame type " + str(dt0) + " not supported")
 
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
         # Laplacians.
@@ -244,7 +258,7 @@ class Frames(object):
             if not color in colors:
                 raise ArgumentError("Invalid color selected for channel extraction")
             self.frames_monochrome = []
-        else:
+        elif self.depth == 8:
             self.frames_monochrome = self.frames_original
 
         self.frames_monochrome_blurred = []
@@ -255,11 +269,22 @@ class Frames(object):
             if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
                 self.progress_signal.emit("Gaussians / Laplacians",
                                           int((frame_index / self.number) * 100.))
-            if self.color:
-                if color == 'panchromatic':
-                    frame_mono = cvtColor(frame, COLOR_BGR2GRAY)
+
+            # If frames are in color mode, or the depth is 16bit, produce a 8bit B/W version.
+            if self.color or self.depth != 8:
+                # If frames are in color mode, create a monochrome version with same depth.
+                if self.color:
+                    if color == 'panchromatic':
+                        frame_mono = cvtColor(frame, COLOR_BGR2GRAY)
+                    else:
+                        frame_mono = frame[:, :, colors.index(color)]
                 else:
-                    frame_mono = frame[:, :, colors.index(color)]
+                    frame_mono = frame
+
+                # If depth is larger than 8bit, reduce the depth to 8bit.
+                if self.depth != 8:
+                    frame_mono = ((frame_mono) / 255.).astype(np.uint8)
+
                 self.frames_monochrome.append(frame_mono)
 
             # Add a version of the frame with Gaussian blur added.
@@ -270,17 +295,13 @@ class Frames(object):
             # Compute the scaling factor for "convertScaleAbs" depending on the data type of the
             # monochrome image. The Laplacian is 8bit. If the monochrome image is 16bit, values
             # have to be scaled down.
-            if frame_monochrome_blurred.dtype == np.uint8:
-                conversion_factor = 1.
-            elif frame_monochrome_blurred.dtype == np.uint16:
-                conversion_factor = 255.0 / 65535.0
 
             # Add the Laplacian of the down-sampled blurred image.
             if self.configuration.rank_frames_method == "Laplace":
                 self.frames_monochrome_blurred_laplacian.append(convertScaleAbs(Laplacian(
                     frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
                     ::self.configuration.align_frames_sampling_stride], CV_32F),
-                    alpha=conversion_factor))
+                    alpha=1))
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Gaussians / Laplacians", 100)
@@ -338,14 +359,16 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        # names = glob.glob('Images/2012_*.tif')
-        names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
+        # names = glob('Images/2012_*.tif')
+        # names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
+        names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
     else:
         names = 'Videos/short_video.avi'
 
     # Get configuration parameters.
     configuration = Configuration()
 
+    start = time()
     try:
         frames = Frames(configuration, names, type=type, convert_to_grayscale=False)
         print("Number of images read: " + str(frames.number))
@@ -353,6 +376,8 @@ if __name__ == "__main__":
     except Exception as e:
         print("Error: " + e.message)
         exit()
+    end = time()
+    print ("Read " + str(frames.number) + " frames in " + str(end-start) + " seconds.")
 
     # Create monochrome versions of all frames. If the original frames are monochrome, just point
     # the monochrome frame list to the original images (no deep copy!).

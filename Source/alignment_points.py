@@ -162,6 +162,12 @@ class AlignmentPoints(object):
         self.alignment_points_dropped_dim = 0
         self.alignment_points_dropped_structure = 0
 
+        # Compute the minimum distance of an AP center from the frame boundary.
+        min_boundary_distance = max(
+            self.configuration.alignment_points_half_box_width + \
+            self.configuration.alignment_points_search_width,
+            self.configuration.alignment_points_half_patch_width)
+
         # Create alignment point rows, start with an even one.
         even = True
         for index_y, y in enumerate(ap_locations_y):
@@ -204,22 +210,14 @@ class AlignmentPoints(object):
                         com = ndimage.measurements.center_of_mass(box)
                         y_adapted = y + int(com[0]) - half_box_width
                         x_adapted = x + int(com[1]) - half_box_width
-                        shift_y = y_adapted - y
-                        shift_x = x_adapted - x
 
-                        # If the alignment points must cover the whole frame, extend the size of
-                        # ap box and patch, so that no holes will open up.
-                        if self.configuration.alignment_points_adjust_edge_patches:
-                            # Increase the box and patch sizes to avoid holes in the stacking image.
-                            box_increment = max(shift_y, shift_x)
-                            half_box_width_adapted = half_box_width + box_increment
-                            half_patch_width_adapted = half_patch_width + box_increment
-                        else:
-                            half_box_width_adapted = half_box_width
-                            half_patch_width_adapted = half_patch_width
+                        y_adapted = max(y_adapted, min_boundary_distance)
+                        y_adapted = min(y_adapted, self.num_pixels_y - min_boundary_distance)
+                        x_adapted = max(x_adapted, min_boundary_distance)
+                        x_adapted = min(x_adapted, self.num_pixels_x - min_boundary_distance)
 
                         # Replace the alignment point with a new one, using the updated
-                        # coordinates and box / patch sizes.
+                        # coordinates.
                         alignment_point = self.new_alignment_point(y_adapted, x_adapted,
                                                                    extend_x_low, extend_x_high,
                                                                    extend_y_low, extend_y_high)

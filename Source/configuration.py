@@ -156,7 +156,6 @@ class Configuration(object):
         self.alignment_points_min_half_box_width = 10
         self.alignment_points_contrast_threshold = 0
         self.alignment_points_dim_fraction_threshold = 0.6
-        self.alignment_points_adjust_edge_patches = True
         self.alignment_points_rank_method = "Laplace"
         self.alignment_points_rank_pixel_stride = 2
         self.alignment_points_de_warp = True
