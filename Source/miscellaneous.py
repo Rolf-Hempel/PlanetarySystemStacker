@@ -29,7 +29,7 @@ from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY
     putText
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin
+    empty, argmin, stack, sin, uint8
 from numpy import min as np_min
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
@@ -578,7 +578,7 @@ class Miscellaneous(object):
             yield (i, j)
 
     @staticmethod
-    def write_video(name, frame_list, annotations, fps):
+    def write_video(name, frame_list, annotations, fps, depth=8):
         """
         Create a video file from a list of frames.
 
@@ -586,6 +586,7 @@ class Miscellaneous(object):
         :param frame_list: List of frames to be written
         :param annotations: List of text strings to be written into the corresponding frame
         :param fps: Frames per second of video
+        :param depth: Bit depth of the image "frame", either 8 or 16.
         :return: -
         """
 
@@ -614,11 +615,16 @@ class Miscellaneous(object):
         # For each frame: If monochrome, convert it to three-channel color mode. insert annotation
         # and write the frame.
         for index, frame in enumerate(frame_list):
-            # If
-            if len(frame.shape) == 2:
-                rgb_frame = stack((frame,) * 3, -1)
+            # If the frames are 16bit, convert them to 8bit.
+            if depth == 8:
+                frame_8b = frame
             else:
-                rgb_frame = frame
+                frame_8b = (frame / 255.).astype(uint8)
+
+            if len(frame.shape) == 2:
+                rgb_frame = stack((frame_8b,) * 3, -1)
+            else:
+                rgb_frame = frame_8b
             putText(rgb_frame, annotations[index],
                         bottomLeftCornerOfText,
                         font,

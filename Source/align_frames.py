@@ -556,7 +556,7 @@ if __name__ == "__main__":
     plt.show()
 
     # Write video with stabilized frames, annotated with their frame indices.
-    stabilized = False
+    stabilized = True
     if stabilized:
         name = 'Videos/stabilized_video_with_frame_numbers.avi'
     else:
