@@ -233,10 +233,6 @@ class Frames(object):
 
         # The frame has not been stored for re-use, read it.
         else:
-            # If another frame has been cached, delete it.
-            if self.original_available is not None:
-                del (self.original_available)
-
             if self.type == 'image':
                 if self.convert_to_grayscale:
                     frame = misc.imread(self.names[index], mode='F')
@@ -244,7 +240,8 @@ class Frames(object):
                     frame = imread(self.names[index], -1)
             else:
                 # Set the read position in the file to frame "index", and read the frame.
-                self.cap.set(CAP_PROP_POS_FRAMES, index)
+                if index != self.original_available_index + 1:
+                    self.cap.set(CAP_PROP_POS_FRAMES, index)
                 ret, frame = self.cap.read()
                 if ret:
                     if self.convert_to_grayscale:
@@ -311,9 +308,6 @@ class Frames(object):
 
         # The frame has not been stored for re-use, compute it.
         else:
-            # If another frame has been cached, delete it.
-            if self.monochrome_available is not None:
-                del(self.monochrome_available)
 
             # Get the original frame. If it is not cached, this involves I/O.
             frame_original = self.frames(index)
@@ -366,9 +360,6 @@ class Frames(object):
 
         # The frame has not been stored for re-use, compute it.
         else:
-            # If another frame has been cached, delete it.
-            if self.gaussian_available is not None:
-                del(self.gaussian_available)
 
             # Get the monochrome frame. If it is not cached, this involves I/O.
             frame_mono = self.frames_mono(index)
@@ -409,9 +400,6 @@ class Frames(object):
 
         # The frame has not been stored for re-use, compute it.
         else:
-            # If another frame has been cached, delete it.
-            if self.laplacian_available is not None:
-                del (self.laplacian_available)
 
             # Get the monochrome frame. If it is not cached, this involves I/O.
             frame_monochrome_blurred = self.frames_mono_blurred(index)

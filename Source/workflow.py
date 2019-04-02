@@ -75,6 +75,12 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot(str, str, bool)
     def execute_frames(self, input_name, input_type, convert_to_grayscale):
 
+        # If objects are left over from previous run, delete them.
+        for obj in [self.frames, self.rank_frames, self.align_frames, self.alignment_points,
+                    self.stack_frames]:
+            if obj is not None:
+                del obj
+
         # Update the status bar in the main GUI.
         self.input_name = input_name
         self.set_status_bar_processing_phase("reading frames")
