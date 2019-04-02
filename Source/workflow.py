@@ -132,15 +132,36 @@ class Workflow(QtCore.QObject):
         self.my_timer = timer()
         self.my_timer.create('Execution over all')
 
-        # Read the frames.
-        if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start reading frames +++", self.stacked_image_log_file)
-        self.my_timer.create('Read all frames')
+        # Decide on the objects to be buffered, depending on configuration parameter.
+        buffer_original = False
+        buffer_monochrome = False
+        buffer_gaussian = False
+        buffer_laplacian = False
+
+        if self.configuration.global_parameters_buffering_level > 0:
+            buffer_laplacian = True
+        if self.configuration.global_parameters_buffering_level > 1:
+            buffer_gaussian = True
+        if self.configuration.global_parameters_buffering_level > 2:
+            buffer_original = True
+        if self.configuration.global_parameters_buffering_level > 3:
+            buffer_monochrome = True
+
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol("+++ Buffering level is " +
+                                   str(self.configuration.global_parameters_buffering_level) + " +++",
+                                   self.stacked_image_log_file)
+        if buffer_original:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("+++ Start reading frames +++", self.stacked_image_log_file)
+            self.my_timer.create('Read all frames')
         try:
             self.frames = Frames(self.configuration, names, type=input_type,
                             convert_to_grayscale=convert_to_grayscale,
-                            progress_signal=self.work_current_progress_signal)
-            if self.configuration.global_parameters_protocol_level > 1:
+                            progress_signal=self.work_current_progress_signal,
+                            buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
+                            buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
+            if buffer_original and self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.protocol(
                             "           Number of images read: " + str(self.frames.number) +
                             ", image shape: " + str(self.frames.shape), self.stacked_image_log_file,
@@ -149,20 +170,8 @@ class Workflow(QtCore.QObject):
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("Error: " + str(e), self.stacked_image_log_file)
             exit()
-        self.my_timer.stop('Read all frames')
-
-        # The whole quality analysis and shift determination process is performed on a monochrome
-        # version of the frames. If the original frames are in RGB, the monochrome channel can be
-        # selected via a configuration parameter. Add a list of monochrome images for all frames to
-        # the "Frames" object.
-        if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol(
-                "+++ Start creating blurred monochrome images and Laplacians +++",
-                self.stacked_image_log_file)
-        self.set_status_bar_processing_phase("computing Gaussians / Laplacians")
-        self.my_timer.create('Blurred monochrome images and Laplacians')
-        self.frames.add_monochrome(self.configuration.frames_mono_channel)
-        self.my_timer.stop('Blurred monochrome images and Laplacians')
+        if buffer_original:
+            self.my_timer.stop('Read all frames')
 
         self.work_next_task_signal.emit("Rank frames")
 

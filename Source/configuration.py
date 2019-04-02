@@ -38,6 +38,7 @@ class ConfigurationParameters(object):
         self.global_parameters_protocol_level = None
         self.global_parameters_write_protocol_to_file = None
         self.global_parameters_store_protocol_with_result = None
+        self.global_parameters_buffering_level = None
         self.frames_gauss_width = None
         self.align_frames_mode = None
         self.align_frames_automation = None
@@ -60,6 +61,7 @@ class ConfigurationParameters(object):
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = True
         self.global_parameters_store_protocol_with_result = False
+        self.global_parameters_buffering_level = 3
         self.frames_gauss_width = 7
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
@@ -92,6 +94,8 @@ class ConfigurationParameters(object):
             configuration_object.global_parameters_write_protocol_to_file
         self.global_parameters_store_protocol_with_result = \
             configuration_object.global_parameters_store_protocol_with_result
+        self.global_parameters_buffering_level = \
+            configuration_object.global_parameters_buffering_level
         self.frames_gauss_width = configuration_object.frames_gauss_width
         self.align_frames_mode = configuration_object.align_frames_mode
         self.align_frames_automation = configuration_object.align_frames_automation
@@ -143,6 +147,7 @@ class Configuration(object):
         # Set fixed parameters which are hidden from the user. Hidden parameters which are
         # changeable are stored in the configuration object.
         self.frames_mono_channel = 'panchromatic'
+        self.frames_buffer_level = 1
 
         self.rank_frames_pixel_stride = 1
         self.rank_frames_method = "Laplace"
@@ -198,6 +203,8 @@ class Configuration(object):
             configuration_parameters.global_parameters_write_protocol_to_file
         self.global_parameters_store_protocol_with_result = \
             configuration_parameters.global_parameters_store_protocol_with_result
+        self.global_parameters_buffering_level = \
+            configuration_parameters.global_parameters_buffering_level
         self.frames_gauss_width = configuration_parameters.frames_gauss_width
         self.align_frames_mode = configuration_parameters.align_frames_mode
         self.align_frames_automation = configuration_parameters.align_frames_automation
@@ -291,6 +298,7 @@ class Configuration(object):
         self.global_parameters_store_protocol_with_result = conf.getboolean(
             'Global parameters',
             'store protocol with result')
+        self.global_parameters_buffering_level = conf.getint('Global parameters', 'buffering level')
         self.frames_gauss_width = conf.getint('Frames', 'gauss width')
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
@@ -339,6 +347,8 @@ class Configuration(object):
                            str(self.global_parameters_write_protocol_to_file))
         self.set_parameter(conf, 'Global parameters', 'store protocol with result',
                            str(self.global_parameters_store_protocol_with_result))
+        self.set_parameter(conf, 'Global parameters', 'buffering level',
+                           str(self.global_parameters_buffering_level))
 
         conf.add_section('Frames')
         self.set_parameter(conf, 'Frames', 'gauss width', str(self.frames_gauss_width))

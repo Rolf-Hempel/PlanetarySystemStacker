@@ -28,7 +28,8 @@ from time import time
 import matplotlib.pyplot as plt
 import numpy as np
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
-    COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs
+    COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs, \
+    CAP_PROP_POS_FRAMES
 from scipy import misc
 
 from configuration import Configuration
@@ -56,7 +57,8 @@ class Frames(object):
     """
 
     def __init__(self, configuration, names, type='video', convert_to_grayscale=False,
-                 progress_signal=None):
+                 progress_signal=None, buffer_original=True, buffer_monochrome=False,
+                 buffer_gaussian=True, buffer_laplacian=True):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
@@ -69,117 +71,227 @@ class Frames(object):
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
                                 (str, int) with the current activity (str) and the progress in
                                 percent (int).
+        :param buffer_original: If "True", read the original frame data only once, otherwise
+                                read them again if required.
+        :param buffer_monochrome: If "True", compute the monochrome image only once, otherwise
+                                  compute it again if required. This may include re-reading the
+                                  original image data.
+        :param buffer_gaussian: If "True", compute the gaussian-blurred image only once, otherwise
+                                compute it again if required. This may include re-reading the
+                                original image data.
+        :param buffer_laplacian: If "True", compute the "Laplacian of Gaussian" only once, otherwise
+                                 compute it again if required. This may include re-reading the
+                                 original image data.
         """
 
         self.configuration = configuration
+        self.names = names
         self.progress_signal = progress_signal
+        self.type = type
+        self.convert_to_grayscale = convert_to_grayscale
 
-        if type == 'image':
-            # Use scipy.misc to read in image files. If "convert_to_grayscale" is True, convert
-            # pixel values to 32bit floats.
-            self.number = len(names)
-            self.signal_step_size = max(int(self.number / 10), 1)
-            if convert_to_grayscale:
-                self.frames_original = [misc.imread(path, mode='F') for path in names]
-            else:
+        self.buffer_original = buffer_original
+        self.buffer_monochrome = buffer_monochrome
+        self.buffer_gaussian = buffer_gaussian
+        self.buffer_laplacian = buffer_laplacian
+
+        # In non-buffered mode, the index of the image just read/computed is stored for re-use.
+        self.original_available = None
+        self.original_available_index = -1
+        self.monochrome_available = None
+        self.monochrome_available_index = -1
+        self.gaussian_available = None
+        self.gaussian_available_index = -1
+        self.laplacian_available = None
+        self.laplacian_available_index = None
+
+        # If the original frames are to be buffered, read them in one go. In this case, a progress
+        # bar is displayed in the main GUI.
+        if self.buffer_original:
+            if self.type == 'image':
+                # Use scipy.misc to read in image files. If "convert_to_grayscale" is True, convert
+                # pixel values to 32bit floats.
+                self.number = len(self.names)
+                self.signal_step_size = max(int(self.number / 10), 1)
+                if self.convert_to_grayscale:
+                    self.frames_original = [misc.imread(path, mode='F') for path in self.names]
+                else:
+                    self.frames_original = []
+                    for frame_index, path in enumerate(self.names):
+                        # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                        if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
+                            self.progress_signal.emit("Read all frames",
+                                                 int((frame_index / self.number) * 100.))
+                        # Read the next frame.
+                        frame = imread(path, -1)
+                        self.frames_original.append(frame)
+
+                    if self.progress_signal is not None:
+                        self.progress_signal.emit("Read all frames", 100)
+                self.shape = self.frames_original[0].shape
+                self.dt0 = self.frames_original[0].dtype
+
+                # Test if all images have the same shape, color type and depth.
+                # If not, raise an exception.
+                for image in self.frames_original:
+                    if image.shape != self.shape:
+                        raise ShapeError("Images have different size")
+                    elif len(self.shape) != len(image.shape):
+                        raise ShapeError("Mixing grayscale and color images not supported")
+                    if image.dtype != self.dt0:
+                        raise TypeError("Images have different type")
+
+            elif self.type == 'video':
+                # In case "video", use OpenCV to capture frames from video file. Revert the implicit
+                # conversion from RGB to BGR in OpenCV input.
+                self.cap = VideoCapture(self.names)
+                self.number = int(self.cap.get(CAP_PROP_FRAME_COUNT))
                 self.frames_original = []
-                for frame_index, path in enumerate(names):
+                self.signal_step_size = max(int(self.number / 10), 1)
+                for frame_index in range(self.number):
                     # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                     if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
-                        self.progress_signal.emit("Read all frames",
-                                             int((frame_index / self.number) * 100.))
+                        self.progress_signal.emit("Read all frames", int((frame_index/self.number)*100.))
                     # Read the next frame.
-                    frame = imread(path, -1)
-                    self.frames_original.append(frame)
-
+                    ret, frame = self.cap.read()
+                    if ret:
+                        if self.convert_to_grayscale:
+                            self.frames_original.append(cvtColor(frame, COLOR_BGR2GRAY))
+                        else:
+                            self.frames_original.append(cvtColor(frame, COLOR_BGR2RGB))
+                    else:
+                        raise IOError("Error in reading video frame")
+                self.cap.release()
                 if self.progress_signal is not None:
                     self.progress_signal.emit("Read all frames", 100)
-            self.shape = self.frames_original[0].shape
-            dt0 = self.frames_original[0].dtype
+                self.shape = self.frames_original[0].shape
+                self.dt0 = self.frames_original[0].dtype
+            else:
+                raise TypeError("Image type " + self.type + " not supported")
 
-            # Test if all images have the same shape, color type and depth.
-            # If not, raise an exception.
-            for image in self.frames_original:
-                if image.shape != self.shape:
-                    raise ShapeError("Images have different size")
-                elif len(self.shape) != len(image.shape):
-                    raise ShapeError("Mixing grayscale and color images not supported")
-                if image.dtype != dt0:
-                    raise TypeError("Images have different type")
+            # Monochrome images are stored as 2D arrays, color images as 3D.
+            if len(self.shape) == 2:
+                self.color = False
+            elif len(self.shape) == 3:
+                self.color = True
+            else:
+                raise ShapeError("Image shape not supported")
 
-        elif type == 'video':
-            # In case "video", use OpenCV to capture frames from video file. Revert the implicit
-            # conversion from RGB to BGR in OpenCV input.
-            cap = VideoCapture(names)
-            self.number = int(cap.get(CAP_PROP_FRAME_COUNT))
-            self.frames_original = []
-            self.signal_step_size = max(int(self.number / 10), 1)
-            for frame_index in range(self.number):
-                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
-                    self.progress_signal.emit("Read all frames", int((frame_index/self.number)*100.))
-                # Read the next frame.
-                ret, frame = cap.read()
-                if ret:
-                    if convert_to_grayscale:
-                        self.frames_original.append(cvtColor(frame, COLOR_BGR2GRAY))
-                    else:
-                        self.frames_original.append(cvtColor(frame, COLOR_BGR2RGB))
-                else:
-                    raise IOError("Error in reading video frame")
-            cap.release()
-            if self.progress_signal is not None:
-                self.progress_signal.emit("Read all frames", 100)
-            self.shape = self.frames_original[0].shape
-            dt0 = self.frames_original[0].dtype
+            # Set the depth value of all images to either 16 or 8 bits.
+            if self.dt0 == 'uint16':
+                self.depth = 16
+            elif self.dt0 == 'uint8':
+                self.depth = 8
+            else:
+                raise TypeError("Frame type " + str(self.dt0) + " not supported")
+
         else:
-            raise TypeError("Image type " + type + " not supported")
+            if self.type == 'image':
+                self.number = len(names)
+            elif self.type == 'video':
+                self.cap = VideoCapture(names)
+                self.number = int(self.cap.get(CAP_PROP_FRAME_COUNT))
 
-        # Monochrome images are stored as 2D arrays, color images as 3D.
-        if len(self.shape) == 2:
-            self.color = False
-        elif len(self.shape) == 3:
-            self.color = True
-        else:
-            raise ShapeError("Image shape not supported")
-
-        # Set the depth value of all images to either 16 or 8 bits.
-        if dt0 == 'uint16':
-            self.depth = 16
-        elif dt0 == 'uint8':
-            self.depth = 8
-        else:
-            raise TypeError("Frame type " + str(dt0) + " not supported")
+            # Initialize metadata
+            self.shape = None
+            self.depth = None
+            self.dt0 = None
+            self.color = None
+            self.frames_original = [None for index in range(self.number)]
 
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
         # Laplacians.
-        self.frames_monochrome = None
-        self.frames_monochrome_blurred = None
-        self.frames_monochrome_blurred_laplacian = None
+        colors = ['red', 'green', 'blue', 'panchromatic']
+        if self.configuration.frames_mono_channel in colors:
+            self.color_index = colors.index(self.configuration.frames_mono_channel)
+        else:
+            raise ArgumentError("Invalid color selected for channel extraction")
+        self.frames_monochrome = [None for index in range(self.number)]
+        self.frames_monochrome_blurred = [None for index in range(self.number)]
+        self.frames_monochrome_blurred_laplacian = [None for index in range(self.number)]
         self.used_alignment_points = None
 
     def frames(self, index):
         """
-        Look up the original frame object with a given index.
+        Read or look up the original frame object with a given index.
 
         :param index: Frame index
         :return: Frame with index "index".
         """
 
-        # # Code for positioning at arbitrary index.
-        # # Check for valid frame number.
-        # if 0 <= index < self.number:
-        #     # Set frame position
-        #     cap.set(cv2.CAP_PROP_POS_FRAMES, index)
-
         if not 0<=index<self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
         # print ("Accessing frame " + str(index))
-        return self.frames_original[index]
+
+        # The original frames are buffered. Just return the frame.
+        if self.buffer_original:
+            return self.frames_original[index]
+
+        # This frame has been cached. Just return it.
+        if self.original_available_index == index:
+            return self.original_available
+
+        # The frame has not been stored for re-use, read it.
+        else:
+            # If another frame has been cached, delete it.
+            if self.original_available is not None:
+                del (self.original_available)
+
+            if self.type == 'image':
+                if self.convert_to_grayscale:
+                    frame = misc.imread(self.names[index], mode='F')
+                else:
+                    frame = imread(self.names[index], -1)
+            else:
+                # Set the read position in the file to frame "index", and read the frame.
+                self.cap.set(CAP_PROP_POS_FRAMES, index)
+                ret, frame = self.cap.read()
+                if ret:
+                    if self.convert_to_grayscale:
+                        frame = cvtColor(frame, COLOR_BGR2GRAY)
+                    else:
+                        frame = cvtColor(frame, COLOR_BGR2RGB)
+                else:
+                    raise IOError("Error in reading video frame")
+
+            # Cache the frame just read.
+            self.original_available = frame
+            self.original_available_index = index
+
+            # For the first frame read, set image metadata.
+            if self.shape is None:
+                self.shape = frame.shape
+                # Monochrome images are stored as 2D arrays, color images as 3D.
+                if len(self.shape) == 2:
+                    self.color = False
+                elif len(self.shape) == 3:
+                    self.color = True
+                else:
+                    raise ShapeError("Image shape not supported")
+
+                self.dt0 = frame.dtype
+                # Set the depth value of all images to either 16 or 8 bits.
+                if self.dt0 == 'uint16':
+                    self.depth = 16
+                elif self.dt0 == 'uint8':
+                    self.depth = 8
+                else:
+                    raise TypeError("Frame type " + str(self.dt0) + " not supported")
+
+            # For every other frame, check for consistency.
+            else:
+                if len(frame.shape) != len(self.shape):
+                    raise ShapeError("Mixing grayscale and color images not supported")
+                elif frame.shape != self.shape:
+                    raise ShapeError("Images have different size")
+                if frame.dtype != self.dt0:
+                    raise TypeError("Images have different type")
+
+            return frame
 
     def frames_mono(self, index):
         """
-        Look up the monochrome version of the frame object with a given index.
+        Look up or compute the monochrome version of the frame object with a given index.
 
         :param index: Frame index
         :return: Monochrome frame with index "index".
@@ -187,11 +299,50 @@ class Frames(object):
 
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
-        if self.frames_monochrome is not None:
-            # print("Accessing frame monochrome " + str(index))
+
+        # The monochrome frames are buffered, and this frame has been stored before. Just return
+        # the frame.
+        if self.frames_monochrome[index] is not None:
             return self.frames_monochrome[index]
+
+        # If the monochrome frame is cached, just return it.
+        if self.monochrome_available_index == index:
+            return self.monochrome_available
+
+        # The frame has not been stored for re-use, compute it.
         else:
-            raise WrongOrderingError("Attempt to look up a monochrome frame before computing it")
+            # If another frame has been cached, delete it.
+            if self.monochrome_available is not None:
+                del(self.monochrome_available)
+
+            # Get the original frame. If it is not cached, this involves I/O.
+            frame_original = self.frames(index)
+
+            # If frames are in color mode, or the depth is 16bit, produce a 8bit B/W version.
+            if self.color or self.depth != 8:
+                # If frames are in color mode, create a monochrome version with same depth.
+                if self.color:
+                    if self.color_index == 3:
+                        frame_mono = cvtColor(frame_original, COLOR_BGR2GRAY)
+                    else:
+                        frame_mono = frame_original[:, :, self.color_index]
+                else:
+                    frame_mono = frame_original
+
+                # If depth is larger than 8bit, reduce the depth to 8bit.
+                if self.depth != 8:
+                    frame_mono = ((frame_mono) / 255.).astype(np.uint8)
+
+                # If the monochrome frames are buffered, store it at the current index.
+                if self.buffer_monochrome:
+                    self.frames_monochrome[index] = frame_mono
+
+                # If frames are not buffered, cache the current frame.
+                else:
+                    self.monochrome_available_index = index
+                    self.monochrome_available = frame_mono
+
+                return frame_mono
 
     def frames_mono_blurred(self, index):
         """
@@ -203,12 +354,39 @@ class Frames(object):
 
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
-        if self.frames_monochrome_blurred is not None:
-            # print("Accessing frame with Gaussian blur " + str(index))
+
+        # The blurred frames are buffered, and this frame has been stored before. Just return
+        # the frame.
+        if self.frames_monochrome_blurred[index] is not None:
             return self.frames_monochrome_blurred[index]
+
+        # If the blurred frame is cached, just return it.
+        if self.gaussian_available_index == index:
+            return self.gaussian_available
+
+        # The frame has not been stored for re-use, compute it.
         else:
-            raise WrongOrderingError("Attempt to look up a Gaussian-blurred frame version before"
-                                     " computing it")
+            # If another frame has been cached, delete it.
+            if self.gaussian_available is not None:
+                del(self.gaussian_available)
+
+            # Get the monochrome frame. If it is not cached, this involves I/O.
+            frame_mono = self.frames_mono(index)
+
+            # Compute a version of the frame with Gaussian blur added.
+            frame_monochrome_blurred = GaussianBlur(frame_mono,
+                (self.configuration.frames_gauss_width, self.configuration.frames_gauss_width), 0)
+
+            # If the blurred frames are buffered, store the current frame at the current index.
+            if self.buffer_gaussian:
+                self.frames_monochrome_blurred[index] = frame_monochrome_blurred
+
+            # If frames are not buffered, cache the current frame.
+            else:
+                self.gaussian_available_index = index
+                self.gaussian_available = frame_monochrome_blurred
+
+            return frame_monochrome_blurred
 
     def frames_mono_blurred_laplacian(self, index):
         """
@@ -220,11 +398,40 @@ class Frames(object):
 
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
-        if self.frames_monochrome_blurred_laplacian is not None:
-            # print("Accessing LoG number " + str(index))
+
+        # The LoG frames are buffered, and this frame has been stored before. Just return the frame.
+        if self.frames_monochrome_blurred_laplacian[index] is not None:
             return self.frames_monochrome_blurred_laplacian[index]
+
+        # If the blurred frame is cached, just return it.
+        if self.laplacian_available_index == index:
+            return self.laplacian_available
+
+        # The frame has not been stored for re-use, compute it.
         else:
-            raise WrongOrderingError("Attempt to look up a LoG frame version before computing it")
+            # If another frame has been cached, delete it.
+            if self.laplacian_available is not None:
+                del (self.laplacian_available)
+
+            # Get the monochrome frame. If it is not cached, this involves I/O.
+            frame_monochrome_blurred = self.frames_mono_blurred(index)
+
+            # Compute a version of the frame with Gaussian blur added.
+            frame_monochrome_laplacian = convertScaleAbs(Laplacian(
+                    frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
+                    ::self.configuration.align_frames_sampling_stride], CV_32F),
+                    alpha=1)
+
+            # If the blurred frames are buffered, store the current frame at the current index.
+            if self.buffer_laplacian:
+                self.frames_monochrome_blurred_laplacian[index] = frame_monochrome_laplacian
+
+            # If frames are not buffered, cache the current frame.
+            else:
+                self.laplacian_available_index = index
+                self.laplacian_available = frame_monochrome_laplacian
+
+            return frame_monochrome_laplacian
 
     def reset_alignment_point_lists(self):
         """
@@ -235,73 +442,7 @@ class Frames(object):
         """
 
         # For every frame initialize the list with used alignment points.
-        self.used_alignment_points = []
-        for frame_index in range(self.number):
-            self.used_alignment_points.append([])
-
-    def add_monochrome(self, color):
-        """
-        Create monochrome versions of all frames. Add a list of monochrome frames
-        "self.frames_mono". If the original frames are monochrome, just point the monochrome frame
-        list to the original images (no deep copy!). Also, add a blurred version of the frame list
-        (using a Gaussian filter) "self.frames_mono_blurred", and the Laplacian of that image.
-
-        :param color: Either "red" or "green", "blue", or "panchromatic"
-        :return: -
-        """
-
-        if self.color:
-            colors = ['red', 'green', 'blue', 'panchromatic']
-            if not color in colors:
-                raise ArgumentError("Invalid color selected for channel extraction")
-            self.frames_monochrome = []
-        elif self.depth == 8:
-            self.frames_monochrome = self.frames_original
-
-        self.frames_monochrome_blurred = []
-        self.frames_monochrome_blurred_laplacian = []
-
-        for frame_index, frame in enumerate(self.frames_original):
-            # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-            if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
-                self.progress_signal.emit("Gaussians / Laplacians",
-                                          int((frame_index / self.number) * 100.))
-
-            # If frames are in color mode, or the depth is 16bit, produce a 8bit B/W version.
-            if self.color or self.depth != 8:
-                # If frames are in color mode, create a monochrome version with same depth.
-                if self.color:
-                    if color == 'panchromatic':
-                        frame_mono = cvtColor(frame, COLOR_BGR2GRAY)
-                    else:
-                        frame_mono = frame[:, :, colors.index(color)]
-                else:
-                    frame_mono = frame
-
-                # If depth is larger than 8bit, reduce the depth to 8bit.
-                if self.depth != 8:
-                    frame_mono = ((frame_mono) / 255.).astype(np.uint8)
-
-                self.frames_monochrome.append(frame_mono)
-
-            # Add a version of the frame with Gaussian blur added.
-            frame_monochrome_blurred = GaussianBlur(self.frames_monochrome[frame_index], (
-                self.configuration.frames_gauss_width, self.configuration.frames_gauss_width), 0)
-            self.frames_monochrome_blurred.append(frame_monochrome_blurred)
-
-            # Compute the scaling factor for "convertScaleAbs" depending on the data type of the
-            # monochrome image. The Laplacian is 8bit. If the monochrome image is 16bit, values
-            # have to be scaled down.
-
-            # Add the Laplacian of the down-sampled blurred image.
-            if self.configuration.rank_frames_method == "Laplace":
-                self.frames_monochrome_blurred_laplacian.append(convertScaleAbs(Laplacian(
-                    frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
-                    ::self.configuration.align_frames_sampling_stride], CV_32F),
-                    alpha=1))
-
-        if self.progress_signal is not None:
-            self.progress_signal.emit("Gaussians / Laplacians", 100)
+        self.used_alignment_points = [[] for index in range(self.number)]
 
     def save_image(self, filename, image, color=False, avoid_overwriting=True):
         """
@@ -354,7 +495,7 @@ if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
-    type = 'video'
+    type = 'image'
     if type == 'image':
         # names = glob('Images/2012_*.tif')
         # names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')

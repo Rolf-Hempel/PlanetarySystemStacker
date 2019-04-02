@@ -262,6 +262,13 @@ class Ui_ConfigurationDialog(object):
         self.line.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.line.setObjectName("line")
         self.GridLayout.addWidget(self.line, 0, 6, 11, 1)
+        self.gpbl_label_parameter = QtWidgets.QLabel(ConfigurationDialog)
+        self.gpbl_label_parameter.setObjectName("gpbl_label_parameter")
+        self.GridLayout.addWidget(self.gpbl_label_parameter, 10, 2, 1, 1)
+        self.gpbl_spinBox = QtWidgets.QSpinBox(ConfigurationDialog)
+        self.gpbl_spinBox.setMaximum(4)
+        self.gpbl_spinBox.setObjectName("gpbl_spinBox")
+        self.GridLayout.addWidget(self.gpbl_spinBox, 10, 4, 1, 1)
         self.GridLayout.setColumnStretch(0, 5)
 
         self.retranslateUi(ConfigurationDialog)
@@ -339,5 +346,7 @@ class Ui_ConfigurationDialog(object):
 "This value specifies this number relative to the total number of frames."))
         self.apfp_label_parameter.setText(_translate("ConfigurationDialog", "Percentage of best frames\n"
 "to be stacked"))
+        self.gpbl_label_parameter.setToolTip(_translate("ConfigurationDialog", "Level of data buffering, 0 for no buffering, 4 for buffering all frames and intermediate results."))
+        self.gpbl_label_parameter.setText(_translate("ConfigurationDialog", "Data buffering level"))
 
 
