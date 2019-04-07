@@ -70,7 +70,9 @@ class Workflow(QtCore.QObject):
             mkl_rt.mkl_set_num_threads(byref(c_int(cores)))
 
         mkl_set_num_threads(2)
-        print("Number of threads used by mkl: " + str(mkl_get_max_threads()))
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol("Number of threads used by mkl: " + str(mkl_get_max_threads()),
+                                   self.stacked_image_log_file, precede_with_timestamp=True)
 
     @QtCore.pyqtSlot(str, str, bool)
     def execute_frames(self, input_name, input_type, convert_to_grayscale):

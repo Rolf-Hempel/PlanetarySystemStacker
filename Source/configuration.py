@@ -61,7 +61,7 @@ class ConfigurationParameters(object):
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = True
         self.global_parameters_store_protocol_with_result = False
-        self.global_parameters_buffering_level = 3
+        self.global_parameters_buffering_level = 2
         self.frames_gauss_width = 7
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
@@ -146,8 +146,7 @@ class Configuration(object):
 
         # Set fixed parameters which are hidden from the user. Hidden parameters which are
         # changeable are stored in the configuration object.
-        self.frames_mono_channel = 'panchromatic'
-        self.frames_buffer_level = 1
+        self.frames_mono_channel = 'green'
 
         self.rank_frames_pixel_stride = 1
         self.rank_frames_method = "Laplace"

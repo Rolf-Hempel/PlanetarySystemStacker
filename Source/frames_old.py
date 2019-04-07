@@ -33,7 +33,7 @@ from scipy import misc
 
 from configuration import Configuration
 from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError
-from frames import Frames
+# from frames import Frames
 
 
 class FramesOld(object):
@@ -387,20 +387,20 @@ if __name__ == "__main__":
         print("Error: " + e.message)
         exit()
 
-    try:
-        frames = Frames(configuration, names, type=type, convert_to_grayscale=convert_to_grayscale,
-                        buffer_original=False, buffer_monochrome=False, buffer_gaussian=False,
-                        buffer_laplacian=False)
-        print("\nFrames: Number of images: " + str(frames.number))
-        print("Image shape: " + str(frames.shape))
-    except Exception as e:
-        print("Error: " + e.message)
-        exit()
-
-    indices = [1, 0, 2, 2, 8]
-
-    for index in indices:
-        frame_old = frames_old.frames_mono_blurred_laplacian(index)
-        frame = frames.frames_mono_blurred_laplacian(index)
-        difference = np.max(np.abs(frame - frame_old))
-        print ("Error for frame " + str(index) + ": " + str(difference))
+    # try:
+    #     frames = Frames(configuration, names, type=type, convert_to_grayscale=convert_to_grayscale,
+    #                     buffer_original=False, buffer_monochrome=False, buffer_gaussian=False,
+    #                     buffer_laplacian=False)
+    #     print("\nFrames: Number of images: " + str(frames.number))
+    #     print("Image shape: " + str(frames.shape))
+    # except Exception as e:
+    #     print("Error: " + e.message)
+    #     exit()
+    #
+    # indices = [1, 0, 2, 2, 8]
+    #
+    # for index in indices:
+    #     frame_old = frames_old.frames_mono_blurred_laplacian(index)
+    #     frame = frames.frames_mono_blurred_laplacian(index)
+    #     difference = np.max(np.abs(frame - frame_old))
+    #     print ("Error for frame " + str(index) + ": " + str(difference))

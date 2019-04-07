@@ -621,8 +621,8 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         """
 
         # Check if a new stack size was selected.
-        if (self.configuration.alignment_points_frame_number != \
-                self.spinBox_number_frames.value() and \
+        if (self.configuration.alignment_points_frame_number !=
+                self.spinBox_number_frames.value() and
                 self.configuration.alignment_points_frame_number is not None) or \
                 self.configuration.alignment_points_frame_percent != \
                 self.spinBox_percentage_frames.value():

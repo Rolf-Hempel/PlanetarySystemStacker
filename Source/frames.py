@@ -25,15 +25,16 @@ from os import path, remove
 from pathlib import Path
 from time import time
 
-import matplotlib.pyplot as plt
 import numpy as np
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs, \
     CAP_PROP_POS_FRAMES
+from math import ceil
 from scipy import misc
 
 from configuration import Configuration
-from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError
+from exceptions import TypeError, ShapeError, ArgumentError
+from frames_old import FramesOld
 
 
 class Frames(object):
@@ -51,8 +52,21 @@ class Frames(object):
             - Overall image ranking ("rank_frames.frame_score")
             - Ranking frames at alignment points("alignment_points.compute_frame_qualities")
 
-        Currently all versions of all frames are stored during the entire workflow. As an
-        alternative, a non-buffered version should be added.
+        Buffering at various levels is available. It is controlled with four flags set at object
+        initialization time.
+
+        A complete PSS execution processes all "n" frames in four complete passes. Additionally,
+        in module "align_frames" there are some extra accesses:
+
+        1. In "rank_frames.frame_score": Access to all "Laplacians of Gaussian" (frame 0 to n-1)
+           In "align_frames.select_alignment_rect and .align_frames": Access to the Gaussian of the
+           best frame.
+        2. In "align_frames.align_frames": Access to all Gaussians (frame 0 to n-1)
+           In "align_frames.average_frame": Access to the monochrome frames of the best images for
+           averaging
+        3. In "alignment_points.compute_frame_qualities": Access to all "Laplacians of Gaussian"
+           (frame 0 to n-1)
+        4. In "stack_frames.stack_frames": Access to all frames + Gaussians (frame 0 to n-1)
 
     """
 
@@ -297,6 +311,7 @@ class Frames(object):
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
 
+        # print("Accessing frame monochrome " + str(index))
         # The monochrome frames are buffered, and this frame has been stored before. Just return
         # the frame.
         if self.frames_monochrome[index] is not None:
@@ -349,6 +364,7 @@ class Frames(object):
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
 
+        # print("Accessing frame with Gaussian blur " + str(index))
         # The blurred frames are buffered, and this frame has been stored before. Just return
         # the frame.
         if self.frames_monochrome_blurred[index] is not None:
@@ -390,6 +406,7 @@ class Frames(object):
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
 
+        # print("Accessing LoG number " + str(index))
         # The LoG frames are buffered, and this frame has been stored before. Just return the frame.
         if self.frames_monochrome_blurred_laplacian[index] is not None:
             return self.frames_monochrome_blurred_laplacian[index]
@@ -479,49 +496,100 @@ class Frames(object):
             imwrite(str(filename), image)
 
 
+def access_pattern(frames_object, average_frame_percent):
+    """
+    Simulate the access pattern of PSS to frame data, without any other activity in between. Return
+    the overall time.
+
+    :param frames_object: Frames object to access frames.
+    :param average_frame_percent: Percentage of frames for average image computation.
+    :return: Total time in seconds.
+    """
+
+
+    number = frames.number
+    average_frame_number = max(
+        ceil(number * average_frame_percent / 100.), 1)
+    start = time()
+
+    for index in range(number):
+        frames_object.frames_mono_blurred_laplacian(index)
+
+    frames_object.frames_mono_blurred(number-1)
+    frames_object.frames_mono_blurred(number-1)
+
+    for index in range(number):
+        frames_object.frames_mono_blurred(index)
+
+    for index in range(average_frame_number):
+        frames_object.frames_mono(index)
+
+    for index in range(number):
+        frames_object.frames_mono_blurred_laplacian(index)
+
+    for index in range(number):
+        frames_object.frames(index)
+        frames_object.frames_mono_blurred(index)
+
+    return time() - start
+
 if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
-    type = 'image'
+    type = 'video'
+    version = 'frames_old'
+    buffering_level = 4
+
     if type == 'image':
         # names = glob('Images/2012_*.tif')
         # names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
         names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
     else:
-        names = 'Videos/short_video.avi'
+        # names = 'Videos/another_short_video.avi'
+        names = 'Videos/Moon_Tile-024_043939.avi'
 
     # Get configuration parameters.
     configuration = Configuration()
 
+    # Decide on the objects to be buffered, depending on configuration parameter.
+    buffer_original = False
+    buffer_monochrome = False
+    buffer_gaussian = False
+    buffer_laplacian = False
+
+    if buffering_level > 0:
+        buffer_laplacian = True
+    if buffering_level > 1:
+        buffer_gaussian = True
+    if buffering_level > 2:
+        buffer_original = True
+    if buffering_level > 3:
+        buffer_monochrome = True
+
     start = time()
-    try:
-        frames = Frames(configuration, names, type=type, convert_to_grayscale=False)
-        print("Number of images read: " + str(frames.number))
-        print("Image shape: " + str(frames.shape))
-    except Exception as e:
-        print("Error: " + e.message)
-        exit()
-    end = time()
-    print ("Read " + str(frames.number) + " frames in " + str(end-start) + " seconds.")
-
-    # Create monochrome versions of all frames. If the original frames are monochrome, just point
-    # the monochrome frame list to the original images (no deep copy!).
-    try:
-        frames.add_monochrome(configuration.frames_mono_channel)
-    except ArgumentError as e:
-        print("Error: " + e.message)
-        exit()
-
-    plt.imshow(frames.frames_mono(0), cmap='Greys_r')
-    plt.show()
-
-    if type == 'video':
-        stacked_image_name = path.splitext(names)[0] + '_pss.tiff'
-    # For single image input, the Frames constructor expects a list of image file names for
-    # "names".
+    if version == 'frames':
+        try:
+            frames = Frames(configuration, names, type=type, convert_to_grayscale=False,
+                   buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
+                   buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
+        except Exception as e:
+            print("Error: " + e.message)
+            exit()
     else:
-        image_dir = 'Images'
-        stacked_image_name = image_dir + '_pss.tiff'
+        try:
+            frames = FramesOld(configuration, names, type=type, convert_to_grayscale=False)
+            frames.add_monochrome(configuration.frames_mono_channel)
+        except Exception as e:
+            print("Error: " + e.message)
+            exit()
+    initialization_time = time() - start
 
-    frames.save_image(stacked_image_name, frames.frames_mono(0), avoid_overwriting=False)
+    print("Number of images read: " + str(frames.number))
+    print("Image shape: " + str(frames.shape))
+
+    total_access_time = access_pattern(frames, configuration.align_frames_average_frame_percent)
+
+    print("\nInitialization time: {0:7.3f}, frame accesses and variant computations: {1:7.3f},"
+          " total: {2:7.3f} (seconds)".format(initialization_time, total_access_time,
+                                              initialization_time+total_access_time))
