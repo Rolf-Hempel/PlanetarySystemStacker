@@ -62,17 +62,21 @@ class Workflow(QtCore.QObject):
         self.output_redirected = False
         self.protocol_file = None
 
+        # The following code works on Windows systems only. It is not necessary, though.
+        try:
+            mkl_rt = CDLL('mkl_rt.dll')
+            mkl_get_max_threads = mkl_rt.mkl_get_max_threads
 
-        mkl_rt = CDLL('mkl_rt.dll')
-        mkl_get_max_threads = mkl_rt.mkl_get_max_threads
+            def mkl_set_num_threads(cores):
+                mkl_rt.mkl_set_num_threads(byref(c_int(cores)))
 
-        def mkl_set_num_threads(cores):
-            mkl_rt.mkl_set_num_threads(byref(c_int(cores)))
-
-        mkl_set_num_threads(2)
-        if self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol("Number of threads used by mkl: " + str(mkl_get_max_threads()),
-                                   self.stacked_image_log_file, precede_with_timestamp=True)
+            mkl_set_num_threads(mkl_get_max_threads())
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol("Number of threads used by mkl: " + str(mkl_get_max_threads()),
+                                       self.stacked_image_log_file, precede_with_timestamp=True)
+        except Exception as e:
+            Miscellaneous.protocol("mkl_rt.dll does not work (not a Windows system?): " + str(e),
+                                    self.stacked_image_log_file, precede_with_timestamp = True)
 
     @QtCore.pyqtSlot(str, str, bool)
     def execute_frames(self, input_name, input_type, convert_to_grayscale):
