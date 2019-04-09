@@ -289,6 +289,12 @@ if __name__ == "__main__":
             if os.path.isdir(dir_abs):
                 input_names.append(dir_abs)
 
+    # Feedback on number of files found to process
+    if len(input_names) > 0:
+        print("+++ Start processing", len(input_names), input_type)
+    else:
+        print("+++ No files found to process")
+
     # Start the processing workflow in batch mode for all AVIs / file directories.
     for input_name in input_names:
         if roi:
