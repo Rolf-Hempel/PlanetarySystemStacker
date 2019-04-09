@@ -617,9 +617,9 @@ class AlignmentPoints(object):
                                self.configuration.alignment_points_rank_pixel_stride))
         else:
             # Sampled-down Laplacians of all blurred frames have been computed in
-            # "frames.add_monochrome". Cut out boxes around alignment points from those objects,
-            # rather than computing new Laplacians. Cycle through all frames and alignment points.
-            # Use the blurred monochrome image for ranking.
+            # "frames.frames_mono_blurred_laplacian". Cut out boxes around alignment points from
+            # those objects, rather than computing new Laplacians. Cycle through all frames and
+            # alignment points. Use the blurred monochrome image for ranking.
             for frame_index in range(self.frames.number):
                 frame = self.frames.frames_mono_blurred_laplacian(frame_index)
 
@@ -822,15 +822,6 @@ if __name__ == "__main__":
     except Exception as e:
         print("Error: " + e.message)
         exit()
-
-    # The whole quality analysis and shift determination process is performed on a monochrome
-    # version of the frames. If the original frames are in RGB, the monochrome channel can be
-    # selected via a configuration parameter. Add a list of monochrome images for all frames to
-    # the "Frames" object.
-    start = time()
-    frames.add_monochrome(configuration.frames_mono_channel)
-    end = time()
-    print('Elapsed time in creating blurred monochrome images: {}'.format(end - start))
 
     # Rank the frames by their overall local contrast.
     rank_frames = RankFrames(frames, configuration)

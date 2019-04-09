@@ -595,15 +595,6 @@ if __name__ == "__main__":
         exit()
     my_timer.stop('Read all frames')
 
-    # The whole quality analysis and shift determination process is performed on a monochrome
-    # version of the frames. If the original frames are in RGB, the monochrome channel can be
-    # selected via a configuration parameter. Add a list of monochrome images for all frames to
-    # the "Frames" object.
-    print("+++ Start creating blurred monochrome images")
-    my_timer.create('Create blurred monochrome images')
-    frames.add_monochrome(configuration.frames_mono_channel)
-    my_timer.stop('Create blurred monochrome images')
-
     # Rank the frames by their overall local contrast.
     my_timer.create('Ranking images')
     rank_frames = RankFrames(frames, configuration)

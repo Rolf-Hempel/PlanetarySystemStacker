@@ -342,16 +342,20 @@ class Frames(object):
                 if self.depth != 8:
                     frame_mono = ((frame_mono) / 255.).astype(np.uint8)
 
-                # If the monochrome frames are buffered, store it at the current index.
-                if self.buffer_monochrome:
-                    self.frames_monochrome[index] = frame_mono
+            # Frames are in 8bit B/W mode already
+            else:
+                frame_mono = frame_original
 
-                # If frames are not buffered, cache the current frame.
-                else:
-                    self.monochrome_available_index = index
-                    self.monochrome_available = frame_mono
+            # If the monochrome frames are buffered, store it at the current index.
+            if self.buffer_monochrome:
+                self.frames_monochrome[index] = frame_mono
 
-                return frame_mono
+            # If frames are not buffered, cache the current frame.
+            else:
+                self.monochrome_available_index = index
+                self.monochrome_available = frame_mono
+
+            return frame_mono
 
     def frames_mono_blurred(self, index):
         """
