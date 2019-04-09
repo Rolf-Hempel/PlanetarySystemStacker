@@ -24,8 +24,9 @@ from glob import glob
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, float32, zeros
+from numpy import arange, float32, zeros, empty, uint32, uint16, uint8
 from scipy import ndimage
+from cv2 import GaussianBlur
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
@@ -73,6 +74,8 @@ class AlignFrames(object):
         self.dy = self.dx = None
         self.dy_original = self.dx_original = None
         self.ROI_set = False
+        self.dev_table = empty((2 * self.configuration.align_frames_search_width,
+                               2 * self.configuration.align_frames_search_width), dtype=float32)
 
     def select_alignment_rect(self, scale_factor):
         """
@@ -233,7 +236,7 @@ class AlignFrames(object):
                                                       self.x_low_opt - dx_min_cum,
                                                       self.x_high_opt - dx_min_cum,
                         self.configuration.align_frames_search_width,
-                        self.configuration.align_frames_sampling_stride)
+                        self.configuration.align_frames_sampling_stride, self.dev_table)
                 else:
                     raise NotSupportedError(
                         "Frame alignment method " + configuration.align_frames_method +
@@ -256,28 +259,28 @@ class AlignFrames(object):
                 # that edge by half the border width.
                 new_reference_window = False
                 # Start with the lower y edge.
-                if self.y_low_opt - dy_min_cum < \
+                while self.y_low_opt - dy_min_cum < \
                         self.configuration.align_frames_search_width + \
                         self.configuration.align_frames_border_width / 2:
                     self.y_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     self.y_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the upper y edge.
-                elif self.y_high_opt - dy_min_cum > self.shape[
+                while self.y_high_opt - dy_min_cum > self.shape[
                     0] - self.configuration.align_frames_search_width - \
                         self.configuration.align_frames_border_width / 2:
                     self.y_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
                     self.y_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the lower x edge.
-                if self.x_low_opt - dx_min_cum < \
+                while self.x_low_opt - dx_min_cum < \
                         self.configuration.align_frames_search_width + \
                         self.configuration.align_frames_border_width / 2:
                     self.x_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     self.x_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the upper x edge.
-                elif self.x_high_opt - dx_min_cum > self.shape[
+                while self.x_high_opt - dx_min_cum > self.shape[
                     1] - self.configuration.align_frames_search_width - \
                         self.configuration.align_frames_border_width / 2:
                     self.x_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
@@ -337,13 +340,13 @@ class AlignFrames(object):
 
         shifts = [self.frame_shifts[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
 
-        # Create an empty numpy buffer. The first and second dimenstions are the y and x
+        # Create an empty numpy buffer. The first and second dimensions are the y and x
         # coordinates. For color frames add a third dimension. Add all frames to the buffer.
         if color:
             self.mean_frame = zeros([self.intersection_shape[0][1] - self.intersection_shape[0][0],
                  self.intersection_shape[1][1] - self.intersection_shape[1][0], 3], dtype=float32)
             for idx in range(self.average_frame_number):
-                self.mean_frame += self.frames[self.quality_sorted_indices[idx]] \
+                self.mean_frame += self.frames.frames(self.quality_sorted_indices[idx]) \
                     [self.intersection_shape[0][0] - shifts[idx][0]:
                     self.intersection_shape[0][1] - shifts[idx][0],
                     self.intersection_shape[1][0] - shifts[idx][1]:
@@ -361,6 +364,9 @@ class AlignFrames(object):
 
         # Compute the mean frame by dividing by the number of frames.
         self.mean_frame /= self.average_frame_number
+        # self.mean_frame = GaussianBlur(self.mean_frame.astype(uint8),
+        #              (self.configuration.frames_gauss_width, self.configuration.frames_gauss_width),
+        #              0)
 
         return self.mean_frame
 
@@ -497,14 +503,6 @@ if __name__ == "__main__":
         print("Image shape: " + str(frames.shape))
     except Exception as e:
         print("Error: " + str(e))
-        exit()
-
-    # Create monochrome versions of all frames. If the original frames are monochrome,
-    # just point the monochrome frame list to the original images (no deep copy!).
-    try:
-        frames.add_monochrome(configuration.frames_mono_channel)
-    except ArgumentError as e:
-        print("Error: " + e.message)
         exit()
 
     # Rank the frames by their overall local contrast.

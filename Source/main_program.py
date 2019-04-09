@@ -98,15 +98,6 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
         exit()
     my_timer.stop('Read all frames')
 
-    # The whole quality analysis and shift determination process is performed on a monochrome
-    # version of the frames. If the original frames are in RGB, the monochrome channel can be
-    # selected via a configuration parameter. Add a list of monochrome images for all frames to
-    # the "Frames" object.
-    print("+++ Start creating blurred monochrome images and Laplacians")
-    my_timer.create('Blurred monochrome images and Laplacians')
-    frames.add_monochrome(configuration.frames_mono_channel)
-    my_timer.stop('Blurred monochrome images and Laplacians')
-
     # Rank the frames by their overall local contrast.
     print("+++ Start ranking images")
     my_timer.create('Ranking images')

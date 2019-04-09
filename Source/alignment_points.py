@@ -25,7 +25,7 @@ from time import time
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt
+from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, uint32
 from scipy import ndimage
 from skimage.feature import register_translation
 
@@ -79,6 +79,9 @@ class AlignmentPoints(object):
 
         # Initialize the number of frames to be stacked at each AP.
         self.stack_size = None
+
+        self.dev_table = empty((2 * self.configuration.alignment_points_search_width,
+                               2 * self.configuration.alignment_points_search_width), dtype=float32)
 
     @staticmethod
     def ap_locations(num_pixels, min_boundary_distance, step_size, even):
@@ -735,7 +738,7 @@ class AlignmentPoints(object):
                 shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(reference_box,
                     frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
-                    self.configuration.alignment_points_sampling_stride)
+                    self.configuration.alignment_points_sampling_stride, self.dev_table)
             else:
                 raise NotSupportedError("The point shift computation method " +
                                         self.configuration.alignment_points_method +

@@ -29,8 +29,9 @@ from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY
     putText
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin, uint8
+    empty, argmin, stack, sin, uint8, full, uint32, isnan, float32
 from numpy import min as np_min
+from numpy import nan as np_nan
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
@@ -217,7 +218,7 @@ class Miscellaneous(object):
             # between the shifted frame and the corresponding box in the mean frame. Find the
             # minimum "deviation_min_r" for radius "r".
             if sampling_stride != 1:
-                for (dx, dy) in circle_r:
+                for (dy, dx) in circle_r:
                     deviation = abs(
                         reference_box[::sampling_stride, ::sampling_stride] - frame[
                                       y_low - dy:y_high - dy:sampling_stride,
@@ -228,7 +229,7 @@ class Miscellaneous(object):
                         deviation_min_r, dy_min_r, dx_min_r = deviation, dy, dx
                     deviations[dy + search_width, dx + search_width] = deviation
             else:
-                for (dx, dy) in circle_r:
+                for (dy, dx) in circle_r:
                     deviation = abs(
                         reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
                     if deviation < deviation_min_r:
@@ -358,7 +359,7 @@ class Miscellaneous(object):
             # Create an enumerator which produces shift values [dy, dx] in a circular pattern
             # with radius "r".
             circle_r = Miscellaneous.circle_around(0, 0, r)
-            for (dx, dy) in circle_r:
+            for (dy, dx) in circle_r:
                 reference_stack[index, :, :] = reference_frame[y_low + dy:y_high + dy,
                                                x_low + dx:x_high + dx]
                 displacements.append([dy, dx])
@@ -425,7 +426,7 @@ class Miscellaneous(object):
 
     @staticmethod
     def search_local_match_gradient(reference_box, frame, y_low, y_high, x_low, x_high, search_width,
-                           sampling_stride):
+                           sampling_stride, dev_table):
         """
         Try shifts in y, x between the box around the alignment point in the mean frame and the
         corresponding box in the given frame. Start with shifts [0, 0] and move out in steps until
@@ -444,10 +445,17 @@ class Miscellaneous(object):
         :param x_high: Upper x coordinate limit
         :param search_width: Maximum distance in y and x from origin of the search area
         :param sampling_stride: Stride in both coordinate directions used in computing deviations
+        :param dev_table: Scratch table to be used internally for storing intermediate results,
+                          size: [2*search_width, 2*search_width], dtype=float32.
         :return: ([shift_y, shift_x], [min_r]) with:
                    shift_y, shift_x: shift values of minimum or [0, 0] if no optimum could be found.
                    [dev_r]: list of minimum deviations for all steps until a local minimum is found.
         """
+
+        # Set up a table which keeps deviation values from earlier iteration steps. This way,
+        # deviation evaluations can be avoided at coordinates which have been visited before.
+        # Initialize deviations with the highest possible UINT32.
+        dev_table[:,:] = 1.e30
 
         # Initialize the global optimum with the value at dy=dx=0.
         if sampling_stride != 1:
@@ -456,8 +464,12 @@ class Miscellaneous(object):
                                           x_low:x_high:sampling_stride]).sum()
         else:
             deviation_min = abs(reference_box - frame[y_low:y_high, x_low:x_high]).sum()
+        dev_table[0, 0] = deviation_min
         dy_min = 0
         dx_min = 0
+
+        counter_new = 0
+        counter_reused = 0
 
         # Initialize list of minimum deviations for each search radius.
         dev_r = [deviation_min]
@@ -468,7 +480,7 @@ class Miscellaneous(object):
 
             # Create an enumerator which produces shift values [dy, dx] in a circular pattern
             # with radius 1 around the current optimum [dy_min, dx_min].
-            circle_1 = Miscellaneous.circle_around(dx_min, dy_min, 1)
+            circle_1 = Miscellaneous.circle_around(dy_min, dx_min, 1)
 
             # Initialize the optimum for the new circle to an impossibly large value,
             # and the corresponding shifts to None.
@@ -478,17 +490,32 @@ class Miscellaneous(object):
             # between the shifted frame and the corresponding box in the mean frame. Find the
             # minimum "deviation_min_1".
             if sampling_stride != 1:
-                for (dx, dy) in circle_1:
-                    deviation = abs(
-                        reference_box[::sampling_stride, ::sampling_stride] - frame[
-                                      y_low - dy:y_high - dy:sampling_stride,
-                                      x_low - dx:x_high - dx:sampling_stride]).sum()
+                for (dy, dx) in circle_1:
+                    deviation = dev_table[dy, dx]
+                    if deviation > 1.e29:
+                        counter_new += 1
+                        deviation = abs(reference_box[::sampling_stride, ::sampling_stride] - frame[
+                                          y_low - dy:y_high - dy:sampling_stride,
+                                          x_low - dx:x_high - dx:sampling_stride]).sum()
+                        dev_table[dy, dx] = deviation
+                    else:
+                        counter_reused += 1
                     if deviation < deviation_min_1:
                         deviation_min_1, dy_min_1, dx_min_1 = deviation, dy, dx
+
+                    # deviation = abs(reference_box[::sampling_stride, ::sampling_stride] - frame[
+                    #                   y_low - dy:y_high - dy:sampling_stride,
+                    #                   x_low - dx:x_high - dx:sampling_stride]).sum()
+                    # if deviation < deviation_min_1:
+                    #     deviation_min_1, dy_min_1, dx_min_1 = deviation, dy, dx
             else:
-                for (dx, dy) in circle_1:
-                    deviation = abs(
-                        reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
+                for (dy, dx) in circle_1:
+                    deviation = dev_table[dy, dx]
+                    if deviation == 1.e30:
+                        deviation = abs(
+                            reference_box - frame[y_low - dy:y_high - dy,
+                                            x_low - dx:x_high - dx]).sum()
+                        dev_table[dy, dx] = deviation
                     if deviation < deviation_min_1:
                         deviation_min_1, dy_min_1, dx_min_1 = deviation, dy, dx
 
@@ -498,6 +525,7 @@ class Miscellaneous(object):
             # If for the current center the match is better than for all neighboring points, a
             # local optimum is found.
             if deviation_min_1 >= deviation_min:
+                # print ("new: " + str(counter_new) + ", reused: " + str(counter_reused))
                 return [dy_min, dx_min], dev_r
 
             # Otherwise, update the current optimum and continue.
@@ -546,7 +574,7 @@ class Miscellaneous(object):
                     frame[y_center, x] = rgb
 
     @staticmethod
-    def circle_around(x, y, r):
+    def circle_around(y, x, r):
         """
         Create an iterator which returns y, x pixel coordinates around a given position in an
         image. Successive elements describe a circle around y, x with distance r (in the 1-norm).
@@ -560,22 +588,22 @@ class Miscellaneous(object):
 
         # Special case 0: The only iterator element is the center point itself.
         if r == 0:
-            yield (x, y)
+            yield (y, x)
 
         # For the general case, set the first element and circle around (y, x) counter-clockwise.
-        i, j = x - r, y - r
+        j, i = y - r, x - r
         while i < x + r:
             i += 1
-            yield (i, j)
+            yield (j, i)
         while j < y + r:
             j += 1
-            yield (i, j)
+            yield (j, i)
         while i > x - r:
             i -= 1
-            yield (i, j)
+            yield (j, i)
         while j > y - r:
             j -= 1
-            yield (i, j)
+            yield (j, i)
 
     @staticmethod
     def write_video(name, frame_list, annotations, fps, depth=8):
@@ -700,6 +728,8 @@ if __name__ == "__main__":
     search_width = 20
     sampling_stride = 1
 
+    dev_table = empty((2 * search_width, 2 * search_width), dtype=float32)
+
     # First try the standard method "search_local_match". Compute the displacement vector, and
     # print a comparison of the true and computed values.
     start = time()
@@ -718,7 +748,7 @@ if __name__ == "__main__":
         [dy, dx], dev_r = Miscellaneous.search_local_match_gradient(reference_box, frame,
                                                                     y_low, y_high,
                                                                     x_low, x_high, search_width,
-                                                                    sampling_stride)
+                                                                    sampling_stride, dev_table)
     end = time()
     print("steepest descent, true displacements: " + str([displacement_y, displacement_x]) +
           ", computed: " + str([dy, dx]) + ", execution time (s): " + str((end - start) / rep_count))
