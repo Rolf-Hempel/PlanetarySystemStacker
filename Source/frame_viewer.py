@@ -278,7 +278,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
                                                     self.align_frames.frame_shifts[index][1]]
 
 
-        # Convert the float32 monochrome image into uint8 format.
+        # Convert the monochrome image into uint8 format.
         image_uint8 = self.image.astype(uint8)
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]

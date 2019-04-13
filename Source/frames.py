@@ -43,9 +43,9 @@ class Frames(object):
         used throughout the data processing workflow. They are (re-)used in the folliwing phases:
         1. Original (color) frames, type: uint8 / uint16
             - Frame stacking ("stack_frames.stack_frames")
-        2. Monochrome version of 1., type: uint8
+        2. Monochrome version of 1., type: uint8 / uint16
             - Computing the average frame (only average frame subset, "align_frames.average_frame")
-        3. Gaussian blur added to 2., type: type: uint8
+        3. Gaussian blur added to 2., type: type: uint16
             - Aligning all frames ("align_frames.align_frames")
             - Frame stacking ("stack_frames.stack_frames")
         4. Down-sampled Laplacian of 3., type: uint8
@@ -118,6 +118,9 @@ class Frames(object):
         self.gaussian_available_index = -1
         self.laplacian_available = None
         self.laplacian_available_index = None
+
+        # Compute the scaling value for Laplacian computation.
+        self.alpha = 1./256.
 
         # If the original frames are to be buffered, read them in one go. In this case, a progress
         # bar is displayed in the main GUI.
@@ -327,22 +330,13 @@ class Frames(object):
             # Get the original frame. If it is not cached, this involves I/O.
             frame_original = self.frames(index)
 
-            # If frames are in color mode, or the depth is 16bit, produce a 8bit B/W version.
-            if self.color or self.depth != 8:
-                # If frames are in color mode, create a monochrome version with same depth.
-                if self.color:
-                    if self.color_index == 3:
-                        frame_mono = cvtColor(frame_original, COLOR_BGR2GRAY)
-                    else:
-                        frame_mono = frame_original[:, :, self.color_index]
+            # If frames are in color mode produce a B/W version.
+            if self.color:
+                if self.color_index == 3:
+                    frame_mono = cvtColor(frame_original, COLOR_BGR2GRAY)
                 else:
-                    frame_mono = frame_original
-
-                # If depth is larger than 8bit, reduce the depth to 8bit.
-                if self.depth != 8:
-                    frame_mono = ((frame_mono) / 255.).astype(np.uint8)
-
-            # Frames are in 8bit B/W mode already
+                    frame_mono = frame_original[:, :, self.color_index]
+            # Frames are in B/W mode already
             else:
                 frame_mono = frame_original
 
@@ -383,6 +377,10 @@ class Frames(object):
 
             # Get the monochrome frame. If it is not cached, this involves I/O.
             frame_mono = self.frames_mono(index)
+
+            # If the mono image is 8bit, interpolate it to 16bit.
+            if frame_mono.dtype == np.uint8:
+                frame_mono = frame_mono.astype(np.uint16) * 256
 
             # Compute a version of the frame with Gaussian blur added.
             frame_monochrome_blurred = GaussianBlur(frame_mono,
@@ -429,7 +427,7 @@ class Frames(object):
             frame_monochrome_laplacian = convertScaleAbs(Laplacian(
                     frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
                     ::self.configuration.align_frames_sampling_stride], CV_32F),
-                    alpha=1)
+                    alpha=self.alpha)
 
             # If the blurred frames are buffered, store the current frame at the current index.
             if self.buffer_laplacian:
@@ -542,7 +540,7 @@ if __name__ == "__main__":
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
     type = 'video'
-    version = 'frames_old'
+    version = 'frames'
     buffering_level = 4
 
     if type == 'image':
@@ -550,8 +548,8 @@ if __name__ == "__main__":
         # names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
         names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
     else:
-        # names = 'Videos/another_short_video.avi'
-        names = 'Videos/Moon_Tile-024_043939.avi'
+        names = 'Videos/another_short_video.avi'
+        # names = 'Videos/Moon_Tile-024_043939.avi'
 
     # Get configuration parameters.
     configuration = Configuration()

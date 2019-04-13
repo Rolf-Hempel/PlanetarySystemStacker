@@ -29,7 +29,7 @@ from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY
     putText
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin, uint8, full, uint32, isnan, float32
+    empty, argmin, stack, sin, uint8, full, uint32, isnan, float32, int32
 from numpy import min as np_min
 from numpy import nan as np_nan
 from numpy.fft import fft2, ifft2

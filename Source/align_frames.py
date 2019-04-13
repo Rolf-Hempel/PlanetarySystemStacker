@@ -24,9 +24,8 @@ from glob import glob
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, float32, zeros, empty, uint32, uint16, uint8
+from numpy import arange, float32, zeros, empty, int32
 from scipy import ndimage
-from cv2 import GaussianBlur
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
@@ -154,7 +153,7 @@ class AlignFrames(object):
             #  will be computed relativ to this patch.
             self.reference_window = self.frames.frames_mono_blurred(self.frame_ranks_max_index)[
                                     self.y_low_opt:self.y_high_opt,
-                                    self.x_low_opt:self.x_high_opt]
+                                    self.x_low_opt:self.x_high_opt].astype(int32)
             self.reference_window_shape = self.reference_window.shape
 
         elif self.configuration.align_frames_mode == "Planet":
@@ -362,11 +361,9 @@ class AlignFrames(object):
                     self.intersection_shape[1][0] - shifts[idx][1]:
                     self.intersection_shape[1][1] - shifts[idx][1]]
 
-        # Compute the mean frame by dividing by the number of frames.
-        self.mean_frame /= self.average_frame_number
-        # self.mean_frame = GaussianBlur(self.mean_frame.astype(uint8),
-        #              (self.configuration.frames_gauss_width, self.configuration.frames_gauss_width),
-        #              0)
+        # Compute the mean frame by dividing by the number of frames, and convert values to 16bit.
+        scaling = 256./self.average_frame_number
+        self.mean_frame = (self.mean_frame[:,:]*scaling).astype(int32)
 
         return self.mean_frame
 

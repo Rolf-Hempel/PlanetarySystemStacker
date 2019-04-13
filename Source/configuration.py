@@ -152,7 +152,7 @@ class Configuration(object):
         self.rank_frames_method = "Laplace"
 
         self.align_frames_method = "SteepestDescent"
-        self.align_frames_rectangle_black_threshold = 40
+        self.align_frames_rectangle_black_threshold = 10240
         self.align_frames_border_width = 10
         self.align_frames_sampling_stride = 2
         self.align_frames_min_stabilization_patch_fraction = 0.2
