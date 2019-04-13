@@ -142,11 +142,12 @@ class AlignmentPoints(object):
         search_width = self.configuration.alignment_points_search_width
         # Minimum structure value for an alignment point (between 0. and 1.)
         structure_threshold = self.configuration.alignment_points_structure_threshold
-        # The brightest pixel must be brighter than this value (0 < value <256)
-        brightness_threshold = self.configuration.alignment_points_brightness_threshold
+        # The brightest pixel must be brighter than this value (0 < value <256). Please note that
+        # brightness and contrast values are converted to 16bit resolution.
+        brightness_threshold = self.configuration.alignment_points_brightness_threshold * 256
         # The difference between the brightest and darkest pixel values must be larger than this
         # value (0 < value < 256)
-        contrast_threshold = self.configuration.alignment_points_contrast_threshold
+        contrast_threshold = self.configuration.alignment_points_contrast_threshold * 256
 
         # Compute the minimum distance of an AP from the boundary.
         min_boundary_distance = max(half_box_width + search_width, half_patch_width)
