@@ -370,7 +370,13 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
         self.setupUi(self)
 
         self.parent_gui = parent_gui
-        self.frame = frame
+
+        # If the frame type is not uint8, values correspond to 16bit resolution.
+        if frame.dtype != uint8:
+            self.frame = frame[:,:]/256.
+        else:
+            self.frame = frame
+
         self.message = message
         self.signal_finished = signal_finished
 
