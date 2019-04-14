@@ -30,7 +30,7 @@ from sys import argv, exit
 from time import time, sleep
 
 import matplotlib.pyplot as plt
-from numpy import array, full, uint8
+from numpy import array, full, uint8, uint16
 from PyQt5 import QtCore, QtGui, QtWidgets
 from matplotlib import patches
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -268,7 +268,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
         :return: -
         """
 
-        self.image = self.frames.frames_mono(index)[self.align_frames.intersection_shape[0][0] -
+        image = self.frames.frames_mono(index)[self.align_frames.intersection_shape[0][0] -
                                                     self.align_frames.frame_shifts[index][0]:
                                                     self.align_frames.intersection_shape[0][1] -
                                                     self.align_frames.frame_shifts[index][0],
@@ -277,9 +277,16 @@ class FrameViewer(QtWidgets.QGraphicsView):
                                                     self.align_frames.intersection_shape[1][1] -
                                                     self.align_frames.frame_shifts[index][1]]
 
+        # Convert the monochrome image into uint8 format. If the frame type is uint16, values
+        # correspond to 16bit resolution.
+        if image.dtype == uint16:
+            image_uint8 = (image[:, :] / 256.).astype(uint8)
+        elif image.dtype == uint8:
+            image_uint8 = image.astype(uint8)
+        else:
+            raise NotSupportedError("Attempt to set a photo in frame viewer with type neither"
+                                    " uint8 nor uint16")
 
-        # Convert the monochrome image into uint8 format.
-        image_uint8 = self.image.astype(uint8)
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
         qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,

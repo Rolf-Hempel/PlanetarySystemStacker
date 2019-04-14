@@ -26,7 +26,7 @@ from glob import glob
 from sys import argv, exit
 from time import time
 
-from numpy import uint8
+from numpy import uint8, uint16, int32
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from exceptions import InternalError, NotSupportedError
@@ -371,11 +371,15 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
 
         self.parent_gui = parent_gui
 
-        # If the frame type is not uint8, values correspond to 16bit resolution.
-        if frame.dtype != uint8:
-            self.frame = frame[:,:]/256.
-        else:
+        # Convert the frame into uint8 format. If the frame type is uint16, values
+        # correspond to 16bit resolution.
+        if frame.dtype == uint16 or frame.dtype == int32:
+            self.frame = (frame[:, :] / 256.).astype(uint8)
+        elif frame.dtype == uint8:
             self.frame = frame
+        else:
+            raise NotSupportedError("Attempt to set a photo in frame viewer with type neither"
+                                    " uint8 nor uint16 not int32")
 
         self.message = message
         self.signal_finished = signal_finished

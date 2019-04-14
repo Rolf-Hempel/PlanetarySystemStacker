@@ -369,8 +369,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
                 # When the editor is finished, it sends a signal (last argument) to the workflow
                 # thread with the four coordinate index bounds.
-                rpew = RectangularPatchEditorWidget(self, self.workflow.frames.frames_mono[
-                    self.workflow.rank_frames.frame_ranks_max_index][border:-border,
+                rpew = RectangularPatchEditorWidget(self, self.workflow.frames.frames_mono(
+                    self.workflow.rank_frames.frame_ranks_max_index)[border:-border,
                     border:-border], "With 'ctrl' and the left mouse button pressed, draw a "
                                      "rectangular patch to be used for frame alignment. Or just "
                                      "press 'OK / Cancel' (automatic selection).",

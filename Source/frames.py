@@ -539,9 +539,9 @@ if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
-    type = 'video'
+    type = 'image'
     version = 'frames'
-    buffering_level = 4
+    buffering_level = 2
 
     if type == 'image':
         # names = glob('Images/2012_*.tif')
@@ -578,6 +578,9 @@ if __name__ == "__main__":
         except Exception as e:
             print("Error: " + e.message)
             exit()
+        frames_mono_3 = frames.frames_mono(3)
+        frames_mono_blurred_4 = frames.frames_mono_blurred(4)
+        frames_mono_blurred_laplacian_1 = frames.frames_mono_blurred_laplacian(1)
     else:
         try:
             frames = FramesOld(configuration, names, type=type, convert_to_grayscale=False)

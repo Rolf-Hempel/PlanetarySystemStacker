@@ -24,7 +24,7 @@ from glob import glob
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, float32, zeros, empty, int32
+from numpy import arange, float32, zeros, empty, int32, uint8, uint16
 from scipy import ndimage
 
 from configuration import Configuration
@@ -362,7 +362,14 @@ class AlignFrames(object):
                     self.intersection_shape[1][1] - shifts[idx][1]]
 
         # Compute the mean frame by dividing by the number of frames, and convert values to 16bit.
-        scaling = 256./self.average_frame_number
+        if self.frames.dt0 == uint8:
+            scaling = 256. / self.average_frame_number
+        elif self.frames.dt0 == uint16:
+            scaling = 1. / self.average_frame_number
+        else:
+            raise NotSupportedError("Attempt to compute the average frame from images with type"
+                                    " neither uint8 nor uint16")
+
         self.mean_frame = (self.mean_frame[:,:]*scaling).astype(int32)
 
         return self.mean_frame
