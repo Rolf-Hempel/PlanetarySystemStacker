@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from glob import glob
+from itertools import chain
 
 import matplotlib.pyplot as plt
 from math import ceil
@@ -169,29 +170,36 @@ class AlignFrames(object):
                 " not supported")
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
-        self.frame_shifts = []
+        self.frame_shifts = [None for i in range(self.frames.number)]
 
         # Initialize lists with info on failed frames.
         self.dev_r_list = []
         self.failed_index_list = []
 
-        # Initialize two variables which keep the shift values of the previous step as the starting
-        # point for the next step. This reduces the search radius if frames are drifting.
-        dy_min_cum = dx_min_cum = 0
+        # Initialize a counter of processed frames for progress bar signalling. It is set to one
+        # because in the loop below the optimal frame is not counted.
+        number_processed = 1
 
-        for idx in range(self.frames.number):
-            frame = self.frames.frames_mono_blurred(idx)
+        # Loop over all frames. Begin with the sharpest (reference) frame
+        for idx in chain(reversed(range(self.frame_ranks_max_index + 1)),
+                         range(self.frame_ranks_max_index, self.frames.number)):
 
-            # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-            if self.progress_signal is not None and idx % self.signal_step_size == 0:
-                self.progress_signal.emit("Align all frames", int((idx / self.frames.number) * 100.))
-
-            # For the sharpest frame the displacement is 0 because it is used as the reference.
             if idx == self.frame_ranks_max_index:
-                self.frame_shifts.append([0, 0])
+                # For the sharpest frame the displacement is 0 because it is used as the reference.
+                self.frame_shifts[idx] = [0, 0]
+                # Initialize two variables which keep the shift values of the previous step as
+                # the starting point for the next step. This reduces the search radius if frames are
+                # drifting.
+                dy_min_cum = dx_min_cum = 0
 
             # For all other frames: Compute the global shift, using the "blurred" monochrome image.
             else:
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and idx % self.signal_step_size == 0:
+                    self.progress_signal.emit("Align all frames",
+                                              int((number_processed / self.frames.number) * 100.))
+
+                frame = self.frames.frames_mono_blurred(idx)
 
                 if self.configuration.align_frames_mode == "Planet":
                     # In Planetary mode the shift of the "center of gravity" of the image is
@@ -245,7 +253,7 @@ class AlignFrames(object):
                 # next frame.
                 dy_min_cum += dy_min
                 dx_min_cum += dx_min
-                self.frame_shifts.append([dy_min_cum, dx_min_cum])
+                self.frame_shifts[idx] = [dy_min_cum, dx_min_cum]
 
                 # In "Surface" mode shift computation can fail if no minimum is found within
                 # the pre-defined search radius.
@@ -291,6 +299,9 @@ class AlignFrames(object):
                                                 self.frame_ranks_max_index)[
                                                 self.y_low_opt:self.y_high_opt,
                                                 self.x_low_opt:self.x_high_opt]
+
+                number_processed += 1
+
         if self.progress_signal is not None:
             self.progress_signal.emit("Align all frames", 100)
 
@@ -492,8 +503,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        # file = 'short_video'
-        file = 'another_short_video'
+        file = 'short_video'
+        # file = 'another_short_video'
         # file = 'Moon_Tile-024_043939'
         names = 'Videos/' + file + '.avi'
     print(names)

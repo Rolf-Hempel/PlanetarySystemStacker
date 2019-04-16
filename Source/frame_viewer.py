@@ -210,6 +210,9 @@ class FrameViewer(QtWidgets.QGraphicsView):
         self.align_frames = align_frames
         self.frame_index = 0
 
+        # Initialize a flag which indicates when an image is being loaded.
+        self.image_loading_busy = False
+
         # Initialize the scene. This object handles mouse events if not in drag mode.
         self._scene = QtWidgets.QGraphicsScene()
         # Initialize the photo object. No image is loaded yet.
@@ -268,6 +271,8 @@ class FrameViewer(QtWidgets.QGraphicsView):
         :return: -
         """
 
+        # Indicate that an image is being loaded.
+        self.image_loading_busy = True
         image = self.frames.frames_mono(index)[self.align_frames.intersection_shape[0][0] -
                                                     self.align_frames.frame_shifts[index][0]:
                                                     self.align_frames.intersection_shape[0][1] -
@@ -299,6 +304,9 @@ class FrameViewer(QtWidgets.QGraphicsView):
         else:
             self._empty = True
             self._photo.setPixmap(QtGui.QPixmap())
+
+        # Release the image loading flag.
+        self.image_loading_busy = False
 
     def wheelEvent(self, event):
         """
@@ -681,7 +689,7 @@ class FramePlayer(QtCore.QObject):
     def __init__(self, frame_viewer_widget):
         super(FramePlayer, self).__init__()
 
-        # Store a reference on the frame viewer widget and create a list of GUI elements. This makes
+        # Store a reference of the frame viewer widget and create a list of GUI elements. This makes
         # it easier to perform the same operation on all elements.
         self.frame_viewer_widget = frame_viewer_widget
         self.frame_viewer_widget_elements = [self.frame_viewer_widget.spinBox_chronological,
@@ -713,7 +721,8 @@ class FramePlayer(QtCore.QObject):
             # The player stops when the end of the video is reached, or when the "run_player"
             # variable is set to False in the GUI thread.
             while self.frame_viewer_widget.quality_index < self.frame_viewer_widget.frames.number \
-                    - 1 and self.run_player:
+                    - 1 and self.run_player and not \
+                    self.frame_viewer_widget.frame_viewer.image_loading_busy:
                 self.frame_viewer_widget.quality_index += 1
                 self.frame_viewer_widget.frame_index = \
                 self.frame_viewer_widget.rank_frames.quality_sorted_indices[
@@ -734,7 +743,8 @@ class FramePlayer(QtCore.QObject):
         else:
             # The same for chronological frame ordering.
             while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.frames.number -\
-                    1 and self.run_player:
+                    1 and self.run_player and not \
+                    self.frame_viewer_widget.frame_viewer.image_loading_busy:
                 self.frame_viewer_widget.frame_index += 1
                 self.frame_viewer_widget.quality_index = \
                     self.frame_viewer_widget.rank_frames.quality_sorted_indices.index(
