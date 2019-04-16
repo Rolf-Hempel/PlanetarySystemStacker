@@ -352,6 +352,22 @@ class FrameViewer(QtWidgets.QGraphicsView):
             else:
                 self._zoom = 0
 
+    def keyPressEvent(self, event):
+        """
+        The + and - keys are used for zooming.
+
+        :param event: event object
+        :return: -
+        """
+
+        # If the "+" key is pressed, zoom in. If "-" is pressed, zoom out.
+        if event.key() == QtCore.Qt.Key_Plus and not event.modifiers() & QtCore.Qt.ControlModifier:
+            self.zoom(1)
+        elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
+            self.zoom(-1)
+        else:
+            super(FrameViewer, self).keyPressEvent(event)
+
 
 class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
     """

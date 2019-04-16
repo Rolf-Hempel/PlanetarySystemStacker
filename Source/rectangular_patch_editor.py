@@ -253,10 +253,6 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
             # Depending of wheel direction, set the direction value to greater or smaller than 1.
             self.zoom(event.angleDelta().y())
 
-        # If not in drag mode, the wheel event is handled at the scene level.
-        else:
-            self._scene.wheelEvent(event)
-
     def zoom(self, direction):
         """
         Zoom in or out. This is only active when a photo is loaded
