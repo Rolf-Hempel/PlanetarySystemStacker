@@ -737,43 +737,44 @@ class FramePlayer(QtCore.QObject):
             # The player stops when the end of the video is reached, or when the "run_player"
             # variable is set to False in the GUI thread.
             while self.frame_viewer_widget.quality_index < self.frame_viewer_widget.frames.number \
-                    - 1 and self.run_player and not \
-                    self.frame_viewer_widget.frame_viewer.image_loading_busy:
-                self.frame_viewer_widget.quality_index += 1
-                self.frame_viewer_widget.frame_index = \
-                self.frame_viewer_widget.rank_frames.quality_sorted_indices[
-                    self.frame_viewer_widget.quality_index]
-                self.frame_viewer_widget.spinBox_chronological.setValue(
-                    self.frame_viewer_widget.frame_index + 1)
-                self.frame_viewer_widget.spinBox_quality.setValue(
-                    self.frame_viewer_widget.quality_index + 1)
-                self.frame_viewer_widget.slider_frames.setValue(
-                    self.frame_viewer_widget.quality_index + 1)
-                self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
-                self.frame_viewer_widget.matplotlib_widget.plot_dot(
-                    self.frame_viewer_widget.quality_index)
+                    - 1 and self.run_player:
+                # Go to the next frame only if the viewer has finished loading the previous one.
+                if not self.frame_viewer_widget.frame_viewer.image_loading_busy:
+                    self.frame_viewer_widget.quality_index += 1
+                    self.frame_viewer_widget.frame_index = \
+                    self.frame_viewer_widget.rank_frames.quality_sorted_indices[
+                        self.frame_viewer_widget.quality_index]
+                    self.frame_viewer_widget.spinBox_chronological.setValue(
+                        self.frame_viewer_widget.frame_index + 1)
+                    self.frame_viewer_widget.spinBox_quality.setValue(
+                        self.frame_viewer_widget.quality_index + 1)
+                    self.frame_viewer_widget.slider_frames.setValue(
+                        self.frame_viewer_widget.quality_index + 1)
+                    self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
+                    self.frame_viewer_widget.matplotlib_widget.plot_dot(
+                        self.frame_viewer_widget.quality_index)
 
                 # Insert a short pause to keep the video from running too fast.
                 sleep(0.1)
                 self.frame_viewer_widget.update()
         else:
             # The same for chronological frame ordering.
-            while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.frames.number -\
-                    1 and self.run_player and not \
-                    self.frame_viewer_widget.frame_viewer.image_loading_busy:
-                self.frame_viewer_widget.frame_index += 1
-                self.frame_viewer_widget.quality_index = \
-                    self.frame_viewer_widget.rank_frames.quality_sorted_indices.index(
-                    self.frame_viewer_widget.frame_index)
-                self.frame_viewer_widget.spinBox_chronological.setValue(
-                    self.frame_viewer_widget.frame_index + 1)
-                self.frame_viewer_widget.spinBox_quality.setValue(
-                    self.frame_viewer_widget.quality_index + 1)
-                self.frame_viewer_widget.slider_frames.setValue(
-                    self.frame_viewer_widget.frame_index + 1)
-                self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
-                self.frame_viewer_widget.matplotlib_widget.plot_dot(
-                    self.frame_viewer_widget.frame_index)
+            while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.frames.number \
+                    - 1 and self.run_player:
+                if not self.frame_viewer_widget.frame_viewer.image_loading_busy:
+                    self.frame_viewer_widget.frame_index += 1
+                    self.frame_viewer_widget.quality_index = \
+                        self.frame_viewer_widget.rank_frames.quality_sorted_indices.index(
+                        self.frame_viewer_widget.frame_index)
+                    self.frame_viewer_widget.spinBox_chronological.setValue(
+                        self.frame_viewer_widget.frame_index + 1)
+                    self.frame_viewer_widget.spinBox_quality.setValue(
+                        self.frame_viewer_widget.quality_index + 1)
+                    self.frame_viewer_widget.slider_frames.setValue(
+                        self.frame_viewer_widget.frame_index + 1)
+                    self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
+                    self.frame_viewer_widget.matplotlib_widget.plot_dot(
+                        self.frame_viewer_widget.frame_index)
                 sleep(0.1)
                 self.frame_viewer_widget.update()
 
