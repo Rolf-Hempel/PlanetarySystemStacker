@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 from math import ceil
 from numpy import arange, float32, zeros, empty, int32, uint8, uint16
 from scipy import ndimage
+from cv2 import imwrite
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
@@ -111,9 +112,10 @@ class AlignFrames(object):
                 # new_quality = Miscellaneous.local_contrast(
                 #     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
                 #     x_low:x_high], self.configuration.quality_area_pixel_stride)
-                new_quality = Miscellaneous.quality_measure_alternative(
+                new_quality = Miscellaneous.quality_measure_threshold_weighted(
                     best_frame_mono_blurred[y_low:y_high, x_low:x_high],
-                    black_threshold=self.configuration.align_frames_rectangle_black_threshold)
+                    black_threshold=self.configuration.align_frames_rectangle_black_threshold,
+                    min_fraction=self.configuration.align_frames_rectangle_min_fraction)
                 if new_quality > quality:
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
                         x_low, x_high, y_low, y_high)
@@ -503,9 +505,10 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        file = 'short_video'
+        file = 'Moon_Tile-013_205538'
         # file = 'another_short_video'
         # file = 'Moon_Tile-024_043939'
+        # file = 'Moon_Tile-013_205538'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -523,6 +526,10 @@ if __name__ == "__main__":
     # Rank the frames by their overall local contrast.
     rank_frames = RankFrames(frames, configuration)
     rank_frames.frame_score()
+
+    print("Best frame index: " + str(rank_frames.frame_ranks_max_index))
+    output_file = 'Images/' + file + '.jpg'
+    imwrite(output_file, frames.frames_mono(rank_frames.frame_ranks_max_index))
 
     # Initialize the frame alignment object.
     align_frames = AlignFrames(frames, rank_frames, configuration)

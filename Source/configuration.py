@@ -153,6 +153,7 @@ class Configuration(object):
 
         self.align_frames_method = "SteepestDescent"
         self.align_frames_rectangle_black_threshold = 10240
+        self.align_frames_rectangle_min_fraction = 0.7
         self.align_frames_border_width = 10
         self.align_frames_sampling_stride = 2
         self.align_frames_min_stabilization_patch_fraction = 0.2

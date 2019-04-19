@@ -68,7 +68,7 @@ class Miscellaneous(object):
         return sharpness
 
     @staticmethod
-    def quality_measure_alternative(frame, black_threshold=40.):
+    def quality_measure_threshold(frame, black_threshold=40.):
         """
         This is an alternative method for computing the amount of local structure. Here the
         summation only takes into account points where the luminosity exceeds a certain
@@ -79,11 +79,39 @@ class Miscellaneous(object):
         :return:
         """
 
-        sum_horizontal = sum(sum(abs(frame[:, 2:] - frame[:, :-2]) / (frame[:, 1:-1] + 0.0001) * (
+        sum_horizontal = sum(sum(abs(frame[:, 2:] - frame[:, :-2]) * (
                 frame[:, 1:-1] > black_threshold)))
-        sum_vertical = sum(sum(abs(frame[2:, :] - frame[:-2, :]) / (frame[1:-1, :] + 0.0001) * (
+        sum_vertical = sum(sum(abs(frame[2:, :] - frame[:-2, :]) * (
                 frame[1:-1, :] > black_threshold)))
         return min(sum_horizontal, sum_vertical)
+
+    @staticmethod
+    def quality_measure_threshold_weighted(frame, black_threshold=40., min_fraction=0.7):
+        """
+        This is an alternative method for computing the amount of local structure. Here the
+        summation only takes into account points where the luminosity exceeds a certain
+        threshold. Additionally, if not too many points are discarded, the reduced sampling size is
+        compensated.
+
+        :param frame: 2D image
+        :param black_threshold: Threshold for points to be considered
+        :param min_fraction: Minimum fraction of points to pass the threshold
+        :return:
+        """
+
+        frame_size = frame.shape[0] * frame.shape[1]
+
+        mask = frame[:, :] > black_threshold
+        mask_fraction = mask.sum() / frame_size
+
+        if mask_fraction > min_fraction:
+            sum_horizontal = sum(
+                sum(abs(frame[:, 2:] - frame[:, :-2]) * mask[:, 1:-1])) / mask_fraction
+            sum_vertical = sum(
+                sum(abs(frame[2:, :] - frame[:-2, :]) * mask[1:-1, :])) / mask_fraction
+            return min(sum_horizontal, sum_vertical)
+        else:
+            return 0.
 
     @staticmethod
     def local_contrast_laplace(frame, stride):
