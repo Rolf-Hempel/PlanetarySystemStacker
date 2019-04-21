@@ -178,6 +178,10 @@ class Workflow(QtCore.QObject):
                             "           Number of images read: " + str(self.frames.number) +
                             ", image shape: " + str(self.frames.shape), self.stacked_image_log_file,
                             precede_with_timestamp=False)
+            elif self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol(
+                    "           Total number of frames: " + str(self.frames.number),
+                    self.stacked_image_log_file, precede_with_timestamp=False)
         except Exception as e:
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("Error: " + str(e), self.stacked_image_log_file)

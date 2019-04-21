@@ -86,7 +86,7 @@ class Miscellaneous(object):
         return min(sum_horizontal, sum_vertical)
 
     @staticmethod
-    def quality_measure_threshold_weighted(frame, black_threshold=40., min_fraction=0.7):
+    def quality_measure_threshold_weighted(frame, stride=2, black_threshold=40., min_fraction=0.7):
         """
         This is an alternative method for computing the amount of local structure. Here the
         summation only takes into account points where the luminosity exceeds a certain
@@ -94,24 +94,33 @@ class Miscellaneous(object):
         compensated.
 
         :param frame: 2D image
-        :param black_threshold: Threshold for points to be considered
-        :param min_fraction: Minimum fraction of points to pass the threshold
+        :param stride: Stride for gradient computation. For blurry images increase this value.
+        :param black_threshold: Threshold for points to be considered.
+        :param min_fraction: Minimum fraction of points to pass the threshold.
         :return:
         """
 
         frame_size = frame.shape[0] * frame.shape[1]
+        stride_2 = 2 * stride
 
+        # Compute a mask for all pixels which are bright enough (to avoid background noise).
         mask = frame[:, :] > black_threshold
         mask_fraction = mask.sum() / frame_size
 
+        # If most pixels are bright enough, compensate for different pixel counts.
         if mask_fraction > min_fraction:
-            sum_horizontal = sum(
-                sum(abs(frame[:, 2:] - frame[:, :-2]) * mask[:, 1:-1])) / mask_fraction
-            sum_vertical = sum(
-                sum(abs(frame[2:, :] - frame[:-2, :]) * mask[1:-1, :])) / mask_fraction
-            return min(sum_horizontal, sum_vertical)
+            sum_horizontal = sum(sum(abs(frame[:, stride_2:] - frame[:, :-stride_2]) *
+                                     mask[:, stride:-stride])) / mask_fraction
+            sum_vertical = sum(sum(abs(frame[stride_2:, :] - frame[:-stride_2, :]) *
+                                   mask[stride:-stride, :])) / mask_fraction
+        # If many pixels are too dim, penalize this patch by not compensating for pixel count.
         else:
-            return 0.
+            sum_horizontal = sum(sum(abs(frame[:, stride_2:] - frame[:, :-stride_2]) *
+                                     mask[:, stride:-stride]))
+            sum_vertical = sum(sum(abs(frame[stride_2:, :] - frame[:-stride_2, :]) *
+                                   mask[stride:-stride, :]))
+
+        return min(sum_horizontal, sum_vertical)
 
     @staticmethod
     def local_contrast_laplace(frame, stride):

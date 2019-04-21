@@ -21,7 +21,7 @@ Comp = 1
 [Graphics]
 Wizard image = D:\SW-Development\Python\PlanetarySystemStacker\InstallForge\Moon_Splash_Screen.jpg
 Header image = C:\Program Files (x86)\solicus\InstallForge\Images\Header_4.bmp
-Install-icon image = D:\SW-Development\Python\PlanetarySystemStacker\Documentation\PlanetarySystemStacker_small.ico
+Install-icon image = D:\SW-Development\Python\PlanetarySystemStacker\Documentation\Icon\PSS-Icon-64.ico
 Show Label = 1
 Windows style = 1
 XpStyle = 1
@@ -79,7 +79,7 @@ n/a
 D:\SW-Development\Python\PlanetarySystemStacker\Documentation\algorithm_summary.pdf
 934.8 KB
 pdf
-D:\SW-Development\Python\PlanetarySystemStacker\Documentation\PlanetarySystemStacker_small.ico
+D:\SW-Development\Python\PlanetarySystemStacker\Documentation\Icon\PSS-Icon-64.ico
 12.6 KB
 ico
 [Licence_Begin]
@@ -314,6 +314,12 @@ If the disclaimer of warranty and limitation of liability provided above cannot 
 [Variables]
 [SCs]
 Desktop
+PlanetarySystemStacker
+<installpath>\planetary_system_stacker\planetary_system_stacker.exe
+
+
+0
+Startmenu
 PlanetarySystemStacker
 <installpath>\planetary_system_stacker\planetary_system_stacker.exe
 

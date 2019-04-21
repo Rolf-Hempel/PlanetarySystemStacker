@@ -96,8 +96,10 @@ class AlignFrames(object):
         # a border and the search radius for frame shifts.
         border_width = self.configuration.align_frames_border_width + \
                        self.configuration.align_frames_search_width
-        rect_y = int((self.shape[0] - 2 * border_width) / scale_factor)
-        rect_x = int((self.shape[1] - 2 * border_width) / scale_factor)
+        rect_y = int((dim_y - 2 * border_width) / scale_factor)
+        rect_y_2 = int(rect_y / 2)
+        rect_x = int((dim_x - 2 * border_width) / scale_factor)
+        rect_x_2 = int(rect_x / 2)
 
         # Initialize the quality measure of the optimal location to an impossible value (<0).
         quality = -1.
@@ -105,21 +107,29 @@ class AlignFrames(object):
         # Compute for all locations in the frame the "quality measure" and find the place with
         # the maximum value.
         best_frame_mono_blurred = self.frames.frames_mono_blurred(self.frame_ranks_max_index)
-        for x_low in arange(border_width, dim_x - rect_x - border_width + 1, rect_x):
-            x_high = x_low + rect_x
-            for y_low in arange(border_width, dim_y - rect_y - border_width + 1, rect_y):
-                y_high = y_low + rect_y
+        x_low = border_width
+        x_high = x_low + rect_x
+        while x_high <= dim_x - border_width:
+            y_low = border_width
+            y_high = y_low + rect_y
+            while y_high <= dim_y - border_width:
                 # new_quality = Miscellaneous.local_contrast(
                 #     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
                 #     x_low:x_high], self.configuration.quality_area_pixel_stride)
                 new_quality = Miscellaneous.quality_measure_threshold_weighted(
                     best_frame_mono_blurred[y_low:y_high, x_low:x_high],
+                    stride=self.configuration.align_frames_rectangle_stride,
                     black_threshold=self.configuration.align_frames_rectangle_black_threshold,
                     min_fraction=self.configuration.align_frames_rectangle_min_fraction)
                 if new_quality > quality:
                     (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
                         x_low, x_high, y_low, y_high)
                     quality = new_quality
+
+                y_low += rect_y_2
+                y_high += rect_y_2
+            x_low += rect_x_2
+            x_high += rect_x_2
         return (self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt)
 
     def set_alignment_rect(self, y_low_opt, y_high_opt, x_low_opt, x_high_opt):
@@ -207,8 +217,8 @@ class AlignFrames(object):
                     # In Planetary mode the shift of the "center of gravity" of the image is
                     # computed. This algorithm cannot fail.
                     cog_frame_real = ndimage.measurements.center_of_mass(frame)
-                    self.frame_shifts.append([cog_reference_y - int(round(cog_frame_real[0])),
-                                              cog_reference_x - int(round(cog_frame_real[1]))])
+                    self.frame_shifts[idx] = [cog_reference_y - int(round(cog_frame_real[0])),
+                                              cog_reference_x - int(round(cog_frame_real[1]))]
                     continue
 
                 # In "Surface" mode three alignment algorithms can be chosen from. In each case
@@ -221,9 +231,8 @@ class AlignFrames(object):
                     # compute its translation relative to the reference.
                     frame_window = self.frames.frames_mono_blurred(idx)[
                                    self.y_low_opt:self.y_high_opt, self.x_low_opt:self.x_high_opt]
-                    self.frame_shifts.append(
-                        Miscellaneous.translation(self.reference_window, frame_window,
-                                                  self.reference_window_shape))
+                    self.frame_shifts[idx] =  Miscellaneous.translation(self.reference_window,
+                                                    frame_window, self.reference_window_shape)
                     continue
 
                 elif self.configuration.align_frames_method == "RadialSearch":
@@ -300,7 +309,7 @@ class AlignFrames(object):
                     self.reference_window = self.frames.frames_mono_blurred(
                                                 self.frame_ranks_max_index)[
                                                 self.y_low_opt:self.y_high_opt,
-                                                self.x_low_opt:self.x_high_opt]
+                                                self.x_low_opt:self.x_high_opt].astype(int32)
 
                 number_processed += 1
 
@@ -505,7 +514,7 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        file = 'Moon_Tile-013_205538'
+        file = 'Moon_Tile-013_205538_short'
         # file = 'another_short_video'
         # file = 'Moon_Tile-024_043939'
         # file = 'Moon_Tile-013_205538'
@@ -583,8 +592,8 @@ if __name__ == "__main__":
         name = 'Videos/not_stabilized_video_with_frame_numbers.avi'
     align_frames.write_stabilized_video(name, 5, stabilized=stabilized)
 
-    print ("Setting ROI and computing new average frame")
-    average = align_frames.set_roi(300, 600, 500, 1000)
-    plt.imshow(average, cmap='Greys_r')
-    plt.show()
+    # print ("Setting ROI and computing new average frame")
+    # average = align_frames.set_roi(300, 600, 500, 1000)
+    # plt.imshow(average, cmap='Greys_r')
+    # plt.show()
 
