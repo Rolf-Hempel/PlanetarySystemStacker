@@ -59,6 +59,8 @@ class AlignFrames(object):
 
         self.frames = frames
         self.shape = frames.shape
+        self.alignment_rect_qualities = None
+        self.alignment_rect_bounds = None
         self.frame_shifts = None
         self.intersection_shape = None
         self.intersection_shape_original = None
@@ -73,14 +75,15 @@ class AlignFrames(object):
         self.dev_r_list = None
         self.failed_index_list = None
         self.dy = self.dx = None
+        self.y_low_opt = self.y_high_opt = self.x_low_opt = self.x_high_opt = None
         self.dy_original = self.dx_original = None
         self.ROI_set = False
         self.dev_table = empty((2 * self.configuration.align_frames_search_width,
                                2 * self.configuration.align_frames_search_width), dtype=float32)
 
-    def select_alignment_rect(self, scale_factor):
+    def compute_alignment_rect(self, scale_factor):
         """
-        Using the frame with the highest rank (sharpest image), select the rectangular patch
+        Using the frame with the highest rank (sharpest image), compute the rectangular patch
         where structure is best in both x and y directions. The size of the patch is the size of the
         frame divided by "scale_factor" in both coordinate directions.
 
@@ -101,11 +104,12 @@ class AlignFrames(object):
         rect_x = int((dim_x - 2 * border_width) / scale_factor)
         rect_x_2 = int(rect_x / 2)
 
-        # Initialize the quality measure of the optimal location to an impossible value (<0).
-        quality = -1.
+        # Initialize lists which for each location store the quality measure and the index bounds.
+        self.alignment_rect_qualities = []
+        self.alignment_rect_bounds = []
 
-        # Compute for all locations in the frame the "quality measure" and find the place with
-        # the maximum value.
+        # Compute for all locations in the frame the "quality measure" and store the location
+        # and quality measure in above lists.
         best_frame_mono_blurred = self.frames.frames_mono_blurred(self.frame_ranks_max_index)
         x_low = border_width
         x_high = x_low + rect_x
@@ -116,21 +120,45 @@ class AlignFrames(object):
                 # new_quality = Miscellaneous.local_contrast(
                 #     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
                 #     x_low:x_high], self.configuration.quality_area_pixel_stride)
-                new_quality = Miscellaneous.quality_measure_threshold_weighted(
+                self.alignment_rect_qualities.append(
+                    Miscellaneous.quality_measure_threshold_weighted(
                     best_frame_mono_blurred[y_low:y_high, x_low:x_high],
                     stride=self.configuration.align_frames_rectangle_stride,
                     black_threshold=self.configuration.align_frames_rectangle_black_threshold,
-                    min_fraction=self.configuration.align_frames_rectangle_min_fraction)
-                if new_quality > quality:
-                    (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
-                        x_low, x_high, y_low, y_high)
-                    quality = new_quality
+                    min_fraction=self.configuration.align_frames_rectangle_min_fraction))
+                self.alignment_rect_bounds.append((y_low, y_high, x_low, x_high))
 
                 y_low += rect_y_2
                 y_high += rect_y_2
             x_low += rect_x_2
             x_high += rect_x_2
-        return (self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt)
+
+        # Sort lists by quality.
+        arq, arb = zip(*sorted(zip(self.alignment_rect_qualities, self.alignment_rect_bounds),
+                               reverse=True))
+        self.alignment_rect_qualities = list(arq)
+        self.alignment_rect_bounds = list(arb)
+
+        # Set the optimal coordinates and return them as a tuple.
+        (self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt) = \
+            self.alignment_rect_bounds[0]
+        return self.alignment_rect_bounds[0]
+
+    def select_alignment_rect(self, index):
+        """
+        Select an alignment patch from the list computed in "compute_aligment_rect" to be used
+        for frame aligment.
+
+        :param index: index of the alignment patch in the list in decreasing quality order.
+        :return: True, if successful. Otherwise return False.
+        """
+
+        if index < 0 or index > len(self.alignment_rect_bounds):
+            return False
+        else:
+            self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt = \
+                self.alignment_rect_bounds[index]
+            return True
 
     def set_alignment_rect(self, y_low_opt, y_high_opt, x_low_opt, x_high_opt):
         """
@@ -147,6 +175,11 @@ class AlignFrames(object):
         self.y_high_opt = y_high_opt
         self.x_low_opt = x_low_opt
         self.x_high_opt = x_high_opt
+
+        # If the user has set the patch manually, set the lists to this single element.
+        self.alignment_rect_qualities = [1.]
+        self.alignment_rect_bounds = [(self.y_low_opt, self.y_high_opt, self.x_low_opt,
+                                       self.x_high_opt)]
 
     def align_frames(self):
         """
@@ -557,7 +590,7 @@ if __name__ == "__main__":
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.compute_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
 
         # Alternative: Set the alignment rectangle by hand.

@@ -254,7 +254,7 @@ class Workflow(QtCore.QObject):
 
                 self.my_timer.create_no_check('Select optimal alignment patch')
                 (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = \
-                    self.align_frames.select_alignment_rect(
+                    self.align_frames.compute_alignment_rect(
                         self.configuration.align_frames_rectangle_scale_factor)
                 self.my_timer.stop('Select optimal alignment patch')
                 if self.configuration.global_parameters_protocol_level > 1:
@@ -287,21 +287,69 @@ class Workflow(QtCore.QObject):
         # Align all frames globally relative to the frame with the highest score.
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start aligning all frames +++", self.stacked_image_log_file)
+
         self.my_timer.create_no_check('Global frame alignment')
-        try:
-            self.align_frames.align_frames()
-        except NotSupportedError as e:
-            if self.configuration.global_parameters_protocol_level > 0:
-                Miscellaneous.protocol("Error: " + e.message, self.stacked_image_log_file)
-            exit()
-        except ArgumentError as e:
-            if self.configuration.global_parameters_protocol_level > 0:
-                Miscellaneous.protocol("Error: " + e.message + "\n", self.stacked_image_log_file)
-            self.work_next_task_signal.emit("Next job")
-            return
-        except InternalError as e:
-            if self.configuration.global_parameters_protocol_level > 0:
-                Miscellaneous.protocol("Warning: " + e.message, self.stacked_image_log_file)
+
+        # Align all frames in "Surface" mode.
+        if self.configuration.align_frames_mode == "Surface":
+            # Try the frame alignment using the alignment patch with the highest quality first. If
+            # for at least one frame no valid shift can be found, try the next alignment patch. If
+            # valid shifts cannot be computed with any patch, abort processing of this job and go to
+            # the next one.
+            number_patches = len(self.align_frames.alignment_rect_qualities)
+            for patch_index in range(number_patches):
+                self.align_frames.select_alignment_rect(patch_index)
+                try:
+                    self.align_frames.align_frames()
+                    # Everything is fine, no need to try another stabilization patch.
+                    break
+                except NotSupportedError as e:
+                    if self.configuration.global_parameters_protocol_level > 0:
+                        Miscellaneous.protocol("Error: " + e.message, self.stacked_image_log_file)
+                    exit()
+                # If this happens, the alignment patch is too large. Skip this job.
+                except ArgumentError as e:
+                    if self.configuration.global_parameters_protocol_level > 0:
+                        Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
+                                               self.stacked_image_log_file)
+                    self.my_timer.stop('Global frame alignment')
+                    self.work_next_task_signal.emit("Next job")
+                    return
+                # For some frames no valid shift could be computed. This would create problems later
+                # in the workflow. Therefore, try again with another stabilization patch.
+                except InternalError as e:
+                    if self.configuration.global_parameters_protocol_level > 0:
+                        Miscellaneous.protocol("Warning: " + e.message + ", will try another"
+                                                " stabilization patch", self.stacked_image_log_file)
+                    # If there is no more patch available, skip this job.
+                    if patch_index == number_patches - 1:
+                        if self.configuration.global_parameters_protocol_level > 0:
+                            Miscellaneous.protocol("Error: No alternative stabilization patch"
+                                                   " available, continue with next job\n",
+                                                   self.stacked_image_log_file)
+                            self.my_timer.stop('Global frame alignment')
+                            self.work_next_task_signal.emit("Next job")
+                            return
+                    # Continue with the next best stabilization patch.
+                    else:
+                        if self.configuration.global_parameters_protocol_level > 0:
+                            y_low_opt, y_high_opt, x_low_opt, x_high_opt = \
+                                self.align_frames.alignment_rect_bounds[patch_index+1]
+                            Miscellaneous.protocol("           Next alignment rectangle tried: " +
+                                       str(y_low_opt) + "<y<" + str(y_high_opt) +
+                                       ", " + str(x_low_opt) + "<x<" +
+                                       str(x_high_opt), self.stacked_image_log_file,
+                                       precede_with_timestamp=False)
+
+        # Align all frames in "Planet" mode.
+        else:
+            try:
+                self.align_frames.align_frames()
+            except NotSupportedError as e:
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("Error: " + e.message, self.stacked_image_log_file)
+                exit()
+
         self.my_timer.stop('Global frame alignment')
 
         if self.configuration.global_parameters_protocol_level > 1:

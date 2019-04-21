@@ -114,7 +114,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.compute_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
         my_timer.stop('Select optimal alignment patch')
 
