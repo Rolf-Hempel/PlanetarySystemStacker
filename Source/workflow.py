@@ -29,7 +29,7 @@ from PyQt5 import QtCore
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
-from exceptions import NotSupportedError, InternalError
+from exceptions import NotSupportedError, InternalError, ArgumentError
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -226,10 +226,20 @@ class Workflow(QtCore.QObject):
             auto_execution = False
             if y_low_opt == 0 and y_high_opt == 0 and x_low_opt==0 and x_high_opt == 0:
                 auto_execution = True
+            elif (y_high_opt - y_low_opt) / self.frames.shape[0] > \
+                self.configuration.align_frames_max_stabilization_patch_fraction or \
+                (x_high_opt - x_low_opt) / self.frames.shape[1] > \
+                self.configuration.align_frames_max_stabilization_patch_fraction and \
+                self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("           Stabilization patch selected manually is "
+                                       "too large, switch to automatic mode",
+                                       self.stacked_image_log_file, precede_with_timestamp=False)
+                auto_execution = True
             elif (y_high_opt - y_low_opt) / self.frames.shape[0] < \
                 self.configuration.align_frames_min_stabilization_patch_fraction or \
                 (x_high_opt - x_low_opt) / self.frames.shape[1] < \
-                self.configuration.align_frames_min_stabilization_patch_fraction:
+                self.configuration.align_frames_min_stabilization_patch_fraction and \
+                self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("           Stabilization patch selected manually is "
                                        "too small, switch to automatic mode",
                                        self.stacked_image_log_file, precede_with_timestamp=False)
@@ -284,6 +294,11 @@ class Workflow(QtCore.QObject):
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("Error: " + e.message, self.stacked_image_log_file)
             exit()
+        except ArgumentError as e:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("Error: " + e.message + "\n", self.stacked_image_log_file)
+            self.work_next_task_signal.emit("Next job")
+            return
         except InternalError as e:
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("Warning: " + e.message, self.stacked_image_log_file)

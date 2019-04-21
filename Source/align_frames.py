@@ -274,7 +274,17 @@ class AlignFrames(object):
                     continue
 
                 # If the alignment window gets too close to a frame edge, move it away from
-                # that edge by half the border width.
+                # that edge by half the border width. First check if the reference window still
+                # fits into the shifted frame.
+                if self.shape[0] - abs(
+                        dy_min_cum) - 2 * self.configuration.align_frames_search_width - \
+                        self.configuration.align_frames_border_width < \
+                        self.reference_window_shape[0] or self.shape[1] - abs(
+                        dx_min_cum) - 2 * self.configuration.align_frames_search_width - \
+                        self.configuration.align_frames_border_width < \
+                        self.reference_window_shape[1]:
+                    raise ArgumentError("Frame stabilization window does not fit into"
+                                        " intersection")
                 new_reference_window = False
                 # Start with the lower y edge.
                 while self.y_low_opt - dy_min_cum < \
