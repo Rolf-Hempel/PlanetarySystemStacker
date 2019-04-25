@@ -134,7 +134,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         message = "Select video file(s) or/and directories containing image files"
         self.file_dialog = FileDialog(self, message,
                                       self.configuration.hidden_parameters_current_dir,
-                                      "Videos (*.avi)", options=options)
+                                      "Videos (*.avi *.mov)", options=options)
 
         # The list of strings with the new job names is sent by the FileDialog via the signal.
         self.file_dialog.signal_dialog_ready.connect(self.get_input_names)
