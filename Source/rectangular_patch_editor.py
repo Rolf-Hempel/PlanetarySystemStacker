@@ -26,7 +26,7 @@ from glob import glob
 from sys import argv, exit
 from time import time
 
-from numpy import uint8
+from numpy import uint8, uint16, int32
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from exceptions import InternalError, NotSupportedError
@@ -253,10 +253,6 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
             # Depending of wheel direction, set the direction value to greater or smaller than 1.
             self.zoom(event.angleDelta().y())
 
-        # If not in drag mode, the wheel event is handled at the scene level.
-        else:
-            self._scene.wheelEvent(event)
-
     def zoom(self, direction):
         """
         Zoom in or out. This is only active when a photo is loaded
@@ -370,7 +366,17 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
         self.setupUi(self)
 
         self.parent_gui = parent_gui
-        self.frame = frame
+
+        # Convert the frame into uint8 format. If the frame type is uint16, values
+        # correspond to 16bit resolution.
+        if frame.dtype == uint16 or frame.dtype == int32:
+            self.frame = (frame[:, :] / 256.).astype(uint8)
+        elif frame.dtype == uint8:
+            self.frame = frame
+        else:
+            raise NotSupportedError("Attempt to set a photo in frame viewer with type neither"
+                                    " uint8 nor uint16 not int32")
+
         self.message = message
         self.signal_finished = signal_finished
 
@@ -447,15 +453,6 @@ if __name__ == '__main__':
         print("Error: " + e.message)
         exit()
 
-    # The whole quality analysis and shift determination process is performed on a monochrome
-    # version of the frames. If the original frames are in RGB, the monochrome channel can be
-    # selected via a configuration parameter. Add a list of monochrome images for all frames to
-    # the "Frames" object.
-    start = time()
-    frames.add_monochrome(configuration.frames_mono_channel)
-    end = time()
-    print('Elapsed time in creating blurred monochrome images: {}'.format(end - start))
-
     # Rank the frames by their overall local contrast.
     rank_frames = RankFrames(frames, configuration)
     start = time()
@@ -476,7 +473,7 @@ if __name__ == '__main__':
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.compute_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
         end = time()
         print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))

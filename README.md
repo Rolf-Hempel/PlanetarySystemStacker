@@ -1,7 +1,7 @@
 # PlanetarySystemStacker
 Produce a sharp image of a planetary system object (moon, sun, planets) from many seeing-affected frames using the "lucky imaging" technique.
 
-The program is mainly targeted at extended objects (moon, sun), but it should work as well for the (easier) planet case. A full working prototype written in Python, still without a graphical user interface, has been finished. Results obtained in first tests show the same image quality as the established software AutoStakkert!3.
+The program is mainly targeted at extended objects (moon, sun), but it should work as well for the (easier) planet case. A full working prototype written in Python has been finished. Results obtained in first tests show the same image quality as the established software AutoStakkert!3.
 
 Input to the program can be either video files or a directories containing still images. The following algorithmic steps are performed:
 
@@ -16,7 +16,9 @@ Input to the program can be either video files or a directories containing still
 * Using those shifts, the alignment point patches of all contributing frames are stacked into a single average image patch.
 * Finally, all stacked patches are blended into a global image.
 
-So far, the code is executed by running the main program in module "main_program.py". Parameters are set at the beginning of the
-main program, and in the module "configuration.py".
+Program execution is most efficient if the image data and all intermediate results can be keept in memory. This, however, requires much RAM space. Therefore, the level of buffering can be selected in the configuration dialog, ranging from 0 (no buffering) to 4 (maximum buffering).
 
-The decision on the programming language and GUI toolkit for the production level software has not been made yet. The goal is to use the compute resources (CPU, RAM, perhaps graphics card) as efficiently as possible, to produce well-maintainable code, and to provide the user with a state-of-the-art interface.
+The program is started by executing the main program in module "planetary_system_stacker.py". As an alternative (for debugging),
+the program can be started without a GUI with the main program in module "main_program.py".
+
+The program uses array operations (numpy) wherever possible to speed up execution. Qt5 is used as the GUI toolkit.

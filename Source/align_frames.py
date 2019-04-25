@@ -21,11 +21,13 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from glob import glob
+from itertools import chain
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, float32, zeros
+from numpy import arange, float32, zeros, empty, int32, uint8, uint16
 from scipy import ndimage
+from cv2 import imwrite
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
@@ -57,6 +59,8 @@ class AlignFrames(object):
 
         self.frames = frames
         self.shape = frames.shape
+        self.alignment_rect_qualities = None
+        self.alignment_rect_bounds = None
         self.frame_shifts = None
         self.intersection_shape = None
         self.intersection_shape_original = None
@@ -71,12 +75,15 @@ class AlignFrames(object):
         self.dev_r_list = None
         self.failed_index_list = None
         self.dy = self.dx = None
+        self.y_low_opt = self.y_high_opt = self.x_low_opt = self.x_high_opt = None
         self.dy_original = self.dx_original = None
         self.ROI_set = False
+        self.dev_table = empty((2 * self.configuration.align_frames_search_width,
+                               2 * self.configuration.align_frames_search_width), dtype=float32)
 
-    def select_alignment_rect(self, scale_factor):
+    def compute_alignment_rect(self, scale_factor):
         """
-        Using the frame with the highest rank (sharpest image), select the rectangular patch
+        Using the frame with the highest rank (sharpest image), compute the rectangular patch
         where structure is best in both x and y directions. The size of the patch is the size of the
         frame divided by "scale_factor" in both coordinate directions.
 
@@ -92,30 +99,66 @@ class AlignFrames(object):
         # a border and the search radius for frame shifts.
         border_width = self.configuration.align_frames_border_width + \
                        self.configuration.align_frames_search_width
-        rect_y = int((self.shape[0] - 2 * border_width) / scale_factor)
-        rect_x = int((self.shape[1] - 2 * border_width) / scale_factor)
+        rect_y = int((dim_y - 2 * border_width) / scale_factor)
+        rect_y_2 = int(rect_y / 2)
+        rect_x = int((dim_x - 2 * border_width) / scale_factor)
+        rect_x_2 = int(rect_x / 2)
 
-        # Initialize the quality measure of the optimal location to an impossible value (<0).
-        quality = -1.
+        # Initialize lists which for each location store the quality measure and the index bounds.
+        self.alignment_rect_qualities = []
+        self.alignment_rect_bounds = []
 
-        # Compute for all locations in the frame the "quality measure" and find the place with
-        # the maximum value.
+        # Compute for all locations in the frame the "quality measure" and store the location
+        # and quality measure in above lists.
         best_frame_mono_blurred = self.frames.frames_mono_blurred(self.frame_ranks_max_index)
-        for x_low in arange(border_width, dim_x - rect_x - border_width + 1, rect_x):
-            x_high = x_low + rect_x
-            for y_low in arange(border_width, dim_y - rect_y - border_width + 1, rect_y):
-                y_high = y_low + rect_y
+        x_low = border_width
+        x_high = x_low + rect_x
+        while x_high <= dim_x - border_width:
+            y_low = border_width
+            y_high = y_low + rect_y
+            while y_high <= dim_y - border_width:
                 # new_quality = Miscellaneous.local_contrast(
                 #     self.frames_mono_blurred[self.frame_ranks_max_index][y_low:y_high,
                 #     x_low:x_high], self.configuration.quality_area_pixel_stride)
-                new_quality = Miscellaneous.quality_measure_alternative(
+                self.alignment_rect_qualities.append(
+                    Miscellaneous.quality_measure_threshold_weighted(
                     best_frame_mono_blurred[y_low:y_high, x_low:x_high],
-                    black_threshold=self.configuration.align_frames_rectangle_black_threshold)
-                if new_quality > quality:
-                    (self.x_low_opt, self.x_high_opt, self.y_low_opt, self.y_high_opt) = (
-                        x_low, x_high, y_low, y_high)
-                    quality = new_quality
-        return (self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt)
+                    stride=self.configuration.align_frames_rectangle_stride,
+                    black_threshold=self.configuration.align_frames_rectangle_black_threshold,
+                    min_fraction=self.configuration.align_frames_rectangle_min_fraction))
+                self.alignment_rect_bounds.append((y_low, y_high, x_low, x_high))
+
+                y_low += rect_y_2
+                y_high += rect_y_2
+            x_low += rect_x_2
+            x_high += rect_x_2
+
+        # Sort lists by quality.
+        arq, arb = zip(*sorted(zip(self.alignment_rect_qualities, self.alignment_rect_bounds),
+                               reverse=True))
+        self.alignment_rect_qualities = list(arq)
+        self.alignment_rect_bounds = list(arb)
+
+        # Set the optimal coordinates and return them as a tuple.
+        (self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt) = \
+            self.alignment_rect_bounds[0]
+        return self.alignment_rect_bounds[0]
+
+    def select_alignment_rect(self, index):
+        """
+        Select an alignment patch from the list computed in "compute_aligment_rect" to be used
+        for frame aligment.
+
+        :param index: index of the alignment patch in the list in decreasing quality order.
+        :return: True, if successful. Otherwise return False.
+        """
+
+        if index < 0 or index > len(self.alignment_rect_bounds):
+            return False
+        else:
+            self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt = \
+                self.alignment_rect_bounds[index]
+            return True
 
     def set_alignment_rect(self, y_low_opt, y_high_opt, x_low_opt, x_high_opt):
         """
@@ -132,6 +175,11 @@ class AlignFrames(object):
         self.y_high_opt = y_high_opt
         self.x_low_opt = x_low_opt
         self.x_high_opt = x_high_opt
+
+        # If the user has set the patch manually, set the lists to this single element.
+        self.alignment_rect_qualities = [1.]
+        self.alignment_rect_bounds = [(self.y_low_opt, self.y_high_opt, self.x_low_opt,
+                                       self.x_high_opt)]
 
     def align_frames(self):
         """
@@ -151,7 +199,7 @@ class AlignFrames(object):
             #  will be computed relativ to this patch.
             self.reference_window = self.frames.frames_mono_blurred(self.frame_ranks_max_index)[
                                     self.y_low_opt:self.y_high_opt,
-                                    self.x_low_opt:self.x_high_opt]
+                                    self.x_low_opt:self.x_high_opt].astype(int32)
             self.reference_window_shape = self.reference_window.shape
 
         elif self.configuration.align_frames_mode == "Planet":
@@ -167,36 +215,43 @@ class AlignFrames(object):
                 " not supported")
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
-        self.frame_shifts = []
+        self.frame_shifts = [None for i in range(self.frames.number)]
 
         # Initialize lists with info on failed frames.
         self.dev_r_list = []
         self.failed_index_list = []
 
-        # Initialize two variables which keep the shift values of the previous step as the starting
-        # point for the next step. This reduces the search radius if frames are drifting.
-        dy_min_cum = dx_min_cum = 0
+        # Initialize a counter of processed frames for progress bar signalling. It is set to one
+        # because in the loop below the optimal frame is not counted.
+        number_processed = 1
 
-        for idx in range(self.frames.number):
-            frame = self.frames.frames_mono_blurred(idx)
+        # Loop over all frames. Begin with the sharpest (reference) frame
+        for idx in chain(reversed(range(self.frame_ranks_max_index + 1)),
+                         range(self.frame_ranks_max_index, self.frames.number)):
 
-            # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-            if self.progress_signal is not None and idx % self.signal_step_size == 0:
-                self.progress_signal.emit("Align all frames", int((idx / self.frames.number) * 100.))
-
-            # For the sharpest frame the displacement is 0 because it is used as the reference.
             if idx == self.frame_ranks_max_index:
-                self.frame_shifts.append([0, 0])
+                # For the sharpest frame the displacement is 0 because it is used as the reference.
+                self.frame_shifts[idx] = [0, 0]
+                # Initialize two variables which keep the shift values of the previous step as
+                # the starting point for the next step. This reduces the search radius if frames are
+                # drifting.
+                dy_min_cum = dx_min_cum = 0
 
             # For all other frames: Compute the global shift, using the "blurred" monochrome image.
             else:
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and idx % self.signal_step_size == 0:
+                    self.progress_signal.emit("Align all frames",
+                                              int((number_processed / self.frames.number) * 100.))
+
+                frame = self.frames.frames_mono_blurred(idx)
 
                 if self.configuration.align_frames_mode == "Planet":
                     # In Planetary mode the shift of the "center of gravity" of the image is
                     # computed. This algorithm cannot fail.
                     cog_frame_real = ndimage.measurements.center_of_mass(frame)
-                    self.frame_shifts.append([cog_reference_y - int(round(cog_frame_real[0])),
-                                              cog_reference_x - int(round(cog_frame_real[1]))])
+                    self.frame_shifts[idx] = [cog_reference_y - int(round(cog_frame_real[0])),
+                                              cog_reference_x - int(round(cog_frame_real[1]))]
                     continue
 
                 # In "Surface" mode three alignment algorithms can be chosen from. In each case
@@ -209,9 +264,8 @@ class AlignFrames(object):
                     # compute its translation relative to the reference.
                     frame_window = self.frames.frames_mono_blurred(idx)[
                                    self.y_low_opt:self.y_high_opt, self.x_low_opt:self.x_high_opt]
-                    self.frame_shifts.append(
-                        Miscellaneous.translation(self.reference_window, frame_window,
-                                                  self.reference_window_shape))
+                    self.frame_shifts[idx] =  Miscellaneous.translation(self.reference_window,
+                                                    frame_window, self.reference_window_shape)
                     continue
 
                 elif self.configuration.align_frames_method == "RadialSearch":
@@ -233,7 +287,7 @@ class AlignFrames(object):
                                                       self.x_low_opt - dx_min_cum,
                                                       self.x_high_opt - dx_min_cum,
                         self.configuration.align_frames_search_width,
-                        self.configuration.align_frames_sampling_stride)
+                        self.configuration.align_frames_sampling_stride, self.dev_table)
                 else:
                     raise NotSupportedError(
                         "Frame alignment method " + configuration.align_frames_method +
@@ -243,7 +297,7 @@ class AlignFrames(object):
                 # next frame.
                 dy_min_cum += dy_min
                 dx_min_cum += dx_min
-                self.frame_shifts.append([dy_min_cum, dx_min_cum])
+                self.frame_shifts[idx] = [dy_min_cum, dx_min_cum]
 
                 # In "Surface" mode shift computation can fail if no minimum is found within
                 # the pre-defined search radius.
@@ -253,31 +307,41 @@ class AlignFrames(object):
                     continue
 
                 # If the alignment window gets too close to a frame edge, move it away from
-                # that edge by half the border width.
+                # that edge by half the border width. First check if the reference window still
+                # fits into the shifted frame.
+                if self.shape[0] - abs(
+                        dy_min_cum) - 2 * self.configuration.align_frames_search_width - \
+                        self.configuration.align_frames_border_width < \
+                        self.reference_window_shape[0] or self.shape[1] - abs(
+                        dx_min_cum) - 2 * self.configuration.align_frames_search_width - \
+                        self.configuration.align_frames_border_width < \
+                        self.reference_window_shape[1]:
+                    raise ArgumentError("Frame stabilization window does not fit into"
+                                        " intersection")
                 new_reference_window = False
                 # Start with the lower y edge.
-                if self.y_low_opt - dy_min_cum < \
+                while self.y_low_opt - dy_min_cum < \
                         self.configuration.align_frames_search_width + \
                         self.configuration.align_frames_border_width / 2:
                     self.y_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     self.y_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the upper y edge.
-                elif self.y_high_opt - dy_min_cum > self.shape[
+                while self.y_high_opt - dy_min_cum > self.shape[
                     0] - self.configuration.align_frames_search_width - \
                         self.configuration.align_frames_border_width / 2:
                     self.y_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
                     self.y_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the lower x edge.
-                if self.x_low_opt - dx_min_cum < \
+                while self.x_low_opt - dx_min_cum < \
                         self.configuration.align_frames_search_width + \
                         self.configuration.align_frames_border_width / 2:
                     self.x_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     self.x_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
                     new_reference_window = True
                 # Now the upper x edge.
-                elif self.x_high_opt - dx_min_cum > self.shape[
+                while self.x_high_opt - dx_min_cum > self.shape[
                     1] - self.configuration.align_frames_search_width - \
                         self.configuration.align_frames_border_width / 2:
                     self.x_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
@@ -288,7 +352,10 @@ class AlignFrames(object):
                     self.reference_window = self.frames.frames_mono_blurred(
                                                 self.frame_ranks_max_index)[
                                                 self.y_low_opt:self.y_high_opt,
-                                                self.x_low_opt:self.x_high_opt]
+                                                self.x_low_opt:self.x_high_opt].astype(int32)
+
+                number_processed += 1
+
         if self.progress_signal is not None:
             self.progress_signal.emit("Align all frames", 100)
 
@@ -337,13 +404,13 @@ class AlignFrames(object):
 
         shifts = [self.frame_shifts[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
 
-        # Create an empty numpy buffer. The first and second dimenstions are the y and x
+        # Create an empty numpy buffer. The first and second dimensions are the y and x
         # coordinates. For color frames add a third dimension. Add all frames to the buffer.
         if color:
             self.mean_frame = zeros([self.intersection_shape[0][1] - self.intersection_shape[0][0],
                  self.intersection_shape[1][1] - self.intersection_shape[1][0], 3], dtype=float32)
             for idx in range(self.average_frame_number):
-                self.mean_frame += self.frames[self.quality_sorted_indices[idx]] \
+                self.mean_frame += self.frames.frames(self.quality_sorted_indices[idx]) \
                     [self.intersection_shape[0][0] - shifts[idx][0]:
                     self.intersection_shape[0][1] - shifts[idx][0],
                     self.intersection_shape[1][0] - shifts[idx][1]:
@@ -359,8 +426,16 @@ class AlignFrames(object):
                     self.intersection_shape[1][0] - shifts[idx][1]:
                     self.intersection_shape[1][1] - shifts[idx][1]]
 
-        # Compute the mean frame by dividing by the number of frames.
-        self.mean_frame /= self.average_frame_number
+        # Compute the mean frame by dividing by the number of frames, and convert values to 16bit.
+        if self.frames.dt0 == uint8:
+            scaling = 256. / self.average_frame_number
+        elif self.frames.dt0 == uint16:
+            scaling = 1. / self.average_frame_number
+        else:
+            raise NotSupportedError("Attempt to compute the average frame from images with type"
+                                    " neither uint8 nor uint16")
+
+        self.mean_frame = (self.mean_frame[:,:]*scaling).astype(int32)
 
         return self.mean_frame
 
@@ -482,9 +557,10 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        # file = 'short_video'
-        file = 'another_short_video'
+        file = 'Moon_Tile-013_205538_short'
+        # file = 'another_short_video'
         # file = 'Moon_Tile-024_043939'
+        # file = 'Moon_Tile-013_205538'
         names = 'Videos/' + file + '.avi'
     print(names)
 
@@ -499,17 +575,13 @@ if __name__ == "__main__":
         print("Error: " + str(e))
         exit()
 
-    # Create monochrome versions of all frames. If the original frames are monochrome,
-    # just point the monochrome frame list to the original images (no deep copy!).
-    try:
-        frames.add_monochrome(configuration.frames_mono_channel)
-    except ArgumentError as e:
-        print("Error: " + e.message)
-        exit()
-
     # Rank the frames by their overall local contrast.
     rank_frames = RankFrames(frames, configuration)
     rank_frames.frame_score()
+
+    print("Best frame index: " + str(rank_frames.frame_ranks_max_index))
+    output_file = 'Images/' + file + '.jpg'
+    imwrite(output_file, frames.frames_mono(rank_frames.frame_ranks_max_index))
 
     # Initialize the frame alignment object.
     align_frames = AlignFrames(frames, rank_frames, configuration)
@@ -518,7 +590,7 @@ if __name__ == "__main__":
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.compute_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
 
         # Alternative: Set the alignment rectangle by hand.
@@ -563,8 +635,8 @@ if __name__ == "__main__":
         name = 'Videos/not_stabilized_video_with_frame_numbers.avi'
     align_frames.write_stabilized_video(name, 5, stabilized=stabilized)
 
-    print ("Setting ROI and computing new average frame")
-    average = align_frames.set_roi(300, 600, 500, 1000)
-    plt.imshow(average, cmap='Greys_r')
-    plt.show()
+    # print ("Setting ROI and computing new average frame")
+    # average = align_frames.set_roi(300, 600, 500, 1000)
+    # plt.imshow(average, cmap='Greys_r')
+    # plt.show()
 

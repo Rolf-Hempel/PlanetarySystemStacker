@@ -714,7 +714,13 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         self.setupUi(self)
 
         self.parent_gui = parent_gui
-        self.mean_frame = align_frames.mean_frame
+
+        # If the mean frame type is not uint8, values correspond to 16bit resolution.
+        if align_frames.mean_frame.dtype != uint8:
+            self.mean_frame = align_frames.mean_frame[:,:]/256.
+        else:
+            self.mean_frame = align_frames.mean_frame
+
         self.configuration = configuration
         self.aps = alignment_points
         self.signal_finished = signal_finished
@@ -842,15 +848,6 @@ if __name__ == '__main__':
         print("Error: " + e.message)
         exit()
 
-    # The whole quality analysis and shift determination process is performed on a monochrome
-    # version of the frames. If the original frames are in RGB, the monochrome channel can be
-    # selected via a configuration parameter. Add a list of monochrome images for all frames to
-    # the "Frames" object.
-    start = time()
-    frames.add_monochrome(configuration.frames_mono_channel)
-    end = time()
-    print('Elapsed time in creating blurred monochrome images: {}'.format(end - start))
-
     # Rank the frames by their overall local contrast.
     rank_frames = RankFrames(frames, configuration)
     start = time()
@@ -871,7 +868,7 @@ if __name__ == '__main__':
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.compute_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
         end = time()
         print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))

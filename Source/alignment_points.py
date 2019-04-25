@@ -25,7 +25,7 @@ from time import time
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt
+from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, uint32
 from scipy import ndimage
 from skimage.feature import register_translation
 
@@ -79,6 +79,9 @@ class AlignmentPoints(object):
 
         # Initialize the number of frames to be stacked at each AP.
         self.stack_size = None
+
+        self.dev_table = empty((2 * self.configuration.alignment_points_search_width,
+                               2 * self.configuration.alignment_points_search_width), dtype=float32)
 
     @staticmethod
     def ap_locations(num_pixels, min_boundary_distance, step_size, even):
@@ -139,11 +142,12 @@ class AlignmentPoints(object):
         search_width = self.configuration.alignment_points_search_width
         # Minimum structure value for an alignment point (between 0. and 1.)
         structure_threshold = self.configuration.alignment_points_structure_threshold
-        # The brightest pixel must be brighter than this value (0 < value <256)
-        brightness_threshold = self.configuration.alignment_points_brightness_threshold
+        # The brightest pixel must be brighter than this value (0 < value <256). Please note that
+        # brightness and contrast values are converted to 16bit resolution.
+        brightness_threshold = self.configuration.alignment_points_brightness_threshold * 256
         # The difference between the brightest and darkest pixel values must be larger than this
         # value (0 < value < 256)
-        contrast_threshold = self.configuration.alignment_points_contrast_threshold
+        contrast_threshold = self.configuration.alignment_points_contrast_threshold * 256
 
         # Compute the minimum distance of an AP from the boundary.
         min_boundary_distance = max(half_box_width + search_width, half_patch_width)
@@ -614,9 +618,9 @@ class AlignmentPoints(object):
                                self.configuration.alignment_points_rank_pixel_stride))
         else:
             # Sampled-down Laplacians of all blurred frames have been computed in
-            # "frames.add_monochrome". Cut out boxes around alignment points from those objects,
-            # rather than computing new Laplacians. Cycle through all frames and alignment points.
-            # Use the blurred monochrome image for ranking.
+            # "frames.frames_mono_blurred_laplacian". Cut out boxes around alignment points from
+            # those objects, rather than computing new Laplacians. Cycle through all frames and
+            # alignment points. Use the blurred monochrome image for ranking.
             for frame_index in range(self.frames.number):
                 frame = self.frames.frames_mono_blurred_laplacian(frame_index)
 
@@ -735,7 +739,7 @@ class AlignmentPoints(object):
                 shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(reference_box,
                     frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
-                    self.configuration.alignment_points_sampling_stride)
+                    self.configuration.alignment_points_sampling_stride, self.dev_table)
             else:
                 raise NotSupportedError("The point shift computation method " +
                                         self.configuration.alignment_points_method +
@@ -820,15 +824,6 @@ if __name__ == "__main__":
         print("Error: " + e.message)
         exit()
 
-    # The whole quality analysis and shift determination process is performed on a monochrome
-    # version of the frames. If the original frames are in RGB, the monochrome channel can be
-    # selected via a configuration parameter. Add a list of monochrome images for all frames to
-    # the "Frames" object.
-    start = time()
-    frames.add_monochrome(configuration.frames_mono_channel)
-    end = time()
-    print('Elapsed time in creating blurred monochrome images: {}'.format(end - start))
-
     # Rank the frames by their overall local contrast.
     rank_frames = RankFrames(frames, configuration)
     start = time()
@@ -849,7 +844,7 @@ if __name__ == "__main__":
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.compute_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
         end = time()
         print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))

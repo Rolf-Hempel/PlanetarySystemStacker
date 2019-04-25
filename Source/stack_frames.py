@@ -595,15 +595,6 @@ if __name__ == "__main__":
         exit()
     my_timer.stop('Read all frames')
 
-    # The whole quality analysis and shift determination process is performed on a monochrome
-    # version of the frames. If the original frames are in RGB, the monochrome channel can be
-    # selected via a configuration parameter. Add a list of monochrome images for all frames to
-    # the "Frames" object.
-    print("+++ Start creating blurred monochrome images")
-    my_timer.create('Create blurred monochrome images')
-    frames.add_monochrome(configuration.frames_mono_channel)
-    my_timer.stop('Create blurred monochrome images')
-
     # Rank the frames by their overall local contrast.
     my_timer.create('Ranking images')
     rank_frames = RankFrames(frames, configuration)
@@ -624,7 +615,7 @@ if __name__ == "__main__":
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.compute_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
         my_timer.stop('Select optimal alignment patch')
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(

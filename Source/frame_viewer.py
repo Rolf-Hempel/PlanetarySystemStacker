@@ -30,7 +30,7 @@ from sys import argv, exit
 from time import time, sleep
 
 import matplotlib.pyplot as plt
-from numpy import array, full, uint8
+from numpy import array, full, uint8, uint16
 from PyQt5 import QtCore, QtGui, QtWidgets
 from matplotlib import patches
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -210,6 +210,9 @@ class FrameViewer(QtWidgets.QGraphicsView):
         self.align_frames = align_frames
         self.frame_index = 0
 
+        # Initialize a flag which indicates when an image is being loaded.
+        self.image_loading_busy = False
+
         # Initialize the scene. This object handles mouse events if not in drag mode.
         self._scene = QtWidgets.QGraphicsScene()
         # Initialize the photo object. No image is loaded yet.
@@ -268,7 +271,9 @@ class FrameViewer(QtWidgets.QGraphicsView):
         :return: -
         """
 
-        self.image = self.frames.frames_mono(index)[self.align_frames.intersection_shape[0][0] -
+        # Indicate that an image is being loaded.
+        self.image_loading_busy = True
+        image = self.frames.frames_mono(index)[self.align_frames.intersection_shape[0][0] -
                                                     self.align_frames.frame_shifts[index][0]:
                                                     self.align_frames.intersection_shape[0][1] -
                                                     self.align_frames.frame_shifts[index][0],
@@ -277,9 +282,16 @@ class FrameViewer(QtWidgets.QGraphicsView):
                                                     self.align_frames.intersection_shape[1][1] -
                                                     self.align_frames.frame_shifts[index][1]]
 
+        # Convert the monochrome image into uint8 format. If the frame type is uint16, values
+        # correspond to 16bit resolution.
+        if image.dtype == uint16:
+            image_uint8 = (image[:, :] / 256.).astype(uint8)
+        elif image.dtype == uint8:
+            image_uint8 = image.astype(uint8)
+        else:
+            raise NotSupportedError("Attempt to set a photo in frame viewer with type neither"
+                                    " uint8 nor uint16")
 
-        # Convert the float32 monochrome image into uint8 format.
-        image_uint8 = self.image.astype(uint8)
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
         qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
@@ -292,6 +304,9 @@ class FrameViewer(QtWidgets.QGraphicsView):
         else:
             self._empty = True
             self._photo.setPixmap(QtGui.QPixmap())
+
+        # Release the image loading flag.
+        self.image_loading_busy = False
 
     def wheelEvent(self, event):
         """
@@ -336,6 +351,22 @@ class FrameViewer(QtWidgets.QGraphicsView):
                 self.fitInView()
             else:
                 self._zoom = 0
+
+    def keyPressEvent(self, event):
+        """
+        The + and - keys are used for zooming.
+
+        :param event: event object
+        :return: -
+        """
+
+        # If the "+" key is pressed, zoom in. If "-" is pressed, zoom out.
+        if event.key() == QtCore.Qt.Key_Plus and not event.modifiers() & QtCore.Qt.ControlModifier:
+            self.zoom(1)
+        elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
+            self.zoom(-1)
+        else:
+            super(FrameViewer, self).keyPressEvent(event)
 
 
 class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
@@ -674,7 +705,7 @@ class FramePlayer(QtCore.QObject):
     def __init__(self, frame_viewer_widget):
         super(FramePlayer, self).__init__()
 
-        # Store a reference on the frame viewer widget and create a list of GUI elements. This makes
+        # Store a reference of the frame viewer widget and create a list of GUI elements. This makes
         # it easier to perform the same operation on all elements.
         self.frame_viewer_widget = frame_viewer_widget
         self.frame_viewer_widget_elements = [self.frame_viewer_widget.spinBox_chronological,
@@ -707,40 +738,43 @@ class FramePlayer(QtCore.QObject):
             # variable is set to False in the GUI thread.
             while self.frame_viewer_widget.quality_index < self.frame_viewer_widget.frames.number \
                     - 1 and self.run_player:
-                self.frame_viewer_widget.quality_index += 1
-                self.frame_viewer_widget.frame_index = \
-                self.frame_viewer_widget.rank_frames.quality_sorted_indices[
-                    self.frame_viewer_widget.quality_index]
-                self.frame_viewer_widget.spinBox_chronological.setValue(
-                    self.frame_viewer_widget.frame_index + 1)
-                self.frame_viewer_widget.spinBox_quality.setValue(
-                    self.frame_viewer_widget.quality_index + 1)
-                self.frame_viewer_widget.slider_frames.setValue(
-                    self.frame_viewer_widget.quality_index + 1)
-                self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
-                self.frame_viewer_widget.matplotlib_widget.plot_dot(
-                    self.frame_viewer_widget.quality_index)
+                # Go to the next frame only if the viewer has finished loading the previous one.
+                if not self.frame_viewer_widget.frame_viewer.image_loading_busy:
+                    self.frame_viewer_widget.quality_index += 1
+                    self.frame_viewer_widget.frame_index = \
+                    self.frame_viewer_widget.rank_frames.quality_sorted_indices[
+                        self.frame_viewer_widget.quality_index]
+                    self.frame_viewer_widget.spinBox_chronological.setValue(
+                        self.frame_viewer_widget.frame_index + 1)
+                    self.frame_viewer_widget.spinBox_quality.setValue(
+                        self.frame_viewer_widget.quality_index + 1)
+                    self.frame_viewer_widget.slider_frames.setValue(
+                        self.frame_viewer_widget.quality_index + 1)
+                    self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
+                    self.frame_viewer_widget.matplotlib_widget.plot_dot(
+                        self.frame_viewer_widget.quality_index)
 
                 # Insert a short pause to keep the video from running too fast.
                 sleep(0.1)
                 self.frame_viewer_widget.update()
         else:
             # The same for chronological frame ordering.
-            while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.frames.number -\
-                    1 and self.run_player:
-                self.frame_viewer_widget.frame_index += 1
-                self.frame_viewer_widget.quality_index = \
-                    self.frame_viewer_widget.rank_frames.quality_sorted_indices.index(
-                    self.frame_viewer_widget.frame_index)
-                self.frame_viewer_widget.spinBox_chronological.setValue(
-                    self.frame_viewer_widget.frame_index + 1)
-                self.frame_viewer_widget.spinBox_quality.setValue(
-                    self.frame_viewer_widget.quality_index + 1)
-                self.frame_viewer_widget.slider_frames.setValue(
-                    self.frame_viewer_widget.frame_index + 1)
-                self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
-                self.frame_viewer_widget.matplotlib_widget.plot_dot(
-                    self.frame_viewer_widget.frame_index)
+            while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.frames.number \
+                    - 1 and self.run_player:
+                if not self.frame_viewer_widget.frame_viewer.image_loading_busy:
+                    self.frame_viewer_widget.frame_index += 1
+                    self.frame_viewer_widget.quality_index = \
+                        self.frame_viewer_widget.rank_frames.quality_sorted_indices.index(
+                        self.frame_viewer_widget.frame_index)
+                    self.frame_viewer_widget.spinBox_chronological.setValue(
+                        self.frame_viewer_widget.frame_index + 1)
+                    self.frame_viewer_widget.spinBox_quality.setValue(
+                        self.frame_viewer_widget.quality_index + 1)
+                    self.frame_viewer_widget.slider_frames.setValue(
+                        self.frame_viewer_widget.frame_index + 1)
+                    self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
+                    self.frame_viewer_widget.matplotlib_widget.plot_dot(
+                        self.frame_viewer_widget.frame_index)
                 sleep(0.1)
                 self.frame_viewer_widget.update()
 
@@ -774,15 +808,6 @@ if __name__ == '__main__':
         print("Error: " + e.message)
         exit()
 
-    # The whole quality analysis and shift determination process is performed on a monochrome
-    # version of the frames. If the original frames are in RGB, the monochrome channel can be
-    # selected via a configuration parameter. Add a list of monochrome images for all frames to
-    # the "Frames" object.
-    start = time()
-    frames.add_monochrome(configuration.frames_mono_channel)
-    end = time()
-    print('Elapsed time in creating blurred monochrome images: {}'.format(end - start))
-
     # Rank the frames by their overall local contrast.
     rank_frames = RankFrames(frames, configuration)
     start = time()
@@ -802,7 +827,7 @@ if __name__ == '__main__':
         # Select the local rectangular patch in the image where the L gradient is highest in both x
         # and y direction. The scale factor specifies how much smaller the patch is compared to the
         # whole image frame.
-        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.select_alignment_rect(
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.compute_alignment_rect(
             configuration.align_frames_rectangle_scale_factor)
 
         print("optimal alignment rectangle, y_low: " + str(y_low_opt) + ", y_high: " +
