@@ -743,7 +743,9 @@ class Miscellaneous(object):
     @staticmethod
     def wavelet_sharpen(input_image, amount, radius):
         """
-        Sharpen a B/W or color image with wavelets.
+        Sharpen a B/W or color image with wavelets. The underlying algorithm was taken from the
+        Gimp wavelet plugin, originally written in C and published under the GPLv2+ license at:
+        https://github.com/mrossini-ethz/gimp-wavelet-sharpen/blob/master/src/wavelet.c
 
         :param input_image: Input image (B/W or color), type uint16
         :param amount: Amount of sharpening
@@ -778,14 +780,14 @@ class Miscellaneous(object):
                     Miscellaneous.mexican_hat_color(temp, fimg[hpass][row, :, :], width, 1 << lev)
                     fimg[lpass][row, :, :] = temp[:width, :] * 0.25
                 for col in range(width):
-                    Miscellaneous.mexican_hat_color(temp, fimg[lpass][:, col, :], height, 1 << lev);
+                    Miscellaneous.mexican_hat_color(temp, fimg[lpass][:, col, :], height, 1 << lev)
                     fimg[lpass][:, col, :] = temp[:height, :] * 0.25
             else:
                 for row in range(height):
                     Miscellaneous.mexican_hat(temp, fimg[hpass][row, :], width, 1 << lev)
                     fimg[lpass][row, :] = temp[:width] * 0.25
                 for col in range(width):
-                    Miscellaneous.mexican_hat(temp, fimg[lpass][:, col], height, 1 << lev);
+                    Miscellaneous.mexican_hat(temp, fimg[lpass][:, col], height, 1 << lev)
                     fimg[lpass][:, col] = temp[:height] * 0.25
 
             # Compute the amount of the correction at the current level.
