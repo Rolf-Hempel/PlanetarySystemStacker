@@ -26,10 +26,11 @@ from sys import stdout
 from time import time
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
-    putText
+    putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin, uint8, full, uint32, isnan, float32, int32
+    empty, argmin, stack, sin, uint8, full, uint32, isnan, float32, int32, uint16
+from math import exp
 from numpy import min as np_min
 from numpy import nan as np_nan
 from numpy.fft import fft2, ifft2
@@ -699,6 +700,153 @@ class Miscellaneous(object):
                         lineType)
             out.write(rgb_frame)
         out.release()
+
+    @staticmethod
+    def gaussian_sharpen(input_image, amount, radius, luminance_only=False):
+        """
+        Sharpen an image with a Gaussian kernel. The input image can be B/W or color.
+
+        :param input_image: Input image, type uint16
+        :param amount: Amount of sharpening
+        :param radius: Radius of Gaussian kernel (in pixels)
+        :param luminance_only: True, if only the luminance channel of a color image is to be
+                               sharpened. Default is False.
+        :return: The sharpened image (B/W or color, as input), type uint16
+        """
+
+        color = len(input_image.shape) == 3
+
+        # Translate the kernel radius into standard deviation.
+        sigma = radius / 3
+
+        # Convert the image to floating point format.
+        image = input_image.astype(float32)
+
+        # Special case: Only sharpen the luminance channel of a color image.
+        if color and luminance_only:
+            hsv = cvtColor(image, COLOR_BGR2HSV)
+            luminance = hsv[:, :, 2]
+
+            # Apply a Gaussian blur filter, subtract it from the original image, and add a multiple
+            # of this correction to the original image. Clip values out of range.
+            luminance_blurred = GaussianBlur(luminance, (0, 0), sigma, borderType=BORDER_DEFAULT)
+            hsv[:, :, 2] = (luminance + amount * (luminance - luminance_blurred)).clip(min=0.,
+                                                                                       max=65025.)
+            # Convert the image back to uint16.
+            return cvtColor(hsv, COLOR_HSV2BGR).astype(uint16)
+        # General case: Treat the entire image (B/W or color 16bit mode).
+        else:
+            image_blurred = GaussianBlur(image, (0, 0), sigma, borderType=BORDER_DEFAULT)
+            return (image + amount * (image - image_blurred)).clip(min=0., max=65025.).astype(
+                uint16)
+
+    @staticmethod
+    def wavelet_sharpen(input_image, amount, radius):
+        """
+        Sharpen a B/W or color image with wavelets.
+
+        :param input_image: Input image (B/W or color), type uint16
+        :param amount: Amount of sharpening
+        :param radius: Radius in pixels
+        :return: Sharpened image, same format as input image
+        """
+
+        height, width = input_image.shape[:2]
+        color = len(input_image.shape) == 3
+
+        # Allocate workspace: Three complete images, plus 1D object with length max(row, column).
+        if color:
+            fimg = empty((3, height, width, 3), dtype=float32)
+            temp = zeros((max(width, height), 3), dtype=float32)
+        else:
+            fimg = empty((3, height, width), dtype=float32)
+            temp = zeros(max(width, height), dtype=float32)
+
+        # Convert input image to floats.
+        fimg[0] = input_image / 65025.
+
+        # Start with level 0. Store its Laplacian on level 1. The operator is separated in a
+        # column and a row operator.
+        hpass = 0
+        for lev in range(5):
+            # Highpass and lowpass levels use image indices 1 and 2 in alternating mode to save
+            # space.
+            lpass = ((lev & 1) + 1)
+
+            if color:
+                for row in range(height):
+                    Miscellaneous.mexican_hat_color(temp, fimg[hpass][row, :, :], width, 1 << lev)
+                    fimg[lpass][row, :, :] = temp[:width, :] * 0.25
+                for col in range(width):
+                    Miscellaneous.mexican_hat_color(temp, fimg[lpass][:, col, :], height, 1 << lev);
+                    fimg[lpass][:, col, :] = temp[:height, :] * 0.25
+            else:
+                for row in range(height):
+                    Miscellaneous.mexican_hat(temp, fimg[hpass][row, :], width, 1 << lev)
+                    fimg[lpass][row, :] = temp[:width] * 0.25
+                for col in range(width):
+                    Miscellaneous.mexican_hat(temp, fimg[lpass][:, col], height, 1 << lev);
+                    fimg[lpass][:, col] = temp[:height] * 0.25
+
+            # Compute the amount of the correction at the current level.
+            amt = amount * exp(-(lev - radius) * (lev - radius) / 1.5) + 1.
+
+            fimg[hpass] -= fimg[lpass]
+            fimg[hpass] *= amt
+
+            # Accumulate all corrections in the first workspace image.
+            if hpass:
+                fimg[0] += fimg[hpass]
+
+            hpass = lpass
+
+        # At the end add the coarsest level and convert back to 16bit integer format.
+        fimg[0] = ((fimg[0] + fimg[lpass]) * 65025.).clip(min=0., max=65025.)
+        return fimg[0].astype(uint16)
+
+    @staticmethod
+    def mexican_hat(temp, base, size, sc):
+        """
+        Apply a 1D strided second derivative to a row or column of a B/W image. Store the result
+        in the temporary workspace "temp".
+
+        :param temp: Workspace (type float32), length at least "size" elements
+        :param base: Input image (B/W), Type float32
+        :param size: Length of image row / column
+        :param sc: Stride (power of 2) of operator
+        :return: -
+        """
+
+        # Special case at begin of row/column. Full operator not applicable.
+        temp[:sc] = 2 * base[:sc] + base[sc:0:-1] + base[sc:2 * sc]
+        # Apply the full operator.
+        temp[sc:size - sc] = 2 * base[sc:size - sc] + base[:size - 2 * sc] + base[2 * sc:size]
+        # Special case at end of row/column. The full operator is not applicable.
+        temp[size - sc:size] = 2 * base[size - sc:size] + base[size - 2 * sc:size - sc] + \
+                               base[size - 2:size - 2 - sc:-1]
+
+    @staticmethod
+    def mexican_hat_color(temp, base, size, sc):
+        """
+        Apply a 1D strided second derivative to a row or column of a color image. Store the result
+        in the temporary workspace "temp".
+
+        :param temp: Workspace (type float32), length at least "size" elements (first dimension)
+                     times 3 colors (second dimension).
+        :param base: Input image (color), Type float32
+        :param size: Length of image row / column
+        :param sc: Stride (power of 2) of operator
+        :return: -
+        """
+
+        # Special case at begin of row/column. Full operator not applicable.
+        temp[:sc, :] = 2 * base[:sc, :] + base[sc:0:-1, :] + base[sc:2 * sc, :]
+        # Apply the full operator.
+        temp[sc:size - sc, :] = 2 * base[sc:size - sc, :] + base[:size - 2 * sc, :] + base[
+                                2 * sc:size, :]
+        # Special case at end of row/column. The full operator is not applicable.
+        temp[size - sc:size, :] = 2 * base[size - sc:size, :] + base[size - 2 * sc:size - sc, :] + \
+                                  base[size - 2:size - 2 - sc:-1, :]
 
     @staticmethod
     def protocol(string, logfile, precede_with_timestamp=True):
