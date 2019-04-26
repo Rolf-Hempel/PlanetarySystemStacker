@@ -2,17 +2,16 @@
 
 # Form implementation generated from reading ui file 'main_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12
+# Created by: PyQt5 UI code generator 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1015, 824)
+        MainWindow.resize(1073, 824)
         MainWindow.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -43,6 +42,9 @@ class Ui_MainWindow(object):
         self.comboBox_back.setCurrentText("")
         self.comboBox_back.setObjectName("comboBox_back")
         self.horizontalLayout_3.addWidget(self.comboBox_back)
+        self.pushButton_pause = QtWidgets.QPushButton(self.control_area)
+        self.pushButton_pause.setObjectName("pushButton_pause")
+        self.horizontalLayout_3.addWidget(self.pushButton_pause)
         self.pushButton_start = QtWidgets.QPushButton(self.control_area)
         icon = QtGui.QIcon.fromTheme("SP_MediaPlay")
         self.pushButton_start.setIcon(icon)
@@ -94,7 +96,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.addLayout(self.tool_line)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1015, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1073, 21))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -149,6 +151,8 @@ class Ui_MainWindow(object):
         _translate = QtCore.QCoreApplication.translate
         MainWindow.setWindowTitle(_translate("MainWindow", "Planetary System Stacker"))
         self.comboBox_back.setToolTip(_translate("MainWindow", "Repeat starting from an earlier processing phase, or go back to the previous job."))
+        self.pushButton_pause.setToolTip(_translate("MainWindow", "Suspend job execution after the current step"))
+        self.pushButton_pause.setText(_translate("MainWindow", "Pause"))
         self.pushButton_start.setToolTip(_translate("MainWindow", "Start or continue job execution."))
         self.pushButton_start.setText(_translate("MainWindow", "Start / Cont."))
         self.pushButton_next_job.setToolTip(_translate("MainWindow", "Skip the remaining phases of the current job and start with the next one."))
@@ -170,5 +174,4 @@ class Ui_MainWindow(object):
         self.actionQuit.setText(_translate("MainWindow", "Quit"))
         self.actionEdit_configuration.setText(_translate("MainWindow", "Edit stacking config"))
         self.actionEdit_postproc_config.setText(_translate("MainWindow", "Edit postproc config"))
-
 

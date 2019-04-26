@@ -102,6 +102,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.actionQuit.triggered.connect(self.closeEvent)
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
         self.ui.pushButton_start.clicked.connect(self.play)
+        self.ui.pushButton_pause.clicked.connect(self.pause)
         self.ui.pushButton_next_job.clicked.connect(self.go_next)
         self.ui.pushButton_quit.clicked.connect(self.close)
         self.ui.box_automatic.stateChanged.connect(self.automatic_changed)
@@ -136,6 +137,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Initialize status variables
         self.automatic = self.ui.box_automatic.isChecked()
         self.busy = False
+        self.pause = False
         self.job_number = 0
         self.job_index = 0
         self.job_names = []
@@ -149,6 +151,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Deactivate GUI elements which do not make sense yet.
         self.activate_gui_elements(
             [self.ui.box_automatic, self.ui.comboBox_back, self.ui.pushButton_start,
+             self.ui.pushButton_pause,
              self.ui.pushButton_next_job, self.ui.actionSave, self.ui.actionSave_as,
              self.ui.actionLoad_postproc_config, self.ui.actionSave_postproc_config,
              self.ui.actionEdit_postproc_config], False)
@@ -312,6 +315,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Start the next task.
         self.work_next_task(self.activity)
 
+    def pause(self):
+        """
+        This method is invoked when the "Pause" button is pressed.
+        :return: -
+        """
+
+        # If the pause flag is not yet set, append a message to the status bar.
+        if not self.pause:
+            self.append_status_bar(" Execution will be suspended after current phase.")
+        # Set the pause flag.
+        self.pause = True
+
     def go_next(self):
         """
         This method is invoked when the "Next Job" button is pressed.
@@ -339,9 +354,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # sends a progress signal.
         self.show_current_progress_widgets(False)
 
+        # If the "Pause" button was pressed during the last activity, stop the workflow.
+        if self.pause:
+            self.pause = False
+            self.busy = False
+
         # Start workflow activities. When a workflow method terminates, it invokes this method on
         # the GUI thread, with "next_activity" denoting the next step in the processing chain.
-        if self.activity == "Read frames":
+        elif self.activity == "Read frames":
             # For the first activity (reading all frames from the file system) there is no
             # GUI interaction. Start the workflow action immediately.
             self.signal_frames.emit(self.job_names[self.job_index],
@@ -435,6 +455,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             # case, the AlignmentPoints object is created there as well.
             if self.automatic:
                 self.signal_set_alignment_points.emit()
+                self.busy = True
             else:
                 # If the APs are created interactively, create the AlignmentPoints object here, but
                 # assign it to the workflow object.
@@ -648,11 +669,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.activate_gui_elements([self.ui.pushButton_start,
                                         self.ui.pushButton_next_job, self.ui.menuFile,
                                         self.ui.menuEdit], False)
+            self.activate_gui_elements([self.ui.pushButton_pause], True)
             self.write_status_bar("Busy processing " + self.job_names[self.job_index], "black")
 
         # In manual mode, activate buttons and menu entries. Update the status bar.
         else:
             self.activate_gui_elements([self.ui.menuFile, self.ui.menuEdit], True)
+            self.activate_gui_elements([self.ui.pushButton_pause], False)
             if self.activity == "Next job":
                 self.activate_gui_elements([self.ui.actionSave, self.ui.actionSave_as], True)
             else:
@@ -725,6 +748,16 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         self.ui.statusBar.showMessage(message)
         self.ui.statusBar.setStyleSheet('color: ' + color)
+
+    def append_status_bar(self, append_message):
+        """
+        Append text to the current status bar message.
+
+        :param append_message: Text to be appended.
+        :return: -
+        """
+
+        self.ui.statusBar.showMessage(self.ui.statusBar.currentMessage() + append_message)
 
     def closeEvent(self, event=None):
         """

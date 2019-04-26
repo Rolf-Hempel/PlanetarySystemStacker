@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1015</width>
+    <width>1073</width>
     <height>824</height>
    </rect>
   </property>
@@ -44,7 +44,7 @@
         <property name="frameShadow">
          <enum>QFrame::Raised</enum>
         </property>
-        <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,0,0,0,0">
+        <layout class="QHBoxLayout" name="horizontalLayout_3" stretch="0,0,0,0,0,0">
          <property name="rightMargin">
           <number>9</number>
          </property>
@@ -67,6 +67,16 @@
            </property>
            <property name="currentIndex">
             <number>-1</number>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QPushButton" name="pushButton_pause">
+           <property name="toolTip">
+            <string>Suspend job execution after the current step</string>
+           </property>
+           <property name="text">
+            <string>Pause</string>
            </property>
           </widget>
          </item>
@@ -218,7 +228,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1015</width>
+     <width>1073</width>
      <height>21</height>
     </rect>
    </property>
