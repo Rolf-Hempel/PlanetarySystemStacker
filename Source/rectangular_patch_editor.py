@@ -143,8 +143,8 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
 class RectangularPatchEditor(QtWidgets.QGraphicsView):
     """
-    This widget implements an editor for handling APs superimposed onto an image. It supports two
-    modes:
+    This widget implements an editor for handling a rectangular patch superimposed onto an image.
+    It supports two modes:
     - In "drag mode" the mouse can be used for panning, and the scroll wheel for zooming.
     - In "alignment point mode" the mouse is used to create/remove APs, to move them or to change
       their sizes.
