@@ -201,14 +201,10 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
     resized = QtCore.pyqtSignal()
 
-    def __init__(self, frames, align_frames):
+    def __init__(self):
         super(FrameViewer, self).__init__()
         self._zoom = 0
         self._empty = True
-
-        self.frames = frames
-        self.align_frames = align_frames
-        self.frame_index = 0
 
         # Initialize a flag which indicates when an image is being loaded.
         self.image_loading_busy = False
@@ -229,7 +225,6 @@ class FrameViewer(QtWidgets.QGraphicsView):
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.drag_mode = True
 
-        self.setPhoto(self.frame_index)
         self.resized.connect(self.fitInView)
 
         # Set the focus on the viewer.
@@ -262,25 +257,17 @@ class FrameViewer(QtWidgets.QGraphicsView):
                 self.scale(factor, factor)
             self._zoom = 0
 
-    def setPhoto(self, index):
+    def setPhoto(self, image):
         """
         Convert a grayscale image to a pixmap and assign it to the photo object.
 
-        :param index: Index into the frame list. Frames are assumed to be grayscale image in format
-                      float32.
+        :param image: Index into the frame list. The image is assumed to be in grayscale format
+                      of length uint8 or uint16.
         :return: -
         """
 
         # Indicate that an image is being loaded.
         self.image_loading_busy = True
-        image = self.frames.frames_mono(index)[self.align_frames.intersection_shape[0][0] -
-                                                    self.align_frames.frame_shifts[index][0]:
-                                                    self.align_frames.intersection_shape[0][1] -
-                                                    self.align_frames.frame_shifts[index][0],
-                                                    self.align_frames.intersection_shape[1][0] -
-                                                    self.align_frames.frame_shifts[index][1]:
-                                                    self.align_frames.intersection_shape[1][1] -
-                                                    self.align_frames.frame_shifts[index][1]]
 
         # Convert the monochrome image into uint8 format. If the frame type is uint16, values
         # correspond to 16bit resolution.
@@ -368,6 +355,43 @@ class FrameViewer(QtWidgets.QGraphicsView):
         else:
             super(FrameViewer, self).keyPressEvent(event)
 
+class VideoFrameViewer(FrameViewer):
+    """
+    This widget implements a frame viewer for frames in a video file. Panning and zooming is
+    implemented by using the mouse and scroll wheel.
+
+    """
+
+    resized = QtCore.pyqtSignal()
+
+    def __init__(self, frames, align_frames):
+        super(VideoFrameViewer, self).__init__()
+        self.frames = frames
+        self.align_frames = align_frames
+        self.frame_index = 0
+
+        self.setPhoto(self.frame_index)
+
+    def setPhoto(self, index):
+        """
+        Convert a grayscale image to a pixmap and assign it to the photo object.
+
+        :param index: Index into the frame list. Frames are assumed to be grayscale image in format
+                      float32.
+        :return: -
+        """
+
+        image = self.frames.frames_mono(index)[self.align_frames.intersection_shape[0][0] -
+                                                    self.align_frames.frame_shifts[index][0]:
+                                                    self.align_frames.intersection_shape[0][1] -
+                                                    self.align_frames.frame_shifts[index][0],
+                                                    self.align_frames.intersection_shape[1][0] -
+                                                    self.align_frames.frame_shifts[index][1]:
+                                                    self.align_frames.intersection_shape[1][1] -
+                                                    self.align_frames.frame_shifts[index][1]]
+
+        super(VideoFrameViewer, self).setPhoto(image)
+
 
 class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
     """
@@ -406,7 +430,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.align_frames = align_frames
 
         # Set up the frame viewer and put it in the upper left corner.
-        self.frame_viewer = FrameViewer(self.frames, self.align_frames)
+        self.frame_viewer = VideoFrameViewer(self.frames, self.align_frames)
         self.frame_viewer.setObjectName("framewiever")
         self.grid_layout.addWidget(self.frame_viewer, 0, 0, 4, 3)
 
