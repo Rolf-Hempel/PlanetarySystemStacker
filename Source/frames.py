@@ -451,7 +451,8 @@ class Frames(object):
         # For every frame initialize the list with used alignment points.
         self.used_alignment_points = [[] for index in range(self.number)]
 
-    def save_image(self, filename, image, color=False, avoid_overwriting=True):
+    @staticmethod
+    def save_image(filename, image, color=False, avoid_overwriting=True):
         """
         Save an image to a file.
 

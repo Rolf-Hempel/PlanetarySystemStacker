@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <ui version="4.0">
  <class>frame_viewer</class>
- <widget class="QWidget" name="frame_viewer">
+ <widget class="QFrame" name="frame_viewer">
   <property name="geometry">
    <rect>
     <x>0</x>
@@ -11,12 +11,18 @@
    </rect>
   </property>
   <property name="windowTitle">
-   <string>Form</string>
+   <string>Frame</string>
   </property>
   <property name="locale">
    <locale language="English" country="UnitedStates"/>
   </property>
-  <layout class="QGridLayout" name="grid_layout" rowstretch="0,0,0,0,0" columnstretch="5,0,0,0">
+  <property name="frameShape">
+   <enum>QFrame::Panel</enum>
+  </property>
+  <property name="frameShadow">
+   <enum>QFrame::Sunken</enum>
+  </property>
+  <layout class="QGridLayout" name="grid_layout" columnstretch="5,0,0,0">
    <item row="3" column="3">
     <widget class="QGroupBox" name="groupBox_frame_sorting">
      <property name="title">
@@ -132,23 +138,6 @@
      </property>
     </widget>
    </item>
-   <item row="4" column="0">
-    <widget class="QSlider" name="slider_frames">
-     <property name="toolTip">
-      <string>Use the slider to select the frame to be displayed. As an alternative,
-you can select the frame with the 'frame sorting' spinboxes.</string>
-     </property>
-     <property name="maximum">
-      <number>1000</number>
-     </property>
-     <property name="pageStep">
-      <number>20</number>
-     </property>
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
    <item row="4" column="2">
     <widget class="QPushButton" name="pushButton_play">
      <property name="toolTip">
@@ -166,6 +155,23 @@ you can select the frame with the 'frame sorting' spinboxes.</string>
      </property>
      <property name="text">
       <string>Stop</string>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0">
+    <widget class="QSlider" name="slider_frames">
+     <property name="toolTip">
+      <string>Use the slider to select the frame to be displayed. As an alternative,
+you can select the frame with the 'frame sorting' spinboxes.</string>
+     </property>
+     <property name="maximum">
+      <number>1000</number>
+     </property>
+     <property name="pageStep">
+      <number>20</number>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>

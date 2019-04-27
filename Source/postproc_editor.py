@@ -21,27 +21,42 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from sys import argv
+from time import sleep
+from os.path import splitext
 
-from PyQt5 import QtWidgets
+from PyQt5 import QtWidgets, QtCore
 from sharpening_level_widget import Ui_sharpening_level_widget
 from version_manager_widget import Ui_version_manager_widget
+from frames import Frames
 
 class DataObject(object):
-    def __init__(self, image_original, name, suffix):
+    def __init__(self, image_original, name_original, suffix, blinking_period, func_display_image):
+        self.image_original = image_original
+        self.color = len(self.image_original.shape) == 3
+        self.file_name_original = name_original
+        self.file_name_processed = splitext(name_original)[0] + suffix + '.tiff'
         self.versions = [Version(image_original)]
-        self.name = name
-        self.suffix = suffix
+        self.number_versions = 0
+        self.version_selected = 0
+        self.version_compared = 0
+        self.blinking = False
+        self.blinking_period = blinking_period
+        self.func_display_image = func_display_image
 
     def add_version(self, version):
         self.versions.append(version)
+        self.number_versions += 1
 
     def remove_version(self, index):
-        self.versions = self.versions[:index] + self.versions[index + 1:]
+        if 0 < index <= self.number_versions:
+            self.versions = self.versions[:index] + self.versions[index + 1:]
+            self.number_versions -= 1
 
 class Version(object):
     def __init__(self, image):
         self.image = image
         self.levels = []
+        self.number_levels = 0
 
     def add_level(self, level):
         for index, level_compare in enumerate(self.levels):
@@ -49,9 +64,12 @@ class Version(object):
                 self.levels.insert(index, level)
                 return
         self.levels.append(level)
+        self.number_levels += 1
 
     def remove_level(self, level_index):
-        self.levels = self.levels[:level_index] + self.levels[level_index+1:]
+        if 0 <= level_index < self.number_levels:
+            self.levels = self.levels[:level_index] + self.levels[level_index+1:]
+            self.number_levels -= 1
 
 class Level(object):
     def __init__(self, radius, amount, luminance_only):
@@ -129,6 +147,91 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         QtWidgets.QWidget.__init__(self, parent)
         self.setupUi(self)
         self.data_object = data_object
+
+        self.spinBox_version.valueChanged.connect(self.select_version)
+        self.spinBox_compare.valueChanged.connect(self.select_version_compared)
+        self.pushButton_new.clicked.connect(self.new_version)
+        self.pushButton_delete.clicked.connect(self.remove_version)
+        self.checkBox_blink_compare.stateChanged.connect(self.blinking_toggled)
+        self.pushButton_save.clicked.connect(self.save_version)
+        self.pushButton_save_as.clicked.connect(self.save_version_as)
+
+    def select_version(self):
+        self.data_object.version_selected = self.spinBox_version.value()
+
+    def select_version_compared(self):
+        self.data_object.version_compared = self.spinBox_compare.value()
+
+    def new_version(self):
+        self.data_object.add_version(Version(self.data_object.image_original))
+
+    def remove_version(self):
+        self.data_object.remove_version(self.data_object.version_selected)
+
+    def blinking_toggled(self):
+        self.data_object.blinking = not self.data_object.blinking
+        if self.data_object.blinking:
+            # Create the blink comparator thread and start it.
+            self.blink_comparator = BlinkComparator(self.data_object)
+            self.blink_comparator.setTerminationEnabled(True)
+        else:
+            self.blink_comparator.stop()
+
+    def save_version(self):
+        """
+        save the result as 16bit Tiff at the standard location.
+
+        :return: -
+        """
+
+        Frames.save_image(self.file_name_processed, self.data_object.version_selected.image,
+                                        color=self.color, avoid_overwriting=False)
+
+    def save_version_as(self):
+        """
+        save the result as 16bit Tiff at a location selected by the user.
+
+        :return: -
+        """
+
+        options = QtWidgets.QFileDialog.Options()
+        filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
+            "Save result as 16bit Tiff image", self.workflow.stacked_image_name ,
+            "Image Files (*.tiff)", options=options)
+
+        if filename and extension:
+            Frames.save_image(filename, self.data_object.version_selected.image,
+                                color=self.color, avoid_overwriting=False)
+
+
+class BlinkComparator(QtCore.QThread):
+
+    def __init__(self, data_object, parent=None):
+        """
+        Show two versions of the image in the image viewer alternately.
+
+        :param data_object: Data object with postprocessing data
+        """
+
+        QtCore.QThread.__init__(self, parent)
+        self.data_object = data_object
+
+        self.start()
+
+    def run(self):
+        show_selected_version = True
+        while self.data_object.blinking:
+            if show_selected_version:
+                self.data_object.func_display_image(self.data_object.version_selected.image)
+            else:
+                self.data_object.func_display_image(self.data_object.version_compared.image)
+            # Toggle back and forth between first and second image version.
+            show_selected_version = not show_selected_version
+            # Sleep time inserted to limit CPU consumption by idle looping.
+            sleep(self.data_object.blinking_period)
+
+    def stop(self):
+        self.terminate()
 
 
 if __name__ == '__main__':

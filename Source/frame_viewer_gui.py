@@ -2,18 +2,19 @@
 
 # Form implementation generated from reading ui file 'frame_viewer_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12
+# Created by: PyQt5 UI code generator 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 
 class Ui_frame_viewer(object):
     def setupUi(self, frame_viewer):
         frame_viewer.setObjectName("frame_viewer")
         frame_viewer.resize(900, 630)
         frame_viewer.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
+        frame_viewer.setFrameShape(QtWidgets.QFrame.Panel)
+        frame_viewer.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.grid_layout = QtWidgets.QGridLayout(frame_viewer)
         self.grid_layout.setObjectName("grid_layout")
         self.groupBox_frame_sorting = QtWidgets.QGroupBox(frame_viewer)
@@ -61,18 +62,18 @@ class Ui_frame_viewer(object):
         self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.grid_layout.addWidget(self.buttonBox, 4, 3, 1, 1)
-        self.slider_frames = QtWidgets.QSlider(frame_viewer)
-        self.slider_frames.setMaximum(1000)
-        self.slider_frames.setPageStep(20)
-        self.slider_frames.setOrientation(QtCore.Qt.Horizontal)
-        self.slider_frames.setObjectName("slider_frames")
-        self.grid_layout.addWidget(self.slider_frames, 4, 0, 1, 1)
         self.pushButton_play = QtWidgets.QPushButton(frame_viewer)
         self.pushButton_play.setObjectName("pushButton_play")
         self.grid_layout.addWidget(self.pushButton_play, 4, 2, 1, 1)
         self.pushButton_stop = QtWidgets.QPushButton(frame_viewer)
         self.pushButton_stop.setObjectName("pushButton_stop")
         self.grid_layout.addWidget(self.pushButton_stop, 4, 1, 1, 1)
+        self.slider_frames = QtWidgets.QSlider(frame_viewer)
+        self.slider_frames.setMaximum(1000)
+        self.slider_frames.setPageStep(20)
+        self.slider_frames.setOrientation(QtCore.Qt.Horizontal)
+        self.slider_frames.setObjectName("slider_frames")
+        self.grid_layout.addWidget(self.slider_frames, 4, 0, 1, 1)
         self.label_matplotlib = QtWidgets.QLabel(frame_viewer)
         self.label_matplotlib.setObjectName("label_matplotlib")
         self.grid_layout.addWidget(self.label_matplotlib, 0, 3, 2, 1)
@@ -83,7 +84,7 @@ class Ui_frame_viewer(object):
 
     def retranslateUi(self, frame_viewer):
         _translate = QtCore.QCoreApplication.translate
-        frame_viewer.setWindowTitle(_translate("frame_viewer", "Form"))
+        frame_viewer.setWindowTitle(_translate("frame_viewer", "Frame"))
         self.groupBox_frame_sorting.setTitle(_translate("frame_viewer", "Frame sorting"))
         self.radioButton_quality.setToolTip(_translate("frame_viewer", "Frames are ordered by their overall sharpness."))
         self.radioButton_quality.setText(_translate("frame_viewer", "By quality"))
@@ -99,12 +100,11 @@ class Ui_frame_viewer(object):
         self.pushButton_set_stacking_limit.setToolTip(_translate("frame_viewer", "Adjust the number of best frames to be stacked at each alignment point such that the current frame is the worst one to be included."))
         self.pushButton_set_stacking_limit.setText(_translate("frame_viewer", "Set limit to current frame"))
         self.buttonBox.setToolTip(_translate("frame_viewer", "Exit the viewer. Press \'OK\' to save the stack size, or \'cancel\' to discard changes."))
-        self.slider_frames.setToolTip(_translate("frame_viewer", "Use the slider to select the frame to be displayed. As an alternative,\n"
-"you can select the frame with the \'frame sorting\' spinboxes."))
         self.pushButton_play.setToolTip(_translate("frame_viewer", "Start a frame display video. Frames are ordered as selected in the \'frame sorting\' section."))
         self.pushButton_play.setText(_translate("frame_viewer", "Play"))
         self.pushButton_stop.setToolTip(_translate("frame_viewer", "Stop the frame display video."))
         self.pushButton_stop.setText(_translate("frame_viewer", "Stop"))
+        self.slider_frames.setToolTip(_translate("frame_viewer", "Use the slider to select the frame to be displayed. As an alternative,\n"
+"you can select the frame with the \'frame sorting\' spinboxes."))
         self.label_matplotlib.setText(_translate("frame_viewer", "Matplotlib placeholder"))
-
 
