@@ -23,10 +23,13 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from sys import argv
 from time import sleep
 from os.path import splitext
+from cv2 import imread
 
 from PyQt5 import QtWidgets, QtCore
-from sharpening_level_widget import Ui_sharpening_level_widget
+from sharpening_layer_widget import Ui_sharpening_layer_widget
 from version_manager_widget import Ui_version_manager_widget
+from postproc_editor_gui import Ui_postproc_editor
+from frame_viewer import FrameViewer
 from frames import Frames
 
 class DataObject(object):
@@ -55,36 +58,36 @@ class DataObject(object):
 class Version(object):
     def __init__(self, image):
         self.image = image
-        self.levels = []
-        self.number_levels = 0
+        self.layers = []
+        self.number_layers = 0
 
-    def add_level(self, level):
-        for index, level_compare in enumerate(self.levels):
-            if level_compare.radius >= level.radius:
-                self.levels.insert(index, level)
+    def add_layer(self, layer):
+        for index, layer_compare in enumerate(self.layers):
+            if layer_compare.radius >= layer.radius:
+                self.layers.insert(index, layer)
                 return
-        self.levels.append(level)
-        self.number_levels += 1
+        self.layers.append(layer)
+        self.number_layers += 1
 
-    def remove_level(self, level_index):
-        if 0 <= level_index < self.number_levels:
-            self.levels = self.levels[:level_index] + self.levels[level_index+1:]
-            self.number_levels -= 1
+    def remove_layer(self, layer_index):
+        if 0 <= layer_index < self.number_layers:
+            self.layers = self.layers[:layer_index] + self.layers[layer_index+1:]
+            self.number_layers -= 1
 
-class Level(object):
+class Layer(object):
     def __init__(self, radius, amount, luminance_only):
         self.radius = radius
         self.amount = amount
         self.luminance_only = luminance_only
 
 
-class SharpeningLevelWidget(QtWidgets.QWidget, Ui_sharpening_level_widget):
-    def __init__(self, title, level, parent=None):
+class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
+    def __init__(self, title, layer, parent=None):
         QtWidgets.QWidget.__init__(self, parent)
         self.setupUi(self)
 
         self.title = title
-        self.set_values(level)
+        self.set_values(layer)
 
         self.horizontalSlider_radius.valueChanged.connect(self.horizontalSlider_radius_changed)
         self.lineEdit_radius.textChanged.connect(self.lineEdit_radius_changed)
@@ -92,15 +95,15 @@ class SharpeningLevelWidget(QtWidgets.QWidget, Ui_sharpening_level_widget):
         self.lineEdit_amount.textChanged.connect(self.lineEdit_amount_changed)
         self.checkBox_luminance.stateChanged.connect(self.checkBox_luminance_toggled)
 
-    def set_values(self, level):
-        self.level = level
+    def set_values(self, layer):
+        self.layer = layer
 
-        self.groupBox_level.setTitle(self.title)
-        self.horizontalSlider_radius.setValue(self.radius_to_int(self.level.radius))
-        self.lineEdit_radius.setText(str(self.level.radius))
-        self.horizontalSlider_amount.setValue(self.level.amount)
-        self.lineEdit_amount.setText(str(self.level.amount))
-        self.checkBox_luminance.setChecked(self.level.luminance_only)
+        self.groupBox_layer.setTitle(self.title)
+        self.horizontalSlider_radius.setValue(self.radius_to_int(self.layer.radius))
+        self.lineEdit_radius.setText(str(self.layer.radius))
+        self.horizontalSlider_amount.setValue(self.layer.amount)
+        self.lineEdit_amount.setText(str(self.layer.amount))
+        self.checkBox_luminance.setChecked(self.layer.luminance_only)
 
     def radius_to_int(self, radius):
         return max(min(int(round(radius*10.)), 99), 1)
@@ -109,37 +112,37 @@ class SharpeningLevelWidget(QtWidgets.QWidget, Ui_sharpening_level_widget):
         return int / 10.
 
     def horizontalSlider_radius_changed(self):
-        self.level.radius = self.int_to_radius(self.horizontalSlider_radius.value())
+        self.layer.radius = self.int_to_radius(self.horizontalSlider_radius.value())
         self.lineEdit_radius.blockSignals(True)
-        self.lineEdit_radius.setText(str(self.level.radius))
+        self.lineEdit_radius.setText(str(self.layer.radius))
         self.lineEdit_radius.blockSignals(False)
 
     def lineEdit_radius_changed(self):
         try:
-            self.level.radius = max(0.1, min(float(self.lineEdit_radius.text()), 9.9))
+            self.layer.radius = max(0.1, min(float(self.lineEdit_radius.text()), 9.9))
             self.horizontalSlider_radius.blockSignals(True)
-            self.horizontalSlider_radius.setValue(self.radius_to_int(self.level.radius))
+            self.horizontalSlider_radius.setValue(self.radius_to_int(self.layer.radius))
             self.horizontalSlider_radius.blockSignals(False)
         except:
             pass
 
     def horizontalSlider_amount_changed(self):
-        self.level.amount = self.horizontalSlider_amount.value()
+        self.layer.amount = self.horizontalSlider_amount.value()
         self.lineEdit_amount.blockSignals(True)
-        self.lineEdit_amount.setText(str(self.level.amount))
+        self.lineEdit_amount.setText(str(self.layer.amount))
         self.lineEdit_amount.blockSignals(False)
 
     def lineEdit_amount_changed(self):
         try:
-            self.level.amount = max(0, min(int(round(float(self.lineEdit_amount.text()))), 200))
+            self.layer.amount = max(0, min(int(round(float(self.lineEdit_amount.text()))), 200))
         except:
             pass
         self.horizontalSlider_amount.blockSignals(True)
-        self.horizontalSlider_amount.setValue(self.level.amount)
+        self.horizontalSlider_amount.setValue(self.layer.amount)
         self.horizontalSlider_amount.blockSignals(False)
 
     def checkBox_luminance_toggled(self):
-        self.level.luminance_only = not self.level.luminance_only
+        self.layer.luminance_only = not self.layer.luminance_only
 
 
 class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
@@ -196,7 +199,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
-            "Save result as 16bit Tiff image", self.workflow.stacked_image_name ,
+            "Save result as 16bit Tiff image", self.data_object.file_name_original ,
             "Image Files (*.tiff)", options=options)
 
         if filename and extension:
@@ -234,27 +237,47 @@ class BlinkComparator(QtCore.QThread):
         self.terminate()
 
 
+class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
+    """
+    This widget implements a frame viewer together with control elements to control the
+    postprocessing. Several postprocessing versions can be created and managed, each one using
+    up to four sharpening layers.
+    """
+
+    def __init__(self, image_original, name_original, suffix, blinking_period):
+        super(PostprocEditorWidget, self).__init__()
+        self.setupUi(self)
+        self.frame_viewer = FrameViewer()
+        self.data_object = DataObject(image_original, name_original, suffix, blinking_period,
+                                      self.frame_viewer.setPhoto)
+        self.frame_viewer.setObjectName("framewiever")
+        self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
+
+
+
 if __name__ == '__main__':
 
-    data_object = DataObject("image", "filename", "_suffix")
+    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
+    input_image = imread(input_file_name)
+    data_object = DataObject(input_image, input_file_name, "_gpp", 1., None)
     for i in range(3):
         data_object.add_version(Version("image_" + str(i)))
 
     version_selected = data_object.versions[2]
     for i in range(4):
-        version_selected.add_level(Level(i, 100+i, True))
+        version_selected.add_layer(Layer(i, 100+i, True))
 
-    version_selected.remove_level(2)
+    version_selected.remove_layer(2)
 
-    version_selected.add_level(Level(30, 1000, False))
+    version_selected.add_layer(Layer(30, 1000, False))
 
-    new_level = Level(3.5, 65, True)
+    new_layer = Layer(3.5, 65, True)
 
     app = QtWidgets.QApplication(argv)
-    window = SharpeningLevelWidget("Level 4", new_level)
+    window = SharpeningLayerWidget("Layer 4", new_layer)
     window.show()
     app.exec_()
 
-    print("radius: " + str(new_level.radius))
-    print("amount: " + str(new_level.amount))
-    print("luminance only: " + str(new_level.luminance_only))
+    print("radius: " + str(new_layer.radius))
+    print("amount: " + str(new_layer.amount))
+    print("luminance only: " + str(new_layer.luminance_only))

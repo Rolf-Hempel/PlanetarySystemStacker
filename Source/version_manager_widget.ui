@@ -13,6 +13,9 @@
   <property name="windowTitle">
    <string>Form</string>
   </property>
+  <property name="toolTip">
+   <string>Create a new postprocessing version</string>
+  </property>
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QGroupBox" name="groupBox">
@@ -22,6 +25,9 @@
      <layout class="QGridLayout" name="gridLayout_2">
       <item row="1" column="0" colspan="2">
        <widget class="QPushButton" name="pushButton_new">
+        <property name="toolTip">
+         <string>Create a new postprocessing version</string>
+        </property>
         <property name="text">
          <string>New</string>
         </property>
@@ -29,6 +35,9 @@
       </item>
       <item row="1" column="2" colspan="2">
        <widget class="QPushButton" name="pushButton_delete">
+        <property name="toolTip">
+         <string>Delete the selected postprocessing version</string>
+        </property>
         <property name="text">
          <string>Delete</string>
         </property>
@@ -36,6 +45,9 @@
       </item>
       <item row="1" column="4" colspan="2">
        <widget class="QPushButton" name="pushButton_save">
+        <property name="toolTip">
+         <string>Save the selected postprocessing version using the standard suffix</string>
+        </property>
         <property name="text">
          <string>Save</string>
         </property>
@@ -43,23 +55,37 @@
       </item>
       <item row="1" column="6" colspan="2">
        <widget class="QPushButton" name="pushButton_save_as">
+        <property name="toolTip">
+         <string>Save the selected postprocessing version at a location of choice</string>
+        </property>
         <property name="text">
          <string>Save as</string>
         </property>
        </widget>
       </item>
       <item row="0" column="7">
-       <widget class="QSpinBox" name="spinBox_compare"/>
+       <widget class="QSpinBox" name="spinBox_compare">
+        <property name="toolTip">
+         <string>Select a version to compare the selected one with</string>
+        </property>
+       </widget>
       </item>
       <item row="0" column="4" colspan="3">
        <widget class="QCheckBox" name="checkBox_blink_compare">
+        <property name="toolTip">
+         <string>Alternate between selected and some other version</string>
+        </property>
         <property name="text">
          <string>Blink compare with</string>
         </property>
        </widget>
       </item>
       <item row="0" column="2">
-       <widget class="QSpinBox" name="spinBox_version"/>
+       <widget class="QSpinBox" name="spinBox_version">
+        <property name="toolTip">
+         <string>Select a postprocessing version. The unprocessed image is version &quot;0&quot;.</string>
+        </property>
+       </widget>
       </item>
       <item row="0" column="0" colspan="2">
        <widget class="QLabel" name="label_version">

@@ -50,11 +50,19 @@ class Ui_version_manager_widget(object):
     def retranslateUi(self, version_manager_widget):
         _translate = QtCore.QCoreApplication.translate
         version_manager_widget.setWindowTitle(_translate("version_manager_widget", "Form"))
+        version_manager_widget.setToolTip(_translate("version_manager_widget", "Create a new postprocessing version"))
         self.groupBox.setTitle(_translate("version_manager_widget", "Version manager"))
+        self.pushButton_new.setToolTip(_translate("version_manager_widget", "Create a new postprocessing version"))
         self.pushButton_new.setText(_translate("version_manager_widget", "New"))
+        self.pushButton_delete.setToolTip(_translate("version_manager_widget", "Delete the selected postprocessing version"))
         self.pushButton_delete.setText(_translate("version_manager_widget", "Delete"))
+        self.pushButton_save.setToolTip(_translate("version_manager_widget", "Save the selected postprocessing version using the standard suffix"))
         self.pushButton_save.setText(_translate("version_manager_widget", "Save"))
+        self.pushButton_save_as.setToolTip(_translate("version_manager_widget", "Save the selected postprocessing version at a location of choice"))
         self.pushButton_save_as.setText(_translate("version_manager_widget", "Save as"))
+        self.spinBox_compare.setToolTip(_translate("version_manager_widget", "Select a version to compare the selected one with"))
+        self.checkBox_blink_compare.setToolTip(_translate("version_manager_widget", "Alternate between selected and some other version"))
         self.checkBox_blink_compare.setText(_translate("version_manager_widget", "Blink compare with"))
+        self.spinBox_version.setToolTip(_translate("version_manager_widget", "Select a postprocessing version. The unprocessed image is version \"0\"."))
         self.label_version.setText(_translate("version_manager_widget", "Version selected"))
 
