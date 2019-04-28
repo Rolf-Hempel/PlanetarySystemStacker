@@ -11,7 +11,12 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_sharpening_layer_widget(object):
     def setupUi(self, sharpening_layer_widget):
         sharpening_layer_widget.setObjectName("sharpening_layer_widget")
-        sharpening_layer_widget.resize(300, 137)
+        sharpening_layer_widget.resize(340, 130)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(sharpening_layer_widget.sizePolicy().hasHeightForWidth())
+        sharpening_layer_widget.setSizePolicy(sizePolicy)
         self.verticalLayout = QtWidgets.QVBoxLayout(sharpening_layer_widget)
         self.verticalLayout.setObjectName("verticalLayout")
         self.groupBox_layer = QtWidgets.QGroupBox(sharpening_layer_widget)

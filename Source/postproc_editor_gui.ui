@@ -39,14 +39,14 @@
    <item row="1" column="1">
     <widget class="QLabel" name="SharpeningLayerWidget_1">
      <property name="text">
-      <string>Placeholder: SharpeningLayer_Widget 1</string>
+      <string/>
      </property>
     </widget>
    </item>
    <item row="2" column="1">
     <widget class="QLabel" name="SharpeningLayerWidget_2">
      <property name="text">
-      <string>Placeholder: SharpeningLayer_Widget 2</string>
+      <string/>
      </property>
     </widget>
    </item>
@@ -55,7 +55,7 @@
      <item>
       <widget class="QLabel" name="label_message">
        <property name="text">
-        <string>Message with user instructions</string>
+        <string/>
        </property>
       </widget>
      </item>
@@ -97,28 +97,28 @@
    <item row="6" column="1">
     <widget class="QLabel" name="VersionManagerWidget">
      <property name="text">
-      <string>Placeholder: VersionManagerWidget</string>
+      <string/>
      </property>
     </widget>
    </item>
    <item row="3" column="1">
     <widget class="QLabel" name="SharpeningLayerWidget_3">
      <property name="text">
-      <string>Placeholder: SharpeningLayer_Widget 3</string>
+      <string/>
      </property>
     </widget>
    </item>
    <item row="4" column="1">
     <widget class="QLabel" name="SharpeningLayerWidget_4">
      <property name="text">
-      <string>Placeholder: SharpeningLayer_Widget 4</string>
+      <string/>
      </property>
     </widget>
    </item>
    <item row="0" column="0" rowspan="7">
     <widget class="QLabel" name="FrameViewer">
      <property name="text">
-      <string>Placeholder: FrameViewer</string>
+      <string/>
      </property>
      <property name="alignment">
       <set>Qt::AlignCenter</set>

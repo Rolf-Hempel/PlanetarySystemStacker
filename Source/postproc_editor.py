@@ -23,7 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from sys import argv
 from time import sleep
 from os.path import splitext
-from cv2 import imread
+from cv2 import imread, cvtColor, COLOR_BGR2GRAY
 
 from PyQt5 import QtWidgets, QtCore
 from sharpening_layer_widget import Ui_sharpening_layer_widget
@@ -38,7 +38,7 @@ class DataObject(object):
         self.color = len(self.image_original.shape) == 3
         self.file_name_original = name_original
         self.file_name_processed = splitext(name_original)[0] + suffix + '.tiff'
-        self.versions = [Version(image_original)]
+        self.versions = [Version(self.image_original)]
         self.number_versions = 0
         self.version_selected = 0
         self.version_compared = 0
@@ -46,14 +46,20 @@ class DataObject(object):
         self.blinking_period = blinking_period
         self.func_display_image = func_display_image
 
+        initial_version = Version(self.image_original)
+        initial_version.add_layer(Layer(1., 0, False))
+        self.add_version(initial_version)
+
     def add_version(self, version):
         self.versions.append(version)
         self.number_versions += 1
+        self.version_selected = self.number_versions
 
     def remove_version(self, index):
         if 0 < index <= self.number_versions:
             self.versions = self.versions[:index] + self.versions[index + 1:]
             self.number_versions -= 1
+            self.version_selected = index -1
 
 class Version(object):
     def __init__(self, image):
@@ -62,10 +68,10 @@ class Version(object):
         self.number_layers = 0
 
     def add_layer(self, layer):
-        for index, layer_compare in enumerate(self.layers):
-            if layer_compare.radius >= layer.radius:
-                self.layers.insert(index, layer)
-                return
+        # for index, layer_compare in enumerate(self.layers):
+        #     if layer_compare.radius >= layer.radius:
+        #         self.layers.insert(index, layer)
+        #         return
         self.layers.append(layer)
         self.number_layers += 1
 
@@ -82,18 +88,20 @@ class Layer(object):
 
 
 class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
-    def __init__(self, title, layer, parent=None):
+    def __init__(self, layer_index, remove_layer_callback, parent=None):
         QtWidgets.QWidget.__init__(self, parent)
         self.setupUi(self)
 
-        self.title = title
-        self.set_values(layer)
+        self.layer_index = layer_index
+        self.title = "Layer " + str(layer_index + 1)
+        self.remove_layer_callback = remove_layer_callback
 
         self.horizontalSlider_radius.valueChanged.connect(self.horizontalSlider_radius_changed)
         self.lineEdit_radius.textChanged.connect(self.lineEdit_radius_changed)
         self.horizontalSlider_amount.valueChanged.connect(self.horizontalSlider_amount_changed)
         self.lineEdit_amount.textChanged.connect(self.lineEdit_amount_changed)
         self.checkBox_luminance.stateChanged.connect(self.checkBox_luminance_toggled)
+        self.pushButton_remove.clicked.connect(self.remove_layer)
 
     def set_values(self, layer):
         self.layer = layer
@@ -101,7 +109,7 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.groupBox_layer.setTitle(self.title)
         self.horizontalSlider_radius.setValue(self.radius_to_int(self.layer.radius))
         self.lineEdit_radius.setText(str(self.layer.radius))
-        self.horizontalSlider_amount.setValue(self.layer.amount)
+        self.horizontalSlider_amount.setValue(int(round(self.layer.amount)))
         self.lineEdit_amount.setText(str(self.layer.amount))
         self.checkBox_luminance.setChecked(self.layer.luminance_only)
 
@@ -144,12 +152,16 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
     def checkBox_luminance_toggled(self):
         self.layer.luminance_only = not self.layer.luminance_only
 
+    def remove_layer(self):
+        self.remove_layer_callback(self.layer_index)
+
 
 class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
-    def __init__(self, data_object, parent=None):
+    def __init__(self, data_object, select_version_callback, parent=None):
         QtWidgets.QWidget.__init__(self, parent)
         self.setupUi(self)
         self.data_object = data_object
+        self.select_version_callback = select_version_callback
 
         self.spinBox_version.valueChanged.connect(self.select_version)
         self.spinBox_compare.valueChanged.connect(self.select_version_compared)
@@ -159,17 +171,35 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.pushButton_save.clicked.connect(self.save_version)
         self.pushButton_save_as.clicked.connect(self.save_version_as)
 
+        self.spinBox_version.setMaximum(1)
+        self.spinBox_version.setMinimum(0)
+        self.spinBox_version.setValue(self.data_object.version_selected)
+        self.spinBox_compare.setMaximum(1)
+        self.spinBox_compare.setMinimum(0)
+
     def select_version(self):
         self.data_object.version_selected = self.spinBox_version.value()
+        self.select_version_callback(self.data_object.version_selected)
 
     def select_version_compared(self):
         self.data_object.version_compared = self.spinBox_compare.value()
 
     def new_version(self):
-        self.data_object.add_version(Version(self.data_object.image_original))
+        new_version = Version(self.data_object.image_original)
+        new_version.add_layer(Layer(1., 0, False))
+        self.data_object.add_version(new_version)
+        self.data_object.func_display_image(self.data_object.versions[self.data_object.version_selected].image)
+        self.spinBox_version.setMaximum(self.data_object.number_versions)
+        self.spinBox_version.setValue(self.data_object.number_versions)
+        self.spinBox_compare.setMaximum(self.data_object.number_versions)
+        self.select_version_callback(self.data_object.version_selected)
 
     def remove_version(self):
         self.data_object.remove_version(self.data_object.version_selected)
+        self.data_object.func_display_image(self.data_object.versions[self.data_object.version_selected].image)
+        self.spinBox_version.setMaximum(self.data_object.number_versions)
+        self.spinBox_compare.setMaximum(self.data_object.number_versions)
+        self.select_version_callback(self.data_object.version_selected)
 
     def blinking_toggled(self):
         self.data_object.blinking = not self.data_object.blinking
@@ -225,9 +255,9 @@ class BlinkComparator(QtCore.QThread):
         show_selected_version = True
         while self.data_object.blinking:
             if show_selected_version:
-                self.data_object.func_display_image(self.data_object.version_selected.image)
+                self.data_object.func_display_image(self.data_object.versions[self.data_object.version_selected].image)
             else:
-                self.data_object.func_display_image(self.data_object.version_compared.image)
+                self.data_object.func_display_image(self.data_object.versions[self.data_object.version_compared].image)
             # Toggle back and forth between first and second image version.
             show_selected_version = not show_selected_version
             # Sleep time inserted to limit CPU consumption by idle looping.
@@ -247,18 +277,68 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
     def __init__(self, image_original, name_original, suffix, blinking_period):
         super(PostprocEditorWidget, self).__init__()
         self.setupUi(self)
+
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+        self.pushButton_add_layer.clicked.connect(self.add_layer)
+
         self.frame_viewer = FrameViewer()
-        self.data_object = DataObject(image_original, name_original, suffix, blinking_period,
-                                      self.frame_viewer.setPhoto)
         self.frame_viewer.setObjectName("framewiever")
         self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
+        self.data_object = DataObject(image_original, name_original, suffix, blinking_period,
+                                      self.frame_viewer.setPhoto)
 
+        self.sharpening_layer_widgets = []
+        self.max_layers = 4
+        for layer in range(self.max_layers):
+            sharpening_layer_widget = SharpeningLayerWidget(layer, self.remove_layer)
+            self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
+            self.gridLayout.addWidget(sharpening_layer_widget, layer+1, 1, 1, 1)
+            self.sharpening_layer_widgets.append(sharpening_layer_widget)
+
+        self.version_manager_widget = VersionManagerWidget(self.data_object, self.select_version)
+        self.gridLayout.addWidget(self.version_manager_widget, 6, 1, 1, 1)
+
+        self.select_version(self.data_object.version_selected)
+
+    def select_version(self, version_index):
+        version_selected = self.data_object.versions[version_index]
+        for layer_index, layer in enumerate(version_selected.layers):
+            self.sharpening_layer_widgets[layer_index].set_values(layer)
+            self.sharpening_layer_widgets[layer_index].setHidden(False)
+        for layer_index in range(version_selected.number_layers, self.max_layers):
+            self.sharpening_layer_widgets[layer_index].setHidden(True)
+        self.frame_viewer.setPhoto(version_selected.image)
+
+    def add_layer(self):
+        version_selected = self.data_object.versions[self.data_object.version_selected]
+        num_layers_current = version_selected.number_layers
+        if self.data_object.version_selected and num_layers_current < self.max_layers:
+            if num_layers_current > 0:
+                previous_layer = version_selected.layers[num_layers_current-1]
+                new_layer = Layer(2.*previous_layer.radius, 0, previous_layer.luminance_only)
+            else:
+                new_layer = Layer(1., 0, False)
+            version_selected.add_layer(new_layer)
+            self.select_version(self.data_object.version_selected)
+
+    def remove_layer(self, layer_index):
+        version_selected = self.data_object.versions[self.data_object.version_selected]
+        version_selected.remove_layer(layer_index)
+        self.select_version(self.data_object.version_selected)
+
+    def accept(self):
+        self.close()
+
+    def reject(self):
+        self.close()
 
 
 if __name__ == '__main__':
 
     input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
-    input_image = imread(input_file_name)
+    input_image = cvtColor(imread(input_file_name), COLOR_BGR2GRAY)
+
     data_object = DataObject(input_image, input_file_name, "_gpp", 1., None)
     for i in range(3):
         data_object.add_version(Version("image_" + str(i)))
@@ -273,11 +353,16 @@ if __name__ == '__main__':
 
     new_layer = Layer(3.5, 65, True)
 
-    app = QtWidgets.QApplication(argv)
-    window = SharpeningLayerWidget("Layer 4", new_layer)
-    window.show()
-    app.exec_()
+    # app = QtWidgets.QApplication(argv)
+    # window = SharpeningLayerWidget("Layer 4")
+    # window.show()
+    # app.exec_()
 
     print("radius: " + str(new_layer.radius))
     print("amount: " + str(new_layer.amount))
     print("luminance only: " + str(new_layer.luminance_only))
+
+    app = QtWidgets.QApplication(argv)
+    window = PostprocEditorWidget(input_image, input_file_name, "_gpp", 1.)
+    window.show()
+    app.exec_()
