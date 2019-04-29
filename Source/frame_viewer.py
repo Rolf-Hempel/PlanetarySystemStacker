@@ -28,6 +28,7 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 from glob import glob
 from sys import argv, exit
 from time import time, sleep
+from cv2 import COLOR_BGR2RGB, cvtColor
 
 import matplotlib.pyplot as plt
 from numpy import array, full, uint8, uint16
@@ -259,20 +260,20 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
     def setPhoto(self, image):
         """
-        Convert a grayscale image to a pixmap and assign it to the photo object.
+        Convert a color or grayscale image to a pixmap and assign it to the photo object.
 
-        :param image: Index into the frame list. The image is assumed to be in grayscale format
-                      of length uint8 or uint16.
+        :param image: Image to be displayed. The image is assumed to be in color or grayscale
+                      format of length uint8 or uint16.
         :return: -
         """
 
         # Indicate that an image is being loaded.
         self.image_loading_busy = True
 
-        # Convert the monochrome image into uint8 format. If the frame type is uint16, values
-        # correspond to 16bit resolution.
+        # Convert the image into uint8 format. If the frame type is uint16, values correspond to
+        # 16bit resolution.
         if image.dtype == uint16:
-            image_uint8 = (image[:, :] / 256.).astype(uint8)
+            image_uint8 = (image / 256.).astype(uint8)
         elif image.dtype == uint8:
             image_uint8 = image.astype(uint8)
         else:
@@ -281,8 +282,15 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
-        qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
-                                QtGui.QImage.Format_Grayscale8)
+
+        # The image is monochrome:
+        if len(image_uint8.shape) == 2:
+            qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
+                                    QtGui.QImage.Format_Grayscale8)
+        # The image is color with OpenCV representation (BGR). QT only understands RGB.
+        else:
+            qt_image = QtGui.QImage(cvtColor(image_uint8, COLOR_BGR2RGB), self.shape_x,
+                                    self.shape_y, 3*self.shape_x, QtGui.QImage.Format_RGB888)
         pixmap = QtGui.QPixmap(qt_image)
 
         if pixmap and not pixmap.isNull():
