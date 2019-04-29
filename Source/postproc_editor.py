@@ -25,6 +25,7 @@ from time import sleep
 from os.path import splitext
 from cv2 import imread, cvtColor, COLOR_BGR2GRAY
 from copy import deepcopy
+from numpy import uint8
 
 from PyQt5 import QtWidgets, QtCore
 from sharpening_layer_widget import Ui_sharpening_layer_widget
@@ -34,8 +35,7 @@ from frame_viewer import FrameViewer
 from frames import Frames
 
 class DataObject(object):
-    def __init__(self, image_original, name_original, suffix, blinking_period, idle_loop_time,
-                 func_display_image):
+    def __init__(self, image_original, name_original, suffix, blinking_period, idle_loop_time):
         self.image_original = image_original
         self.color = len(self.image_original.shape) == 3
         self.file_name_original = name_original
@@ -47,9 +47,9 @@ class DataObject(object):
         self.blinking = False
         self.blinking_period = blinking_period
         self.idle_loop_time = idle_loop_time
-        self.func_display_image = func_display_image
 
-        initial_version = Version(self.image_original)
+        # initial_version = Version(self.image_original)
+        initial_version = Version((self.image_original / 2.).astype(uint8))
         initial_version.add_layer(Layer(1., 0, False))
         self.add_version(initial_version)
 
@@ -160,6 +160,9 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
 
 
 class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
+
+    set_photo_signal = QtCore.pyqtSignal(int)
+
     def __init__(self, data_object, select_version_callback, parent=None):
         QtWidgets.QWidget.__init__(self, parent)
         self.setupUi(self)
@@ -191,15 +194,16 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         new_version = Version(self.data_object.image_original)
         new_version.add_layer(Layer(1., 0, False))
         self.data_object.add_version(new_version)
-        self.data_object.func_display_image(self.data_object.versions[self.data_object.version_selected].image)
+        # print ("new version")
+        self.set_photo_signal.emit(self.data_object.version_selected)
         self.spinBox_version.setMaximum(self.data_object.number_versions)
         self.spinBox_version.setValue(self.data_object.number_versions)
         self.spinBox_compare.setMaximum(self.data_object.number_versions)
-        self.select_version_callback(self.data_object.version_selected)
+        # self.select_version_callback(self.data_object.version_selected)
 
     def remove_version(self):
         self.data_object.remove_version(self.data_object.version_selected)
-        self.data_object.func_display_image(self.data_object.versions[self.data_object.version_selected].image)
+        self.set_photo_signal.emit(self.data_object.version_selected)
         self.spinBox_version.setMaximum(self.data_object.number_versions)
         self.spinBox_compare.setMaximum(self.data_object.number_versions)
         self.select_version_callback(self.data_object.version_selected)
@@ -208,9 +212,10 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.data_object.blinking = not self.data_object.blinking
         if self.data_object.blinking:
             # Create the blink comparator thread and start it.
-            self.blink_comparator = BlinkComparator(self.data_object)
+            self.blink_comparator = BlinkComparator(self.data_object, self.set_photo_signal)
             self.blink_comparator.setTerminationEnabled(True)
         else:
+            self.set_photo_signal.emit(self.data_object.version_selected)
             self.blink_comparator.stop()
 
     def save_version(self):
@@ -242,7 +247,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
 class BlinkComparator(QtCore.QThread):
 
-    def __init__(self, data_object, parent=None):
+    def __init__(self, data_object, set_photo_signal, parent=None):
         """
         Show two versions of the image in the image viewer alternately.
 
@@ -251,6 +256,7 @@ class BlinkComparator(QtCore.QThread):
 
         QtCore.QThread.__init__(self, parent)
         self.data_object = data_object
+        self.set_photo_signal = set_photo_signal
 
         self.start()
 
@@ -258,9 +264,9 @@ class BlinkComparator(QtCore.QThread):
         show_selected_version = True
         while self.data_object.blinking:
             if show_selected_version:
-                self.data_object.func_display_image(self.data_object.versions[self.data_object.version_selected].image)
+                self.set_photo_signal.emit(self.data_object.version_selected)
             else:
-                self.data_object.func_display_image(self.data_object.versions[self.data_object.version_compared].image)
+                self.set_photo_signal.emit(self.data_object.version_compared)
             # Toggle back and forth between first and second image version.
             show_selected_version = not show_selected_version
             # Sleep time inserted to limit CPU consumption by idle looping.
@@ -271,6 +277,8 @@ class BlinkComparator(QtCore.QThread):
 
 
 class ImageProcessor(QtCore.QThread):
+
+    set_photo_signal = QtCore.pyqtSignal(int)
 
     def __init__(self, data_object, parent=None):
         """
@@ -296,14 +304,12 @@ class ImageProcessor(QtCore.QThread):
                 self.data_object.version_selected].layers)
             if self.start_new_computation() and self.version_selected:
                 # Insert computation of a new image here.
-                print ("Computing a new version")
-                print ("setting image to version " + str(self.version_selected))
-                self.data_object.func_display_image(
-                    self.data_object.versions[self.version_selected].image)
+                # print ("Computing a new version")
+                # print ("setting image to version " + str(self.version_selected))
+                self.set_photo_signal.emit(self.version_selected)
                 self.last_version_selected = self.version_selected
                 self.last_layers = self.layers_selected
             else:
-                print ("no change")
                 sleep(self.data_object.idle_loop_time)
 
     def start_new_computation(self):
@@ -316,7 +322,7 @@ class ImageProcessor(QtCore.QThread):
         for last_layer, layer_selected in zip(self.last_layers, self.layers_selected):
             if last_layer.radius != layer_selected.radius or last_layer.amount != layer_selected.amount or \
                 last_layer.luminance_only != layer_selected.luminance_only:
-                print("layer_selected.radius: " + str(layer_selected.radius))
+                # print("layer_selected.radius: " + str(layer_selected.radius))
                 return True
 
         return False
@@ -344,7 +350,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.frame_viewer.setObjectName("framewiever")
         self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
         self.data_object = DataObject(image_original, name_original, suffix, blinking_period,
-                                      idle_loop_time, self.frame_viewer.setPhoto)
+                                      idle_loop_time)
 
         self.sharpening_layer_widgets = []
         self.max_layers = 4
@@ -356,11 +362,13 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         self.version_manager_widget = VersionManagerWidget(self.data_object, self.select_version)
         self.gridLayout.addWidget(self.version_manager_widget, 6, 1, 1, 1)
+        self.version_manager_widget.set_photo_signal.connect(self.select_image)
 
         self.select_version(self.data_object.version_selected)
 
         self.image_processor = ImageProcessor(self.data_object)
         self.image_processor.setTerminationEnabled(True)
+        self.image_processor.set_photo_signal.connect(self.select_image)
 
     def select_version(self, version_index):
         version_selected = self.data_object.versions[version_index]
@@ -369,7 +377,11 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             self.sharpening_layer_widgets[layer_index].setHidden(False)
         for layer_index in range(version_selected.number_layers, self.max_layers):
             self.sharpening_layer_widgets[layer_index].setHidden(True)
-        self.frame_viewer.setPhoto(version_selected.image)
+        self.select_image(version_index)
+
+    def select_image(self, version_index):
+        # print ("set Photo")
+        self.frame_viewer.setPhoto(self.data_object.versions[version_index].image)
 
     def add_layer(self):
         version_selected = self.data_object.versions[self.data_object.version_selected]
@@ -402,7 +414,7 @@ if __name__ == '__main__':
     input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
     # input_image = cvtColor(imread(input_file_name), COLOR_BGR2GRAY)
     input_image = imread(input_file_name)
-    data_object = DataObject(input_image, input_file_name, "_gpp", 1., 0.1, None)
+    data_object = DataObject(input_image, input_file_name, "_gpp", 1., 0.1)
     for i in range(3):
         data_object.add_version(Version("image_" + str(i)))
 
