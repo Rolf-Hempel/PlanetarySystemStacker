@@ -25,7 +25,7 @@ from time import sleep
 from os.path import splitext
 from cv2 import imread, cvtColor, COLOR_BGR2GRAY
 from copy import deepcopy
-from numpy import uint8
+from numpy import uint8, uint16
 
 from PyQt5 import QtWidgets, QtCore
 from sharpening_layer_widget import Ui_sharpening_layer_widget
@@ -48,8 +48,8 @@ class DataObject(object):
         self.blinking_period = blinking_period
         self.idle_loop_time = idle_loop_time
 
-        # initial_version = Version(self.image_original)
-        initial_version = Version((self.image_original / 2.).astype(uint8))
+        initial_version = Version(self.image_original)
+        # initial_version = Version((self.image_original / 2.).astype(uint16))
         initial_version.add_layer(Layer(1., 0, False))
         self.add_version(initial_version)
 
@@ -162,6 +162,7 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
 class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
     set_photo_signal = QtCore.pyqtSignal(int)
+    variant_shown_signal = QtCore.pyqtSignal(bool, bool)
 
     def __init__(self, data_object, select_version_callback, parent=None):
         QtWidgets.QWidget.__init__(self, parent)
@@ -176,6 +177,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.checkBox_blink_compare.stateChanged.connect(self.blinking_toggled)
         self.pushButton_save.clicked.connect(self.save_version)
         self.pushButton_save_as.clicked.connect(self.save_version_as)
+        self.variant_shown_signal.connect(self.highlight_variant)
 
         self.spinBox_version.setMaximum(1)
         self.spinBox_version.setMinimum(0)
@@ -212,11 +214,27 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.data_object.blinking = not self.data_object.blinking
         if self.data_object.blinking:
             # Create the blink comparator thread and start it.
-            self.blink_comparator = BlinkComparator(self.data_object, self.set_photo_signal)
+            self.blink_comparator = BlinkComparator(self.data_object, self.set_photo_signal,
+                                                    self.variant_shown_signal)
             self.blink_comparator.setTerminationEnabled(True)
         else:
             self.set_photo_signal.emit(self.data_object.version_selected)
             self.blink_comparator.stop()
+
+    def highlight_variant(self, selected, compare):
+        if selected and compare:
+            self.spinBox_version.setStyleSheet('color: red')
+            self.spinBox_compare.setStyleSheet('color: red')
+        elif not selected and not compare:
+            self.spinBox_version.setStyleSheet('color: black')
+            self.spinBox_compare.setStyleSheet('color: black')
+        elif selected:
+            self.spinBox_version.setStyleSheet('color: red')
+            self.spinBox_compare.setStyleSheet('color: white')
+        elif compare:
+            self.spinBox_version.setStyleSheet('color: white')
+            self.spinBox_compare.setStyleSheet('color: red')
+
 
     def save_version(self):
         """
@@ -225,8 +243,9 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
-        Frames.save_image(self.file_name_processed, self.data_object.version_selected.image,
-                                        color=self.color, avoid_overwriting=False)
+        Frames.save_image(self.data_object.file_name_processed,
+                          self.data_object.versions[self.data_object.version_selected].image,
+                          color=self.data_object.color, avoid_overwriting=False)
 
     def save_version_as(self):
         """
@@ -241,13 +260,14 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
             "Image Files (*.tiff)", options=options)
 
         if filename and extension:
-            Frames.save_image(filename, self.data_object.version_selected.image,
-                                color=self.color, avoid_overwriting=False)
+            Frames.save_image(filename,
+                              self.data_object.versions[self.data_object.version_selected].image,
+                              color=self.data_object.color, avoid_overwriting=False)
 
 
 class BlinkComparator(QtCore.QThread):
 
-    def __init__(self, data_object, set_photo_signal, parent=None):
+    def __init__(self, data_object, set_photo_signal, variant_shown_signal, parent=None):
         """
         Show two versions of the image in the image viewer alternately.
 
@@ -257,6 +277,8 @@ class BlinkComparator(QtCore.QThread):
         QtCore.QThread.__init__(self, parent)
         self.data_object = data_object
         self.set_photo_signal = set_photo_signal
+        self.variant_shown_signal = variant_shown_signal
+        self.variant_shown_signal.emit(False, False)
 
         self.start()
 
@@ -265,14 +287,17 @@ class BlinkComparator(QtCore.QThread):
         while self.data_object.blinking:
             if show_selected_version:
                 self.set_photo_signal.emit(self.data_object.version_selected)
+                self.variant_shown_signal.emit(True, False)
             else:
                 self.set_photo_signal.emit(self.data_object.version_compared)
+                self.variant_shown_signal.emit(False, True)
             # Toggle back and forth between first and second image version.
             show_selected_version = not show_selected_version
             # Sleep time inserted to limit CPU consumption by idle looping.
             sleep(self.data_object.blinking_period)
 
     def stop(self):
+        self.variant_shown_signal.emit(False, False)
         self.terminate()
 
 
@@ -303,9 +328,9 @@ class ImageProcessor(QtCore.QThread):
             self.layers_selected = deepcopy(self.data_object.versions[
                 self.data_object.version_selected].layers)
             if self.start_new_computation() and self.version_selected:
+
                 # Insert computation of a new image here.
-                # print ("Computing a new version")
-                # print ("setting image to version " + str(self.version_selected))
+
                 self.set_photo_signal.emit(self.version_selected)
                 self.last_version_selected = self.version_selected
                 self.last_layers = self.layers_selected
@@ -413,7 +438,7 @@ if __name__ == '__main__':
 
     input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
     # input_image = cvtColor(imread(input_file_name), COLOR_BGR2GRAY)
-    input_image = imread(input_file_name)
+    input_image = imread(input_file_name, -1)
     data_object = DataObject(input_image, input_file_name, "_gpp", 1., 0.1)
     for i in range(3):
         data_object.add_version(Version("image_" + str(i)))
