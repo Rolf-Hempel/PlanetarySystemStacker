@@ -26,6 +26,7 @@ from os.path import splitext
 from cv2 import imread, cvtColor, COLOR_BGR2GRAY
 from copy import deepcopy
 from numpy import uint8, uint16
+from math import log, exp, sqrt
 
 from PyQt5 import QtWidgets, QtCore
 from sharpening_layer_widget import Ui_sharpening_layer_widget
@@ -33,6 +34,7 @@ from version_manager_widget import Ui_version_manager_widget
 from postproc_editor_gui import Ui_postproc_editor
 from frame_viewer import FrameViewer
 from frames import Frames
+from miscellaneous import Miscellaneous
 
 class DataObject(object):
     def __init__(self, image_original, name_original, suffix, blinking_period, idle_loop_time):
@@ -138,19 +140,22 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
             pass
 
     def horizontalSlider_amount_changed(self):
-        self.layer.amount = self.horizontalSlider_amount.value()
+        x = self.horizontalSlider_amount.value()
+        self.layer.amount = 0.02 * x**2
         self.lineEdit_amount.blockSignals(True)
-        self.lineEdit_amount.setText(str(self.layer.amount))
+        self.lineEdit_amount.setText("{0:.2f}".format(round(self.layer.amount,2)))
         self.lineEdit_amount.blockSignals(False)
 
     def lineEdit_amount_changed(self):
         try:
-            self.layer.amount = max(0, min(int(round(float(self.lineEdit_amount.text()))), 200))
+            y = float(self.lineEdit_amount.text())
+            x = max(0, min(int(round(sqrt(50. * y))), 100))
+            self.layer.amount = max(0., min(y, 200.))
+            self.horizontalSlider_amount.blockSignals(True)
+            self.horizontalSlider_amount.setValue(x)
+            self.horizontalSlider_amount.blockSignals(False)
         except:
             pass
-        self.horizontalSlider_amount.blockSignals(True)
-        self.horizontalSlider_amount.setValue(self.layer.amount)
-        self.horizontalSlider_amount.blockSignals(False)
 
     def checkBox_luminance_toggled(self):
         self.layer.luminance_only = not self.layer.luminance_only
@@ -327,9 +332,9 @@ class ImageProcessor(QtCore.QThread):
             self.version_selected = self.data_object.version_selected
             self.layers_selected = deepcopy(self.data_object.versions[
                 self.data_object.version_selected].layers)
-            if self.start_new_computation() and self.version_selected:
+            if self.new_computation_required() and self.version_selected:
 
-                # Insert computation of a new image here.
+                self.recompute_selected_version()
 
                 self.set_photo_signal.emit(self.version_selected)
                 self.last_version_selected = self.version_selected
@@ -337,7 +342,7 @@ class ImageProcessor(QtCore.QThread):
             else:
                 sleep(self.data_object.idle_loop_time)
 
-    def start_new_computation(self):
+    def new_computation_required(self):
         if self.last_version_selected != self.version_selected:
             return True
 
@@ -351,6 +356,13 @@ class ImageProcessor(QtCore.QThread):
                 return True
 
         return False
+
+    def recompute_selected_version(self):
+        new_image = self.data_object.image_original
+        for layer in self.layers_selected:
+            new_image = Miscellaneous.gaussian_sharpen(new_image, layer.amount, layer.radius,
+                                                       luminance_only=layer.luminance_only)
+        self.data_object.versions[self.data_object.version_selected].image = new_image
 
     def stop(self):
         self.terminate()

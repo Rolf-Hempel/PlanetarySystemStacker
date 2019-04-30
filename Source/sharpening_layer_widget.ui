@@ -35,7 +35,10 @@
          <string>Increase / decrease the effect of this layer</string>
         </property>
         <property name="maximum">
-         <number>200</number>
+         <number>100</number>
+        </property>
+        <property name="pageStep">
+         <number>1</number>
         </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
@@ -73,6 +76,12 @@
          <string>Change the radius of Gauss filter for this layer</string>
         </property>
         <property name="minimum">
+         <number>1</number>
+        </property>
+        <property name="maximum">
+         <number>100</number>
+        </property>
+        <property name="pageStep">
          <number>1</number>
         </property>
         <property name="orientation">
