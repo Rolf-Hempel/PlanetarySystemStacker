@@ -73,10 +73,6 @@ class Version(object):
         self.number_layers = 0
 
     def add_layer(self, layer):
-        # for index, layer_compare in enumerate(self.layers):
-        #     if layer_compare.radius >= layer.radius:
-        #         self.layers.insert(index, layer)
-        #         return
         self.layers.append(layer)
         self.number_layers += 1
 
@@ -112,20 +108,30 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.layer = layer
 
         self.groupBox_layer.setTitle(self.title)
-        self.horizontalSlider_radius.setValue(self.radius_to_int(self.layer.radius))
+        self.horizontalSlider_radius.setValue(self.radius_to_integer(self.layer.radius))
         self.lineEdit_radius.setText(str(self.layer.radius))
-        self.horizontalSlider_amount.setValue(int(round(self.layer.amount)))
+        self.horizontalSlider_amount.setValue(self.amount_to_integer(self.layer.amount))
         self.lineEdit_amount.setText(str(self.layer.amount))
         self.checkBox_luminance.setChecked(self.layer.luminance_only)
 
-    def radius_to_int(self, radius):
+    @staticmethod
+    def radius_to_integer(radius):
         return max(min(int(round(radius*10.)), 99), 1)
 
-    def int_to_radius(self, int):
+    @staticmethod
+    def integer_to_radius(int):
         return int / 10.
 
+    @staticmethod
+    def amount_to_integer(amount):
+        return max(0, min(int(round(sqrt(50. * amount))), 100))
+
+    @staticmethod
+    def integer_to_amount(integer):
+        return 0.02 * integer**2
+
     def horizontalSlider_radius_changed(self):
-        self.layer.radius = self.int_to_radius(self.horizontalSlider_radius.value())
+        self.layer.radius = self.integer_to_radius(self.horizontalSlider_radius.value())
         self.lineEdit_radius.blockSignals(True)
         self.lineEdit_radius.setText(str(self.layer.radius))
         self.lineEdit_radius.blockSignals(False)
@@ -134,25 +140,23 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         try:
             self.layer.radius = max(0.1, min(float(self.lineEdit_radius.text()), 9.9))
             self.horizontalSlider_radius.blockSignals(True)
-            self.horizontalSlider_radius.setValue(self.radius_to_int(self.layer.radius))
+            self.horizontalSlider_radius.setValue(self.radius_to_integer(self.layer.radius))
             self.horizontalSlider_radius.blockSignals(False)
         except:
             pass
 
     def horizontalSlider_amount_changed(self):
-        x = self.horizontalSlider_amount.value()
-        self.layer.amount = 0.02 * x**2
+
+        self.layer.amount = self.integer_to_amount(self.horizontalSlider_amount.value())
         self.lineEdit_amount.blockSignals(True)
         self.lineEdit_amount.setText("{0:.2f}".format(round(self.layer.amount,2)))
         self.lineEdit_amount.blockSignals(False)
 
     def lineEdit_amount_changed(self):
         try:
-            y = float(self.lineEdit_amount.text())
-            x = max(0, min(int(round(sqrt(50. * y))), 100))
-            self.layer.amount = max(0., min(y, 200.))
+            self.layer.amount = float(self.lineEdit_amount.text())
             self.horizontalSlider_amount.blockSignals(True)
-            self.horizontalSlider_amount.setValue(x)
+            self.horizontalSlider_amount.setValue(self.amount_to_integer(self.layer.amount))
             self.horizontalSlider_amount.blockSignals(False)
         except:
             pass
