@@ -691,6 +691,10 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.buttonBox.rejected.connect(self.reject)
         self.pushButton_add_layer.clicked.connect(self.add_layer)
 
+        self.label_message.setText("Create sharp image versions using up to four correction layers."
+                                   " Adjust layer parameters as required.")
+        self.label_message.setStyleSheet('color: red')
+
         # Start the frame viewer.
         self.frame_viewer = FrameViewer()
         self.frame_viewer.setObjectName("framewiever")
@@ -834,14 +838,14 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.close()
 
 
-class DummyStatusBar(object):
+class EmulateStatusBar(object):
     """
     This class is only used for unit testing with the main program below. It emulates the status
     bar of the main GUI by printing the message to standard output.
     """
 
     def __init__(self):
-        super(DummyStatusBar, self).__init__()
+        super(EmulateStatusBar, self).__init__()
         pass
 
     @staticmethod
@@ -878,7 +882,7 @@ if __name__ == '__main__':
     # Change colors to standard RGB
     input_image = cvtColor(imread(input_file_name, -1), COLOR_BGR2GRAY)
 
-    dummy_status_bar = DummyStatusBar()
+    dummy_status_bar = EmulateStatusBar()
     app = QtWidgets.QApplication(argv)
     window = PostprocEditorWidget(input_image, input_file_name, "_gpp", 1., 0.2,
                                   dummy_status_bar.print_status_bar_info)
