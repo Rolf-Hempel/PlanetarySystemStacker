@@ -140,7 +140,7 @@ class Frames(object):
                             self.progress_signal.emit("Read all frames",
                                                  int((frame_index / self.number) * 100.))
                         # Read the next frame.
-                        frame = imread(path, -1)
+                        frame = cvtColor(imread(path, -1), COLOR_BGR2RGB)
                         self.frames_original.append(frame)
 
                     if self.progress_signal is not None:
@@ -254,7 +254,7 @@ class Frames(object):
                 if self.convert_to_grayscale:
                     frame = misc.imread(self.names[index], mode='F')
                 else:
-                    frame = imread(self.names[index], -1)
+                    frame = cvtColor(imread(self.names[index], -1), COLOR_BGR2RGB)
             else:
                 # Set the read position in the file to frame "index", and read the frame.
                 if index != self.original_available_index + 1:
