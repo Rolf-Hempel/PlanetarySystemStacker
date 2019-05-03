@@ -60,26 +60,27 @@ class DataObject(object):
         self.image_original = image_original
         self.color = len(self.image_original.shape) == 3
         self.file_name_original = name_original
+        self.blinking_period = blinking_period
+        self.idle_loop_time = idle_loop_time
+
+        # Set the standard path to the resulting image using the provided file suffix.
         self.file_name_processed = splitext(name_original)[0] + suffix + '.tiff'
 
         # Initialize the postprocessing image versions with the unprocessed image (as version 0).
         self.versions = [Version(self.image_original)]
         self.number_versions = 0
 
-        # Initialize the pointer to the currently selected version to 0 (input image).
-        # "version_compared" is used by the blink comparator later on. The blink comparator is
-        # switched off initially.
-        self.version_selected = 0
-        self.version_compared = 0
-        self.blinking = False
-        self.blinking_period = blinking_period
-        self.idle_loop_time = idle_loop_time
-
         # Create a first processed version with initial parameters for Gaussian radius. The amount
         # of sharpening is initialized to zero.
         initial_version = Version(self.image_original)
         initial_version.add_layer(Layer(1., 0, False))
         self.add_version(initial_version)
+
+        # Initialize the pointer to the currently selected version to 0 (input image).
+        # "version_compared" is used by the blink comparator later on. The blink comparator is
+        # switched off initially.
+        self.blinking = False
+        self.version_compared = 0
 
     def add_version(self, version):
         """
@@ -211,7 +212,7 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.horizontalSlider_radius.setValue(self.radius_to_integer(self.layer.radius))
         self.lineEdit_radius.setText(str(self.layer.radius))
         self.horizontalSlider_amount.setValue(self.amount_to_integer(self.layer.amount))
-        self.lineEdit_amount.setText(str(self.layer.amount))
+        self.lineEdit_amount.setText("{0:.2f}".format(round(self.layer.amount, 2)))
         self.checkBox_luminance.setChecked(self.layer.luminance_only)
 
     # The following four methods implement the translation between data model values and the
