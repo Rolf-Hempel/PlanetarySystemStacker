@@ -67,14 +67,15 @@ class DataObject(object):
         self.file_name_processed = splitext(name_original)[0] + suffix + '.tiff'
 
         # Initialize the postprocessing image versions with the unprocessed image (as version 0).
-        self.versions = [Version(self.image_original)]
+        original_version = Version()
+        original_version.image = self.image_original
+        self.versions = [original_version]
         self.number_versions = 0
 
         # Create a first processed version with initial parameters for Gaussian radius. The amount
         # of sharpening is initialized to zero.
-        initial_version = Version(self.image_original)
+        initial_version = self.add_version()
         initial_version.add_layer(Layer(1., 0, False))
-        self.add_version(initial_version)
 
         # Initialize the pointer to the currently selected version to 0 (input image).
         # "version_compared" is used by the blink comparator later on. The blink comparator is
@@ -82,17 +83,19 @@ class DataObject(object):
         self.blinking = False
         self.version_compared = 0
 
-    def add_version(self, version):
+    def add_version(self):
         """
         Add a new postprocessing version, and set the "selected" pointer to it.
 
-        :param version:
-        :return: -
+        :return: The new version object
         """
 
-        self.versions.append(version)
+        new_version = Version()
+        new_version.image = self.image_original
+        self.versions.append(new_version)
         self.number_versions += 1
         self.version_selected = self.number_versions
+        return new_version
 
     def remove_version(self, index):
         """
@@ -115,13 +118,12 @@ class Version(object):
     resulting image for the current parameter set.
     """
 
-    def __init__(self, image):
+    def __init__(self):
         """
         Initialize the version object with the input image and an empty set of processing layers.
         :param image: Input image (16bit Tiff) for postprocessing
         """
 
-        self.image = image
         self.layers = []
         self.number_layers = 0
 
@@ -377,9 +379,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         """
 
         # Create a Version object, and add an initial layer (radius 1., amount 0).
-        new_version = Version(self.data_object.image_original)
+        new_version = self.data_object.add_version()
         new_version.add_layer(Layer(1., 0, False))
-        self.data_object.add_version(new_version)
 
         # Set the image viewer to the new version, and increase the range of spinboxes to include
         # the new version.
