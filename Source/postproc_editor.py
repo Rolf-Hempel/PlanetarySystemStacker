@@ -68,7 +68,7 @@ class DataObject(object):
 
         # Initialize the postprocessing image versions with the unprocessed image (as version 0).
         original_version = Version()
-        original_version.image = self.image_original
+        original_version.set_image(self.image_original)
         self.versions = [original_version]
         self.number_versions = 0
 
@@ -91,7 +91,7 @@ class DataObject(object):
         """
 
         new_version = Version()
-        new_version.image = self.image_original
+        new_version.set_image(self.image_original)
         self.versions.append(new_version)
         self.number_versions += 1
         self.version_selected = self.number_versions
@@ -111,6 +111,68 @@ class DataObject(object):
             self.number_versions -= 1
             self.version_selected = index - 1
 
+    def dump_config(self, config_parser_object):
+        """
+        Dump all version and layer parameters into a ConfigParser object (except for image data).
+        Version 0 is not included because it does not contain any layer info.
+
+        :param config_parser_object: ConfigParser object.
+        :return: -
+        """
+
+        # First remove old postprocessing sections, if there are any in the ConfigParser object.
+        for section in config_parser_object.sections():
+            section_items = section.split()
+            if section_items[0] == 'PostprocessingVersion':
+                config_parser_object.remove_section(section)
+
+        # For every version, and for all layers in each version, create a separate section.
+        for version_index, version in enumerate(self.versions):
+            for layer_index, layer in enumerate(version.layers):
+                section_name = "PostprocessingVersion " + str(version_index) + " layer " + str(layer_index)
+                config_parser_object.add_section(section_name)
+
+                # Add the three parameters of the layer.
+                config_parser_object.set(section_name, 'radius', str(layer.radius))
+                config_parser_object.set(section_name, 'amount', str(layer.amount))
+                config_parser_object.set(section_name, 'luminance only', str(layer.luminance_only))
+
+    def load_config(self, config_parser_object):
+        """
+        Load all postprocessing configuration data from a ConfigParser object. The data replace
+        all versions (apart from version 0) and all associated layer info. The image data is taken
+        from the current data object and is not restored.
+
+        :param config_parser_object: ConfigParser object.
+        :return: -
+        """
+
+        # Initialize the postprocessing image versions with the unprocessed image (as version 0).
+        original_version = Version()
+        original_version.set_image(self.image_original)
+        self.versions = [original_version]
+        self.number_versions = 0
+
+        # Initialize the version index for comparison with an impossible value.
+        old_version_index = -1
+
+        # Go through all sections and find the postprocessing sections.
+        for section in config_parser_object.sections():
+            section_items = section.split()
+            if section_items[0] == 'PostprocessingVersion':
+                this_version_index = section_items[1]
+
+                # A layer section with a new version index is found. Allocate a new version.
+                if this_version_index != old_version_index:
+                    new_version = self.add_version()
+                    old_version_index = this_version_index
+
+                # Read all parameters of this layer, and add a layer to the current version.
+                radius = config_parser_object.getfloat(section, 'radius')
+                amount = config_parser_object.getfloat(section, 'amount')
+                luminance_only = config_parser_object.getboolean(section, 'luminance only')
+                new_version.add_layer(Layer(radius, amount, luminance_only))
+
 
 class Version(object):
     """
@@ -126,6 +188,16 @@ class Version(object):
 
         self.layers = []
         self.number_layers = 0
+
+    def set_image(self, image):
+        """
+        Set the current image for this version.
+
+        :param image: Image file (16bit Tiff) holding the pixel data of this version's image.
+        :return: -
+        """
+
+        self.image = image
 
     def add_layer(self, layer):
         """
