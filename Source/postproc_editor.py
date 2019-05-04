@@ -129,7 +129,8 @@ class DataObject(object):
         # For every version, and for all layers in each version, create a separate section.
         for version_index, version in enumerate(self.versions):
             for layer_index, layer in enumerate(version.layers):
-                section_name = "PostprocessingVersion " + str(version_index) + " layer " + str(layer_index)
+                section_name = "PostprocessingVersion " + str(version_index) + " layer " + str(
+                    layer_index)
                 config_parser_object.add_section(section_name)
 
                 # Add the three parameters of the layer.
@@ -951,7 +952,6 @@ class EmulateStatusBar(object):
 
 
 if __name__ == '__main__':
-
     input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
     # Change colors to standard RGB
     input_image = cvtColor(imread(input_file_name, -1), COLOR_BGR2GRAY)
