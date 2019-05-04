@@ -75,6 +75,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.apst_slider_value.valueChanged['int'].connect(self.apst_changed)
         self.apbt_slider_value.valueChanged['int'].connect(self.apbt_changed)
         self.apfp_slider_value.valueChanged['int'].connect(self.apfp_changed)
+        self.spp_checkBox.stateChanged.connect(self.spp_changed)
 
         self.restore_standard_values.clicked.connect(self.restore_standard_parameters)
 
@@ -120,6 +121,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.apbt_label_display.setText(str(self.config_copy.alignment_points_brightness_threshold))
         self.apfp_slider_value.setValue(self.config_copy.alignment_points_frame_percent)
         self.apfp_label_display.setText(str(self.config_copy.alignment_points_frame_percent))
+        self.spp_checkBox.setChecked(self.config_copy.global_parameters_include_postprocessing)
 
     def fgw_changed(self, value):
         """
@@ -203,6 +205,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
     def apfp_changed(self, value):
         self.config_copy.alignment_points_frame_percent = value
+
+    def spp_changed(self, state):
+        self.config_copy.global_parameters_include_postprocessing = (state == QtCore.Qt.Checked)
 
     def restore_standard_parameters(self):
         """
@@ -323,6 +328,12 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                 self.configuration.global_parameters_buffering_level:
             self.configuration.global_parameters_buffering_level = \
                 self.config_copy.global_parameters_buffering_level
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_include_postprocessing != \
+                self.configuration.global_parameters_include_postprocessing:
+            self.configuration.global_parameters_include_postprocessing = \
+                self.config_copy.global_parameters_include_postprocessing
             self.configuration.configuration_changed = True
 
         # Set dependent parameters.

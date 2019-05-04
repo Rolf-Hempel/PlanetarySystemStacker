@@ -71,6 +71,7 @@ class DataObject(object):
         original_version.set_image(self.image_original)
         self.versions = [original_version]
         self.number_versions = 0
+        self.version_selected = 0
 
         # Create a first processed version with initial parameters for Gaussian radius. The amount
         # of sharpening is initialized to zero.
@@ -123,8 +124,14 @@ class DataObject(object):
         # First remove old postprocessing sections, if there are any in the ConfigParser object.
         for section in config_parser_object.sections():
             section_items = section.split()
-            if section_items[0] == 'PostprocessingVersion':
+            if section_items[0] == 'PostprocessingVersion' or \
+                    section_items[0] == 'PostprocessingInfo':
                 config_parser_object.remove_section(section)
+
+        # Store general postprocessing info.
+        config_parser_object.add_section('PostprocessingInfo')
+        config_parser_object.set('PostprocessingInfo', 'version selected',
+                                 str(self.version_selected))
 
         # For every version, and for all layers in each version, create a separate section.
         for version_index, version in enumerate(self.versions):
@@ -154,6 +161,15 @@ class DataObject(object):
         self.versions = [original_version]
         self.number_versions = 0
 
+        # Load general postprocessing info.
+        try:
+            self.version_selected = config_parser_object.getint('PostprocessingInfo',
+                                                                'version selected')
+        except:
+            # the ConfigParser object does not contain postprocessing info. Leave the data object
+            # with only the original version stored.
+            return
+
         # Initialize the version index for comparison with an impossible value.
         old_version_index = -1
 
@@ -166,6 +182,7 @@ class DataObject(object):
                 # A layer section with a new version index is found. Allocate a new version.
                 if this_version_index != old_version_index:
                     new_version = self.add_version()
+                    self.number_versions += 1
                     old_version_index = this_version_index
 
                 # Read all parameters of this layer, and add a layer to the current version.

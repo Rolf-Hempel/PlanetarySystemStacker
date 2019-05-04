@@ -39,6 +39,7 @@ class ConfigurationParameters(object):
         self.global_parameters_write_protocol_to_file = None
         self.global_parameters_store_protocol_with_result = None
         self.global_parameters_buffering_level = None
+        self.global_parameters_include_postprocessing = None
         self.frames_gauss_width = None
         self.align_frames_mode = None
         self.align_frames_automation = None
@@ -62,6 +63,7 @@ class ConfigurationParameters(object):
         self.global_parameters_write_protocol_to_file = True
         self.global_parameters_store_protocol_with_result = False
         self.global_parameters_buffering_level = 2
+        self.global_parameters_include_postprocessing = False
         self.frames_gauss_width = 7
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
@@ -96,6 +98,8 @@ class ConfigurationParameters(object):
             configuration_object.global_parameters_store_protocol_with_result
         self.global_parameters_buffering_level = \
             configuration_object.global_parameters_buffering_level
+        self.global_parameters_include_postprocessing = \
+            configuration_object.global_parameters_include_postprocessing
         self.frames_gauss_width = configuration_object.frames_gauss_width
         self.align_frames_mode = configuration_object.align_frames_mode
         self.align_frames_automation = configuration_object.align_frames_automation
@@ -207,6 +211,8 @@ class Configuration(object):
             configuration_parameters.global_parameters_store_protocol_with_result
         self.global_parameters_buffering_level = \
             configuration_parameters.global_parameters_buffering_level
+        self.global_parameters_include_postprocessing = \
+            configuration_parameters.global_parameters_include_postprocessing
         self.frames_gauss_width = configuration_parameters.frames_gauss_width
         self.align_frames_mode = configuration_parameters.align_frames_mode
         self.align_frames_automation = configuration_parameters.align_frames_automation
@@ -249,6 +255,8 @@ class Configuration(object):
             self.global_parameters_write_protocol_to_file
         configuration_parameters.global_parameters_store_protocol_with_result = \
             self.global_parameters_store_protocol_with_result
+        configuration_parameters.global_parameters_include_postprocessing = \
+            self.global_parameters_include_postprocessing
 
         configuration_parameters.frames_gauss_width = self.frames_gauss_width
 
@@ -298,9 +306,10 @@ class Configuration(object):
         self.global_parameters_write_protocol_to_file = conf.getboolean('Global parameters',
                                                                         'write protocol to file')
         self.global_parameters_store_protocol_with_result = conf.getboolean(
-            'Global parameters',
-            'store protocol with result')
+            'Global parameters', 'store protocol with result')
         self.global_parameters_buffering_level = conf.getint('Global parameters', 'buffering level')
+        self.global_parameters_include_postprocessing = conf.getboolean(
+            'Global parameters', 'include postprocessing')
         self.frames_gauss_width = conf.getint('Frames', 'gauss width')
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
@@ -351,6 +360,8 @@ class Configuration(object):
                            str(self.global_parameters_store_protocol_with_result))
         self.set_parameter(conf, 'Global parameters', 'buffering level',
                            str(self.global_parameters_buffering_level))
+        self.set_parameter(conf, 'Global parameters', 'include postprocessing',
+                           str(self.global_parameters_include_postprocessing))
 
         conf.add_section('Frames')
         self.set_parameter(conf, 'Frames', 'gauss width', str(self.frames_gauss_width))
