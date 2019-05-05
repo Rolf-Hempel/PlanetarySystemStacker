@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from os.path import expanduser, join, isfile
+from os.path import splitext
 from configparser import ConfigParser
 
 from exceptions import IncompatibleVersionsError
@@ -126,28 +127,6 @@ class Configuration(object):
         self.config_filename = join(self.home, ".PlanetarySystemStacker.ini")
         self.protocol_filename = join(self.home, "PlanetarySystemStacker.log")
 
-        self.config_file_exists = isfile(self.config_filename)
-
-        # If an existing config file is found, read it in.
-        self.configuration_read = False
-        if self.config_file_exists:
-            try:
-                self.read_config()
-                # Set flag to indicate that parameters were read from file successfully.
-                self.configuration_read = True
-            except:
-                self.configuration_read = False
-
-        if not self.configuration_read:
-            # The configuration could not be read from a file, or versions did not match. Ccreate a
-            # new one with standard parameters.
-
-            configuration_parameters = ConfigurationParameters()
-            configuration_parameters.set_defaults()
-
-            # Set current configuration parameters to the new values.
-            self.import_from_configuration_parameters(configuration_parameters)
-
         # Set fixed parameters which are hidden from the user. Hidden parameters which are
         # changeable are stored in the configuration object.
         self.frames_mono_channel = 'green'
@@ -177,6 +156,38 @@ class Configuration(object):
         self.stack_frames_background_fraction = 0.3
         self.stack_frames_background_patch_size = 100
         self.stack_frames_gauss_width = 5
+
+        self.postproc_suffix = "_gpp"
+        self.postproc_blinking_period = 1.
+        self.postproc_idle_loop_time = 0.2
+
+        # Initialize the ConfigParser object for parameters which the user can change.
+        self.config_parser_object = ConfigParser()
+
+        # Create and initialize the central data object for postprocessing.
+        self.postproc_data_object = PostprocDataObject(self.postproc_suffix)
+
+        # Determine if there is a configuration file from a previous run.
+        self.config_file_exists = isfile(self.config_filename)
+
+        # If an existing config file is found, read it in. Set flag to indicate if parameters were
+        # read from file successfully.
+        self.configuration_read = False
+        if self.config_file_exists:
+            try:
+                self.config_parser_object = self.read_config()
+                self.configuration_read = True
+            except:
+                self.configuration_read = False
+
+        # The configuration could not be read from a file, or versions did not match. Create a
+        # new set of standard parameters.
+        if not self.configuration_read:
+            configuration_parameters = ConfigurationParameters()
+            configuration_parameters.set_defaults()
+
+            # Set current configuration parameters to the new values.
+            self.import_from_configuration_parameters(configuration_parameters)
 
         # Compute parameters which are derived from other parameters.
         self.set_derived_parameters()
@@ -335,67 +346,66 @@ class Configuration(object):
         :return: ConfigParser object with all parameters
         """
 
-        # Create a ConfigParser object.
-        conf = ConfigParser()
+        # Clear the ConfigParser object.
+        sections = self.config_parser_object.sections()
+        for section in sections:
+            self.config_parser_object.remove_section(section)
 
         # Copy all current parameters from the current configuration into the ConfigParser object.
-        conf.add_section('Hidden parameters')
-        self.set_parameter(conf, 'Hidden parameters', 'current directory',
+        self.config_parser_object.add_section('Hidden parameters')
+        self.set_parameter('Hidden parameters', 'current directory',
                            self.hidden_parameters_current_dir)
-        self.set_parameter(conf, 'Hidden parameters', 'main window x0',
+        self.set_parameter('Hidden parameters', 'main window x0',
                            str(self.hidden_parameters_main_window_x0))
-        self.set_parameter(conf, 'Hidden parameters', 'main window y0',
+        self.set_parameter('Hidden parameters', 'main window y0',
                            str(self.hidden_parameters_main_window_y0))
-        self.set_parameter(conf, 'Hidden parameters', 'main window width',
+        self.set_parameter('Hidden parameters', 'main window width',
                            str(self.hidden_parameters_main_window_width))
-        self.set_parameter(conf, 'Hidden parameters', 'main window height',
+        self.set_parameter('Hidden parameters', 'main window height',
                            str(self.hidden_parameters_main_window_height))
-        conf.add_section('Global parameters')
-        self.set_parameter(conf, 'Global parameters', 'version', self.global_parameters_version)
-        self.set_parameter(conf, 'Global parameters', 'protocol level',
+        self.config_parser_object.add_section('Global parameters')
+        self.set_parameter('Global parameters', 'version', self.global_parameters_version)
+        self.set_parameter('Global parameters', 'protocol level',
                            str(self.global_parameters_protocol_level))
-        self.set_parameter(conf, 'Global parameters', 'write protocol to file',
+        self.set_parameter('Global parameters', 'write protocol to file',
                            str(self.global_parameters_write_protocol_to_file))
-        self.set_parameter(conf, 'Global parameters', 'store protocol with result',
+        self.set_parameter('Global parameters', 'store protocol with result',
                            str(self.global_parameters_store_protocol_with_result))
-        self.set_parameter(conf, 'Global parameters', 'buffering level',
+        self.set_parameter('Global parameters', 'buffering level',
                            str(self.global_parameters_buffering_level))
-        self.set_parameter(conf, 'Global parameters', 'include postprocessing',
+        self.set_parameter('Global parameters', 'include postprocessing',
                            str(self.global_parameters_include_postprocessing))
 
-        conf.add_section('Frames')
-        self.set_parameter(conf, 'Frames', 'gauss width', str(self.frames_gauss_width))
+        self.config_parser_object.add_section('Frames')
+        self.set_parameter('Frames', 'gauss width', str(self.frames_gauss_width))
 
-        conf.add_section('Align frames')
-        self.set_parameter(conf, 'Align frames', 'mode', self.align_frames_mode)
-        self.set_parameter(conf, 'Align frames', 'automation', str(self.align_frames_automation))
-        self.set_parameter(conf, 'Align frames', 'rectangle scale factor',
+        self.config_parser_object.add_section('Align frames')
+        self.set_parameter('Align frames', 'mode', self.align_frames_mode)
+        self.set_parameter('Align frames', 'automation', str(self.align_frames_automation))
+        self.set_parameter('Align frames', 'rectangle scale factor',
                            str(self.align_frames_rectangle_scale_factor))
-        self.set_parameter(conf, 'Align frames', 'search width',
+        self.set_parameter('Align frames', 'search width',
                            str(self.align_frames_search_width))
-        self.set_parameter(conf, 'Align frames', 'average frame percent',
+        self.set_parameter('Align frames', 'average frame percent',
                            str(self.align_frames_average_frame_percent))
 
-        conf.add_section('Alignment points')
-        self.set_parameter(conf, 'Alignment points', 'half box width',
+        self.config_parser_object.add_section('Alignment points')
+        self.set_parameter('Alignment points', 'half box width',
                            str(self.alignment_points_half_box_width))
-        self.set_parameter(conf, 'Alignment points', 'search width',
+        self.set_parameter('Alignment points', 'search width',
                            str(self.alignment_points_search_width))
-        self.set_parameter(conf, 'Alignment points', 'structure threshold',
+        self.set_parameter('Alignment points', 'structure threshold',
                            str(self.alignment_points_structure_threshold))
-        self.set_parameter(conf, 'Alignment points', 'brightness threshold',
+        self.set_parameter('Alignment points', 'brightness threshold',
                            str(self.alignment_points_brightness_threshold))
-        self.set_parameter(conf, 'Alignment points', 'frame percent',
+        self.set_parameter('Alignment points', 'frame percent',
                            str(self.alignment_points_frame_percent))
 
-        return conf
-
-    def set_parameter(self, conf, section, name, value):
+    def set_parameter(self, section, name, value):
         """
         Assign a new value to a parameter in the configuration object. The value is not checked for
         validity. Therefore, this method should be used with well-defined values internally only.
 
-        :param conf: ConfigParser object where the parameter is to be set
         :param section: section name (e.g. 'Global parameters') within the JSON data object
         :param name: name of the parameter (e.g. 'protocol level')
         :param value: new value to be assigned to the parameter (type str)
@@ -403,7 +413,7 @@ class Configuration(object):
         """
 
         try:
-            conf.set(section, name, value)
+            self.config_parser_object.set(section, name, value)
             return True
         except:
             return False
@@ -432,21 +442,24 @@ class Configuration(object):
 
     def write_config(self, file_name=None):
         """
-        Write all variable configuration parameters to a file. If no file name is specified, the
-        standard ".ini" file
+        Write all variable configuration parameters to a file. If no file name is specified, take
+        the standard ".ini" file
 
-        :param file_name: Optional configuration file name
+        :param file_name: Optional configuration file name.
         :return: -
         """
 
-        # Create a ConfigParser object, and set it to the current parameters.
-        conf = self.store_all_parameters_to_config_parser()
+        # Reset the ConfigParser object, and fill it with the current parameters.
+        self.store_all_parameters_to_config_parser()
+
+        # Add the contents of the postprocessing data object to the ConfigParser object.
+        self.postproc_data_object.dump_config(self.config_parser_object)
 
         if not file_name:
             file_name = self.config_filename
 
         with open(file_name, 'w') as config_file:
-            conf.write(config_file)
+            self.config_parser_object.write(config_file)
 
     def read_config(self, file_name=None):
         """
@@ -457,13 +470,252 @@ class Configuration(object):
         :return: ConfigParser object with configuration parameters
         """
 
-        # Allocate a new ConfigParser object.
-        conf = ConfigParser()
-
         if not file_name:
             file_name = self.config_filename
-        conf.read(file_name)
+        self.config_parser_object.read(file_name)
 
-        self.get_all_parameters_from_configparser(conf)
+        # Get all stacking parameters from the parser object.
+        self.get_all_parameters_from_configparser(self.config_parser_object)
 
-        return conf
+        # Transfer all postprocessing parameters from the parser object to the postproc object.
+        self.postproc_data_object.load_config(self.config_parser_object)
+
+        return self.config_parser_object
+
+
+class PostprocDataObject(object):
+    """
+    This class implements the central data object used in postprocessing.
+
+    """
+
+    def __init__(self, postproc_suffix):
+        """
+        Initialize the data object.
+
+        :param postproc_suffix: File suffix used for postprocessing result.
+        :return: -
+        """
+
+        self.postproc_suffix = postproc_suffix
+
+        # Initialize the postprocessing image versions with the unprocessed image (as version 0).
+        self.initialize_versions()
+
+        # Create a first processed version with initial parameters for Gaussian radius. The amount
+        # of sharpening is initialized to zero.
+        initial_version = self.add_postproc_version()
+        initial_version.add_postproc_layer(PostprocLayer(1., 0, False))
+
+        # Initialize the pointer to the currently selected version to 0 (input image).
+        # "version_compared" is used by the blink comparator later on. The blink comparator is
+        # switched off initially.
+        self.blinking = False
+        self.version_compared = 0
+
+    def set_postproc_input_image(self, image_original, name_original):
+        """
+        Set the input image and associated file name for postprocessing, and set derived variables.
+
+        :param image_original: Image file (16bit Tiff) holding the input for postprocessing
+        :param name_original: Path name of the original image.
+        :return: -
+        """
+
+        self.image_original = image_original
+        self.color = len(self.image_original.shape) == 3
+        self.file_name_original = name_original
+
+        # Set the standard path to the resulting image using the provided file suffix.
+        self.file_name_processed = splitext(self.file_name_original)[0] + self.postproc_suffix + '.tiff'
+
+        for version in self.versions:
+            version.set_image(self.image_original)
+
+    def initialize_versions(self):
+        """
+        Initialize the postprocessing image versions with the unprocessed image (as version 0).
+
+        :return: -
+        """
+
+        original_version = PostprocVersion()
+        self.versions = [original_version]
+        self.number_versions = 0
+        self.version_selected = 0
+
+    def add_postproc_version(self):
+        """
+        Add a new postprocessing version, and set the "selected" pointer to it.
+
+        :return: The new version object
+        """
+
+        new_version = PostprocVersion()
+        self.versions.append(new_version)
+        self.number_versions += 1
+        self.version_selected = self.number_versions
+        return new_version
+
+    def remove_postproc_version(self, index):
+        """
+        Remove a postprocessing version, and set the "selected" pointer to the previous one. The
+        initial version (input image) cannot be removed.
+
+        :param index: Index of the version to be removed.
+        :return: -
+        """
+
+        if 0 < index <= self.number_versions:
+            self.versions = self.versions[:index] + self.versions[index + 1:]
+            self.number_versions -= 1
+            self.version_selected = index - 1
+
+    def dump_config(self, config_parser_object):
+        """
+        Dump all version and layer parameters into a ConfigParser object (except for image data).
+        Version 0 is not included because it does not contain any layer info.
+
+        :param config_parser_object: ConfigParser object.
+        :return: -
+        """
+
+        # First remove old postprocessing sections, if there are any in the ConfigParser object.
+        for section in config_parser_object.sections():
+            section_items = section.split()
+            if section_items[0] == 'PostprocessingVersion' or \
+                    section_items[0] == 'PostprocessingInfo':
+                config_parser_object.remove_section(section)
+
+        # Store general postprocessing info.
+        config_parser_object.add_section('PostprocessingInfo')
+        config_parser_object.set('PostprocessingInfo', 'version selected',
+                                 str(self.version_selected))
+
+        # For every version, and for all layers in each version, create a separate section.
+        for version_index, version in enumerate(self.versions):
+            for layer_index, layer in enumerate(version.layers):
+                section_name = "PostprocessingVersion " + str(version_index) + " layer " + str(
+                    layer_index)
+                config_parser_object.add_section(section_name)
+
+                # Add the three parameters of the layer.
+                config_parser_object.set(section_name, 'radius', str(layer.radius))
+                config_parser_object.set(section_name, 'amount', str(layer.amount))
+                config_parser_object.set(section_name, 'luminance only', str(layer.luminance_only))
+
+    def load_config(self, config_parser_object):
+        """
+        Load all postprocessing configuration data from a ConfigParser object. The data replace
+        all versions (apart from version 0) and all associated layer info. The image data is taken
+        from the current data object and is not restored.
+
+        :param config_parser_object: ConfigParser object.
+        :return: -
+        """
+
+        # Initialize the postprocessing image versions with the unprocessed image (as version 0).
+        self.initialize_versions()
+
+        # Load general postprocessing info.
+        try:
+            self.version_selected = config_parser_object.getint('PostprocessingInfo',
+                                                                'version selected')
+        except:
+            # the ConfigParser object does not contain postprocessing info. Leave the data object
+            # with only the original version stored.
+            return
+
+        # Initialize the version index for comparison with an impossible value.
+        old_version_index = -1
+        self.number_versions = 0
+
+        # Go through all sections and find the postprocessing sections.
+        for section in config_parser_object.sections():
+            section_items = section.split()
+            if section_items[0] == 'PostprocessingVersion':
+                this_version_index = section_items[1]
+
+                # A layer section with a new version index is found. Allocate a new version.
+                if this_version_index != old_version_index:
+                    new_version = self.add_postproc_version()
+                    old_version_index = this_version_index
+
+                # Read all parameters of this layer, and add a layer to the current version.
+                radius = config_parser_object.getfloat(section, 'radius')
+                amount = config_parser_object.getfloat(section, 'amount')
+                luminance_only = config_parser_object.getboolean(section, 'luminance only')
+                new_version.add_postproc_layer(PostprocLayer(radius, amount, luminance_only))
+
+        # Set the selectec version again, because it may have been changed by reading versions.
+        self.version_selected = config_parser_object.getint('PostprocessingInfo',
+                                                            'version selected')
+
+
+class PostprocVersion(object):
+    """
+    Instances of this class hold the data defining a single postprocessing version, including the
+    resulting image for the current parameter set.
+    """
+
+    def __init__(self):
+        """
+        Initialize the version object with the input image and an empty set of processing layers.
+        :param image: Input image (16bit Tiff) for postprocessing
+        """
+
+        self.layers = []
+        self.number_layers = 0
+
+    def set_image(self, image):
+        """
+        Set the current image for this version.
+
+        :param image: Image file (16bit Tiff) holding the pixel data of this version's image.
+        :return: -
+        """
+
+        self.image = image
+
+    def add_postproc_layer(self, layer):
+        """
+        Add a postprocessing layer.
+        :param layer: Layer instance to be added to the list of layers.
+        :return: -
+        """
+
+        self.layers.append(layer)
+        self.number_layers += 1
+
+    def remove_postproc_layer(self, layer_index):
+        """
+        Remove a postprocessing layer from this version.
+
+        :param layer_index: Index of the layer to be removed.
+        :return: -
+        """
+
+        if 0 <= layer_index < self.number_layers:
+            self.layers = self.layers[:layer_index] + self.layers[layer_index + 1:]
+            self.number_layers -= 1
+
+
+class PostprocLayer(object):
+    """
+    Instances of this class hold the parameters which define a postprocessing layer.
+    """
+
+    def __init__(self, radius, amount, luminance_only):
+        """
+        Initialize the Layer instance with values for Gaussian radius, amount of sharpening and a
+        flag which indicates on which channel the sharpening is to be applied.
+
+        :param radius: Radius (in pixels) of the Gaussian sharpening kernel.
+        :param amount: Amount of sharpening for this layer.
+        :param luminance_only: True, if sharpening is to be applied to the luminance channel only.
+                               False, otherwise.
+        """
+
+        self.radius = radius
+        self.amount = amount
+        self.luminance_only = luminance_only

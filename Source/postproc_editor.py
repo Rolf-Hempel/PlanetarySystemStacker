@@ -21,7 +21,6 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from copy import deepcopy
-from os.path import splitext
 from sys import argv, stdout
 from time import sleep
 
@@ -29,236 +28,13 @@ from PyQt5 import QtWidgets, QtCore
 from cv2 import imread, cvtColor, COLOR_BGR2GRAY
 from math import sqrt
 
+from configuration import Configuration, PostprocDataObject, PostprocLayer
 from frame_viewer import FrameViewer
 from frames import Frames
 from miscellaneous import Miscellaneous
 from postproc_editor_gui import Ui_postproc_editor
 from sharpening_layer_widget import Ui_sharpening_layer_widget
 from version_manager_widget import Ui_version_manager_widget
-
-
-class DataObject(object):
-    """
-    This class implements the central data object used in postprocessing.
-
-    """
-
-    def __init__(self, image_original, name_original, suffix, blinking_period, idle_loop_time):
-        """
-        Initialize the data object.
-
-        :param image_original: Image file (16bit Tiff) holding the input for postprocessing
-        :param name_original: Path name of the original image.
-        :param suffix: File suffix (str) to be appended to the original path name. The resulting
-                       path is used to store the image resulting from postprocessing.
-        :param blinking_period: Time between image exchanges in the blink comparator
-        :param idle_loop_time: The image processor is realized as a separate thread. It checks
-                               periodically if a new image version is to be computed. This parameter
-                               specifies the idle time between checks.
-        """
-
-        self.image_original = image_original
-        self.color = len(self.image_original.shape) == 3
-        self.file_name_original = name_original
-        self.blinking_period = blinking_period
-        self.idle_loop_time = idle_loop_time
-
-        # Set the standard path to the resulting image using the provided file suffix.
-        self.file_name_processed = splitext(name_original)[0] + suffix + '.tiff'
-
-        # Initialize the postprocessing image versions with the unprocessed image (as version 0).
-        original_version = Version()
-        original_version.set_image(self.image_original)
-        self.versions = [original_version]
-        self.number_versions = 0
-        self.version_selected = 0
-
-        # Create a first processed version with initial parameters for Gaussian radius. The amount
-        # of sharpening is initialized to zero.
-        initial_version = self.add_version()
-        initial_version.add_layer(Layer(1., 0, False))
-
-        # Initialize the pointer to the currently selected version to 0 (input image).
-        # "version_compared" is used by the blink comparator later on. The blink comparator is
-        # switched off initially.
-        self.blinking = False
-        self.version_compared = 0
-
-    def add_version(self):
-        """
-        Add a new postprocessing version, and set the "selected" pointer to it.
-
-        :return: The new version object
-        """
-
-        new_version = Version()
-        new_version.set_image(self.image_original)
-        self.versions.append(new_version)
-        self.number_versions += 1
-        self.version_selected = self.number_versions
-        return new_version
-
-    def remove_version(self, index):
-        """
-        Remove a postprocessing version, and set the "selected" pointer to the previous one. The
-        initial version (input image) cannot be removed.
-
-        :param index: Index of the version to be removed.
-        :return: -
-        """
-
-        if 0 < index <= self.number_versions:
-            self.versions = self.versions[:index] + self.versions[index + 1:]
-            self.number_versions -= 1
-            self.version_selected = index - 1
-
-    def dump_config(self, config_parser_object):
-        """
-        Dump all version and layer parameters into a ConfigParser object (except for image data).
-        Version 0 is not included because it does not contain any layer info.
-
-        :param config_parser_object: ConfigParser object.
-        :return: -
-        """
-
-        # First remove old postprocessing sections, if there are any in the ConfigParser object.
-        for section in config_parser_object.sections():
-            section_items = section.split()
-            if section_items[0] == 'PostprocessingVersion' or \
-                    section_items[0] == 'PostprocessingInfo':
-                config_parser_object.remove_section(section)
-
-        # Store general postprocessing info.
-        config_parser_object.add_section('PostprocessingInfo')
-        config_parser_object.set('PostprocessingInfo', 'version selected',
-                                 str(self.version_selected))
-
-        # For every version, and for all layers in each version, create a separate section.
-        for version_index, version in enumerate(self.versions):
-            for layer_index, layer in enumerate(version.layers):
-                section_name = "PostprocessingVersion " + str(version_index) + " layer " + str(
-                    layer_index)
-                config_parser_object.add_section(section_name)
-
-                # Add the three parameters of the layer.
-                config_parser_object.set(section_name, 'radius', str(layer.radius))
-                config_parser_object.set(section_name, 'amount', str(layer.amount))
-                config_parser_object.set(section_name, 'luminance only', str(layer.luminance_only))
-
-    def load_config(self, config_parser_object):
-        """
-        Load all postprocessing configuration data from a ConfigParser object. The data replace
-        all versions (apart from version 0) and all associated layer info. The image data is taken
-        from the current data object and is not restored.
-
-        :param config_parser_object: ConfigParser object.
-        :return: -
-        """
-
-        # Initialize the postprocessing image versions with the unprocessed image (as version 0).
-        original_version = Version()
-        original_version.set_image(self.image_original)
-        self.versions = [original_version]
-        self.number_versions = 0
-
-        # Load general postprocessing info.
-        try:
-            self.version_selected = config_parser_object.getint('PostprocessingInfo',
-                                                                'version selected')
-        except:
-            # the ConfigParser object does not contain postprocessing info. Leave the data object
-            # with only the original version stored.
-            return
-
-        # Initialize the version index for comparison with an impossible value.
-        old_version_index = -1
-
-        # Go through all sections and find the postprocessing sections.
-        for section in config_parser_object.sections():
-            section_items = section.split()
-            if section_items[0] == 'PostprocessingVersion':
-                this_version_index = section_items[1]
-
-                # A layer section with a new version index is found. Allocate a new version.
-                if this_version_index != old_version_index:
-                    new_version = self.add_version()
-                    self.number_versions += 1
-                    old_version_index = this_version_index
-
-                # Read all parameters of this layer, and add a layer to the current version.
-                radius = config_parser_object.getfloat(section, 'radius')
-                amount = config_parser_object.getfloat(section, 'amount')
-                luminance_only = config_parser_object.getboolean(section, 'luminance only')
-                new_version.add_layer(Layer(radius, amount, luminance_only))
-
-
-class Version(object):
-    """
-    Instances of this class hold the data defining a single postprocessing version, including the
-    resulting image for the current parameter set.
-    """
-
-    def __init__(self):
-        """
-        Initialize the version object with the input image and an empty set of processing layers.
-        :param image: Input image (16bit Tiff) for postprocessing
-        """
-
-        self.layers = []
-        self.number_layers = 0
-
-    def set_image(self, image):
-        """
-        Set the current image for this version.
-
-        :param image: Image file (16bit Tiff) holding the pixel data of this version's image.
-        :return: -
-        """
-
-        self.image = image
-
-    def add_layer(self, layer):
-        """
-        Add a postprocessing layer.
-        :param layer: Layer instance to be added to the list of layers.
-        :return: -
-        """
-
-        self.layers.append(layer)
-        self.number_layers += 1
-
-    def remove_layer(self, layer_index):
-        """
-        Remove a postprocessing layer from this version.
-
-        :param layer_index: Index of the layer to be removed.
-        :return: -
-        """
-
-        if 0 <= layer_index < self.number_layers:
-            self.layers = self.layers[:layer_index] + self.layers[layer_index + 1:]
-            self.number_layers -= 1
-
-
-class Layer(object):
-    """
-    Instances of this class hold the parameters which define a postprocessing layer.
-    """
-
-    def __init__(self, radius, amount, luminance_only):
-        """
-        Initialize the Layer instance with values for Gaussian radius, amount of sharpening and a
-        flag which indicates on which channel the sharpening is to be applied.
-
-        :param radius: Radius (in pixels) of the Gaussian sharpening kernel.
-        :param amount: Amount of sharpening for this layer.
-        :param luminance_only: True, if sharpening is to be applied to the luminance channel only.
-                               False, otherwise.
-        """
-
-        self.radius = radius
-        self.amount = amount
-        self.luminance_only = luminance_only
 
 
 class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
@@ -413,17 +189,18 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
     # selector which corresponds to the image currently displayed.
     variant_shown_signal = QtCore.pyqtSignal(bool, bool)
 
-    def __init__(self, data_object, select_version_callback, parent=None):
+    def __init__(self, configuration, select_version_callback, parent=None):
         """
 
-        :param data_object: Central data object holding postprocessing images and parameters.
+        :param configuration: Configuration object with parameters.
         :param select_version_callback: Higher-level method to set the currently selected version.
         :param parent: parent object.
         """
 
         QtWidgets.QWidget.__init__(self, parent)
         self.setupUi(self)
-        self.data_object = data_object
+        self.postproc_data_object = configuration.postproc_data_object
+        self.postproc_blinking_period = configuration.postproc_blinking_period
         self.select_version_callback = select_version_callback
 
         self.spinBox_version.valueChanged.connect(self.select_version)
@@ -436,13 +213,13 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.variant_shown_signal.connect(self.highlight_variant)
 
         # Set the ranges for version selection spinboxes. Initially, there are only two versions.
-        self.spinBox_version.setMaximum(1)
+        self.spinBox_version.setMaximum(configuration.postproc_data_object.number_versions)
         self.spinBox_version.setMinimum(0)
-        self.spinBox_compare.setMaximum(1)
+        self.spinBox_compare.setMaximum(configuration.postproc_data_object.number_versions)
         self.spinBox_compare.setMinimum(0)
 
         # Set the spinbox to the newly created version
-        self.spinBox_version.setValue(self.data_object.version_selected)
+        self.spinBox_version.setValue(self.postproc_data_object.version_selected)
 
     def select_version(self):
         """
@@ -450,8 +227,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         :return: -
         """
-        self.data_object.version_selected = self.spinBox_version.value()
-        self.select_version_callback(self.data_object.version_selected)
+        self.postproc_data_object.version_selected = self.spinBox_version.value()
+        self.select_version_callback(self.postproc_data_object.version_selected)
 
     def select_version_compared(self):
         """
@@ -460,7 +237,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
-        self.data_object.version_compared = self.spinBox_compare.value()
+        self.postproc_data_object.version_compared = self.spinBox_compare.value()
 
     def new_version(self):
         """
@@ -469,15 +246,16 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         """
 
         # Create a Version object, and add an initial layer (radius 1., amount 0).
-        new_version = self.data_object.add_version()
-        new_version.add_layer(Layer(1., 0, False))
+        new_version = self.postproc_data_object.add_postproc_version()
+        new_version.set_image(self.postproc_data_object.image_original)
+        new_version.add_postproc_layer(PostprocLayer(1., 0, False))
 
         # Set the image viewer to the new version, and increase the range of spinboxes to include
         # the new version.
-        self.set_photo_signal.emit(self.data_object.version_selected)
-        self.spinBox_version.setMaximum(self.data_object.number_versions)
-        self.spinBox_version.setValue(self.data_object.number_versions)
-        self.spinBox_compare.setMaximum(self.data_object.number_versions)
+        self.set_photo_signal.emit(self.postproc_data_object.version_selected)
+        self.spinBox_version.setMaximum(self.postproc_data_object.number_versions)
+        self.spinBox_version.setValue(self.postproc_data_object.number_versions)
+        self.spinBox_compare.setMaximum(self.postproc_data_object.number_versions)
 
     def remove_version(self):
         """
@@ -487,13 +265,13 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         # Remove the version from the central data object, and instruct the image viewer to
         # show the previous version.
-        self.data_object.remove_version(self.data_object.version_selected)
-        self.set_photo_signal.emit(self.data_object.version_selected)
+        self.postproc_data_object.remove_postproc_version(self.postproc_data_object.version_selected)
+        self.set_photo_signal.emit(self.postproc_data_object.version_selected)
 
         # Adjust the spinbox bounds, and set the current version parameters to the new selection.
-        self.spinBox_version.setMaximum(self.data_object.number_versions)
-        self.spinBox_compare.setMaximum(self.data_object.number_versions)
-        self.select_version_callback(self.data_object.version_selected)
+        self.spinBox_version.setMaximum(self.postproc_data_object.number_versions)
+        self.spinBox_compare.setMaximum(self.postproc_data_object.number_versions)
+        self.select_version_callback(self.postproc_data_object.version_selected)
 
     def blinking_toggled(self):
         """
@@ -503,19 +281,21 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         """
 
         # Toggle the status variable.
-        self.data_object.blinking = not self.data_object.blinking
+        self.postproc_data_object.blinking = not self.postproc_data_object.blinking
 
         # The blink comparator is switched on.
-        if self.data_object.blinking:
+        if self.postproc_data_object.blinking:
             # Create the blink comparator thread and start it.
-            self.blink_comparator = BlinkComparator(self.data_object, self.set_photo_signal,
+            self.blink_comparator = BlinkComparator(self.postproc_data_object,
+                                                    self.postproc_blinking_period,
+                                                    self.set_photo_signal,
                                                     self.variant_shown_signal)
             self.blink_comparator.setTerminationEnabled(True)
 
         # The blink comparator is switched off. Set the image viewer to the currently selected
         # image and terminate the separate thread.
         else:
-            self.set_photo_signal.emit(self.data_object.version_selected)
+            self.set_photo_signal.emit(self.postproc_data_object.version_selected)
             self.blink_comparator.stop()
 
     def highlight_variant(self, selected, compare):
@@ -552,9 +332,9 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
-        Frames.save_image(self.data_object.file_name_processed,
-                          self.data_object.versions[self.data_object.version_selected].image,
-                          color=self.data_object.color, avoid_overwriting=False)
+        Frames.save_image(self.postproc_data_object.file_name_processed,
+                          self.postproc_data_object.versions[self.postproc_data_object.version_selected].image,
+                          color=self.postproc_data_object.color, avoid_overwriting=False)
 
     def save_version_as(self):
         """
@@ -565,13 +345,13 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
-                            "Save result as 16bit Tiff image", self.data_object.file_name_original,
+                            "Save result as 16bit Tiff image", self.postproc_data_object.file_name_original,
                             "Image Files (*.tiff)", options=options)
 
         if filename and extension:
             Frames.save_image(filename,
-                              self.data_object.versions[self.data_object.version_selected].image,
-                              color=self.data_object.color, avoid_overwriting=False)
+                              self.postproc_data_object.versions[self.postproc_data_object.version_selected].image,
+                              color=self.postproc_data_object.color, avoid_overwriting=False)
 
 
 class BlinkComparator(QtCore.QThread):
@@ -579,9 +359,11 @@ class BlinkComparator(QtCore.QThread):
     This class implements the blink comparator. It shows alternately two image versions.
     """
 
-    def __init__(self, data_object, set_photo_signal, variant_shown_signal, parent=None):
+    def __init__(self, postproc_data_object, postproc_blinking_period, set_photo_signal,
+                 variant_shown_signal, parent=None):
         """
-        :param data_object: The central postprocessing data object.
+        :param postproc_data_object: The central postprocessing data object.
+        :param postproc_blinking_period: Time between image switching.
         :param set_photo_signal: Signal which tells the image viewer which image it should show.
         :param variant_shown_signal: Signal which tells the GUI widget which spinbox should be
                                      highlighted.
@@ -589,7 +371,8 @@ class BlinkComparator(QtCore.QThread):
         """
 
         QtCore.QThread.__init__(self, parent)
-        self.data_object = data_object
+        self.postproc_data_object = postproc_data_object
+        self.postproc_blinking_period = postproc_blinking_period
         self.set_photo_signal = set_photo_signal
         self.variant_shown_signal = variant_shown_signal
 
@@ -611,21 +394,21 @@ class BlinkComparator(QtCore.QThread):
         show_selected_version = True
 
         # Begin main loop.
-        while self.data_object.blinking:
+        while self.postproc_data_object.blinking:
             # Show the "selected" version.
             if show_selected_version:
-                self.set_photo_signal.emit(self.data_object.version_selected)
+                self.set_photo_signal.emit(self.postproc_data_object.version_selected)
                 self.variant_shown_signal.emit(True, False)
             # Show the "compared" version.
             else:
-                self.set_photo_signal.emit(self.data_object.version_compared)
+                self.set_photo_signal.emit(self.postproc_data_object.version_compared)
                 self.variant_shown_signal.emit(False, True)
 
             # Toggle back and forth between first and second image version.
             show_selected_version = not show_selected_version
 
             # Sleep time inserted to limit CPU consumption by idle looping.
-            sleep(self.data_object.blinking_period)
+            sleep(self.postproc_blinking_period)
 
     def stop(self):
         """
@@ -649,20 +432,21 @@ class ImageProcessor(QtCore.QThread):
     # status bar.
     set_status_bar_signal = QtCore.pyqtSignal(str, str)
 
-    def __init__(self, data_object, parent=None):
+    def __init__(self, configuration, parent=None):
         """
         Whenever the parameters of the current version change, compute a new sharpened image.
 
-        :param data_object: Data object with postprocessing data
+        :param configuration: Data object with configuration parameters
         """
 
         QtCore.QThread.__init__(self, parent)
-        self.data_object = data_object
+        self.postproc_data_object = configuration.postproc_data_object
+        self.postproc_idle_loop_time = configuration.postproc_idle_loop_time
 
         # Remember the last version (and the corresponding layer parameters) for which an image
         # was computed. As soon as this data change, a new image is computed.
         self.last_version_selected = 1
-        self.last_layers = [Layer(1., 0, False)]
+        self.last_layers = [PostprocLayer(1., 0, False)]
 
         # Initialize the data objects holding the currently active version.
         self.version_selected = None
@@ -673,9 +457,9 @@ class ImageProcessor(QtCore.QThread):
     def run(self):
         while True:
             # To avoid chasing a moving target, copy the parameters of the currently active version
-            self.version_selected = self.data_object.version_selected
-            self.layers_selected = deepcopy(self.data_object.versions[
-                                                self.data_object.version_selected].layers)
+            self.version_selected = self.postproc_data_object.version_selected
+            self.layers_selected = deepcopy(self.postproc_data_object.versions[
+                                                self.postproc_data_object.version_selected].layers)
 
             # Compare the currently active version with the last one for which an image was
             # computed. If there is a difference, start a new computation.
@@ -683,7 +467,7 @@ class ImageProcessor(QtCore.QThread):
 
                 # Change the main GUI's status bar to show that a computation is going on.
                 self.set_status_bar_signal.emit(
-                    "Processing " + self.data_object.file_name_original +
+                    "Processing " + self.postproc_data_object.file_name_original +
                     ", busy computing a new postprocessing image.", "black")
 
                 # Perform the new computation.
@@ -691,7 +475,7 @@ class ImageProcessor(QtCore.QThread):
 
                 # Reset the status bar to its idle state.
                 self.set_status_bar_signal.emit(
-                    "Processing " + self.data_object.file_name_original + ", postprocessing.",
+                    "Processing " + self.postproc_data_object.file_name_original + ", postprocessing.",
                     "black")
 
                 # Show the new image in the image viewer, and remember its parameters.
@@ -701,7 +485,7 @@ class ImageProcessor(QtCore.QThread):
 
             # Idle loop before doing the next check for updates.
             else:
-                sleep(self.data_object.idle_loop_time)
+                sleep(self.postproc_idle_loop_time)
 
     def new_computation_required(self):
         """
@@ -735,7 +519,7 @@ class ImageProcessor(QtCore.QThread):
         """
 
         # Initialize the new image with the original image.
-        new_image = self.data_object.image_original
+        new_image = self.postproc_data_object.image_original
 
         # Apply all sharpening layers.
         for layer in self.layers_selected:
@@ -743,7 +527,7 @@ class ImageProcessor(QtCore.QThread):
                                                        luminance_only=layer.luminance_only)
 
         # Store the result in the central data object.
-        self.data_object.versions[self.data_object.version_selected].image = new_image
+        self.postproc_data_object.versions[self.postproc_data_object.version_selected].image = new_image
 
     def stop(self):
         """
@@ -761,23 +545,21 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
     up to four sharpening layers. A blink comparator allows comparing any two versions.
     """
 
-    def __init__(self, image_original, name_original, suffix, blinking_period, idle_loop_time,
-                 set_status_bar_callback):
+    def __init__(self, configuration, image_original, name_original, set_status_bar_callback):
         """
 
-        :param image_original: Image file (16bit Tiff) holding the input for postprocessing
+        :param configuration: Configuration object with parameters.
+        :param image_original: Image file (16bit Tiff) holding the input for postprocessing.
         :param name_original: Path name of the original image.
-        :param suffix: File suffix (str) to be appended to the original path name. The resulting
-                       path is used to store the image resulting from postprocessing.
-        :param blinking_period: Time between image exchanges in the blink comparator
-        :param idle_loop_time: The image processor is realized as a separate thread. It checks
-                               periodically if a new image version is to be computed. This parameter
-                               specifies the idle time between checks.
         :param set_status_bar_callback: Call-back function to update the main GUI's status bar.
         """
 
         super(PostprocEditorWidget, self).__init__()
         self.setupUi(self)
+
+        self.configuration = configuration
+        self.postproc_data_object = self.configuration.postproc_data_object
+        self.postproc_data_object.set_postproc_input_image(image_original, name_original)
 
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -792,10 +574,6 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.frame_viewer.setObjectName("framewiever")
         self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
 
-        # Create and initialize the central data object.
-        self.data_object = DataObject(image_original, name_original, suffix, blinking_period,
-                                      idle_loop_time)
-
         # Create four widgets to control the parameters of individual sharpening layers. Widgets
         # corresponding to inactive layers will be de-activated.
         self.sharpening_layer_widgets = []
@@ -807,7 +585,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             self.sharpening_layer_widgets.append(sharpening_layer_widget)
 
         # Create the version manager and pass it the "select_version" callback function.
-        self.version_manager_widget = VersionManagerWidget(self.data_object, self.select_version)
+        self.version_manager_widget = VersionManagerWidget(self.configuration, self.select_version)
         self.gridLayout.addWidget(self.version_manager_widget, 6, 1, 1, 1)
 
         # The "set_photo_signal" from the VersionManagerWidget is not passed to the image viewer
@@ -816,10 +594,10 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.version_manager_widget.set_photo_signal.connect(self.select_image)
 
         # Select the initial current version.
-        self.select_version(self.data_object.version_selected)
+        self.select_version(self.postproc_data_object.version_selected)
 
         # Start the image processor thread, and connect its signals.
-        self.image_processor = ImageProcessor(self.data_object)
+        self.image_processor = ImageProcessor(self.configuration)
         self.image_processor.setTerminationEnabled(True)
         self.image_processor.set_photo_signal.connect(self.select_image)
         self.image_processor.set_status_bar_signal.connect(set_status_bar_callback)
@@ -833,7 +611,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return: -
         """
 
-        version_selected = self.data_object.versions[version_index]
+        version_selected = self.postproc_data_object.versions[version_index]
 
         # Set the layer widgets values for all active layers. Hide the inactive layer widgets.
         for layer_index, layer in enumerate(version_selected.layers):
@@ -855,7 +633,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return: -
         """
 
-        self.frame_viewer.setPhoto(self.data_object.versions[version_index].image)
+        self.frame_viewer.setPhoto(self.postproc_data_object.versions[version_index].image)
 
     def add_layer(self):
         """
@@ -865,7 +643,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return:-
         """
 
-        version_selected = self.data_object.versions[self.data_object.version_selected]
+        version_selected = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
         num_layers_current = version_selected.number_layers
 
         # The "zero" layer is reserved for the original image, so for this version no additional
@@ -873,21 +651,21 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         # The first layer is initialized with a fixed parameter set (see "init" method of DataObject
         # class).
-        if self.data_object.version_selected and num_layers_current < self.max_layers:
+        if self.postproc_data_object.version_selected and num_layers_current < self.max_layers:
 
             # This version has already at least one layer. Initialize the radius parameter of the
             # new layer to 1.5 times the radius of the previous one.
             if num_layers_current > 0:
                 previous_layer = version_selected.layers[num_layers_current - 1]
-                new_layer = Layer(1.5 * previous_layer.radius, 0, previous_layer.luminance_only)
+                new_layer = PostprocLayer(1.5 * previous_layer.radius, 0, previous_layer.luminance_only)
 
             # This is the first layer for this image version. Start with standard parameters.
             else:
-                new_layer = Layer(1., 0, False)
-            version_selected.add_layer(new_layer)
+                new_layer = PostprocLayer(1., 0, False)
+            version_selected.add_postproc_layer(new_layer)
 
             # Update all layer widgets.
-            self.select_version(self.data_object.version_selected)
+            self.select_version(self.postproc_data_object.version_selected)
 
     def remove_layer(self, layer_index):
         """
@@ -898,11 +676,11 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return: -
         """
 
-        version_selected = self.data_object.versions[self.data_object.version_selected]
-        version_selected.remove_layer(layer_index)
+        version_selected = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        version_selected.remove_postproc_layer(layer_index)
 
         # Update all layer widgets.
-        self.select_version(self.data_object.version_selected)
+        self.select_version(self.postproc_data_object.version_selected)
 
     def accept(self):
         """
@@ -916,6 +694,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         # Terminate the image processor thread.
         self.image_processor.stop()
+        self.configuration.write_config()
         self.close()
 
     def reject(self):
@@ -973,9 +752,10 @@ if __name__ == '__main__':
     # Change colors to standard RGB
     input_image = cvtColor(imread(input_file_name, -1), COLOR_BGR2GRAY)
 
+    configuration = Configuration()
     dummy_status_bar = EmulateStatusBar()
     app = QtWidgets.QApplication(argv)
-    window = PostprocEditorWidget(input_image, input_file_name, "_gpp", 1., 0.2,
+    window = PostprocEditorWidget(configuration, input_image, input_file_name,
                                   dummy_status_bar.print_status_bar_info)
     window.show()
     app.exec_()
