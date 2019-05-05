@@ -28,7 +28,7 @@ from PyQt5 import QtWidgets, QtCore
 from cv2 import imread, cvtColor, COLOR_BGR2GRAY
 from math import sqrt
 
-from configuration import Configuration, PostprocDataObject, PostprocLayer
+from configuration import Configuration, PostprocLayer
 from frame_viewer import FrameViewer
 from frames import Frames
 from miscellaneous import Miscellaneous
@@ -333,7 +333,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         """
 
         Frames.save_image(self.postproc_data_object.file_name_processed,
-                          self.postproc_data_object.versions[self.postproc_data_object.version_selected].image,
+                          self.postproc_data_object.versions[
+                              self.postproc_data_object.version_selected].image,
                           color=self.postproc_data_object.color, avoid_overwriting=False)
 
     def save_version_as(self):
@@ -345,12 +346,14 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
-                            "Save result as 16bit Tiff image", self.postproc_data_object.file_name_original,
+                            "Save result as 16bit Tiff image",
+                            self.postproc_data_object.file_name_original,
                             "Image Files (*.tiff)", options=options)
 
         if filename and extension:
             Frames.save_image(filename,
-                              self.postproc_data_object.versions[self.postproc_data_object.version_selected].image,
+                              self.postproc_data_object.versions[
+                                  self.postproc_data_object.version_selected].image,
                               color=self.postproc_data_object.color, avoid_overwriting=False)
 
 
@@ -475,8 +478,8 @@ class ImageProcessor(QtCore.QThread):
 
                 # Reset the status bar to its idle state.
                 self.set_status_bar_signal.emit(
-                    "Processing " + self.postproc_data_object.file_name_original + ", postprocessing.",
-                    "black")
+                    "Processing " + self.postproc_data_object.file_name_original +
+                    ", postprocessing.", "black")
 
                 # Show the new image in the image viewer, and remember its parameters.
                 self.set_photo_signal.emit(self.version_selected)
@@ -527,7 +530,8 @@ class ImageProcessor(QtCore.QThread):
                                                        luminance_only=layer.luminance_only)
 
         # Store the result in the central data object.
-        self.postproc_data_object.versions[self.postproc_data_object.version_selected].image = new_image
+        self.postproc_data_object.versions[self.postproc_data_object.version_selected].image = \
+            new_image
 
     def stop(self):
         """
@@ -643,7 +647,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return:-
         """
 
-        version_selected = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        version_selected = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected]
         num_layers_current = version_selected.number_layers
 
         # The "zero" layer is reserved for the original image, so for this version no additional
@@ -657,7 +662,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             # new layer to 1.5 times the radius of the previous one.
             if num_layers_current > 0:
                 previous_layer = version_selected.layers[num_layers_current - 1]
-                new_layer = PostprocLayer(1.5 * previous_layer.radius, 0, previous_layer.luminance_only)
+                new_layer = PostprocLayer(1.5 * previous_layer.radius, 0,
+                                          previous_layer.luminance_only)
 
             # This is the first layer for this image version. Start with standard parameters.
             else:
@@ -676,7 +682,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return: -
         """
 
-        version_selected = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        version_selected = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected]
         version_selected.remove_postproc_layer(layer_index)
 
         # Update all layer widgets.

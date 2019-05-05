@@ -20,16 +20,15 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
+from configparser import ConfigParser
 from os.path import expanduser, join, isfile
 from os.path import splitext
-from configparser import ConfigParser
 
 from exceptions import IncompatibleVersionsError
 
 
 class ConfigurationParameters(object):
     def __init__(self):
-
         self.hidden_parameters_current_dir = None
         self.hidden_parameters_main_window_x0 = None
         self.hidden_parameters_main_window_y0 = None
@@ -116,6 +115,7 @@ class ConfigurationParameters(object):
         self.alignment_points_brightness_threshold = \
             configuration_object.alignment_points_brightness_threshold
         self.alignment_points_frame_percent = configuration_object.alignment_points_frame_percent
+
 
 class Configuration(object):
     def __init__(self):
@@ -289,7 +289,6 @@ class Configuration(object):
         configuration_parameters.alignment_points_frame_percent = \
             self.alignment_points_frame_percent
 
-
     def get_all_parameters_from_configparser(self, conf):
         """
         All parameters which can be modified by the user are stored in the ConfigParser object.
@@ -311,9 +310,9 @@ class Configuration(object):
         self.hidden_parameters_main_window_width = \
             conf.getint('Hidden parameters', 'main window width')
         self.hidden_parameters_main_window_height = conf.getint('Hidden parameters',
-                                                               'main window height')
+                                                                'main window height')
         self.global_parameters_protocol_level = conf.getint('Global parameters',
-                                                                 'protocol level')
+                                                            'protocol level')
         self.global_parameters_write_protocol_to_file = conf.getboolean('Global parameters',
                                                                         'write protocol to file')
         self.global_parameters_store_protocol_with_result = conf.getboolean(
@@ -325,19 +324,18 @@ class Configuration(object):
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
         self.align_frames_rectangle_scale_factor = conf.getfloat('Align frames',
-                                                                    'rectangle scale factor')
+                                                                 'rectangle scale factor')
         self.align_frames_search_width = conf.getint('Align frames', 'search width')
         self.align_frames_average_frame_percent = conf.getint('Align frames',
-                                                                   'average frame percent')
+                                                              'average frame percent')
         self.alignment_points_half_box_width = conf.getint('Alignment points',
-                                                                'half box width')
+                                                           'half box width')
         self.alignment_points_search_width = conf.getint('Alignment points', 'search width')
         self.alignment_points_structure_threshold = conf.getfloat('Alignment points',
-                                                                       'structure threshold')
+                                                                  'structure threshold')
         self.alignment_points_brightness_threshold = conf.getint('Alignment points',
-                                                                      'brightness threshold')
-        self.alignment_points_frame_percent = conf.getint('Alignment points',
-                                                                   'frame percent')
+                                                                 'brightness threshold')
+        self.alignment_points_frame_percent = conf.getint('Alignment points', 'frame percent')
 
     def store_all_parameters_to_config_parser(self):
         """
@@ -527,7 +525,8 @@ class PostprocDataObject(object):
         self.file_name_original = name_original
 
         # Set the standard path to the resulting image using the provided file suffix.
-        self.file_name_processed = splitext(self.file_name_original)[0] + self.postproc_suffix + '.tiff'
+        self.file_name_processed = splitext(self.file_name_original)[
+                                       0] + self.postproc_suffix + '.tiff'
 
         for version in self.versions:
             version.set_image(self.image_original)
