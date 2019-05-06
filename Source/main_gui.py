@@ -2,11 +2,12 @@
 
 # Form implementation generated from reading ui file 'main_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.12
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -134,12 +135,8 @@ class Ui_MainWindow(object):
         self.menuFile.addAction(self.actionLoad_config)
         self.menuFile.addAction(self.actionSave_config)
         self.menuFile.addSeparator()
-        self.menuFile.addAction(self.actionLoad_postproc_config)
-        self.menuFile.addAction(self.actionSave_postproc_config)
-        self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionQuit)
         self.menuEdit.addAction(self.actionEdit_configuration)
-        self.menuEdit.addAction(self.actionEdit_postproc_config)
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuEdit.menuAction())
 
@@ -165,13 +162,16 @@ class Ui_MainWindow(object):
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.menuEdit.setTitle(_translate("MainWindow", "Edit"))
         self.actionLoad_video_directory.setText(_translate("MainWindow", "Open"))
-        self.actionLoad_config.setText(_translate("MainWindow", "Load stacking config"))
-        self.actionSave_config.setText(_translate("MainWindow", "Save stacking config"))
+        self.actionLoad_config.setText(_translate("MainWindow", "Load configuration"))
+        self.actionLoad_config.setToolTip(_translate("MainWindow", "Load configuration from \".pss\" file"))
+        self.actionSave_config.setText(_translate("MainWindow", "Save configuration"))
+        self.actionSave_config.setToolTip(_translate("MainWindow", "Save configuration to \".pss\" file"))
         self.actionLoad_postproc_config.setText(_translate("MainWindow", "Load postproc config"))
         self.actionSave_postproc_config.setText(_translate("MainWindow", "Save postproc config"))
         self.actionSave.setText(_translate("MainWindow", "Save"))
         self.actionSave_as.setText(_translate("MainWindow", "Save as"))
         self.actionQuit.setText(_translate("MainWindow", "Quit"))
-        self.actionEdit_configuration.setText(_translate("MainWindow", "Edit stacking config"))
+        self.actionEdit_configuration.setText(_translate("MainWindow", "Edit configuration"))
         self.actionEdit_postproc_config.setText(_translate("MainWindow", "Edit postproc config"))
+
 

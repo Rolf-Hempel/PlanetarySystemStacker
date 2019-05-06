@@ -2,11 +2,12 @@
 
 # Form implementation generated from reading ui file 'postproc_editor_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.12
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_postproc_editor(object):
     def setupUi(self, postproc_editor):
@@ -70,5 +71,6 @@ class Ui_postproc_editor(object):
         postproc_editor.setWindowTitle(_translate("postproc_editor", "Frame"))
         self.buttonBox.setToolTip(_translate("postproc_editor", "Press \"OK\" to save the selected version and exit, or \"Cancel\" to discard changes"))
         self.pushButton_add_layer.setToolTip(_translate("postproc_editor", "Add a sharpening layer (up to four)"))
-        self.pushButton_add_layer.setText(_translate("postproc_editor", "Add postprocessing layer"))
+        self.pushButton_add_layer.setText(_translate("postproc_editor", "Add correction layer"))
+
 

@@ -56,10 +56,9 @@ class Ui_JobDialog(object):
         self.button_remove_jobs.setToolTip(_translate("JobDialog", "Select one or more items in the list. Press this button to remove them from the list."))
         self.button_remove_jobs.setText(_translate("JobDialog", "Remove selected job(s)"))
         self.buttonBox.setToolTip(_translate("JobDialog", "Press \'OK\' to save changes and exit the job editor, or \'Cancel\' to exit without saving."))
-        self.button_add_jobs.setToolTip(_translate("JobDialog", "Select video files and / or directories containing image files.\n"
-"Each entry is executed as a job, either in batch mode (automatic) or manually.\n"
-"When the list is okay, confirm with pressing the \"OK\" button."))
+        self.button_add_jobs.setToolTip(_translate("JobDialog", "Select job input. This can be video files and / or directories containing image files for stacking, or single image files for postprocessing.\n"
+"Each entry is executed as a job, either in batch mode (automatic) or manually. When the list is complete, confirm with pressing \"OK\"."))
         self.button_add_jobs.setText(_translate("JobDialog", "Add job(s)"))
-        self.messageLabel.setText(_translate("JobDialog", "Add / remove video files or image directories, confirm with \'OK\'."))
+        self.messageLabel.setText(_translate("JobDialog", "Add / remove videos / image folders for stacking, or images for postprocessing, confirm with \'OK\'."))
 
 

@@ -170,8 +170,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         else:
             # Tell the user to begin with specifying jobs to be executed.
             self.write_status_bar(
-                "Specify video(s) or dir(s) with image files to be stacked (menu: File / Open).",
-                'red')
+                "Specify video(s) or dir(s) with image files to be stacked, or single image "
+                "files for postprocessing (menu: File / Open).", 'red')
 
     def automatic_changed(self):
         """
@@ -282,10 +282,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Get the choice of the combobox button.
         task = self.ui.comboBox_back.currentText()
-        Miscellaneous.protocol("", self.workflow.stacked_image_log_file,
+        Miscellaneous.protocol("", self.workflow.attached_log_file,
                                precede_with_timestamp=False)
         Miscellaneous.protocol("+++ Repeating from task: " + task + " +++",
-                               self.workflow.stacked_image_log_file)
+                               self.workflow.attached_log_file)
 
         # If the end of the job queue was reached, reverse the last job index increment.
         if self.job_index == self.job_number and self.job_index>0:
@@ -417,7 +417,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # method on the main thread.
                 fvw = FrameViewerWidget(self, self.workflow.configuration, self.workflow.frames,
                                         self.workflow.rank_frames, self.workflow.align_frames,
-                                        self.workflow.stacked_image_log_file,
+                                        self.workflow.attached_log_file,
                                         self.workflow.work_next_task_signal, "Set ROI")
 
                 self.display_widget(fvw)
@@ -461,7 +461,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # assign it to the workflow object.
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("+++ Start creating alignment points +++",
-                                           self.workflow.stacked_image_log_file)
+                                           self.workflow.attached_log_file)
                 # Initialize the AlignmentPoints object.
                 self.workflow.my_timer.create_no_check('Initialize alignment point object')
                 self.workflow.alignment_points = AlignmentPoints(self.workflow.configuration,
@@ -779,8 +779,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 event.accept()
 
             # If there is a image log file still open, close it.
-            if self.workflow.stacked_image_log_file:
-                self.workflow.stacked_image_log_file.close()
+            if self.workflow.attached_log_file:
+                self.workflow.attached_log_file.close()
 
             # Store the geometry of main window, so it is placed the same at next program start.
             if self.windowState() != QtCore.Qt.WindowMaximized:

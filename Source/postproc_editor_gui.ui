@@ -90,7 +90,7 @@
       <string>Add a sharpening layer (up to four)</string>
      </property>
      <property name="text">
-      <string>Add postprocessing layer</string>
+      <string>Add correction layer</string>
      </property>
     </widget>
    </item>

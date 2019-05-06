@@ -60,7 +60,7 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_height = 800
         self.global_parameters_version = "Planetary System Stacker 0.5.0"
         self.global_parameters_protocol_level = 1
-        self.global_parameters_write_protocol_to_file = True
+        self.global_parameters_write_protocol_to_file = False
         self.global_parameters_store_protocol_with_result = False
         self.global_parameters_buffering_level = 2
         self.global_parameters_include_postprocessing = False
@@ -153,6 +153,7 @@ class Configuration(object):
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
 
+        self.stack_frames_suffix = "_pss"
         self.stack_frames_background_fraction = 0.3
         self.stack_frames_background_patch_size = 100
         self.stack_frames_gauss_width = 5
@@ -646,7 +647,7 @@ class PostprocDataObject(object):
                 luminance_only = config_parser_object.getboolean(section, 'luminance only')
                 new_version.add_postproc_layer(PostprocLayer(radius, amount, luminance_only))
 
-        # Set the selectec version again, because it may have been changed by reading versions.
+        # Set the selected version again, because it may have been changed by reading versions.
         self.version_selected = config_parser_object.getint('PostprocessingInfo',
                                                             'version selected')
 

@@ -125,16 +125,21 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
     def add_jobs(self):
         """
         Open a file dialog for entering additional job names. Entries can either be video files or
-        directories.
+        directories for stacking, or single image files for postprocessing.
 
         :return: -
         """
 
         options = QtWidgets.QFileDialog.Options()
-        message = "Select video file(s) or/and directories containing image files"
+        message = "Select video file(s)/folders with image files for stacking, and/or " \
+                  "image files for postprocessing"
+
         self.file_dialog = FileDialog(self, message,
                                       self.configuration.hidden_parameters_current_dir,
                                       "Videos (*.avi)", options=options)
+        self.file_dialog.setNameFilters(["Videos for stacking (*.avi)",
+                                         "Images for postprocessing (*.tiff *.tif *.png *.jpg)"])
+        self.file_dialog.selectNameFilter("Videos for stacking (*.avi)")
 
         # The list of strings with the new job names is sent by the FileDialog via the signal.
         self.file_dialog.signal_dialog_ready.connect(self.get_input_names)
@@ -185,11 +190,19 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         :return: -
         """
 
+        image_extensions = ['.tif', '.tiff', '.jpg', '.png']
+        video_extensions = ['.avi']
         # Set the job types of all current jobs on the list.
         self.job_types = []
         for job in self.job_names:
             if isfile(job):
-                self.job_types.append('video')
+                extension = Path(job).suffix
+                if extension in video_extensions:
+                    self.job_types.append('video')
+                elif Path(job).suffix in image_extensions:
+                    self.job_types.append('postproc')
+                else:
+                    raise InternalError("Unsupported file type '" + extension + "' specified for job")
             elif isdir(job):
                 self.job_types.append('image')
             else:

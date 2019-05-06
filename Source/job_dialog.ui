@@ -75,9 +75,8 @@
    <item row="1" column="0">
     <widget class="QPushButton" name="button_add_jobs">
      <property name="toolTip">
-      <string>Select video files and / or directories containing image files.
-Each entry is executed as a job, either in batch mode (automatic) or manually.
-When the list is okay, confirm with pressing the &quot;OK&quot; button.</string>
+      <string>Select job input. This can be video files and / or directories containing image files for stacking, or single image files for postprocessing.
+Each entry is executed as a job, either in batch mode (automatic) or manually. When the list is complete, confirm with pressing &quot;OK&quot;.</string>
      </property>
      <property name="text">
       <string>Add job(s)</string>
@@ -87,7 +86,7 @@ When the list is okay, confirm with pressing the &quot;OK&quot; button.</string>
    <item row="1" column="3">
     <widget class="QLabel" name="messageLabel">
      <property name="text">
-      <string>Add / remove video files or image directories, confirm with 'OK'.</string>
+      <string>Add / remove videos / image folders for stacking, or images for postprocessing, confirm with 'OK'.</string>
      </property>
     </widget>
    </item>
