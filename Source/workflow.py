@@ -26,6 +26,7 @@ from os import listdir
 from os.path import splitext, join
 
 from PyQt5 import QtCore
+from cv2 import imread, cvtColor, COLOR_BGR2RGB
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
@@ -56,6 +57,11 @@ class Workflow(QtCore.QObject):
         self.alignment_points = None
         self.stack_frames = None
         self.stacked_image_name = None
+        self.postprocessed_image_name = None
+        self.postprocessed_image = None
+        self.postproc_input_image = None
+        self.postproc_input_name = None
+        self.job_type = None
         self.attached_log_name = None
         self.attached_log_file = None
         self.stdout_saved = None
@@ -99,19 +105,24 @@ class Workflow(QtCore.QObject):
         # 'image'.
 
         if input_type == 'postproc':
+            self.job_type = 'postproc'
+            self.postproc_input_name = input_name
             self.postprocessed_image_name = splitext(input_name)[0] + \
                                             self.configuration.postproc_suffix + '.tiff'
             self.attached_log_name = splitext(input_name)[0] + '_postproc-log.txt'
-            return
+
         # For video file input, the Frames constructor expects the video file name for "names".
         elif input_type == 'video':
+            self.job_type = 'stacking'
             names = input_name
             self.stacked_image_name = splitext(input_name)[0] + \
                                       self.configuration.stack_frames_suffix + '.tiff'
             self.attached_log_name = splitext(input_name)[0] + '_stacking-log.txt'
+
         # For single image input, the Frames constructor expects a list of image file names for
         # "names".
         else: # input_type = 'image'
+            self.job_type = 'stacking'
             names = listdir(input_name)
             names = [join(input_name, name) for name in names]
             self.stacked_image_name = input_name + self.configuration.stack_frames_suffix + '.tiff'
@@ -154,52 +165,58 @@ class Workflow(QtCore.QObject):
         self.my_timer = timer()
         self.my_timer.create('Execution over all')
 
-        # Decide on the objects to be buffered, depending on configuration parameter.
-        buffer_original = False
-        buffer_monochrome = False
-        buffer_gaussian = False
-        buffer_laplacian = False
+        if self.job_type == 'stacking':
+            # Decide on the objects to be buffered, depending on configuration parameter.
+            buffer_original = False
+            buffer_monochrome = False
+            buffer_gaussian = False
+            buffer_laplacian = False
 
-        if self.configuration.global_parameters_buffering_level > 0:
-            buffer_laplacian = True
-        if self.configuration.global_parameters_buffering_level > 1:
-            buffer_gaussian = True
-        if self.configuration.global_parameters_buffering_level > 2:
-            buffer_original = True
-        if self.configuration.global_parameters_buffering_level > 3:
-            buffer_monochrome = True
+            if self.configuration.global_parameters_buffering_level > 0:
+                buffer_laplacian = True
+            if self.configuration.global_parameters_buffering_level > 1:
+                buffer_gaussian = True
+            if self.configuration.global_parameters_buffering_level > 2:
+                buffer_original = True
+            if self.configuration.global_parameters_buffering_level > 3:
+                buffer_monochrome = True
 
-        if self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol("+++ Buffering level is " +
-                                   str(self.configuration.global_parameters_buffering_level) + " +++",
-                                   self.attached_log_file)
-        if buffer_original:
-            if self.configuration.global_parameters_protocol_level > 0:
-                Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
-            self.my_timer.create('Read all frames')
-        try:
-            self.frames = Frames(self.configuration, names, type=input_type,
-                            convert_to_grayscale=convert_to_grayscale,
-                            progress_signal=self.work_current_progress_signal,
-                            buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
-                            buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
-            if buffer_original and self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.protocol(
-                            "           Number of images read: " + str(self.frames.number) +
-                            ", image shape: " + str(self.frames.shape), self.attached_log_file,
-                            precede_with_timestamp=False)
-            elif self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.protocol(
-                    "           Total number of frames: " + str(self.frames.number),
-                    self.attached_log_file, precede_with_timestamp=False)
-        except Exception as e:
-            if self.configuration.global_parameters_protocol_level > 0:
-                Miscellaneous.protocol("Error: " + str(e), self.attached_log_file)
-            exit()
-        if buffer_original:
-            self.my_timer.stop('Read all frames')
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol("+++ Buffering level is " +
+                                       str(self.configuration.global_parameters_buffering_level) + " +++",
+                                       self.attached_log_file)
+            if buffer_original:
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
+                self.my_timer.create('Read all frames')
+            try:
+                self.frames = Frames(self.configuration, names, type=input_type,
+                                convert_to_grayscale=convert_to_grayscale,
+                                progress_signal=self.work_current_progress_signal,
+                                buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
+                                buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
+                if buffer_original and self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol(
+                                "           Number of images read: " + str(self.frames.number) +
+                                ", image shape: " + str(self.frames.shape), self.attached_log_file,
+                                precede_with_timestamp=False)
+                elif self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol(
+                        "           Total number of frames: " + str(self.frames.number),
+                        self.attached_log_file, precede_with_timestamp=False)
+            except Exception as e:
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("Error: " + str(e), self.attached_log_file)
+                exit()
+            if buffer_original:
+                self.my_timer.stop('Read all frames')
 
-        self.work_next_task_signal.emit("Rank frames")
+            self.work_next_task_signal.emit("Rank frames")
+
+        # Job type is 'postproc'.
+        else:
+            self.postproc_input_image = cvtColor(imread(self.postproc_input_name, -1), COLOR_BGR2RGB)
+            self.work_next_task_signal.emit("Postprocessing")
 
     @QtCore.pyqtSlot()
     def execute_rank_frames(self):
@@ -487,21 +504,79 @@ class Workflow(QtCore.QObject):
     def execute_save_stacked_image(self):
 
         self.set_status_bar_processing_phase("saving result")
-        # Save the stacked image as 16bit int (color or mono).
+        # Save the image as 16bit int (color or mono).
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start saving the stacked image +++",
                                    self.attached_log_file)
-        self.my_timer.create_no_check('Saving the final image')
+        self.my_timer.create_no_check('Saving the stacked image')
         self.frames.save_image(self.stacked_image_name, self.stack_frames.stacked_image,
                                color=self.frames.color, avoid_overwriting=False)
-        self.my_timer.stop('Saving the final image')
-        self.my_timer.stop('Execution over all')
+        self.my_timer.stop('Saving the stacked image')
+
+        # If postprocessing is included after stacking, set the stacked image as input.
+        if self.configuration.global_parameters_include_postprocessing:
+            self.postproc_input_image = self.stack_frames.stacked_image
+            self.postprocessed_image_name = splitext(self.stacked_image_name)[
+                                                0] + self.configuration.postproc_suffix + '.tiff'
+            self.work_next_task_signal.emit("Postprocessing")
+        else:
+            self.work_next_task_signal.emit("Next job")
+
+            # Print timing info for this job.
+            self.my_timer.stop('Execution over all')
+            if self.configuration.global_parameters_protocol_level > 0:
+                self.my_timer.protocol(self.attached_log_file)
+
+            # Close the protocol file attached to the result.
+            if self.configuration.global_parameters_store_protocol_with_result:
+                self.attached_log_file.close()
+
+    @QtCore.pyqtSlot()
+    def execute_postprocess_image(self):
+
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start postprocessing +++",
+                                   self.attached_log_file)
+        self.my_timer.create_no_check('Conputing image postprocessing')
+
+        # Initialize the new image with the original image.
+        self.postprocessed_image = self.postproc_input_image
+
+        # Apply all sharpening layers of the postprocessing version selected last time.
+        version_index = self.configuration.postproc_data_object.version_selected
+        postproc_layers = self.configuration.postproc_data_object.versions[version_index].layers
+        for layer in postproc_layers:
+            self.postprocessed_image = Miscellaneous.gaussian_sharpen(self.postprocessed_image,
+                                                        layer.amount, layer.radius,
+                                                        luminance_only=layer.luminance_only)
+        self.my_timer.stop('Conputing image postprocessing')
+
+        self.work_next_task_signal.emit("Save postprocessed image")
+
+    @QtCore.pyqtSlot()
+    def execute_save_postprocessed_image(self):
+
+        self.set_status_bar_processing_phase("saving result")
+        # Save the image as 16bit int (color or mono).
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start saving the postprocessed image +++",
+                                   self.attached_log_file)
+        self.my_timer.create_no_check('Saving the postprocessed image')
+        Frames.save_image(self.postprocessed_image_name, self.postprocessed_image,
+                               color=(len(self.postprocessed_image.shape)==3),
+                               avoid_overwriting=False)
+        self.my_timer.stop('Saving the postprocessed image')
 
         self.work_next_task_signal.emit("Next job")
 
         # Print timing info for this job.
+        self.my_timer.stop('Execution over all')
         if self.configuration.global_parameters_protocol_level > 0:
             self.my_timer.protocol(self.attached_log_file)
+
+        # Close the protocol file attached to the result.
+        if self.configuration.global_parameters_store_protocol_with_result:
+            self.attached_log_file.close()
 
     def set_status_bar_processing_phase(self, phase):
         """

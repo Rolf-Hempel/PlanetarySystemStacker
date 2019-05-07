@@ -59,6 +59,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     signal_compute_frame_qualities = QtCore.pyqtSignal()
     signal_stack_frames = QtCore.pyqtSignal()
     signal_save_stacked_image = QtCore.pyqtSignal()
+    signal_postprocess_image = QtCore.pyqtSignal()
+    signal_save_postprocessed_image = QtCore.pyqtSignal()
 
     def __init__(self, parent=None):
         """
@@ -133,6 +135,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.signal_compute_frame_qualities.connect(self.workflow.execute_compute_frame_qualities)
         self.signal_stack_frames.connect(self.workflow.execute_stack_frames)
         self.signal_save_stacked_image.connect(self.workflow.execute_save_stacked_image)
+        self.signal_postprocess_image.connect(self.workflow.execute_postprocess_image)
+        self.signal_save_postprocessed_image.connect(self.workflow.execute_save_postprocessed_image)
 
         # Initialize status variables
         self.automatic = self.ui.box_automatic.isChecked()
@@ -482,11 +486,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 pass
             self.signal_compute_frame_qualities.emit()
             self.busy = True
+
         elif self.activity == "Stack frames":
             if not self.automatic:
                 pass
             self.signal_stack_frames.emit()
             self.busy = True
+
         elif self.activity == "Save stacked image":
             if self.automatic:
                 self.signal_save_stacked_image.emit()
@@ -496,6 +502,19 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                                     self.signal_save_stacked_image)
                 self.display_widget(sdv)
             self.busy = True
+
+        elif self.activity == "Postprocessing":
+            if not self.automatic:
+                pass
+            self.signal_postprocess_image.emit()
+            self.busy = True
+
+        elif self.activity == "Save postprocessed image":
+            if not self.automatic:
+                pass
+            self.signal_save_postprocessed_image.emit()
+            self.busy = True
+
         elif self.activity == "Next job":
             self.job_index += 1
             if self.job_index < self.job_number:
