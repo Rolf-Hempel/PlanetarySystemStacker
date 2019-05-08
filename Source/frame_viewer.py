@@ -287,9 +287,9 @@ class FrameViewer(QtWidgets.QGraphicsView):
         if len(image_uint8.shape) == 2:
             qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
                                     QtGui.QImage.Format_Grayscale8)
-        # The image is color with OpenCV representation (BGR). QT only understands RGB.
+        # The image is RGB color.
         else:
-            qt_image = QtGui.QImage(cvtColor(image_uint8, COLOR_BGR2RGB), self.shape_x,
+            qt_image = QtGui.QImage(image_uint8, self.shape_x,
                                     self.shape_y, 3*self.shape_x, QtGui.QImage.Format_RGB888)
         pixmap = QtGui.QPixmap(qt_image)
 
