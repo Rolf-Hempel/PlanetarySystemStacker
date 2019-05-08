@@ -526,11 +526,23 @@ class PostprocDataObject(object):
         self.file_name_original = name_original
 
         # Set the standard path to the resulting image using the provided file suffix.
-        self.file_name_processed = splitext(self.file_name_original)[
-                                       0] + self.postproc_suffix + '.tiff'
+        self.file_name_processed = PostprocDataObject.set_file_name_processed(
+            self.file_name_original, self.postproc_suffix)
 
         for version in self.versions:
             version.set_image(self.image_original)
+
+    @staticmethod
+    def set_file_name_processed(file_name_original, postproc_suffix):
+        """
+        Derive the postprocessing output file name from the name of postprocessing input.
+
+        :param file_name_original: Postprocessing input file name (e.g. result from stacking)
+        :param postproc_suffix: Additional suffix to be inserted before file extension.
+        :return: Name of postprocessing result.
+        """
+
+        return splitext(file_name_original)[0] + postproc_suffix + '.tiff'
 
     def initialize_versions(self):
         """

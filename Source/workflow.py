@@ -30,6 +30,7 @@ from cv2 import imread, cvtColor, COLOR_BGR2RGB
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
+from configuration import PostprocDataObject
 from exceptions import NotSupportedError, InternalError, ArgumentError
 from frames import Frames
 from miscellaneous import Miscellaneous
@@ -107,8 +108,12 @@ class Workflow(QtCore.QObject):
         if input_type == 'postproc':
             self.job_type = 'postproc'
             self.postproc_input_name = input_name
-            self.postprocessed_image_name = splitext(input_name)[0] + \
-                                            self.configuration.postproc_suffix + '.tiff'
+
+            # Reset the postprocessed image to None. This way, in saving the postprocessing result,
+            # it can be checked if an image was computed in the workflow thread.
+            self.postprocessed_image = None
+            self.postprocessed_image_name = PostprocDataObject.set_file_name_processed(
+                input_name, self.configuration.postproc_suffix)
             self.attached_log_name = splitext(input_name)[0] + '_postproc-log.txt'
 
         # For video file input, the Frames constructor expects the video file name for "names".
@@ -516,8 +521,9 @@ class Workflow(QtCore.QObject):
         # If postprocessing is included after stacking, set the stacked image as input.
         if self.configuration.global_parameters_include_postprocessing:
             self.postproc_input_image = self.stack_frames.stacked_image
-            self.postprocessed_image_name = splitext(self.stacked_image_name)[
-                                                0] + self.configuration.postproc_suffix + '.tiff'
+            self.postproc_input_name = self.stacked_image_name
+            self.postprocessed_image_name = PostprocDataObject.set_file_name_processed(
+                self.stacked_image_name, self.configuration.postproc_suffix)
             self.work_next_task_signal.emit("Postprocessing")
         else:
             self.work_next_task_signal.emit("Next job")
@@ -553,19 +559,22 @@ class Workflow(QtCore.QObject):
 
         self.work_next_task_signal.emit("Save postprocessed image")
 
-    @QtCore.pyqtSlot()
-    def execute_save_postprocessed_image(self):
+    @QtCore.pyqtSlot(object)
+    def execute_save_postprocessed_image(self, postprocessed_image):
 
-        self.set_status_bar_processing_phase("saving result")
-        # Save the image as 16bit int (color or mono).
-        if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start saving the postprocessed image +++",
-                                   self.attached_log_file)
-        self.my_timer.create_no_check('Saving the postprocessed image')
-        Frames.save_image(self.postprocessed_image_name, self.postprocessed_image,
-                               color=(len(self.postprocessed_image.shape)==3),
-                               avoid_overwriting=False)
-        self.my_timer.stop('Saving the postprocessed image')
+        # The signal payload is None only if the editor was left with "cancel" in interactive mode.
+        # In this case, skip saving the result and proceed with the next job.
+        if postprocessed_image is not None:
+            self.set_status_bar_processing_phase("saving result")
+            # Save the image as 16bit int (color or mono).
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("+++ Start saving the postprocessed image +++",
+                                       self.attached_log_file)
+            self.my_timer.create_no_check('Saving the postprocessed image')
+            Frames.save_image(self.postprocessed_image_name, postprocessed_image,
+                                   color=(len(postprocessed_image.shape)==3),
+                                   avoid_overwriting=False)
+            self.my_timer.stop('Saving the postprocessed image')
 
         self.work_next_task_signal.emit("Next job")
 
@@ -573,10 +582,6 @@ class Workflow(QtCore.QObject):
         self.my_timer.stop('Execution over all')
         if self.configuration.global_parameters_protocol_level > 0:
             self.my_timer.protocol(self.attached_log_file)
-
-        # Close the protocol file attached to the result.
-        if self.configuration.global_parameters_store_protocol_with_result:
-            self.attached_log_file.close()
 
     def set_status_bar_processing_phase(self, phase):
         """

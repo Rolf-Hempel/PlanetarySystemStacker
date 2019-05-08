@@ -39,6 +39,7 @@ from frame_viewer import FrameViewerWidget
 from alignment_points import AlignmentPoints
 from alignment_point_editor import AlignmentPointEditorWidget
 from shift_distribution_viewer import ShiftDistributionViewerWidget
+from postproc_editor import PostprocEditorWidget
 from miscellaneous import Miscellaneous
 from workflow import Workflow
 
@@ -60,7 +61,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     signal_stack_frames = QtCore.pyqtSignal()
     signal_save_stacked_image = QtCore.pyqtSignal()
     signal_postprocess_image = QtCore.pyqtSignal()
-    signal_save_postprocessed_image = QtCore.pyqtSignal()
+    signal_save_postprocessed_image = QtCore.pyqtSignal(object)
 
     def __init__(self, parent=None):
         """
@@ -298,7 +299,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Restart from the specified task within the current job.
         if task in ['Read frames', 'Rank frames', 'Align frames', 'Select stack size', 'Set ROI',
                     'Set alignment points', 'Compute frame qualities',
-                    'Stack frames', 'Save stacked image']:
+                    'Stack frames', 'Save stacked image', 'Postprocessing',
+                    'Save postprocessed image']:
             # Make sure to remove any active interaction widget.
             self.display_widget(None, display=False)
             self.work_next_task(task)
@@ -504,15 +506,36 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.busy = True
 
         elif self.activity == "Postprocessing":
-            if not self.automatic:
-                pass
-            self.signal_postprocess_image.emit()
+            if self.automatic:
+                self.signal_postprocess_image.emit()
+            else:
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("+++ Start postprocessing +++",
+                                           self.workflow.attached_log_file)
+                # In interactive mode the postprocessed image is computed in the GUI thread. The
+                # resulting image is sent via the "signal_save_postprocessed_image" signal.
+                pew = PostprocEditorWidget(self.workflow.configuration,
+                                           self.workflow.postproc_input_image,
+                                           self.workflow.postproc_input_name,
+                                           self.write_status_bar,
+                                           self.signal_save_postprocessed_image)
+                self.display_widget(pew)
             self.busy = True
 
         elif self.activity == "Save postprocessed image":
             if not self.automatic:
                 pass
-            self.signal_save_postprocessed_image.emit()
+            # This path is executed for "automatic" mode. In that case the postprocessed image
+            # is available in the workflow object.
+            if self.workflow.postprocessed_image is not None:
+                self.signal_save_postprocessed_image.emit(self.workflow.postprocessed_image)
+            # Otherwise it has been computed in the PostprocEditor on the GUI thread, and stored
+            # in the postproc_data_object. If the editor was left with "cancel", the image is set
+            # to None. In that case the workflow thread will not save the image.
+            else:
+                self.signal_save_postprocessed_image.emit(
+                    self.workflow.configuration.postproc_data_object.versions[
+                    self.workflow.configuration.postproc_data_object.version_selected].image)
             self.busy = True
 
         elif self.activity == "Next job":
@@ -654,11 +677,33 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                             'Select stack size', 'Set ROI', 'Set alignment points',
                                             'Compute frame qualities', 'Stack frames',
                                             'Save stacked image'])
+        elif self.activity == "Postprocessing":
+            if self.workflow.job_type == 'stacking':
+                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
+                                                'Select stack size', 'Set ROI', 'Set alignment points',
+                                                'Compute frame qualities', 'Stack frames',
+                                                'Save stacked image', 'Postprocessing'])
+            # This is to be added for both job types.
+            self.ui.comboBox_back.addItems(['Postprocessing'])
+        elif self.activity == "Save postprocessed image":
+            if self.workflow.job_type == 'stacking':
+                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
+                                                'Select stack size', 'Set ROI', 'Set alignment points',
+                                                'Compute frame qualities', 'Stack frames',
+                                                'Save stacked image', 'Postprocessing',
+                                                'Save postprocessed image'])
+            # This is to be added for both job types.
+            self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
         elif self.activity == "Next job":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                            'Select stack size', 'Set ROI', 'Set alignment points',
-                                            'Compute frame qualities', 'Stack frames',
-                                            'Save stacked image'])
+            if self.workflow.job_type == 'stacking':
+                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
+                                                'Select stack size', 'Set ROI', 'Set alignment points',
+                                                'Compute frame qualities', 'Stack frames',
+                                                'Save stacked image'])
+                if self.workflow.configuration.global_parameters_include_postprocessing == True:
+                    self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
+            else:
+                self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
         self.ui.comboBox_back.setCurrentIndex(0)
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
 

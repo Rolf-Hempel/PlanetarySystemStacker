@@ -25,7 +25,7 @@ from sys import argv, stdout
 from time import sleep
 
 from PyQt5 import QtWidgets, QtCore
-from cv2 import imread, cvtColor, COLOR_BGR2GRAY
+from cv2 import imread, cvtColor, COLOR_BGR2GRAY, COLOR_BGR2RGB
 from math import sqrt
 
 from configuration import Configuration, PostprocLayer
@@ -549,13 +549,16 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
     up to four sharpening layers. A blink comparator allows comparing any two versions.
     """
 
-    def __init__(self, configuration, image_original, name_original, set_status_bar_callback):
+    def __init__(self, configuration, image_original, name_original, set_status_bar_callback,
+                 signal_save_postprocessed_image):
         """
 
         :param configuration: Configuration object with parameters.
         :param image_original: Image file (16bit Tiff) holding the input for postprocessing.
         :param name_original: Path name of the original image.
         :param set_status_bar_callback: Call-back function to update the main GUI's status bar.
+        :param signal_save_postprocessed_image: Signal to be issued when the postprocessing
+                                                widget closes.
         """
 
         super(PostprocEditorWidget, self).__init__()
@@ -564,6 +567,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.configuration = configuration
         self.postproc_data_object = self.configuration.postproc_data_object
         self.postproc_data_object.set_postproc_input_image(image_original, name_original)
+        self.signal_save_postprocessed_image = signal_save_postprocessed_image
 
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
@@ -702,6 +706,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # Terminate the image processor thread.
         self.image_processor.stop()
         self.configuration.write_config()
+        self.signal_save_postprocessed_image.emit(self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].image)
         self.close()
 
     def reject(self):
@@ -713,6 +719,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         """
 
         self.image_processor.stop()
+        self.signal_save_postprocessed_image.emit(None)
         self.close()
 
 
@@ -757,12 +764,12 @@ class EmulateStatusBar(object):
 if __name__ == '__main__':
     input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
     # Change colors to standard RGB
-    input_image = cvtColor(imread(input_file_name, -1), COLOR_BGR2GRAY)
+    input_image = cvtColor(imread(input_file_name, -1), COLOR_BGR2RGB)
 
     configuration = Configuration()
     dummy_status_bar = EmulateStatusBar()
     app = QtWidgets.QApplication(argv)
     window = PostprocEditorWidget(configuration, input_image, input_file_name,
-                                  dummy_status_bar.print_status_bar_info)
+                                  dummy_status_bar.print_status_bar_info, None)
     window.show()
     app.exec_()
