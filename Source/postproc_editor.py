@@ -275,7 +275,11 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         # Adjust the spinbox bounds, and set the current version parameters to the new selection.
         self.spinBox_version.setMaximum(self.postproc_data_object.number_versions)
+        self.spinBox_version.setValue(
+            min(self.spinBox_version.value(), self.postproc_data_object.number_versions))
         self.spinBox_compare.setMaximum(self.postproc_data_object.number_versions)
+        self.spinBox_compare.setValue(
+            min(self.spinBox_compare.value(), self.postproc_data_object.number_versions))
         self.select_version_callback(self.postproc_data_object.version_selected)
 
     def blinking_toggled(self):
@@ -524,20 +528,21 @@ class ImageProcessor(QtCore.QThread):
         :return: True, if the current version parameters have changed. False, otherwise.
         """
 
-        # First check if another version was selected, or if the number of layers has changed.
-        # if self.last_version_selected != self.version_selected or \
-        #         len(self.last_layers) != len(self.layers_selected):
-        #     return True
+        # First check if an additional version was created. Copy its layer info for later checks
+        # for changes.
         if self.version_selected >= len(self.last_version_layers):
-            self.last_version_layers.append(deepcopy(self.postproc_data_object.versions[self.version_selected].layers))
+            self.last_version_layers.append(deepcopy(self.postproc_data_object.versions[
+                                                         self.version_selected].layers))
             return True
 
+        # If the selected version is already known, check if the number of layers has changed.
         if len(self.last_version_layers[self.version_selected]) != len(self.layers_selected):
             self.last_version_layers[self.version_selected] = deepcopy(self.layers_selected)
             return True
 
         # For all layers check if a parameter has changed.
-        for last_layer, layer_selected in zip(self.last_version_layers[self.version_selected], self.layers_selected):
+        for last_layer, layer_selected in zip(self.last_version_layers[self.version_selected],
+                                              self.layers_selected):
             if last_layer.postproc_method != layer_selected.postproc_method or \
                     last_layer.radius != layer_selected.radius or \
                     last_layer.amount != layer_selected.amount or \
