@@ -2,17 +2,16 @@
 
 # Form implementation generated from reading ui file 'main_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12
+# Created by: PyQt5 UI code generator 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
         MainWindow.setObjectName("MainWindow")
-        MainWindow.resize(1073, 824)
+        MainWindow.resize(1098, 824)
         MainWindow.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
         self.centralwidget = QtWidgets.QWidget(MainWindow)
         self.centralwidget.setObjectName("centralwidget")
@@ -38,9 +37,10 @@ class Ui_MainWindow(object):
         self.horizontalLayout_3.setContentsMargins(-1, -1, 9, -1)
         self.horizontalLayout_3.setObjectName("horizontalLayout_3")
         self.comboBox_back = QtWidgets.QComboBox(self.control_area)
-        self.comboBox_back.setMinimumSize(QtCore.QSize(150, 0))
+        self.comboBox_back.setMinimumSize(QtCore.QSize(165, 0))
         self.comboBox_back.setEditable(False)
         self.comboBox_back.setCurrentText("")
+        self.comboBox_back.setMaxVisibleItems(14)
         self.comboBox_back.setObjectName("comboBox_back")
         self.horizontalLayout_3.addWidget(self.comboBox_back)
         self.pushButton_pause = QtWidgets.QPushButton(self.control_area)
@@ -97,7 +97,7 @@ class Ui_MainWindow(object):
         self.verticalLayout_2.addLayout(self.tool_line)
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QtWidgets.QMenuBar(MainWindow)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 1073, 21))
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 1098, 21))
         self.menubar.setObjectName("menubar")
         self.menuFile = QtWidgets.QMenu(self.menubar)
         self.menuFile.setObjectName("menuFile")
@@ -173,5 +173,4 @@ class Ui_MainWindow(object):
         self.actionQuit.setText(_translate("MainWindow", "Quit"))
         self.actionEdit_configuration.setText(_translate("MainWindow", "Edit configuration"))
         self.actionEdit_postproc_config.setText(_translate("MainWindow", "Edit postproc config"))
-
 

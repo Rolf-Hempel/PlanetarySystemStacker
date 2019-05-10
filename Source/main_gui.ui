@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>1073</width>
+    <width>1098</width>
     <height>824</height>
    </rect>
   </property>
@@ -52,7 +52,7 @@
           <widget class="QComboBox" name="comboBox_back">
            <property name="minimumSize">
             <size>
-             <width>150</width>
+             <width>165</width>
              <height>0</height>
             </size>
            </property>
@@ -67,6 +67,9 @@
            </property>
            <property name="currentIndex">
             <number>-1</number>
+           </property>
+           <property name="maxVisibleItems">
+            <number>14</number>
            </property>
           </widget>
          </item>
@@ -228,7 +231,7 @@
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>1073</width>
+     <width>1098</width>
      <height>21</height>
     </rect>
    </property>
