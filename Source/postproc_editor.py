@@ -81,7 +81,12 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.lineEdit_radius.setText(str(self.layer.radius))
         self.horizontalSlider_amount.setValue(self.amount_to_integer(self.layer.amount))
         self.lineEdit_amount.setText("{0:.2f}".format(round(self.layer.amount, 2)))
+
+        # Temporarily block signals for the luminance checkbox. Otherwise the variable would be
+        # switched immediately.
+        self.checkBox_luminance.blockSignals(True)
         self.checkBox_luminance.setChecked(self.layer.luminance_only)
+        self.checkBox_luminance.blockSignals(False)
 
     # The following four methods implement the translation between data model values and the
     # (integer) values of the horizontal GUI sliders. In the case of the sharpening amount this
@@ -248,7 +253,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         # Create a Version object, and add an initial layer (radius 1., amount 0).
         new_version = self.postproc_data_object.add_postproc_version()
         new_version.set_image(self.postproc_data_object.image_original)
-        new_version.add_postproc_layer(PostprocLayer(1., 0, False))
+        new_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 0, False))
 
         # Set the image viewer to the new version, and increase the range of spinboxes to include
         # the new version.
@@ -347,7 +352,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
                             "Save result as 16bit Tiff image",
-                            self.postproc_data_object.file_name_original,
+                            self.postproc_data_object.file_name_processed,
                             "Image Files (*.tiff)", options=options)
 
         if filename and extension:
@@ -446,10 +451,26 @@ class ImageProcessor(QtCore.QThread):
         self.postproc_data_object = configuration.postproc_data_object
         self.postproc_idle_loop_time = configuration.postproc_idle_loop_time
 
-        # Remember the last version (and the corresponding layer parameters) for which an image
-        # was computed. As soon as this data change, a new image is computed.
-        self.last_version_selected = 1
-        self.last_layers = [PostprocLayer(1., 0, False)]
+        # Change the main GUI's status bar to show that a computation is going on.
+        self.set_status_bar_signal.emit(
+            "Processing " + self.postproc_data_object.file_name_original +
+            ", busy computing a new postprocessing image.", "black")
+
+        # Initialize images for all versions using the current layer data.
+        self.last_version_layers = []
+        for index, version in enumerate(self.postproc_data_object.versions):
+            self.last_version_layers.append(deepcopy(version.layers))
+            version.image = ImageProcessor.recompute_selected_version(
+                self.postproc_data_object.image_original, version.layers)
+
+        # Reset the status bar to its idle state.
+        self.set_status_bar_signal.emit(
+                "Processing " + self.postproc_data_object.file_name_original + ", postprocessing.",
+                "black")
+
+        # Remember the last version (and the corresponding layer parameters) shown in the image
+        # viewer. As soon as this index changes, a new image is displayed.
+        self.last_version_selected = -1
 
         # Initialize the data objects holding the currently active version.
         self.version_selected = None
@@ -461,8 +482,8 @@ class ImageProcessor(QtCore.QThread):
         while True:
             # To avoid chasing a moving target, copy the parameters of the currently active version
             self.version_selected = self.postproc_data_object.version_selected
-            self.layers_selected = deepcopy(self.postproc_data_object.versions[
-                                                self.postproc_data_object.version_selected].layers)
+            self.layers_selected = self.postproc_data_object.versions[
+                                                self.version_selected].layers
 
             # Compare the currently active version with the last one for which an image was
             # computed. If there is a difference, start a new computation.
@@ -474,7 +495,9 @@ class ImageProcessor(QtCore.QThread):
                     ", busy computing a new postprocessing image.", "black")
 
                 # Perform the new computation.
-                self.recompute_selected_version()
+                self.postproc_data_object.versions[
+                    self.version_selected].image = ImageProcessor.recompute_selected_version(
+                        self.postproc_data_object.image_original, self.layers_selected)
 
                 # Reset the status bar to its idle state.
                 self.set_status_bar_signal.emit(
@@ -484,7 +507,11 @@ class ImageProcessor(QtCore.QThread):
                 # Show the new image in the image viewer, and remember its parameters.
                 self.set_photo_signal.emit(self.version_selected)
                 self.last_version_selected = self.version_selected
-                self.last_layers = self.layers_selected
+
+            elif self.version_selected != self.last_version_selected:
+                # Show the new image in the image viewer, and remember its parameters.
+                self.set_photo_signal.emit(self.version_selected)
+                self.last_version_selected = self.version_selected
 
             # Idle loop before doing the next check for updates.
             else:
@@ -498,21 +525,31 @@ class ImageProcessor(QtCore.QThread):
         """
 
         # First check if another version was selected, or if the number of layers has changed.
-        if self.last_version_selected != self.version_selected or \
-                len(self.last_layers) != len(self.layers_selected):
+        # if self.last_version_selected != self.version_selected or \
+        #         len(self.last_layers) != len(self.layers_selected):
+        #     return True
+        if self.version_selected >= len(self.last_version_layers):
+            self.last_version_layers.append(deepcopy(self.postproc_data_object.versions[self.version_selected].layers))
+            return True
+
+        if len(self.last_version_layers[self.version_selected]) != len(self.layers_selected):
+            self.last_version_layers[self.version_selected] = deepcopy(self.layers_selected)
             return True
 
         # For all layers check if a parameter has changed.
-        for last_layer, layer_selected in zip(self.last_layers, self.layers_selected):
-            if last_layer.radius != layer_selected.radius or \
+        for last_layer, layer_selected in zip(self.last_version_layers[self.version_selected], self.layers_selected):
+            if last_layer.postproc_method != layer_selected.postproc_method or \
+                    last_layer.radius != layer_selected.radius or \
                     last_layer.amount != layer_selected.amount or \
                     last_layer.luminance_only != layer_selected.luminance_only:
+                self.last_version_layers[self.version_selected] = deepcopy(self.layers_selected)
                 return True
 
         # No change detected.
         return False
 
-    def recompute_selected_version(self):
+    @staticmethod
+    def recompute_selected_version(input_image, layers):
         """
         Do the actual computation. Starting from the original image, for each sharpening layer
         apply a Gaussian filter using the layer's parameters. Store the result in the central
@@ -522,16 +559,15 @@ class ImageProcessor(QtCore.QThread):
         """
 
         # Initialize the new image with the original image.
-        new_image = self.postproc_data_object.image_original
+        new_image = input_image
 
         # Apply all sharpening layers.
-        for layer in self.layers_selected:
+        for layer in layers:
             new_image = Miscellaneous.gaussian_sharpen(new_image, layer.amount, layer.radius,
                                                        luminance_only=layer.luminance_only)
 
         # Store the result in the central data object.
-        self.postproc_data_object.versions[self.postproc_data_object.version_selected].image = \
-            new_image
+        return new_image
 
     def stop(self):
         """
@@ -666,12 +702,12 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             # new layer to 1.5 times the radius of the previous one.
             if num_layers_current > 0:
                 previous_layer = version_selected.layers[num_layers_current - 1]
-                new_layer = PostprocLayer(1.5 * previous_layer.radius, 0,
+                new_layer = PostprocLayer(previous_layer.postproc_method, 1.5 * previous_layer.radius, 0,
                                           previous_layer.luminance_only)
 
             # This is the first layer for this image version. Start with standard parameters.
             else:
-                new_layer = PostprocLayer(1., 0, False)
+                new_layer = PostprocLayer("Multilevel unsharp masking", 1., 0, False)
             version_selected.add_postproc_layer(new_layer)
 
             # Update all layer widgets.

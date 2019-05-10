@@ -517,6 +517,10 @@ class Workflow(QtCore.QObject):
         self.frames.save_image(self.stacked_image_name, self.stack_frames.stacked_image,
                                color=self.frames.color, avoid_overwriting=False)
         self.my_timer.stop('Saving the stacked image')
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol("           The stacked image was written to: " +
+                                   self.stacked_image_name,
+                                   self.attached_log_file, precede_with_timestamp=False)
 
         # If postprocessing is included after stacking, set the stacked image as input.
         if self.configuration.global_parameters_include_postprocessing:
@@ -575,6 +579,17 @@ class Workflow(QtCore.QObject):
                                    color=(len(postprocessed_image.shape)==3),
                                    avoid_overwriting=False)
             self.my_timer.stop('Saving the postprocessed image')
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol(
+                    "           The postprocessed image was written to: " +
+                    self.postprocessed_image_name,
+                    self.attached_log_file, precede_with_timestamp=False)
+
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.print_postproc_parameters(
+                        self.configuration.postproc_data_object.versions[
+                        self.configuration.postproc_data_object.version_selected].layers,
+                        self.attached_log_file)
 
         self.work_next_task_signal.emit("Next job")
 

@@ -874,6 +874,26 @@ class Miscellaneous(object):
         if logfile:
             logfile.write(output_string + "\n")
 
+    @staticmethod
+    def print_postproc_parameters(layers, logfile):
+        """
+        Print a table with postprocessing layer info for the selected postprocessing version.
+
+        :return: -
+        """
+
+        output_string = "\n           Postprocessing method: " + layers[0].postproc_method + "\n\n" + \
+                        "           Layer    |    Radius    |   Amount   |   Luminance only   |\n" \
+                        "           -----------------------------------------------------------" \
+                        "\n           "
+
+        # Extend the three table lines up to the max index.
+        for index, layer in enumerate(layers):
+            output_string += " {0:3d}     |     {1:5.2f}    |    {2:5.2f}   |      {3:8s}      |" \
+                 "\n           ".format(index + 1, layer.radius, layer.amount, str(layer.luminance_only))
+
+        Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
+
 
 if __name__ == "__main__":
 

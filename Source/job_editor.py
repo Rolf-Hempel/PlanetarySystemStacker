@@ -20,13 +20,12 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-from os.path import isfile, isdir, join
 from pathlib import Path
 
 from PyQt5 import QtWidgets, QtCore
 
-from job_dialog import Ui_JobDialog
 from exceptions import InternalError
+from job_dialog import Ui_JobDialog
 
 
 class FileDialog(QtWidgets.QFileDialog):
@@ -57,7 +56,7 @@ class FileDialog(QtWidgets.QFileDialog):
         files = []
         for i in inds:
             if i.column() == 0:
-                files.append(join(str(self.directory().absolutePath()), str(i.data())))
+                files.append(self.directory().filePath(str(i.data())))
         self.signal_dialog_ready.emit(files)
         self.close()
 
@@ -195,7 +194,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         # Set the job types of all current jobs on the list.
         self.job_types = []
         for job in self.job_names:
-            if isfile(job):
+            if Path(job).is_file():
                 extension = Path(job).suffix
                 if extension in video_extensions:
                     self.job_types.append('video')
@@ -203,7 +202,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
                     self.job_types.append('postproc')
                 else:
                     raise InternalError("Unsupported file type '" + extension + "' specified for job")
-            elif isdir(job):
+            elif Path(job).is_dir():
                 self.job_types.append('image')
             else:
                 raise InternalError("Cannot decide if input file is video or image directory")

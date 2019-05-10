@@ -504,7 +504,7 @@ class PostprocDataObject(object):
         # Create a first processed version with initial parameters for Gaussian radius. The amount
         # of sharpening is initialized to zero.
         initial_version = self.add_postproc_version()
-        initial_version.add_postproc_layer(PostprocLayer(1., 0, False))
+        initial_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 0, False))
 
         # Initialize the pointer to the currently selected version to 0 (input image).
         # "version_compared" is used by the blink comparator later on. The blink comparator is
@@ -611,7 +611,8 @@ class PostprocDataObject(object):
                     layer_index)
                 config_parser_object.add_section(section_name)
 
-                # Add the three parameters of the layer.
+                # Add the four parameters of the layer.
+                config_parser_object.set(section_name, 'postprocessing method', layer.postproc_method)
                 config_parser_object.set(section_name, 'radius', str(layer.radius))
                 config_parser_object.set(section_name, 'amount', str(layer.amount))
                 config_parser_object.set(section_name, 'luminance only', str(layer.luminance_only))
@@ -654,10 +655,11 @@ class PostprocDataObject(object):
                     old_version_index = this_version_index
 
                 # Read all parameters of this layer, and add a layer to the current version.
+                method = config_parser_object.get(section, 'postprocessing method')
                 radius = config_parser_object.getfloat(section, 'radius')
                 amount = config_parser_object.getfloat(section, 'amount')
                 luminance_only = config_parser_object.getboolean(section, 'luminance only')
-                new_version.add_postproc_layer(PostprocLayer(radius, amount, luminance_only))
+                new_version.add_postproc_layer(PostprocLayer(method, radius, amount, luminance_only))
 
         # Set the selected version again, because it may have been changed by reading versions.
         self.version_selected = config_parser_object.getint('PostprocessingInfo',
@@ -676,6 +678,7 @@ class PostprocVersion(object):
         :param image: Input image (16bit Tiff) for postprocessing
         """
 
+        self.postproc_method = "Multilevel unsharp masking"
         self.layers = []
         self.number_layers = 0
 
@@ -717,17 +720,19 @@ class PostprocLayer(object):
     Instances of this class hold the parameters which define a postprocessing layer.
     """
 
-    def __init__(self, radius, amount, luminance_only):
+    def __init__(self, method, radius, amount, luminance_only):
         """
         Initialize the Layer instance with values for Gaussian radius, amount of sharpening and a
         flag which indicates on which channel the sharpening is to be applied.
 
+        :param method: Description of the sharpening method.
         :param radius: Radius (in pixels) of the Gaussian sharpening kernel.
         :param amount: Amount of sharpening for this layer.
         :param luminance_only: True, if sharpening is to be applied to the luminance channel only.
                                False, otherwise.
         """
 
+        self.postproc_method = method
         self.radius = radius
         self.amount = amount
         self.luminance_only = luminance_only
