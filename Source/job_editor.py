@@ -22,7 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
 
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
 
 from exceptions import InternalError
 from job_dialog import Ui_JobDialog
@@ -78,6 +78,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         QtWidgets.QFrame.__init__(self, parent)
         self.setupUi(self)
+        self.setWindowIcon(QtGui.QIcon('../PSS-Icon-64.ico'))
 
         self.setFrameShape(QtWidgets.QFrame.Panel)
         self.setFrameShadow(QtWidgets.QFrame.Sunken)
@@ -87,6 +88,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         self.parent_gui = parent_gui
         self.configuration = self.parent_gui.configuration
+
+        # Set the window icon to the PSS icon.
+        self.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
 
         # Get a copy of the job names constructed so far. The editor only works on the copy, so
         # that in the case of "cancel" the original list is not changed.

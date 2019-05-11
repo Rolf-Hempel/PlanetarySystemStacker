@@ -27,7 +27,7 @@ from sys import exit, argv
 from os import remove
 from pathlib import Path
 
-from PyQt5 import QtWidgets, QtCore
+from PyQt5 import QtWidgets, QtCore, QtGui
 
 from main_gui import Ui_MainWindow
 
@@ -85,6 +85,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Create configuration object and set configuration parameters to standard values.
         self.configuration = Configuration()
+
+        # Set the window icon to the PSS icon.
+        self.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
 
         # Look up the location and size of the main GUI. Replace the location parameters with those
         # stored in the configuration file when the GUI was closed last time. This way, the GUI
