@@ -389,6 +389,9 @@ class VideoFrameViewer(FrameViewer):
         :return: -
         """
 
+        # Indicate that an image is being loaded.
+        self.image_loading_busy = True
+
         image = self.frames.frames_mono(index)[self.align_frames.intersection_shape[0][0] -
                                                     self.align_frames.frame_shifts[index][0]:
                                                     self.align_frames.intersection_shape[0][1] -
