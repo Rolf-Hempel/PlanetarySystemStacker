@@ -129,7 +129,7 @@ class Configuration(object):
 
         # Set fixed parameters which are hidden from the user. Hidden parameters which are
         # changeable are stored in the configuration object.
-        self.window_icon = '../PSS-Icon-64.ico'
+        self.window_icon = 'PSS-Icon-64.ico'
 
         self.frames_mono_channel = 'green'
 

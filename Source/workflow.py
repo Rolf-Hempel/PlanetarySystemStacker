@@ -211,8 +211,12 @@ class Workflow(QtCore.QObject):
                         self.attached_log_file, precede_with_timestamp=False)
             except Exception as e:
                 if self.configuration.global_parameters_protocol_level > 0:
-                    Miscellaneous.protocol("Error: " + str(e), self.attached_log_file)
-                exit()
+                    Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
+                                           self.attached_log_file)
+                if buffer_original:
+                    self.my_timer.stop('Read all frames')
+                self.work_next_task_signal.emit("Next job")
+                return
             if buffer_original:
                 self.my_timer.stop('Read all frames')
 
@@ -335,12 +339,7 @@ class Workflow(QtCore.QObject):
                     self.align_frames.align_frames()
                     # Everything is fine, no need to try another stabilization patch.
                     break
-                except NotSupportedError as e:
-                    if self.configuration.global_parameters_protocol_level > 0:
-                        Miscellaneous.protocol("Error: " + e.message, self.attached_log_file)
-                    exit()
-                # If this happens, the alignment patch is too large. Skip this job.
-                except ArgumentError as e:
+                except (NotSupportedError, ArgumentError) as e:
                     if self.configuration.global_parameters_protocol_level > 0:
                         Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
                                                self.attached_log_file)
@@ -379,8 +378,11 @@ class Workflow(QtCore.QObject):
                 self.align_frames.align_frames()
             except NotSupportedError as e:
                 if self.configuration.global_parameters_protocol_level > 0:
-                    Miscellaneous.protocol("Error: " + e.message, self.attached_log_file)
-                exit()
+                    Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
+                                           self.attached_log_file)
+                self.my_timer.stop('Global frame alignment')
+                self.work_next_task_signal.emit("Next job")
+                return
 
         self.my_timer.stop('Global frame alignment')
 
