@@ -539,10 +539,6 @@ class Workflow(QtCore.QObject):
             if self.configuration.global_parameters_protocol_level > 0:
                 self.my_timer.protocol(self.attached_log_file)
 
-            # Close the protocol file attached to the result.
-            if self.configuration.global_parameters_store_protocol_with_result:
-                self.attached_log_file.close()
-
     @QtCore.pyqtSlot()
     def execute_postprocess_image(self):
 
