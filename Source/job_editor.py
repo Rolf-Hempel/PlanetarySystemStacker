@@ -140,9 +140,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.file_dialog = FileDialog(self, message,
                                       self.configuration.hidden_parameters_current_dir,
                                       "Videos (*.avi)", options=options)
-        self.file_dialog.setNameFilters(["Videos for stacking (*.avi)",
+        self.file_dialog.setNameFilters(["Still image folders / video files for stacking (*.avi)",
                                          "Images for postprocessing (*.tiff *.tif *.png *.jpg)"])
-        self.file_dialog.selectNameFilter("Videos for stacking (*.avi)")
+        self.file_dialog.selectNameFilter("Still image folders / video files for stacking (*.avi)")
 
         # The list of strings with the new job names is sent by the FileDialog via the signal.
         self.file_dialog.signal_dialog_ready.connect(self.get_input_names)
