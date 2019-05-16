@@ -845,7 +845,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             if event:
                 event.accept()
 
-            # If there is a image log file still open, close it.
+            # If there is an image log file still open, close it.
             if self.workflow.attached_log_file:
                 self.workflow.attached_log_file.close()
 
