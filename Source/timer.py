@@ -24,6 +24,7 @@ from time import time, sleep
 from collections import OrderedDict
 
 from exceptions import ArgumentError
+from miscellaneous import Miscellaneous
 
 
 class timer(object):
@@ -52,6 +53,16 @@ class timer(object):
         else:
             self.counters[name] = [0., time()]
 
+    def create_no_check(self, name):
+        """
+        If a named timer does not exist, create one. If it exists, reset and start it.
+
+        :param name: Name of the timer
+        :return: -
+        """
+
+        self.counters[name] = [0., time()]
+
     def delete(self, name):
         """
         Delete a named timer.
@@ -64,6 +75,16 @@ class timer(object):
             raise ArgumentError("Attempt to delete timer with undefined name")
         else:
             del self.counters[name]
+
+    def exists(self, name):
+        """
+        Find out if a named timer with a given name already exists.
+
+        :param name: Name of the timer
+        :return: True, if the timer exists; otherwise False.
+        """
+
+        return name in self.counters.keys()
 
     def start(self, name):
         """
@@ -124,6 +145,18 @@ class timer(object):
 
             print("{0:40} {1:8.3f}".format(name, self.counters[name][0]))
         print("--------------------------------------------------")
+
+    def protocol(self, logfile):
+        Miscellaneous.protocol("", logfile, precede_with_timestamp=False)
+        Miscellaneous.protocol("           --------------------------------------------------\n"
+                               "           Status of time counters:", logfile,
+                               precede_with_timestamp=False)
+        for name in self.counters.keys():
+            Miscellaneous.protocol(
+                "           {0:40} {1:8.3f}".format(name, self.counters[name][0]), logfile,
+                precede_with_timestamp=False)
+        Miscellaneous.protocol("           --------------------------------------------------\n",
+                               logfile, precede_with_timestamp=False)
 
 
 if __name__ == "__main__":

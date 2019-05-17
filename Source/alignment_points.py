@@ -20,19 +20,18 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import glob
-from math import ceil
+from glob import glob
 from time import time
 
 import matplotlib.pyplot as plt
-from numpy import arange, amax, stack, amin, hypot, zeros, full, float32, uint16, array, matmul, \
-    square, sqrt
-from numpy.linalg import solve
+from math import ceil
+from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, uint32
+from scipy import ndimage
 from skimage.feature import register_translation
 
 from align_frames import AlignFrames
 from configuration import Configuration
-from exceptions import WrongOrderingError, NotSupportedError, DivideByZeroError
+from exceptions import NotSupportedError
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -47,7 +46,7 @@ class AlignmentPoints(object):
 
     """
 
-    def __init__(self, configuration, frames, rank_frames, align_frames):
+    def __init__(self, configuration, frames, rank_frames, align_frames, progress_signal=None):
         """
         Initialize the AlignmentPoints object and compute the mean frame.
 
@@ -56,258 +55,625 @@ class AlignmentPoints(object):
         :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
                             1. being optimal) for all frames
         :param align_frames: AlignFrames object with global shift information for all frames
+        :param progress_signal: Either None (no progress signalling), or a signal with the signature
+                                (str, int) with the current activity (str) and the progress in
+                                percent (int).
         """
 
         self.configuration = configuration
         self.frames = frames
         self.rank_frames = rank_frames
         self.align_frames = align_frames
-        self.y_locations = None
-        self.x_locations = None
-        self.y_locations_number = None
-        self.x_locations_number = None
-        self.alignment_boxes = None
-        self.alignment_points = None
-        self.alignment_point_neighbors = None
-        self.y_shifts = None
-        self.x_shifts = None
-        self.ap_mask = None
-        self.deviations = zeros(
-            (2 * self.configuration.alignment_point_search_width + 1,
-             2 * self.configuration.alignment_point_search_width + 1))
+        self.progress_signal = progress_signal
+        self.mean_frame = align_frames.mean_frame
+        self.num_pixels_y = self.mean_frame.shape[0]
+        self.num_pixels_x = self.mean_frame.shape[1]
+        self.alignment_points_dropped_dim = None
+        self.alignment_points_dropped_structure = None
 
-        # Compute the number of frames to be used for creating the mean frame.
-        self.average_frame_number = max(
-            ceil(frames.number * configuration.average_frame_percent / 100.), 1)
+        # Initialize counters for APs which are dropped because
+        # they do not satisfy the brightness or structure condition.
+        self.alignment_points = []
+        self.alignment_points_dropped_dim = 0
+        self.alignment_points_dropped_structure = 0
 
-        # Call method "average_frame" of the AlignFrames object to compute the mean frame. Use
-        # the best frames according to their ranks.
-        self.align_frames.average_frame([self.frames.frames_mono[i] for i in
-                                         self.rank_frames.quality_sorted_indices[
-                                         :self.average_frame_number]],
-                                        [self.align_frames.frame_shifts[i] for i in
-                                         self.rank_frames.quality_sorted_indices[
-                                         :self.average_frame_number]])
+        # Initialize the number of frames to be stacked at each AP.
+        self.stack_size = None
 
-    def ap_locations(self, num_pixels, box_size, search_width, step_size):
+        self.dev_table = empty((2 * self.configuration.alignment_points_search_width,
+                               2 * self.configuration.alignment_points_search_width), dtype=float32)
+
+    @staticmethod
+    def ap_locations(num_pixels, min_boundary_distance, step_size, even):
         """
-        Compute optimal alignment box coordinates in one coordinate direction. Include boundary
-        boxes. Place boundary neighbors as close as possible to the boundary.
+        Compute optimal alignment patch coordinates in one coordinate direction. Place boundary
+        neighbors as close as possible to the boundary.
 
         :param num_pixels: Number of pixels in the given coordinate direction
-        :param box_size: Width of the alignment boxes
-        :param search_width: Maximum search width for alignment point matching
+        :param min_boundary_distance: Minimum distance of an AP from the boundary
         :param step_size: Distance of alignment boxes
-        :return: List of bounding box coordinates in the given direction
+        :param even: If True, compute locations for even row indices. Otherwise, for odd ones.
+        :return: List of alignment point coordinates in the given direction
         """
-
-        # Compute the minimum distance from the boundary for an alignment box. Take into account
-        # that in alignment point matching the box might be displaced relative to the non-warped
-        # location.
-        box_size_half_p_sw = int((box_size + 1) / 2.) + search_width
-        locations = [0]
 
         # The number of interior alignment boxes in general is not an integer. Round to the next
         # higher number.
-        num_interior = int(
-            ceil(float(num_pixels - box_size - 2 * search_width) / float(step_size)))
+        num_interior_odd = int(
+            ceil(float(num_pixels - 2 * min_boundary_distance) / float(step_size)))
+        # Because alignment points are arranged in a staggered grid, in even rows there is one point
+        # more.
+        num_interior_even = num_interior_odd + 1
 
-        # Compute the interior box coordinates.
-        for i in range(num_interior):
-            locations.append(box_size_half_p_sw + i * step_size)
+        # The precise distance between alignment points will differ slightly from the specified
+        # step_size. Compute the exact distance. Integer locations will be rounded later.
+        distance_corrected = float(num_pixels - 2 * min_boundary_distance) / float(
+            num_interior_odd)
 
-        # If the last interior box is too far away from the boundary, add another one as close as
-        # possible to the boundary.
-        if num_pixels - locations[-1] > box_size:
-            locations.append(num_pixels - box_size_half_p_sw - 1)
-
-        # Set the last location to the last pixel.
-        locations.append(num_pixels - 1)
+        # Compute the AP locations, separately for even and odd rows.
+        if even:
+            locations = []
+            for i in range(num_interior_even):
+                locations.append(int(min_boundary_distance + i * distance_corrected))
+        else:
+            locations = []
+            for i in range(num_interior_odd):
+                locations.append(int(
+                    min_boundary_distance + 0.5 * distance_corrected +
+                    i * distance_corrected))
         return locations
 
-    def create_alignment_boxes(self, step_size, box_size):
+    def create_ap_grid(self):
         """
-        Create a rectangular grid of potential places for alignment points. For each location
-        create a small "alignment box" around it.
+        Create a 2D staggered grid of alignment points. For each AP compute its center coordinates,
+        and the coordinate limits of its alignment box and alignment patch. Only alignment points
+        which satisfy the conditions on brightness, contrast and structure are eventually added to
+        the list.
 
-        :param step_size: Number of pixels in y and x directions between alignment boxes
-        :param box_size: Extension of alignment boxes in both y and x directions
-        :return: -
-        """
-
-        mean_frame = self.align_frames.mean_frame
-        mean_frame_shape = mean_frame.shape
-        box_size_half = int(box_size / 2)
-        self.alignment_boxes = []
-
-        # Create the y and x coordinates for the rectangular grid of alignment boxes. Keep the
-        # boxes away from the frame borders enough to avoid that boxes reach beyond the frame border
-        # in the search for the local displacement.
-        self.y_locations = self.ap_locations(mean_frame_shape[0], box_size,
-                                             self.configuration.alignment_point_search_width,
-                                             step_size)
-        self.y_locations_number = len(self.y_locations)
-        self.x_locations = self.ap_locations(mean_frame_shape[1], box_size,
-                                             self.configuration.alignment_point_search_width,
-                                             step_size)
-        self.x_locations_number = len(self.x_locations)
-
-        # Initialize the pixel shift arrays in y and x for all alignment box locations.
-        self.y_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float32)
-        self.x_shifts = zeros((self.y_locations_number, self.x_locations_number), dtype=float32)
-
-        for j, y in enumerate(self.y_locations):
-            # Compute the y index bounds of the row of alignment boxes.
-            y_low = y - box_size_half
-            y_high = y + box_size_half
-            alignment_box_row = []
-            for i, x in enumerate(self.x_locations):
-
-                # Compute the x index bounds of the alignment box.
-                x_low = x - box_size_half
-                x_high = x + box_size_half
-
-                # Check if the location is on the boundary. Initialize box dictionary. Most entries
-                # do not make sense for boundary pooints.
-                if j==0 or j==self.y_locations_number-1 or i==0 or i==self.x_locations_number-1:
-                    alignment_box = {}
-                    alignment_box['type'] = 'boundary point'
-                    alignment_box['box'] = None
-                    alignment_box['coordinates'] = (j, i, y, x, y_low, y_high, x_low, x_high)
-                    alignment_box['structure'] = None
-                    alignment_box['max_brightness'] = None
-                    alignment_box['min_brightness'] = None
-                    alignment_box['alignment_point_index'] = None
-                else:
-                    # Initialize a dictionary for the alignment box which contains all related info.
-                    alignment_box = {}
-
-                    # Cut the reference box from the mean frame.
-                    box = mean_frame[y_low:y_high, x_low:x_high]
-
-                    # Initialize the type of the alignment box to None. Later it will be changed to
-                    # 'alignment point' or 'alignment point neighbor' if there is enough structure at
-                    # this point or in the neighborhood.
-                    alignment_box['type'] = None
-                    alignment_box['box'] = box
-                    alignment_box['coordinates'] = (j, i, y, x, y_low, y_high, x_low, x_high)
-
-                    # Compute structure and brightness information for the alignment box, and add the
-                    # box to the list.
-                    alignment_box['structure'] = Miscellaneous.quality_measure(box)
-                    alignment_box['max_brightness'] = amax(box)
-                    alignment_box['min_brightness'] = amin(box)
-
-                    # Initialize the index of the corresponding element in the list of alignment
-                    # points to "None".
-                    alignment_box['alignment_point_index'] = None
-                alignment_box_row.append(alignment_box)
-
-            # Append the row of alignment boxes to the 2D grid structure of alignment boxes.
-            self.alignment_boxes.append(alignment_box_row)
-
-        # Normalize the structure information for all boxes by dividing by the maximum value.
-        structure_max = max(
-            alignment_box_row[i + 1]['structure'] for alignment_box_row in
-            self.alignment_boxes[1:-1] for
-            i in range(self.x_locations_number - 2))
-        for alignment_box_row in (self.alignment_boxes[1:-1]):
-            for alignment_box in (alignment_box_row[1:-1]):
-                alignment_box['structure'] /= structure_max
-
-    def select_alignment_points(self, structure_threshold, brightness_threshold,
-                                contrast_threshold):
-        """
-        For each alignment box decide if there is enough structure and brightness to make it an
-        alignment point. If so, add it to the list of alignment points.
-
-        :param structure_threshold: Minimum structure value for an alignment point (between 0.
-                                    and 1.)
-        :param brightness_threshold: The brightest pixel must be brighter than this value
-                                     (0 < value <256)
-        :param contrast_threshold: The difference between the brightest and darkest pixel values
-                                   must be larger than this value (0 < value < 256)
-        :return: -
+        :return: List of alignment points.
         """
 
-        if self.alignment_boxes is None:
-            raise WrongOrderingError(
-                "Attempt to select alignment points before alignment boxes are created")
+        # The alignment patch is the area which is stacked after a rigid displacement.
+        half_patch_width = self.configuration.alignment_points_half_patch_width
+        # The alignment box is the object on which the displacement computation is performed.
+        half_box_width = self.configuration.alignment_points_half_box_width
+        # Number of pixels in one coordinate direction between alignment points
+        step_size = self.configuration.alignment_points_step_size
+        # Maximum displacement searched for in the alignment process.
+        search_width = self.configuration.alignment_points_search_width
+        # Minimum structure value for an alignment point (between 0. and 1.)
+        structure_threshold = self.configuration.alignment_points_structure_threshold
+        # The brightest pixel must be brighter than this value (0 < value <256). Please note that
+        # brightness and contrast values are converted to 16bit resolution.
+        brightness_threshold = self.configuration.alignment_points_brightness_threshold * 256
+        # The difference between the brightest and darkest pixel values must be larger than this
+        # value (0 < value < 256)
+        contrast_threshold = self.configuration.alignment_points_contrast_threshold * 256
 
-        # Check for each alignment box if it qualifies for being an alignment point.
+        # Compute the minimum distance of an AP from the boundary.
+        min_boundary_distance = max(half_box_width + search_width, half_patch_width)
+
+        # Compute y and x coordinate locations of alignemnt points. Note that the grid is staggered.
+        ap_locations_y = self.ap_locations(self.num_pixels_y, min_boundary_distance,
+                                           step_size, True)
+        ap_locations_x_even = self.ap_locations(self.num_pixels_x, min_boundary_distance,
+                                                step_size, True)
+        ap_locations_x_odd = self.ap_locations(self.num_pixels_x, min_boundary_distance,
+                                               step_size, False)
+
+        # Reset the alignment point list, and initialize counters for APs which are dropped because
+        # they do not satisfy the brightness or structure condition.
         self.alignment_points = []
-        alignment_point_index = 0
-        for alignment_box_row in (self.alignment_boxes[1:-1]):
-            for alignment_box in (alignment_box_row[1:-1]):
-                if alignment_box['structure'] > structure_threshold and alignment_box[
-                    'max_brightness'] > brightness_threshold and alignment_box['max_brightness'] - \
-                        alignment_box['min_brightness'] > contrast_threshold:
-                    # This point satisfies the conditions for an alignment point. Append its
-                    # coordinates to the list.
-                    self.alignment_points.append(alignment_box['coordinates'])
-                    alignment_box['type'] = 'alignment point'
-                    alignment_box['alignment_point_index'] = alignment_point_index
-                    alignment_point_index += 1
+        self.alignment_points_dropped_dim = 0
+        self.alignment_points_dropped_structure = 0
 
-        # Check all interior alignment boxes which did not qualify for being an alignment point,
-        # if there are alignment points in the neighborhood. In this case compute the weights with
-        # which the shifts at those points are interpolated to this position.
-        #
-        # First, initialize the list of the points in the neighborhood of alignment points.
-        self.alignment_point_neighbors = []
-        alignment_point_neighbor_index = 0
-        for alignment_box_row in (self.alignment_boxes[1:-1]):
-            for alignment_box in (alignment_box_row[1:-1]):
-                # The box did not qualify for being an alignment point.
-                if alignment_box['type'] is None:
-                    j_center = alignment_box['coordinates'][0]
-                    i_center = alignment_box['coordinates'][1]
+        # Compute the minimum distance of an AP center from the frame boundary.
+        min_boundary_distance = max(
+            self.configuration.alignment_points_half_box_width + \
+            self.configuration.alignment_points_search_width,
+            self.configuration.alignment_points_half_patch_width)
 
-                    # Circle around the point and look for "contributing" alignment points in the
-                    #  neighborhood.
-                    contributing_alignment_points = []
-                    weight_sum = 0.
+        # Create alignment point rows, start with an even one.
+        even = True
+        for index_y, y in enumerate(ap_locations_y):
+            # For the first row extend the patch to the upper frame border, and for the last row
+            # to the lower frame border.
+            extend_y_low  = (index_y == 0)
+            extend_y_high = (index_y == len(ap_locations_y)-1)
 
-                    # Limit the radius of the search circle according to a configuration parameter.
-                    for r in arange(1, self.configuration.alignment_box_max_neighbor_distance+1):
-                        circle = Miscellaneous.circle_around(i_center, j_center, r)
-                        for (i, j) in circle:
-                            if 1 <= i < self.x_locations_number-1 and 1 <= j < \
-                                    self.y_locations_number-1 and \
-                                    self.alignment_boxes[j][i]['type'] == 'alignment point':
-                                # Alignment point found. Compute its distance and weight,
-                                # and add it to the list.
-                                contributing_alignment_point = {}
-                                contributing_alignment_point['alignment_point_index'] = \
-                                self.alignment_boxes[j][i]['alignment_point_index']
-                                contributing_alignment_point['weight'] = 1. / hypot(i - i_center,
-                                                                                    j - j_center)
-                                weight_sum += contributing_alignment_point['weight']
-                                contributing_alignment_points.append(contributing_alignment_point)
+            # Create x coordinate, depending on the y row being even or odd (staggered grid).
+            if even:
+                ap_locations_x = ap_locations_x_even
+            else:
+                ap_locations_x = ap_locations_x_odd
 
-                    # Normalize the weights such that their sum is 1.
-                    for contributing_alignment_point in contributing_alignment_points:
-                        contributing_alignment_point['weight'] /= weight_sum
+            # For each location create an alignment point.
+            for index_x, x in enumerate(ap_locations_x):
+                # For the first point in a row, extend the patch to the left frame border, and for
+                # the last point in a row to the right frame border.
+                extend_x_low  = (index_x == 0)
+                extend_x_high = (index_x == len(ap_locations_x) - 1)
 
-                    # If the list of alignment points in the neighborhood is not empty. Add the
-                    # point to the list of "alignment point neighbors".
-                    if contributing_alignment_points:
-                        self.alignment_point_neighbors.append(
-                            [j_center, i_center, contributing_alignment_points])
-                        alignment_box['type'] = 'alignment point neighbor'
-                        alignment_box[
-                            'alignment_point_neighbor_index'] = alignment_point_neighbor_index
-                        alignment_point_neighbor_index += 1
+                alignment_point = self.new_alignment_point(y, x, extend_x_low, extend_x_high,
+                                                           extend_y_low, extend_y_high)
 
-    def compute_alignment_point_shifts(self, frame_index, alignment_point_list=None,
-                                       alignment_point_neighbor_list=None,
-                                       use_ap_mask=False):
+                # Compute structure and brightness information for the alignment box.
+                max_brightness = amax(alignment_point['reference_box'])
+                min_brightness = amin(alignment_point['reference_box'])
+                # If the alignment box satisfies the brightness conditions, add the AP to the list.
+                if max_brightness > brightness_threshold and max_brightness - \
+                        min_brightness > contrast_threshold:
+
+                    # Check if the fraction of dark pixels exceeds a threshold.
+                    box = alignment_point['reference_box']
+                    fraction = (box < brightness_threshold).sum() / float(
+                        box.shape[0] * box.shape[1])
+                    if fraction > self.configuration.alignment_points_dim_fraction_threshold:
+
+                        # Compute the center of mass of the brightness distribution within the box,
+                        # and shift the box center to this location.
+                        com = ndimage.measurements.center_of_mass(box)
+                        y_adapted = y + int(com[0]) - half_box_width
+                        x_adapted = x + int(com[1]) - half_box_width
+
+                        y_adapted = max(y_adapted, min_boundary_distance)
+                        y_adapted = min(y_adapted, self.num_pixels_y - min_boundary_distance)
+                        x_adapted = max(x_adapted, min_boundary_distance)
+                        x_adapted = min(x_adapted, self.num_pixels_x - min_boundary_distance)
+
+                        # Replace the alignment point with a new one, using the updated
+                        # coordinates.
+                        alignment_point = self.new_alignment_point(y_adapted, x_adapted,
+                                                                   extend_x_low, extend_x_high,
+                                                                   extend_y_low, extend_y_high)
+
+                    alignment_point['structure'] = Miscellaneous.quality_measure(
+                        alignment_point['reference_box'])
+                    self.alignment_points.append(alignment_point)
+                else:
+                    # If a point does not satisfy the conditions, increase the counter.
+                    self.alignment_points_dropped_dim += 1
+
+            # Switch between even and odd rows.
+            even = not even
+
+        # Normalize the structure information for all alignment point boxes by dividing by the
+        # maximum value.
+        structure_max = max(
+            alignment_point['structure'] for alignment_point in self.alignment_points)
+        alignment_points_dropped_structure_indices = []
+        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
+            alignment_point['structure'] /= structure_max
+            # Remove alignment points with too little structure and increment the counter.
+            if alignment_point['structure'] < structure_threshold:
+                alignment_points_dropped_structure_indices.append(alignment_point_index)
+                self.alignment_points_dropped_structure += 1
+
+        # Remove alignment points which do not satisfy the structure condition, if there is any.
+        if alignment_points_dropped_structure_indices:
+            alignment_points_new = []
+            dropped_index = 0
+            for alignment_point_index, alignment_point in enumerate(self.alignment_points):
+                if alignment_point_index != alignment_points_dropped_structure_indices[
+                    dropped_index]:
+                    alignment_points_new.append(alignment_point)
+                elif dropped_index < len(alignment_points_dropped_structure_indices) - 1:
+                    dropped_index += 1
+            self.alignment_points = alignment_points_new
+
+    def new_alignment_point(self, y, x, extend_x_low, extend_x_high, extend_y_low, extend_y_high):
         """
-        For each alignment point compute the shifts in y and x relative to the mean frame. Three
-        different methods can be used to compute the shift values:
+        Create a new alignment point. This method is called in creating the initial alignment point
+        grid. Later it can be invoked by the user to add single alignment points.
+
+        :param y: y coordinate of alignment point center
+        :param x: x coordinate of alignment point center
+        :param extend_x_low: True, if patch is to be extended to the left frame boundary.
+                             False otherwise.
+        :param extend_x_high: True, if patch is to be extended to the right frame boundary.
+                              False otherwise.
+        :param extend_y_low: True, if patch is to be extended to the upper frame boundary.
+                             False otherwise.
+        :param extend_y_high: True, if patch is to be extended to the lower frame boundary.
+                              False otherwise.
+        :return: If successful, the alignment point object is returned; otherwise None.
+        """
+
+        # If the patch does not fit into the frame, or the AP box is too close to the border,
+        # the AP cannot be created at this place.
+        min_boundary_distance = max(self.configuration.alignment_points_half_box_width + \
+                                self.configuration.alignment_points_search_width,
+                                self.configuration.alignment_points_half_patch_width)
+        if y<min_boundary_distance or y>self.num_pixels_y-min_boundary_distance or \
+            x<min_boundary_distance or x>self.num_pixels_x-min_boundary_distance:
+            return None
+
+        alignment_point = {}
+        alignment_point['y'] = y
+        alignment_point['x'] = x
+        alignment_point['half_box_width'] = self.configuration.alignment_points_half_box_width
+        alignment_point['box_y_low'] = y - self.configuration.alignment_points_half_box_width
+        alignment_point['box_y_high'] = y + self.configuration.alignment_points_half_box_width
+        alignment_point['box_x_low'] = x - self.configuration.alignment_points_half_box_width
+        alignment_point['box_x_high'] = x + self.configuration.alignment_points_half_box_width
+
+        alignment_point['patch_y_low'] = y - self.configuration.alignment_points_half_patch_width
+        alignment_point['patch_y_high'] = y + self.configuration.alignment_points_half_patch_width
+        if extend_y_low:
+            alignment_point['patch_y_low'] = 0
+        elif extend_y_high:
+            alignment_point['patch_y_high'] = self.num_pixels_y
+
+        alignment_point['patch_x_low'] = x - self.configuration.alignment_points_half_patch_width
+        alignment_point['patch_x_high'] = x + self.configuration.alignment_points_half_patch_width
+        if extend_x_low:
+            alignment_point['patch_x_low'] = 0
+        elif extend_x_high:
+            alignment_point['patch_x_high'] = self.num_pixels_x
+
+        # Initialize the reference to the corresponding widget in the AP viewer scene.
+        alignment_point['graphics_item'] = None
+
+        # Allocate buffers and fill alignment point box with mean frame.
+        AlignmentPoints.set_reference_box(alignment_point, self.mean_frame)
+
+        return alignment_point
+
+    def add_alignment_point(self, ap):
+        """
+        Add an alignment point to the list.
+
+        :param ap: AP to be added
+        :return: -
+        """
+
+        self.alignment_points.append(ap)
+
+    def remove_alignment_points(self, ap_list):
+        """
+        Remove a list of alignment points from the current list.
+
+        :param ap_list: List of point objects to be removed
+        :return: -
+        """
+
+        # Initialize the reduced AP list.
+        new_alignment_point_list = []
+
+        # Create list with unique identifiers of all items on the list.
+        ap_list_ids = [id(ap_list_item) for ap_list_item in ap_list]
+
+        # If the identifier of an alignment point does not match any list item, keep it.
+        for ap in self.alignment_points:
+            if id(ap) not in ap_list_ids:
+                new_alignment_point_list.append(ap)
+
+        # Replace the original AP list with the reduced one.
+        self.alignment_points = new_alignment_point_list
+
+    def replace_alignment_point(self, ap_old, ap_new):
+        """
+        Replace an alignment point with a new one.
+
+        :param ap_old: Existing alignment point to be replaced
+        :param ap_new: New alignment point to replace the old one
+        :return: True if successful, False otherwise
+        """
+
+        ap_old_id = id(ap_old)
+        for index, ap in enumerate(self.alignment_points):
+            if id(ap) == ap_old_id:
+                self.alignment_points[index] = ap_new
+                return True
+        return False
+
+    def move_alignment_point(self, ap, y_new, x_new):
+        """
+        Move an existing AP to a different position.
+
+        :param ap: Esisting alignment point to be moved
+        :param y_new: New y coordinate of AP center
+        :param x_new: New x coordinate of AP center
+        :return: The updated AP; or None, if unsuccessful
+        """
+
+        # Try to do the changes. If unsuccessful, return None.
+        return self.change_alignment_point(ap, y_new, x_new, ap['half_box_width'])
+
+    def resize_alignment_point(self, ap, factor):
+        """
+        Change the size of an existing alignment point.
+
+        :param ap: Esisting alignment point to be resized
+        :param factor: Factor by which the size is to be changed
+        :return: The resized alignment point; or None, if unsuccessful
+        """
+
+        half_box_width_new = ap['half_box_width'] * factor
+
+        # Try to do the changes. If unsuccessful, return None.
+        return self.change_alignment_point(ap, ap["y"], ap["x"], half_box_width_new)
+
+    def change_alignment_point(self, ap, y, x, half_box_width):
+        """
+        Try to fit a resized or moved AP into the frame.
+
+        :param ap: AP to be resized or moved
+        :param y: New y coordinate of center
+        :param x: New x coordinate of center
+        :param half_box_width: New half width of AP box
+        :return: The resized / moved AP; or None, if unsuccessful
+        """
+
+        # Test if the AP box is too small.
+        if half_box_width < self.configuration.alignment_points_min_half_box_width:
+            return None
+
+        # Compute new values for patch and box sizes.
+        half_patch_width_new_int = int(round(half_box_width *
+                                             self.configuration.alignment_points_half_patch_width /
+                                             self.configuration.alignment_points_half_box_width))
+        half_box_width_new_int = int(round(half_box_width))
+
+        # Compute resized patch bounds. If resizing hits the image boundary on at least one side,
+        # the operation is aborted.
+        patch_y_low = y - half_patch_width_new_int
+        if patch_y_low < 0:
+            return None
+        patch_y_high = y + half_patch_width_new_int
+        if patch_y_high > self.num_pixels_y:
+            return None
+        patch_x_low = x - half_patch_width_new_int
+        if patch_x_low < 0:
+            return None
+        patch_x_high = x + half_patch_width_new_int
+        if patch_x_high > self.num_pixels_x:
+            return None
+
+        # Compute resized box bounds. If resizing moves the box closer to the frame border than
+        # the search width on at least one side, the operation is aborted.
+        box_y_low = y - half_box_width_new_int
+        if box_y_low < self.configuration.alignment_points_search_width:
+            return None
+        box_y_high = y + half_box_width_new_int
+        if box_y_high > self.num_pixels_y - self.configuration.alignment_points_search_width:
+            return None
+        box_x_low = x - half_box_width_new_int
+        if box_x_low < self.configuration.alignment_points_search_width:
+            return None
+        box_x_high = x + half_box_width_new_int
+        if box_x_high > self.num_pixels_x - self.configuration.alignment_points_search_width:
+            return None
+
+        # Perform the changes.
+        ap['y'] = y
+        ap['x'] = x
+        ap['patch_y_low'] = patch_y_low
+        ap['patch_y_high'] = patch_y_high
+        ap['patch_x_low'] = patch_x_low
+        ap['patch_x_high'] = patch_x_high
+        ap['box_y_low'] = box_y_low
+        ap['box_y_high'] = box_y_high
+        ap['box_x_low'] = box_x_low
+        ap['box_x_high'] = box_x_high
+        ap['half_box_width'] = half_box_width
+
+        # Invalidate buffers. To save computing time, they are not re-computed at every wheel
+        # event.
+        ap['graphics_item'] = None
+        ap['reference_box'] = None
+        ap['stacking_buffer'] = None
+
+        return ap
+
+    @staticmethod
+    def set_reference_box(alignment_point, mean_frame):
+        """
+        For APs which have been changed in the AP editor, buffers have been invalidated. They have
+        to be re-computed after AP editing is done.
+
+        :param alignment_point: Alignment_point object
+        :param mean_frame: Average frame
+        :return: -
+        """
+
+        # Cut out the reference box from the mean frame, used in alignment.
+        box = mean_frame[alignment_point['box_y_low']:alignment_point['box_y_high'],
+              alignment_point['box_x_low']:alignment_point['box_x_high']]
+        alignment_point['reference_box'] = box
+
+    @staticmethod
+    def initialize_ap_stacking_buffer(alignment_point, color):
+        """
+        In the stacking initialization, for each AP a stacking buffer has to be allocated.
+
+        :param alignment_point: Alignment_point object
+        :param color: True, if stacking is to be done for color frames. False for
+        monochrome case.
+        :return: -
+        """
+
+        # Allocate space for the stacking buffer.
+        if color:
+            alignment_point['stacking_buffer'] = zeros(
+                [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
+                 alignment_point['patch_x_high'] - alignment_point['patch_x_low'], 3],
+                dtype=float32)
+        else:
+            alignment_point['stacking_buffer'] = zeros(
+                [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
+                 alignment_point['patch_x_high'] - alignment_point['patch_x_low']], dtype=float32)
+
+    def find_alignment_points(self, y_low, y_high, x_low, x_high):
+        """
+        Find all alignment points the centers of which are within given (y, x) bounds.
+
+        :param y_low: Lower y pixel coordinate bound
+        :param y_high: Upper y pixel coordinate bound
+        :param x_low: Lower x pixel coordinate bound
+        :param x_high: Upper x pixel coordinate bound
+        :return: List of all alignment points with centers within the given coordinate bounds.
+                 If no AP satisfies the condition, return an empty list.
+        """
+
+        ap_list = []
+        for ap in self.alignment_points:
+            if y_low <= ap['y'] <= y_high and x_low <= ap['x'] <= x_high:
+                ap_list.append(ap)
+        return ap_list
+
+    @staticmethod
+    def find_neighbor(ap_y, ap_x, alignment_points):
+        """
+        For a given (y, x) position find the closest "real" alignment point.
+
+        :param ap_y: y cocrdinate of location of interest
+        :param ap_x: x cocrdinate of location of interest
+        :param alignment_points: List of alignment points to be searched
+
+        :return: Alignment point object of closest AP, and distance in pixels. If the list of
+                 alignment points is empty, (None, None) is returned.
+        """
+
+        # If no APs have been created yet, return None for both results.
+        if not alignment_points:
+            return None, None
+
+        # Start with an impossibly large distance, and find the closest AP on the list.
+        min_distance_squared = 1.e30
+        ap_neighbor = None
+        for ap in alignment_points:
+            distance_squared = (ap['y'] - ap_y) ** 2 + (ap['x'] - ap_x) ** 2
+            if distance_squared < min_distance_squared:
+                ap_neighbor = ap
+                min_distance_squared = distance_squared
+        return ap_neighbor, sqrt(min_distance_squared)
+
+    def compute_frame_qualities(self):
+        """
+        For each alignment point compute a ranking of best frames. Store the list in the
+        alignment point dictionary with the key 'best_frame_indices'.
+
+        Consider the special case that sampled-down Laplacians have been stored for frame ranking.
+        In this case they can be re-used for ranking the boxes around alignment points (but only
+        if "Laplace" has been selected for alignment point ranking).
+
+        :return: -
+        """
+
+        # If the user has entered a value for the number of frames, use it.
+        if self.configuration.alignment_points_frame_number is not None:
+            self.stack_size = self.configuration.alignment_points_frame_number
+        # Otherwise compute the stack size from the given percentage. Take at least one frame.
+        else:
+            self.stack_size = max(int(ceil(
+                self.frames.number * self.configuration.alignment_points_frame_percent / 100.)), 1)
+        # Select the ranking method.
+        if self.configuration.alignment_points_rank_method == "xy gradient":
+            method = Miscellaneous.local_contrast
+        elif self.configuration.alignment_points_rank_method == "Laplace":
+            method = Miscellaneous.local_contrast_laplace
+        elif self.configuration.alignment_points_rank_method == "Sobel":
+            method = Miscellaneous.local_contrast_sobel
+        else:
+            raise NotSupportedError(
+                "Ranking method " + self.configuration.alignment_points_rank_method +
+                " not supported")
+
+        # Compute the frequency of progress signals in the computational loop.
+        if self.progress_signal is not None:
+            self.signal_loop_length = max(self.frames.number, 1)
+            self.signal_step_size = max(int(round(self.frames.number / 10)), 1)
+
+        # Initialize a list which for each AP contains the qualities of all frames at this point.
+        for alignment_point in self.alignment_points:
+            alignment_point['frame_qualities'] = []
+
+        if self.configuration.rank_frames_method != "Laplace" or \
+                self.configuration.alignment_points_rank_method != "Laplace":
+            # There are no stored Laplacians, or they cannot be used for the specified method.
+            # Cycle through all frames and alignment points:
+            for frame_index in range(self.frames.number):
+                frame = self.frames.frames_mono_blurred(frame_index)
+
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                    self.progress_signal.emit("Rank frames at APs",
+                                              int((frame_index / self.signal_loop_length) * 100.))
+
+                for ap_index, alignment_point in enumerate(self.alignment_points):
+                    # Compute patch bounds within the current frame.
+                    y_low = max(0,
+                                alignment_point['patch_y_low'] + self.align_frames.dy[frame_index])
+                    y_high = min(self.frames.shape[0],
+                                 alignment_point['patch_y_high'] + self.align_frames.dy[
+                                     frame_index])
+                    x_low = max(0,
+                                alignment_point['patch_x_low'] + self.align_frames.dx[frame_index])
+                    x_high = min(self.frames.shape[1],
+                                 alignment_point['patch_x_high'] + self.align_frames.dx[
+                                     frame_index])
+                    # Compute the frame quality and append it to the list for this alignment point.
+                    alignment_point['frame_qualities'].append(
+                        method(frame[y_low:y_high, x_low:x_high],
+                               self.configuration.alignment_points_rank_pixel_stride))
+        else:
+            # Sampled-down Laplacians of all blurred frames have been computed in
+            # "frames.frames_mono_blurred_laplacian". Cut out boxes around alignment points from
+            # those objects, rather than computing new Laplacians. Cycle through all frames and
+            # alignment points. Use the blurred monochrome image for ranking.
+            for frame_index in range(self.frames.number):
+                frame = self.frames.frames_mono_blurred_laplacian(frame_index)
+
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                    self.progress_signal.emit("Rank frames at APs",
+                                              int((frame_index / self.signal_loop_length) * 100.))
+
+                for ap_index, alignment_point in enumerate(self.alignment_points):
+                    # Compute patch bounds within the current frame.
+                    y_low = int(max(0, alignment_point['patch_y_low'] + self.align_frames.dy[
+                        frame_index]) / self.configuration.align_frames_sampling_stride)
+                    y_high = int(min(self.frames.shape[0],
+                                     alignment_point['patch_y_high'] + self.align_frames.dy[
+                                         frame_index]) / self.configuration.align_frames_sampling_stride)
+                    x_low = int(max(0, alignment_point['patch_x_low'] + self.align_frames.dx[
+                        frame_index]) / self.configuration.align_frames_sampling_stride)
+                    x_high = int(min(self.frames.shape[1],
+                                     alignment_point['patch_x_high'] + self.align_frames.dx[
+                                         frame_index]) / self.configuration.align_frames_sampling_stride)
+                    # Compute the frame quality and append it to the list for this alignment point.
+                    alignment_point['frame_qualities'].append(
+                        frame[y_low:y_high, x_low:x_high].var())
+
+        if self.progress_signal is not None:
+            self.progress_signal.emit("Rank frames at APs", 100)
+
+        # Initialize the alignment point lists for all frames.
+        self.frames.reset_alignment_point_lists()
+        # For each alignment point sort the computed quality ranks in descending order.
+        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
+            alignment_point['best_frame_indices'] = [b[0] for b in sorted(
+                enumerate(alignment_point['frame_qualities']), key=lambda i: i[1],
+                reverse=True)]
+            # Truncate the list to the number of frames to be stacked for each alignmeent point.
+            alignment_point['best_frame_indices'] = alignment_point['best_frame_indices'][
+                                                    :self.stack_size]
+            # Add this alignment point to the AP lists of those frames where the AP is to be used.
+            for frame_index in alignment_point['best_frame_indices']:
+                self.frames.used_alignment_points[frame_index].append(alignment_point_index)
+
+    def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
+                                      de_warp=True):
+        """
+        Compute the [y, x] pixel shift vector at a given alignment point relative to the mean frame.
+        Four different methods can be used to compute the shift values:
         - a subpixel algorithm from "skimage.feature"
         - a phase correlation algorithm (miscellaneous.translation)
-        - a local search algorithm (spiralling outwards), see method "search_local_match"
+        - a local search algorithm (spiralling outwards), see method "search_local_match",
+          optionally with subpixel accuracy.
+        - a local search algorithm, based on steepest descent, see method
+          "search_local_match_gradient". This method is faster than the previous one, but it has no
+          subpixel option.
 
         Be careful with the sign of the local shift values. For the first two methods, a positive
         value means that the current frame has to be shifted in the positive coordinate direction
@@ -320,381 +686,120 @@ class AlignmentPoints(object):
         corresponding box in the reference frame. If at this point the box is shifted towards a
         higher coordinate value, this value is returned with a negative sign as the local shift.
 
-        After computing the shift vectors for the alignment points, shift vectors are interpolated
-        for neighbors of those alignment points. Make sure that all contributing alignment points
-        for those neighbors are included in the list of alignment points.
-
-        This method can be called in three different ways, depending on optional parameters:
-        - Shifts are computed for all alignment boxes if no optional parameter is set.
-        - If "alignment_point_list" and "alignment_point_neighbor_list" are specified, shifts are
-          computed for points on those lists only.
-        - If "use_ap_mask" is set to "True", shifts are computed for alignment box positions where
-          the corresponding mask entry is "True". This mode requires that the mask has been
-          set before by calling method "ap_mask_set".
-
-        :param frame_index: Index of the selected frame in the list of frames.
-        :param alignment_point_list: List of alignment point indices. If not specified, shifts are
-               computed for all alignment points in the frame.
-        :param alignment_point_neighbor_list: List of alignment point neighbor indices. If not
-               specified, shifts are computed for all alignment point neighbors in the frame.
-        :param use_ap_mask: If True, a mask specifies which alignment points are to be computed.
-        :return: -
-        """
-
-        if self.alignment_points is None:
-            raise WrongOrderingError(
-                "Attempt to compute alignment point shifts before selecting alingment points")
-
-        # Reset the pixel shift array values in y and x.
-        self.y_shifts[:, :] = 0.
-        self.x_shifts[:, :] = 0.
-
-        # A mask defines the locations where shift vectors are to be computed.
-        if use_ap_mask:
-
-            # Check if mask ist initialized.
-            if self.ap_mask is None:
-                raise WrongOrderingError(
-                    "Attempt to compute shift vectors without setting the mask first")
-
-            # First make sure that all "contributing alignment points" of alignment point neighbors
-            # are included in the mask.
-            for alignment_box_row in (self.alignment_boxes[1:-1]):
-                for alignment_box in (alignment_box_row[1:-1]):
-                    j = alignment_box['coordinates'][0]
-                    i = alignment_box['coordinates'][1]
-                    # If not an alignment point neighbor, go to the next box.
-                    if alignment_box['type'] != 'alignment point neighbor' or not self.ap_mask[j][i]:
-                        continue
-                    for ap in self.alignment_point_neighbors[alignment_box[
-                                                            'alignment_point_neighbor_index']][2]:
-                        self.ap_mask[self.alignment_points[ap['alignment_point_index']][0],
-                                     self.alignment_points[ap['alignment_point_index']][1]] = True
-
-            # Compute shifts at alignment points.
-            for alignment_box_row in (self.alignment_boxes[1:-1]):
-                for alignment_box in (alignment_box_row[1:-1]):
-                    # If not an alignment point, go to the next box.
-                    if alignment_box['type'] != 'alignment point':
-                        continue
-                    j = alignment_box['coordinates'][0]
-                    i = alignment_box['coordinates'][1]
-                    # The mask is "True": Compute the shift vector.
-                    if self.ap_mask[j][i]:
-                        self.compute_shift_alignment_point(frame_index, j, i,
-                            alignment_box['coordinates'][4], alignment_box['coordinates'][5],
-                            alignment_box['coordinates'][6], alignment_box['coordinates'][7])
-
-            # Now compute shifts at alignment point neighbors.
-            for alignment_box_row in (self.alignment_boxes[1:-1]):
-                for alignment_box in (alignment_box_row[1:-1]):
-                    # If not an alignment point neighbor, go to the next box.
-                    if alignment_box['type'] != 'alignment point neighbor':
-                        continue
-                    j = alignment_box['coordinates'][0]
-                    i = alignment_box['coordinates'][1]
-                    # The mask is "True": Compute the shift vector.
-                    if self.ap_mask[j][i]:
-                        self.compute_shift_neighbor_point(j, i, self.alignment_point_neighbors[
-                            alignment_box['alignment_point_neighbor_index']][2])
-
-            # Finally compute shifts at boundary points.
-            for alignment_box_row in self.alignment_boxes:
-                for alignment_box in alignment_box_row:
-                    # If not an alignment point neighbor, go to the next box.
-                    if alignment_box['type'] != 'boundary point':
-                        continue
-                    j = alignment_box['coordinates'][0]
-                    i = alignment_box['coordinates'][1]
-                    # The mask is "True": Compute the shift vector.
-                    if self.ap_mask[j][i]:
-                        self.compute_shift_boundary_point(j, i)
-
-        # Alignment box positions are specified via lists.
-        else:
-            # If no list is specified explicitly, compute shifts for all alignment points.
-            if alignment_point_list is not None:
-                ap_list = alignment_point_list
-            else:
-                ap_list = self.alignment_points
-
-            # If no list is specified explicitly, compute shifts for all alignment point neighbors.
-            if alignment_point_neighbor_list is not None:
-                ap_neighbor_list = alignment_point_neighbor_list
-            else:
-                ap_neighbor_list = self.alignment_point_neighbors
-
-            # For each alignment point, compute the shift for the given frame index.
-            for [j, i, y_center, x_center, y_low, y_high, x_low, x_high] in ap_list:
-                self.compute_shift_alignment_point(frame_index, j, i, y_low, y_high, x_low, x_high)
-
-            # For each alignment point neighbor, compute the shifts for the given frame index.
-            for [j, i, contributing_alignment_points] in ap_neighbor_list:
-                self.compute_shift_neighbor_point(j, i, contributing_alignment_points)
-
-    def compute_shift_alignment_point(self, frame_index, j, i, y_low, y_high, x_low, x_high):
-        """
-        Compute the pixel shift vector at a given alignment point. The resulting shifts in y and x
-        direction are assigned to the corresponding entries in arrays self.y_shifts and
-        self.x_shifts.
-
+        :param frame_mono_blurred: Gaussian-blurred version of the frame with index "frame_index"
         :param frame_index: Index of the selected frame in the list of frames
-        :param j: Row index (y) of alignment box
-        :param i: Column index (x) of alignment box
-        :param y_low: Lower y pixel index bound of alignment box
-        :param y_high: Upper y pixel index bound of alignment box
-        :param x_low: Lower x pixel index bound of alignment box
-        :param x_high: Upper x pixel index bound of alignment box
-        :return: -
+        :param alignment_point_index: Index of the selected alignment point
+        :param de_warp: If True, include local warp shift computation. If False, only apply
+                        global frame shift.
+        :return: Local shift vector [dy, dx]
         """
+
+        alignment_point = self.alignment_points[alignment_point_index]
+        y_low = alignment_point['box_y_low']
+        y_high = alignment_point['box_y_high']
+        x_low = alignment_point['box_x_low']
+        x_high = alignment_point['box_x_high']
+        reference_box = alignment_point['reference_box']
 
         # The offsets dy and dx are caused by two effects: First, the mean frame is smaller
         # than the original frames. It only contains their intersection. And second, because the
         # given frame is globally shifted as compared to the mean frame.
-        dy = self.align_frames.intersection_shape[0][0] - \
-             self.align_frames.frame_shifts[frame_index][0]
-        dx = self.align_frames.intersection_shape[1][0] - \
-             self.align_frames.frame_shifts[frame_index][1]
+        dy = self.align_frames.dy[frame_index]
+        dx = self.align_frames.dx[frame_index]
 
-        # Cut out the alignment box from the given frame. Take into account the offsets
-        # explained above.
-        box_in_frame = self.frames.frames_mono[frame_index][y_low + dy:y_high + dy,
-                       x_low + dx:x_high + dx]
+        if de_warp:
+            # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
+            if self.configuration.alignment_points_method == 'Subpixel':
+                # Cut out the alignment box from the given frame. Take into account the offsets
+                # explained above.
+                box_in_frame = frame_mono_blurred[y_low + dy:y_high + dy,
+                               x_low + dx:x_high + dx]
+                shift_pixel, error, diffphase = register_translation(
+                    reference_box, box_in_frame, 10, space='real')
 
-        # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
-        if self.configuration.alignment_point_method == 'Subpixel':
-            shift_pixel, error, diffphase = register_translation(
-                self.alignment_boxes[j][i]['box'], box_in_frame, 10, space='real')
+            # Use a simple phase shift computation (contained in module "miscellaneous").
+            elif self.configuration.alignment_points_method == 'CrossCorrelation':
+                # Cut out the alignment box from the given frame. Take into account the offsets
+                # explained above.
+                box_in_frame = frame_mono_blurred[y_low + dy:y_high + dy,
+                                                  x_low + dx:x_high + dx]
+                shift_pixel = Miscellaneous.translation(reference_box,
+                                                        box_in_frame, box_in_frame.shape)
 
-        # Use a simple phase shift computation (contained in module "miscellaneous").
-        elif self.configuration.alignment_point_method == 'CrossCorrelation':
-            shift_pixel = Miscellaneous.translation(self.alignment_boxes[j][i]['box'],
-                                                    box_in_frame, box_in_frame.shape)
+            # Use a local search (see method "search_local_match" below.
+            elif self.configuration.alignment_points_method == 'RadialSearch':
+                shift_pixel, dev_r = Miscellaneous.search_local_match(reference_box,
+                    frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                    self.configuration.alignment_points_search_width,
+                    self.configuration.alignment_points_sampling_stride,
+                    sub_pixel=self.configuration.alignment_points_local_search_subpixel)
 
-        # Use a local search (see method "search_local_match" below.
-        elif self.configuration.alignment_point_method == 'LocalSearch':
-            shift_pixel = self.search_local_match(self.alignment_boxes[j][i]['box'],
-                                                  self.frames.frames_mono[frame_index],
-                                                  y_low + dy, y_high + dy, x_low + dx,
-                                                  x_high + dx,
-                                                  self.configuration.alignment_point_search_width,
-                                                  sub_pixel=self.configuration.alignment_sub_pixel)
-        else:
-            raise NotSupportedError("The point shift computation method " +
-                                    self.configuration.alignment_point_method + " is not implemented")
-
-        # Copy pixel shift values into the shift arrays.
-        self.y_shifts[j][i] = shift_pixel[0]
-        self.x_shifts[j][i] = shift_pixel[1]
-
-    def compute_shift_neighbor_point(self, j, i, contributing_alignment_points):
-        """
-        Compute the pixel shift vector at a given alignment point neighbor, by interpolating from
-        the alignment points in the neighborhood. Make sure that the shifts for those alignment
-        points are computed before calling this method.. The resulting shifts in y and x
-        direction are assigned to the corresponding entries in arrays self.y_shifts and
-        self.x_shifts.
-
-        :param j: Row index (y) of alignment box
-        :param i: Column index (x) of alignment box
-        :param contributing_alignment_points: locations and interpolation weights for
-                                              alignment points in the neighborhood
-        :return: -
-        """
-
-        self.y_shifts[j][i] = 0.
-        self.x_shifts[j][i] = 0.
-        for ap in contributing_alignment_points:
-            j_ap = self.alignment_points[ap['alignment_point_index']][0]
-            i_ap = self.alignment_points[ap['alignment_point_index']][1]
-            self.y_shifts[j][i] += ap['weight'] * self.y_shifts[j_ap][i_ap]
-            self.x_shifts[j][i] += ap['weight'] * self.x_shifts[j_ap][i_ap]
-
-    def compute_shift_boundary_point(self, j, i):
-        """
-        For boundary points copy the shifts from the closest interior point.
-
-        :param j: Row index (y) of alignment box
-        :param i: Column index (x) of alignment box
-        :return: -
-        """
-
-        # Upper boundary
-        if j==0:
-            j_copy = 1
-        # Lower boundary
-        elif j== self.y_locations_number-1:
-            j_copy = self.y_locations_number-2
-        else:
-            j_copy = j
-
-        # Left boundary
-        if i==0:
-            i_copy = 1
-        # Right boundary
-        elif i== self.x_locations_number-1:
-            i_copy = self.x_locations_number-2
-        else:
-            i_copy = i
-
-        # Copy shift vector from closest interior point
-        self.y_shifts[j][i] = self.y_shifts[j_copy][i_copy]
-        self.x_shifts[j][i] = self.x_shifts[j_copy][i_copy]
-
-    def search_local_match(self, reference_box, frame, y_low, y_high, x_low, x_high, search_width,
-                           sub_pixel=True):
-        """
-        Try shifts in y, x between the box around the alignment point in the mean frame and the
-        corresponding box in the given frame. Start with shifts [0, 0] and move out in a circular
-        fashion, until the radius "search_width" is reached. The global frame shift is accounted for
-        beforehand already.
-
-        :param reference_box: Image box around alignment point in mean frame.
-        :param frame: Given frame for which the local shift at the alignment point is to be
-                      computed.
-        :param y_low: Lower y coordinate limit of box in given frame, taking into account the
-                      global shift and the different sizes of the mean frame and the original
-                      frames.
-        :param y_high: Upper y coordinate limit
-        :param x_low: Lower x coordinate limit
-        :param x_high: Upper x coordinate limit
-        :param search_width: maximum radius of the search spiral
-        :param sub_pixel: If True, compute local shifts with sub-pixel accuracy
-        :return: Local shift in the form [shift_y, shift_x], or [0, 0] if no optimum could be found.
-        """
-
-        # Initialize the global optimum with an impossibly large value.
-        deviation_min = 1.e30
-        dy_min = None
-        dx_min = None
-
-        # Start with shift [0, 0] and proceed in a circular pattern.
-        for r in arange(search_width + 1):
-
-            # Create an enumerator which produces shift values [dy, dx] in a circular pattern
-            # with radius "r".
-            circle_r = Miscellaneous.circle_around(0, 0, r)
-
-            # Initialize the optimum for radius "r" to an impossibly large value,
-            # and the corresponding shifts to None.
-            deviation_min_r, dy_min_r, dx_min_r = 1.e30, None, None
-
-            # Go through the circle with radius "r" and compute the difference (deviation)
-            # between the shifted frame and the corresponding box in the mean frame. Find the
-            # minimum "deviation_min_r" for radius "r".
-            for (dx, dy) in circle_r:
-                deviation = abs(
-                    reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
-                # deviation = sqrt(square(
-                #     reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum())
-                if deviation < deviation_min_r:
-                    deviation_min_r, dy_min_r, dx_min_r = deviation, dy, dx
-                self.deviations[dy + search_width, dx + search_width] = deviation
-
-            # If for the current radius there is no improvement compared to the previous radius,
-            # the optimum is reached.
-            if deviation_min_r >= deviation_min:
-
-                # For sub-pixel accuracy, find local minimum of fitting paraboloid.
-                if sub_pixel:
-                    try:
-                        y_correction, x_correction = self.sub_pixel_solve(self.deviations[
-                            dy_min + search_width - 1: dy_min + search_width + 2,
-                            dx_min + search_width - 1: dx_min + search_width + 2])
-                    except DivideByZeroError as ex:
-                        print (ex.message)
-                        x_correction = y_correction = 0.
-
-                    # Add the sub-pixel correction to the local shift.
-                    dy_min += y_correction
-                    dx_min += x_correction
-
-                return [dy_min, dx_min]
-
-            # Otherwise, update the current optimum and continue.
+            # Use the steepest descent search method.
+            elif self.configuration.alignment_points_method == 'SteepestDescent':
+                shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(reference_box,
+                    frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                    self.configuration.alignment_points_search_width,
+                    self.configuration.alignment_points_sampling_stride, self.dev_table)
             else:
-                deviation_min, dy_min, dx_min = deviation_min_r, dy_min_r, dx_min_r
-        # print("search local match unsuccessful: y_low: " + str(y_low) + ", x_low: " + str(x_low))
-        # print("search local match unsuccessful: y: " + str((y_high + y_low) / 2.) + ",
-        #       x: " + str((x_high + x_low) / 2.))
+                raise NotSupportedError("The point shift computation method " +
+                                        self.configuration.alignment_points_method +
+                                        " is not implemented")
 
-        # If within the maximum search radius no optimum could be found, return [0, 0].
-        return [0, 0]
-
-    def sub_pixel_solve(self, function_values):
-        """
-        Compute the sub-pixel correction for method "search_local_match".
-
-        :param function_values: Matching differences at (3 x 3) pixels around the minimum found
-        :return: Corrections in y and x to the center position for local minimum
-        """
-
-        # If the functions are not yet reduced to 1D, do it now.
-        function_values_1d = function_values.reshape((9,))
-
-        # There are nine equations for six unknowns. Use normal equations to solve for optimum.
-        a_transpose = array(
-            [[1., 0., 1., 1., 0., 1., 1., 0., 1.], [1., 1., 1., 0., 0., 0., 1., 1., 1.],
-             [1., -0., -1., -0., 0., 0., -1., 0., 1.], [-1., 0., 1., -1., 0., 1., -1., 0., 1.],
-             [-1., -1., -1., 0., 0., 0., 1., 1., 1.], [1., 1., 1., 1., 1., 1., 1., 1., 1.]])
-        a_transpose_a = array(
-            [[6., 4., 0., 0., 0., 6.], [4., 6., 0., 0., 0., 6.], [0., 0., 4., 0., 0., 0.],
-             [0., 0., 0., 6., 0., 0.], [0., 0., 0., 0., 6., 0.], [6., 6., 0., 0., 0., 9.]])
-
-        # Right hand side is "a transposed times input vector".
-        rhs = matmul(a_transpose, function_values_1d)
-
-        # Solve for parameters of the fitting function
-        # f = a_f * x ** 2 + b_f * y ** 2 + c_f * x * y + d_f * x + e_f * y + g_f
-        a_f, b_f, c_f, d_f, e_f, g_f = solve(a_transpose_a, rhs)
-
-        # The corrected pixel values of the minimum result from setting the first derivatives of
-        # the fitting funtion in y and x direction to zero, and solving for y and x.
-        denominator_y = c_f ** 2 - 4. * a_f * b_f
-        if abs(denominator_y) > 1.e-10 and abs(a_f) > 1.e-10:
-            y_correction = (2. * a_f * e_f - c_f * d_f) / denominator_y
-            x_correction = (- c_f * y_correction - d_f) / (2. * a_f)
-        elif abs(denominator_y) > 1.e-10 and abs(c_f) > 1.e-10:
-            y_correction = (2. * a_f * e_f - c_f * d_f) / denominator_y
-            x_correction = (-2. * b_f * y_correction - e_f) / c_f
+            # Return the computed shift vector.
+            return shift_pixel
         else:
-            raise DivideByZeroError("Sub-pixel shift cannot be computed, set to zero")
+            # If no de-warping is computed, just return the zero vector.
+            return [0, 0]
 
-        return y_correction, x_correction
-
-    def ap_mask_initialize(self):
+    def show_alignment_points(self, image):
         """
-        Initialize the alignment point mask used to specify at which alignment box locations shift
-        vectors are to be computed. This method (and at least one call to "ap_mask_set" must be
-        called before calling "compute_alignment_point_shifts".
+        Create an RGB version of a monochrome image and insert red crosses at all alignment
+        point locations. Draw green alignment point boxes and white alignment point patches.
 
-        :return: -
+        :return: 8-bit RGB image with annotations.
         """
 
-        self.ap_mask = full((self.y_locations_number, self.x_locations_number), False, dtype=bool)
+        if len(image.shape) == 3:
+            color_image = image.astype(uint8)
+        else:
+            # Expand the monochrome reference frame to RGB
+            color_image = stack((image.astype(uint8),) * 3, -1)
 
-    def ap_mask_set(self, j_ap_low, j_ap_high, i_ap_low, i_ap_high):
-        """
-        Register a rectangular patch of alignment box locations for shift vector computation.
+        # For all alignment boxes insert a color-coded cross.
+        cross_half_len = 5
 
-        :param j_ap_low:  lower bound of alignment box indices in y direction
-        :param j_ap_high: upper bound of alignment box indices in y direction
-        :param i_ap_low:  lower bound of alignment box indices in x direction
-        :param i_ap_high: upper bound of alignment box indices in x direction
-        :return: -
-        """
+        for alignment_point in (self.alignment_points):
+            y_center = alignment_point['y']
+            x_center = alignment_point['x']
+            Miscellaneous.insert_cross(color_image, y_center,
+                                       x_center, cross_half_len, 'red')
+            box_y_low = max(alignment_point['box_y_low'], 0)
+            box_y_high = min(alignment_point['box_y_high'], image.shape[0]) - 1
+            box_x_low = max(alignment_point['box_x_low'], 0)
+            box_x_high = min(alignment_point['box_x_high'], image.shape[1]) - 1
+            for y in arange(box_y_low, box_y_high):
+                color_image[y, box_x_low] = [255, 255, 255]
+                color_image[y, box_x_high] = [255, 255, 255]
+            for x in arange(box_x_low, box_x_high):
+                color_image[box_y_low, x] = [255, 255, 255]
+                color_image[box_y_high, x] = [255, 255, 255]
 
-        self.ap_mask[j_ap_low:j_ap_high+1, i_ap_low:i_ap_high+1] = True
+            patch_y_low = max(alignment_point['patch_y_low'], 0)
+            patch_y_high = min(alignment_point['patch_y_high'], image.shape[0]) - 1
+            patch_x_low = max(alignment_point['patch_x_low'], 0)
+            patch_x_high = min(alignment_point['patch_x_high'], image.shape[1]) - 1
+            for y in arange(patch_y_low, patch_y_high):
+                color_image[y, patch_x_low] = [0, int(
+                    (255 + color_image[y, patch_x_low][1]) / 2.), 0]
+                color_image[y, patch_x_high] = [0, int(
+                    (255 + color_image[y, patch_x_high][1]) / 2.), 0]
+            for x in arange(patch_x_low, patch_x_high):
+                color_image[patch_y_low, x] = [0, int(
+                    (255 + color_image[patch_y_low, x][1]) / 2.), 0]
+                color_image[patch_y_high, x] = [0, int(
+                    (255 + color_image[patch_y_high, x][1]) / 2.), 0]
 
-    def ap_mask_reset(self):
-        """
-        Reset the alignment point mask everywhere to False. After this call, the mask can be re-used
-        for the definition of another alignment box selection.
-
-        :return: -
-        """
-
-        self.ap_mask[:, :] = False
+        return color_image
 
 
 if __name__ == "__main__":
@@ -702,7 +807,7 @@ if __name__ == "__main__":
     # the example for the test run.
     type = 'video'
     if type == 'image':
-        names = glob.glob('Images/2012*.tif')
+        names = glob('Images/2012*.tif')
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
@@ -712,7 +817,7 @@ if __name__ == "__main__":
     # Get configuration parameters.
     configuration = Configuration()
     try:
-        frames = Frames(names, type=type)
+        frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
@@ -733,25 +838,28 @@ if __name__ == "__main__":
 
     # Initialize the frame alignment object.
     align_frames = AlignFrames(frames, rank_frames, configuration)
-    start = time()
-    # Select the local rectangular patch in the image where the L gradient is highest in both x
-    # and y direction. The scale factor specifies how much smaller the patch is compared to the
-    # whole image frame.
-    (x_low_opt, x_high_opt, y_low_opt, y_high_opt) = align_frames.select_alignment_rect(
-        configuration.alignment_rectangle_scale_factor)
-    end = time()
-    print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
-    print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
-        x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
-    reference_frame_with_alignment_points = align_frames.frames_mono[
-        align_frames.frame_ranks_max_index].copy()
-    reference_frame_with_alignment_points[y_low_opt,
-    x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
-                            x_low_opt:x_high_opt] = 255
-    reference_frame_with_alignment_points[y_low_opt:y_high_opt,
-    x_low_opt] = reference_frame_with_alignment_points[y_low_opt:y_high_opt, x_high_opt - 1] = 255
-    # plt.imshow(reference_frame_with_alignment_points, cmap='Greys_r')
-    # plt.show()
+
+    if configuration.align_frames_mode == "Surface":
+        start = time()
+        # Select the local rectangular patch in the image where the L gradient is highest in both x
+        # and y direction. The scale factor specifies how much smaller the patch is compared to the
+        # whole image frame.
+        (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = align_frames.compute_alignment_rect(
+            configuration.align_frames_rectangle_scale_factor)
+        end = time()
+        print('Elapsed time in computing optimal alignment rectangle: {}'.format(end - start))
+        print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
+            x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
+        reference_frame_with_alignment_points = frames.frames_mono(
+            align_frames.frame_ranks_max_index).copy()
+        reference_frame_with_alignment_points[y_low_opt,
+        x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
+                                x_low_opt:x_high_opt] = 255
+        reference_frame_with_alignment_points[y_low_opt:y_high_opt,
+        x_low_opt] = reference_frame_with_alignment_points[y_low_opt:y_high_opt,
+                     x_high_opt - 1] = 255
+        # plt.imshow(reference_frame_with_alignment_points, cmap='Greys_r')
+        # plt.show()
 
     # Align all frames globally relative to the frame with the highest score.
     start = time()
@@ -761,189 +869,67 @@ if __name__ == "__main__":
     print("Frame shifts: " + str(align_frames.frame_shifts))
     print("Intersection: " + str(align_frames.intersection_shape))
 
+    start = time()
+    # Compute the reference frame by averaging the best frames.
+    average = align_frames.average_frame()
+
     # Initialize the AlignmentPoints object. This includes the computation of the average frame
     # against which the alignment point shifts are measured.
-    start = time()
+
     alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
     end = time()
     print('Elapsed time in computing average frame: {}'.format(end - start))
     print("Average frame computed from the best " + str(
-        alignment_points.average_frame_number) + " frames.")
+        align_frames.average_frame_number) + " frames.")
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()
 
-    # Create a regular grid with small boxes. A subset of those boxes will be selected as
-    # alignment points.
-    step_size = configuration.alignment_box_step_size
-    box_size = configuration.alignment_box_size
-    start = time()
-    alignment_points.create_alignment_boxes(step_size, box_size)
-    end = time()
-    print('Elapsed time in alignment box creation: {}'.format(end - start))
-    print("Number of alignment boxes created: " + str(
-        len(alignment_points.alignment_boxes)) + " rows, each with " + str(
-        len(alignment_points.alignment_boxes[0])) + " boxes.")
+    # Create alignment points, and show alignment point boxes and patches.
+    alignment_points.create_ap_grid()
+    print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
+          ", number of dropped aps (dim): " + str(
+        alignment_points.alignment_points_dropped_dim) +
+          ", number of dropped aps (structure): " + str(
+        alignment_points.alignment_points_dropped_structure))
+    color_image = alignment_points.show_alignment_points(average)
 
-    # An alignment box is selected as an alignment point if it satisfies certain conditions
-    # regarding local contrast etc.
-    structure_threshold = configuration.alignment_point_structure_threshold
-    brightness_threshold = configuration.alignment_point_brightness_threshold
-    contrast_threshold = configuration.alignment_point_contrast_threshold
-    print("Selection of alignment points, structure threshold: " + str(
-        structure_threshold) + ", brightness threshold: " + str(
-        brightness_threshold) + ", contrast threshold: " + str(contrast_threshold))
-    start = time()
-    alignment_points.select_alignment_points(structure_threshold, brightness_threshold,
-                                             contrast_threshold)
-    end = time()
-    print('Elapsed time in alignment point selection: {}'.format(end - start))
-    print("Number of alignment points selected: " + str(len(alignment_points.alignment_points)))
-    print("Number of alignment point neighbors selected: " + str(
-        len(alignment_points.alignment_point_neighbors)))
-
-    # Create a version of the reference frame with small white crosses at alignment points and
-    # alignment point neighbors.
-    start = time()
-    reference_frame_with_alignment_points = stack((align_frames.mean_frame.astype(uint16),) * 3, -1)
-    cross_half_len = 5
-    for j, y_center in enumerate(alignment_points.y_locations):
-        for i, x_center in enumerate(alignment_points.x_locations):
-            # if alignment_points.alignment_boxes[j][i]['type'] == 'alignment point' or \
-            #         alignment_points.alignment_boxes[j][i]['type'] == 'alignment point neighbor':
-            Miscellaneous.insert_cross(reference_frame_with_alignment_points, y_center,
-                                           x_center, cross_half_len, 'white')
-    end = time()
-    print('Elapsed time in drawing alignment points: {}'.format(end - start))
-    plt.imshow(reference_frame_with_alignment_points)
+    plt.imshow(color_image)
     plt.show()
 
-    # Select the frame index and an area on this frame where details on local shifts are to be
-    # visualized.
-    frame_index_details = 0
-    y_center_low_details = 0
-    y_center_high_details = 4000
-    x_center_low_details = 0
-    x_center_high_details = 6000
-    warp_threshold = 0.1
-    box_size_half = int(configuration.alignment_box_size / 2)
+    # For each alignment point rank frames by their quality.
+    start = time()
+    alignment_points.compute_frame_qualities()
+    end = time()
+    print('Elapsed time in ranking frames for every alignment point: {}'.format(end - start))
 
-    # Initialize the alignment point mask and set it to True everywhere. This way, shifts will be
-    # computed at all locations.
-    alignment_points.ap_mask_initialize()
-    alignment_points.ap_mask[:, :] = True
+    y_low = 490
+    y_high = 570
+    x_low = 880
+    x_high = 960
+    found_ap_list = alignment_points.find_alignment_points(y_low, y_high, x_low, x_high)
+    print("Removing alignment points between bounds " + str(y_low) + " <= y <= " + str(y_high) +
+          ", " + str(x_low) + " <= x <= " + str(x_high) + ":")
+    for ap in found_ap_list:
+        print("y: " + str(ap['y']) + ", x: " + str(ap['x']))
+    alignment_points.remove_alignment_points(found_ap_list)
 
-    for frame_index in range(frames.number):
+    y_new = 530
+    x_new = 920
+    half_box_width_new = 40
+    half_patch_width_new = 50
+    num_pixels_y = average.shape[0]
+    num_pixels_x = average.shape[1]
+    alignment_points.alignment_points.append(
+        alignment_points.new_alignment_point(y_new, x_new, False, False, False, False))
+    print("Added alignment point at y: " + str(y_new) + ", x: " + str(x_new) + ", box size: "
+          + str(2 * half_box_width_new) + ", patch size: " + str(2 * half_patch_width_new))
 
-        # Get a copy of the reference frame with white crosses at alignment points.
-        frame_with_shifts = reference_frame_with_alignment_points.copy()
+    # Show updated alignment point boxes and patches.
+    print("Number of alignment points created: " + str(len(alignment_points.alignment_points)) +
+          ", number of dropped aps (dim): " + str(alignment_points.alignment_points_dropped_dim) +
+          ", number of dropped aps (structure): " + str(
+        alignment_points.alignment_points_dropped_structure))
+    color_image = alignment_points.show_alignment_points(average)
 
-        # For all frames: Compute the local shifts for all alignment points (to be used for
-        # de-warping).
-        start = time()
-
-        alignment_points.compute_alignment_point_shifts(frame_index, use_ap_mask=True)
-        end = time()
-        print("Elapsed time in computing point shifts for frame number " + str(
-            frame_index) + ": " + str(end - start))
-
-        # Insert small crosses into the reference frame showing local shifts. For alignment points
-        # insert a red cross next to the unshifted white one. For alignment point neighbors insert
-        # a green cross to show the interpolated shift. Mark empty boxes with a blue cross.
-        for j, y_center in enumerate(alignment_points.y_locations):
-            for i, x_center in enumerate(alignment_points.x_locations):
-                if alignment_points.alignment_boxes[j][i]['type'] == 'alignment point':
-                    color_cross = 'red'
-                elif alignment_points.alignment_boxes[j][i]['type'] == 'alignment point neighbor':
-                    color_cross = 'green'
-                elif alignment_points.alignment_boxes[j][i]['type'] == 'boundary point':
-                    color_cross = 'cyan'
-                else:
-                    color_cross = 'blue'
-                Miscellaneous.insert_cross(frame_with_shifts,
-                                           y_center + int(round(alignment_points.y_shifts[j][i])),
-                                           x_center + int(round(alignment_points.x_shifts[j][i])),
-                                           cross_half_len, color_cross)
-        plt.imshow(frame_with_shifts)
-        plt.show()
-
-        # The following is executed only for one selected frame ...
-        if frame_index == frame_index_details:
-            reference_frame = reference_frame_with_alignment_points.copy()
-            for j, y_center in enumerate(alignment_points.y_locations):
-                for i, x_center in enumerate(alignment_points.x_locations):
-                    if alignment_points.alignment_boxes[j][i]['type'] == 'boundary point':
-                        continue
-                    # ... and only if the alignment point lies in the specified region.
-                    if y_center_low_details <= y_center <= y_center_high_details and \
-                            x_center_low_details <= x_center <= x_center_high_details:
-
-                        # Display on the left the reference frame at the box position with a
-                        # centered white cross.
-                        reference_frame_box = reference_frame[
-                                              y_center - box_size_half:y_center + box_size_half,
-                                              x_center - box_size_half:x_center + box_size_half]
-                        dy = align_frames.intersection_shape[0][0] - \
-                             align_frames.frame_shifts[frame_index][0]
-                        dx = align_frames.intersection_shape[1][0] - \
-                             align_frames.frame_shifts[frame_index][1]
-
-                        # Display in the middle the globally shifted selected frame with a centered
-                        # red cross. First, produce a three channel RGB object from the mono
-                        # channel.
-                        box_in_frame = stack((frames.frames_mono[frame_index],) * 3, -1)[
-                                       y_center - box_size_half + dy:y_center + box_size_half + dy,
-                                       x_center - box_size_half + dx:x_center + box_size_half + dx]
-                        Miscellaneous.insert_cross(box_in_frame, box_size_half, box_size_half,
-                                                   cross_half_len, 'red')
-
-                        # On the right, the de-warped box is displayed with a red cross for an
-                        # alignment point, or a green cross for an alignment point neighbor. For
-                        # all other points no shift is applied and the cross is colored blue.
-                        point_dy = alignment_points.y_shifts[j][i]
-                        point_dx = alignment_points.x_shifts[j][i]
-                        point_dy_int = int(round(point_dy))
-                        point_dx_int = int(round(point_dx))
-                        if alignment_points.alignment_boxes[j][i]['type'] == 'alignment point':
-                            color_cross = 'red'
-                        elif alignment_points.alignment_boxes[j][i][
-                            'type'] == 'alignment point neighbor':
-                            color_cross = 'green'
-                        else:
-                            color_cross = 'blue'
-
-                        # The three views are displayed only if the shift is larger than a
-                        # given threshold
-                        if max(abs(point_dy), abs(point_dx)) < warp_threshold:
-                            continue
-
-                        print("frame shifts: " + str(dy) + ", " + str(dx))
-                        print("Point shifts: " + str(point_dy) + ", " + str(point_dx))
-
-                        # Again, create an RGB image from the mono channel, and insert either a
-                        # green or red cross.
-                        box_in_frame_shifted = stack((frames.frames_mono[frame_index],) * 3, -1)[
-                                               y_center - box_size_half + dy -
-                                               point_dy_int:y_center + box_size_half + dy -
-                                                            point_dy_int,
-                                               x_center - box_size_half + dx -
-                                               point_dx_int:x_center + box_size_half + dx -
-                                                            point_dx_int]
-                        Miscellaneous.insert_cross(box_in_frame_shifted, box_size_half,
-                                                   box_size_half, cross_half_len, color_cross)
-
-                        # Display the three views around the alignment point.
-                        fig = plt.figure(figsize=(12, 6))
-                        ax1 = plt.subplot(1, 3, 1)
-                        ax2 = plt.subplot(1, 3, 2, sharex=ax1, sharey=ax1)
-                        ax3 = plt.subplot(1, 3, 3, sharex=ax2, sharey=ax2)
-                        ax1.imshow(reference_frame_box)
-                        ax1.set_axis_off()
-                        ax1.set_title(
-                            'Reference frame, y :' + str(y_center) + ", x:" + str(x_center))
-                        ax2.imshow(box_in_frame)
-                        ax2.set_axis_off()
-                        ax2.set_title('Frame, dy: ' + str(dy) + ", dx: " + str(dx))
-                        ax3.imshow(box_in_frame_shifted)
-                        ax3.set_axis_off()
-                        ax3.set_title('De-warped, dy: ' + str(point_dy) + ", dx: " + str(point_dx))
-                        plt.show()
+    plt.imshow(color_image)
+    plt.show()

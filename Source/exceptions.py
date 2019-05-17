@@ -93,3 +93,13 @@ class DivideByZeroError(Error):
 
     def __init__(self, message):
         self.message = message
+
+class IncompatibleVersionsError(Error):
+    """Exception raised if data and program versions do not match.
+
+        Attributes:
+            message -- explanation of the error
+        """
+
+    def __init__(self, message):
+        self.message = message
