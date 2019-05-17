@@ -703,7 +703,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                                 'Select stack size', 'Set ROI', 'Set alignment points',
                                                 'Compute frame qualities', 'Stack frames',
                                                 'Save stacked image'])
-                if self.workflow.configuration.global_parameters_include_postprocessing == True:
+                if self.workflow.configuration.global_parameters_include_postprocessing:
                     self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
             else:
                 self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
