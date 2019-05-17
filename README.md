@@ -15,6 +15,7 @@ Input to the program can be either video files or a directories containing still
 * For all frames, local shifts are computed at all alignment points.
 * Using those shifts, the alignment point patches of all contributing frames are stacked into a single average image patch.
 * Finally, all stacked patches are blended into a global image.
+* After stacking is completed, the stacked image can be postprocessed (sharpened) either in a final step of the stacking workflow, or in a separate postprocessing job.
 
 Program execution is most efficient if the image data and all intermediate results can be keept in memory. This, however, requires much RAM space. Therefore, the level of buffering can be selected in the configuration dialog, ranging from 0 (no buffering) to 4 (maximum buffering).
 
