@@ -27,6 +27,7 @@ from os.path import splitext, join
 
 from PyQt5 import QtCore
 from cv2 import imread, cvtColor, COLOR_BGR2RGB
+from numpy import uint16, uint8
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
@@ -224,7 +225,17 @@ class Workflow(QtCore.QObject):
 
         # Job type is 'postproc'.
         else:
-            self.postproc_input_image = cvtColor(imread(self.postproc_input_name, -1), COLOR_BGR2RGB)
+            input_image = imread(self.postproc_input_name, -1)
+
+            # If color image, convert to RGB mode.
+            if len(input_image.shape) == 3:
+                self.postproc_input_image = cvtColor(input_image, COLOR_BGR2RGB)
+            else:
+                self.postproc_input_image = input_image
+
+            # Convert 8 bit to 16 bit.
+            if self.postproc_input_image.dtype == uint8:
+                self.postproc_input_image = self.postproc_input_image.astype(uint16)*256
             self.work_next_task_signal.emit("Postprocessing")
 
     @QtCore.pyqtSlot()
