@@ -33,8 +33,158 @@ from math import ceil
 from scipy import misc
 
 from configuration import Configuration
-from exceptions import TypeError, ShapeError, ArgumentError
+from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError
 from frames_old import FramesOld
+
+
+class VideoReader(object):
+    """
+    The VideoReader deals with the import of frames from a video file. Frames can be read either
+    consecutively, or at an arbitrary frame index. Eventually, all common video types (such as .avi,
+    .ser, .mov) should be supported.
+    """
+
+    def __init__(self):
+        """
+        Create the VideoReader object and initialize instance variables.
+        """
+
+        self.opened = False
+        self.just_opened = False
+        self.last_read = None
+        self.last_frame_read = None
+        self.frame_count = None
+        self.shape = None
+        self.color = None
+        self.convert_to_grayscale = False
+        self.dtype = None
+
+
+    def open(self, file_path, convert_to_grayscale=False):
+        """
+        Initialize the VideoReader object and return parameters with video metadata.
+         Throws an IOError if the video file format is not supported.
+
+        :param file_path: Full name of the video file.
+        :param convert_to_grayscale: If True, convert color frames to grayscale;
+                                     otherwise return RGB color frames.
+        :return: (frame_count, color, dtype, shape) with
+                 frame_count: Total number of frames in video.
+                 color: True, if frames are in color; False otherwise.
+                 dtype: Numpy type, either uint8 or uint16
+                 shape: Tuple with the shape of a single frame; (num_px_y, num_px_x, 3) for color,
+                        (num_px_y, num_px_x) for B/W.
+        """
+
+        try:
+            # Create the VideoCapture object.
+            self.cap = VideoCapture(file_path)
+
+            # Read the first frame.
+            ret, self.last_frame_read = self.cap.read()
+            if not ret:
+                raise IOError("Error in reading video frame")
+
+            # Look up video metadata.
+            self.last_read = 0
+            self.frame_count = int(self.cap.get(CAP_PROP_FRAME_COUNT))
+            self.shape = self.last_frame_read.shape
+            self.color = (len(self.shape) == 3)
+            self.dtype = self.last_frame_read.dtype
+        except:
+            raise IOError("Error in reading video frame")
+
+        # If file is in color mode and grayscale output is requested, do the conversion and change
+        # metadata.
+        if self.color:
+            if convert_to_grayscale:
+                # Remember to do the conversion when reading frames later on.
+                self.convert_to_grayscale = True
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
+                self.color = False
+                self.shape = self.last_frame_read.shape
+            else:
+                # If color mode should stay, change image read by OpenCV into RGB.
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
+
+        self.opened = True
+        self.just_opened = True
+
+        # Return the metadata.
+        return self.frame_count, self.color, self.dtype, self.shape
+
+    def read_frame(self, index=None):
+        """
+        Read a single frame from the video.
+
+        :param index: Frame index (optional). If no index is specified, the next frame is read.
+                      At the first invocation, this is frame number 0.
+        :return: Numpy array containing the frame. For B/W, the shape is (num_px_y, num_px_x).
+                 For a color video, it is (num_px_y, num_px_x, 3). The type is uint8 or uint16 for
+                 8 or 16 bit resolution.
+        """
+
+        if not self.opened:
+            raise WrongOrderingError(
+                "Error: Attempt to read video frame before opening VideoReader")
+
+        # Special case: first call after initialization.
+        if self.just_opened:
+            self.just_opened = False
+
+            # Frame 0 has been read during initialization. Not necessary to read it again.
+            if index is None or index == 0:
+                return self.last_frame_read
+            # Otherwise set the frame pointer to the specified position.
+            else:
+                self.cap.set(CAP_PROP_POS_FRAMES, index)
+                self.last_read = index
+
+        # General case: not the first call.
+        else:
+
+            # Consecutive reading. Just increment the frame pointer.
+            if index is None:
+                self.last_read += 1
+
+            # An index is specified explicitly. If it is the same as at last call, just return the
+            # last frame.
+            elif index == self.last_read:
+                return self.last_frame_read
+
+            # Some other frame was specified explicitly. If it is the next frame after the one read
+            # last time, the frame pointer does not have to be set.
+            else:
+                if index != self.last_read + 1:
+                    self.cap.set(CAP_PROP_POS_FRAMES, index)
+                self.last_read = index
+
+        # A new frame has to be read. First check if the index is not out of bounds.
+        if 0 <= self.last_read < self.frame_count:
+            # Read the next frame.
+            ret, self.last_frame_read = self.cap.read()
+            if not ret:
+                raise IOError("Error in reading video frame")
+
+            # Do the conversion to grayscale or into RGB color if necessary.
+            if self.convert_to_grayscale:
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
+            elif self.color:
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
+        else:
+            raise ArgumentError("Error in reading video frame, index " + str(index) +
+                                " is out of bounds")
+
+        return self.last_frame_read
+
+    def close(self):
+        """
+        Close the VideoReader object.
+
+        :return:
+        """
+
+        self.cap.release()
 
 
 class Frames(object):
@@ -159,10 +309,10 @@ class Frames(object):
                         raise TypeError("Images have different type")
 
             elif self.type == 'video':
-                # In case "video", use OpenCV to capture frames from video file. Revert the implicit
-                # conversion from RGB to BGR in OpenCV input.
-                self.cap = VideoCapture(self.names)
-                self.number = int(self.cap.get(CAP_PROP_FRAME_COUNT))
+                self.reader = VideoReader()
+                self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
+                                                convert_to_grayscale=self.convert_to_grayscale)
+
                 self.frames_original = []
                 self.signal_step_size = max(int(self.number / 10), 1)
                 for frame_index in range(self.number):
@@ -170,29 +320,14 @@ class Frames(object):
                     if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
                         self.progress_signal.emit("Read all frames", int((frame_index/self.number)*100.))
                     # Read the next frame.
-                    ret, frame = self.cap.read()
-                    if ret:
-                        if self.convert_to_grayscale:
-                            self.frames_original.append(cvtColor(frame, COLOR_BGR2GRAY))
-                        else:
-                            self.frames_original.append(cvtColor(frame, COLOR_BGR2RGB))
-                    else:
-                        raise IOError("Error in reading video frame")
-                self.cap.release()
+                    self.frames_original.append(self.reader.read_frame())
+
+                self.reader.close()
+
                 if self.progress_signal is not None:
                     self.progress_signal.emit("Read all frames", 100)
-                self.shape = self.frames_original[0].shape
-                self.dt0 = self.frames_original[0].dtype
             else:
                 raise TypeError("Image type " + self.type + " not supported")
-
-            # Monochrome images are stored as 2D arrays, color images as 3D.
-            if len(self.shape) == 2:
-                self.color = False
-            elif len(self.shape) == 3:
-                self.color = True
-            else:
-                raise ShapeError("Image shape not supported")
 
             # Set the depth value of all images to either 16 or 8 bits.
             if self.dt0 == 'uint16':
@@ -205,15 +340,24 @@ class Frames(object):
         else:
             if self.type == 'image':
                 self.number = len(names)
-            elif self.type == 'video':
-                self.cap = VideoCapture(names)
-                self.number = int(self.cap.get(CAP_PROP_FRAME_COUNT))
+                # Initialize metadata
+                self.shape = None
+                self.depth = None
+                self.dt0 = None
+                self.color = None
 
-            # Initialize metadata
-            self.shape = None
-            self.depth = None
-            self.dt0 = None
-            self.color = None
+            elif self.type == 'video':
+                self.reader = VideoReader()
+                self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
+                                                    convert_to_grayscale=self.convert_to_grayscale)
+                # Set the depth value of all images to either 16 or 8 bits.
+                if self.dt0 == 'uint16':
+                    self.depth = 16
+                elif self.dt0 == 'uint8':
+                    self.depth = 8
+                else:
+                    raise TypeError("Frame type " + str(self.dt0) + " not supported")
+
             self.frames_original = [None for index in range(self.number)]
 
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
@@ -256,17 +400,7 @@ class Frames(object):
                 else:
                     frame = cvtColor(imread(self.names[index], -1), COLOR_BGR2RGB)
             else:
-                # Set the read position in the file to frame "index", and read the frame.
-                if index != self.original_available_index + 1:
-                    self.cap.set(CAP_PROP_POS_FRAMES, index)
-                ret, frame = self.cap.read()
-                if ret:
-                    if self.convert_to_grayscale:
-                        frame = cvtColor(frame, COLOR_BGR2GRAY)
-                    else:
-                        frame = cvtColor(frame, COLOR_BGR2RGB)
-                else:
-                    raise IOError("Error in reading video frame")
+                frame = self.reader.read_frame(index)
 
             # Cache the frame just read.
             self.original_available = frame
@@ -540,7 +674,7 @@ if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
-    type = 'image'
+    type = 'video'
     version = 'frames'
     buffering_level = 2
 
