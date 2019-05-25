@@ -28,7 +28,7 @@ from time import time
 import numpy as np
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs, \
-    CAP_PROP_POS_FRAMES
+    CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED
 from math import ceil
 from scipy import misc
 
@@ -59,7 +59,6 @@ class VideoReader(object):
         self.convert_to_grayscale = False
         self.dtype = None
 
-
     def open(self, file_path, convert_to_grayscale=False):
         """
         Initialize the VideoReader object and return parameters with video metadata.
@@ -83,7 +82,7 @@ class VideoReader(object):
             # Read the first frame.
             ret, self.last_frame_read = self.cap.read()
             if not ret:
-                raise IOError("Error in reading video frame")
+                raise IOError("Error in reading first video frame")
 
             # Look up video metadata.
             self.last_read = 0
@@ -92,7 +91,7 @@ class VideoReader(object):
             self.color = (len(self.shape) == 3)
             self.dtype = self.last_frame_read.dtype
         except:
-            raise IOError("Error in reading video frame")
+            raise IOError("Error in reading first video frame")
 
         # If file is in color mode and grayscale output is requested, do the conversion and change
         # metadata.
@@ -161,10 +160,13 @@ class VideoReader(object):
 
         # A new frame has to be read. First check if the index is not out of bounds.
         if 0 <= self.last_read < self.frame_count:
-            # Read the next frame.
-            ret, self.last_frame_read = self.cap.read()
-            if not ret:
-                raise IOError("Error in reading video frame")
+            try:
+                # Read the next frame.
+                ret, self.last_frame_read = self.cap.read()
+                if not ret:
+                    raise IOError("Error in reading video frame, index: " + str(index))
+            except:
+                raise IOError("Error in reading video frame, index: " + str(index))
 
             # Do the conversion to grayscale or into RGB color if necessary.
             if self.convert_to_grayscale:
@@ -185,6 +187,154 @@ class VideoReader(object):
         """
 
         self.cap.release()
+        self.opened = False
+
+
+class ImageReader(object):
+    """
+    The ImageReader deals with the import of frames from a list of single images. Frames can
+    be read either consecutively, or at an arbitrary frame index. It is assumed that the
+    lexicographic order of file names corresponds to their chronological order. Eventually, all
+    common image types (such as .tiff, .png, .jpg) should be supported.
+    """
+
+    def __init__(self):
+        """
+        Create the ImageReader object and initialize instance variables.
+        """
+
+        self.opened = False
+        self.just_opened = False
+        self.last_read = None
+        self.last_frame_read = None
+        self.frame_count = None
+        self.shape = None
+        self.color = None
+        self.convert_to_grayscale = False
+        self.dtype = None
+
+    def open(self, file_path_list, convert_to_grayscale=False):
+        """
+        Initialize the ImageReader object and return parameters with image metadata.
+
+        :param file_path_list: List with path names to the image files.
+        :param convert_to_grayscale: If True, convert color frames to grayscale;
+                                     otherwise return RGB color frames.
+        :return: (frame_count, color, dtype, shape) with
+                 frame_count: Total number of frames.
+                 color: True, if frames are in color; False otherwise.
+                 dtype: Numpy type, either uint8 or uint16
+                 shape: Tuple with the shape of a single frame; (num_px_y, num_px_x, 3) for color,
+                        (num_px_y, num_px_x) for B/W.
+        """
+
+        self.file_path_list = file_path_list
+
+        try:
+            self.frame_count = len(self.file_path_list)
+
+            if convert_to_grayscale:
+                self.last_frame_read = imread(self.file_path_list[0], IMREAD_GRAYSCALE)
+                # Remember to do the conversion when reading frames later on.
+                self.convert_to_grayscale = True
+            else:
+                self.last_frame_read = imread(self.file_path_list[0], IMREAD_UNCHANGED)
+
+            # Look up metadata.
+            self.last_read = 0
+            self.shape = self.last_frame_read.shape
+            self.color = (len(self.shape) == 3)
+            self.dtype = self.last_frame_read.dtype
+        except:
+            raise IOError("Error in reading first frame")
+
+        # If in color mode, swap B and R channels to convert from cv2 to standard RGB.
+        if self.color:
+            self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
+
+        self.opened = True
+        self.just_opened = True
+
+        # Return the metadata.
+        return self.frame_count, self.color, self.dtype, self.shape
+
+    def read_frame(self, index=None):
+        """
+        Read a single frame.
+
+        :param index: Frame index (optional). If no index is specified, the next frame is read.
+                      At the first invocation, this is frame number 0.
+        :return: Numpy array containing the frame. For B/W, the shape is (num_px_y, num_px_x).
+                 For a color video, it is (num_px_y, num_px_x, 3). The type is uint8 or uint16 for
+                 8 or 16 bit resolution.
+        """
+
+        if not self.opened:
+            raise WrongOrderingError(
+                "Error: Attempt to read image file frame before opening ImageReader")
+
+        # Special case: first call after initialization.
+        if self.just_opened:
+            self.just_opened = False
+
+            # Frame 0 has been read during initialization. Not necessary to read it again.
+            if index is None or index == 0:
+                return self.last_frame_read
+
+        # General case: not the first call.
+        else:
+
+            # Consecutive reading. Just increment the frame index.
+            if index is None:
+                self.last_read += 1
+
+            # An index is specified explicitly. If it is the same as at last call, just return the
+            # last frame.
+            elif index == self.last_read:
+                return self.last_frame_read
+
+            # Some other frame was specified explicitly.
+            else:
+                self.last_read = index
+
+        # A new frame has to be read. First check if the index is not out of bounds.
+        if 0 <= self.last_read < self.frame_count:
+            try:
+                if self.convert_to_grayscale:
+                    self.last_frame_read = imread(self.file_path_list[self.last_read],
+                                                  IMREAD_GRAYSCALE)
+                else:
+                    self.last_frame_read = imread(self.file_path_list[self.last_read],
+                                                  IMREAD_UNCHANGED)
+            except:
+                raise IOError("Error in reading image frame, index: " + str(index))
+        else:
+            raise ArgumentError("Error in reading image frame, index: " + str(index) +
+                                " is out of bounds")
+
+        # Check if the metadata match.
+        shape = self.last_frame_read.shape
+        color = (len(shape) == 3)
+
+        # Check if all images have matching metadata.
+        if color != self.color:
+            raise ShapeError(
+                "Mixing grayscale and color images not supported, index: " + str(index))
+        elif shape != self.shape:
+            raise ShapeError("Images have different size, index: " + str(index))
+        elif self.last_frame_read.dtype != self.dtype:
+            raise TypeError("Images have different type, index: " + str(index))
+
+        return self.last_frame_read
+
+    def close(self):
+        """
+        Close the ImageReader object.
+
+        :return:
+        """
+
+        self.opened = False
 
 
 class Frames(object):
@@ -270,94 +420,45 @@ class Frames(object):
         self.laplacian_available_index = None
 
         # Compute the scaling value for Laplacian computation.
-        self.alpha = 1./256.
+        self.alpha = 1. / 256.
+
+        # Initialize and open the reader object.
+        if self.type == 'image':
+            self.reader = ImageReader()
+        elif self.type == 'video':
+            self.reader = VideoReader()
+        else:
+            raise TypeError("Image type " + self.type + " not supported")
+
+        self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
+                                                    convert_to_grayscale=self.convert_to_grayscale)
+
+        # Set the depth value of all images to either 16 or 8 bits.
+        if self.dt0 == 'uint16':
+            self.depth = 16
+        elif self.dt0 == 'uint8':
+            self.depth = 8
+        else:
+            raise TypeError("Frame type " + str(self.dt0) + " not supported")
 
         # If the original frames are to be buffered, read them in one go. In this case, a progress
         # bar is displayed in the main GUI.
         if self.buffer_original:
-            if self.type == 'image':
-                # Use scipy.misc to read in image files. If "convert_to_grayscale" is True, convert
-                # pixel values to 32bit floats.
-                self.number = len(self.names)
-                self.signal_step_size = max(int(self.number / 10), 1)
-                if self.convert_to_grayscale:
-                    self.frames_original = [misc.imread(path, mode='F') for path in self.names]
-                else:
-                    self.frames_original = []
-                    for frame_index, path in enumerate(self.names):
-                        # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                        if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
-                            self.progress_signal.emit("Read all frames",
-                                                 int((frame_index / self.number) * 100.))
-                        # Read the next frame.
-                        frame = cvtColor(imread(path, -1), COLOR_BGR2RGB)
-                        self.frames_original.append(frame)
+            self.frames_original = []
+            self.signal_step_size = max(int(self.number / 10), 1)
+            for frame_index in range(self.number):
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                    self.progress_signal.emit("Read all frames",
+                                              int((frame_index / self.number) * 100.))
+                # Read the next frame.
+                self.frames_original.append(self.reader.read_frame())
 
-                    if self.progress_signal is not None:
-                        self.progress_signal.emit("Read all frames", 100)
-                self.shape = self.frames_original[0].shape
-                self.dt0 = self.frames_original[0].dtype
+            self.reader.close()
 
-                # Test if all images have the same shape, color type and depth.
-                # If not, raise an exception.
-                for image in self.frames_original:
-                    if image.shape != self.shape:
-                        raise ShapeError("Images have different size")
-                    elif len(self.shape) != len(image.shape):
-                        raise ShapeError("Mixing grayscale and color images not supported")
-                    if image.dtype != self.dt0:
-                        raise TypeError("Images have different type")
-
-            elif self.type == 'video':
-                self.reader = VideoReader()
-                self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
-                                                convert_to_grayscale=self.convert_to_grayscale)
-
-                self.frames_original = []
-                self.signal_step_size = max(int(self.number / 10), 1)
-                for frame_index in range(self.number):
-                    # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                    if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
-                        self.progress_signal.emit("Read all frames", int((frame_index/self.number)*100.))
-                    # Read the next frame.
-                    self.frames_original.append(self.reader.read_frame())
-
-                self.reader.close()
-
-                if self.progress_signal is not None:
-                    self.progress_signal.emit("Read all frames", 100)
-            else:
-                raise TypeError("Image type " + self.type + " not supported")
-
-            # Set the depth value of all images to either 16 or 8 bits.
-            if self.dt0 == 'uint16':
-                self.depth = 16
-            elif self.dt0 == 'uint8':
-                self.depth = 8
-            else:
-                raise TypeError("Frame type " + str(self.dt0) + " not supported")
-
+        # If original frames are not buffered, initialize an empty frame list, so frames can be
+        # read later in non-consecutive order.
         else:
-            if self.type == 'image':
-                self.number = len(names)
-                # Initialize metadata
-                self.shape = None
-                self.depth = None
-                self.dt0 = None
-                self.color = None
-
-            elif self.type == 'video':
-                self.reader = VideoReader()
-                self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
-                                                    convert_to_grayscale=self.convert_to_grayscale)
-                # Set the depth value of all images to either 16 or 8 bits.
-                if self.dt0 == 'uint16':
-                    self.depth = 16
-                elif self.dt0 == 'uint8':
-                    self.depth = 8
-                else:
-                    raise TypeError("Frame type " + str(self.dt0) + " not supported")
-
             self.frames_original = [None for index in range(self.number)]
 
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
@@ -380,7 +481,7 @@ class Frames(object):
         :return: Frame with index "index".
         """
 
-        if not 0<=index<self.number:
+        if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
         # print ("Accessing frame " + str(index))
 
@@ -518,7 +619,8 @@ class Frames(object):
 
             # Compute a version of the frame with Gaussian blur added.
             frame_monochrome_blurred = GaussianBlur(frame_mono,
-                (self.configuration.frames_gauss_width, self.configuration.frames_gauss_width), 0)
+                                                    (self.configuration.frames_gauss_width,
+                                                     self.configuration.frames_gauss_width), 0)
 
             # If the blurred frames are buffered, store the current frame at the current index.
             if self.buffer_gaussian:
@@ -559,9 +661,9 @@ class Frames(object):
 
             # Compute a version of the frame with Gaussian blur added.
             frame_monochrome_laplacian = convertScaleAbs(Laplacian(
-                    frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
-                    ::self.configuration.align_frames_sampling_stride], CV_32F),
-                    alpha=self.alpha)
+                frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
+                ::self.configuration.align_frames_sampling_stride], CV_32F),
+                alpha=self.alpha)
 
             # If the blurred frames are buffered, store the current frame at the current index.
             if self.buffer_laplacian:
@@ -643,7 +745,6 @@ def access_pattern(frames_object, average_frame_percent):
     :return: Total time in seconds.
     """
 
-
     number = frames.number
     average_frame_number = max(
         ceil(number * average_frame_percent / 100.), 1)
@@ -652,8 +753,8 @@ def access_pattern(frames_object, average_frame_percent):
     for index in range(number):
         frames_object.frames_mono_blurred_laplacian(index)
 
-    frames_object.frames_mono_blurred(number-1)
-    frames_object.frames_mono_blurred(number-1)
+    frames_object.frames_mono_blurred(number - 1)
+    frames_object.frames_mono_blurred(number - 1)
 
     for index in range(number):
         frames_object.frames_mono_blurred(index)
@@ -670,18 +771,20 @@ def access_pattern(frames_object, average_frame_percent):
 
     return time() - start
 
+
 if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
-    type = 'video'
+    type = 'image'
     version = 'frames'
     buffering_level = 2
 
     if type == 'image':
         # names = glob('Images/2012_*.tif')
         # names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
-        names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
+        names = glob(
+            'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
     else:
         names = 'Videos/another_short_video.avi'
         # names = 'Videos/Moon_Tile-024_043939.avi'
@@ -708,8 +811,8 @@ if __name__ == "__main__":
     if version == 'frames':
         try:
             frames = Frames(configuration, names, type=type, convert_to_grayscale=False,
-                   buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
-                   buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
+                            buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
+                            buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
         except Exception as e:
             print("Error: " + e.message)
             exit()
@@ -732,4 +835,4 @@ if __name__ == "__main__":
 
     print("\nInitialization time: {0:7.3f}, frame accesses and variant computations: {1:7.3f},"
           " total: {2:7.3f} (seconds)".format(initialization_time, total_access_time,
-                                              initialization_time+total_access_time))
+                                              initialization_time + total_access_time))
