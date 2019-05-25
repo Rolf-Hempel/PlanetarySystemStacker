@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import sys
+import gc
 from ctypes import CDLL, byref, c_int
 from os import listdir
 from os.path import splitext, join
@@ -94,6 +95,9 @@ class Workflow(QtCore.QObject):
                     self.stack_frames]:
             if obj is not None:
                 del obj
+
+        # Force the garbage collector to release unreferenced objects.
+        gc.collect()
 
         # Update the status bar in the main GUI.
         self.input_name = input_name
