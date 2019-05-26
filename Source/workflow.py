@@ -22,6 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import sys
 import gc
+import psutil
 from ctypes import CDLL, byref, c_int
 from os import listdir
 from os.path import splitext, join
@@ -177,37 +178,25 @@ class Workflow(QtCore.QObject):
 
         if self.job_type == 'stacking':
             # Decide on the objects to be buffered, depending on configuration parameter.
-            buffer_original = False
-            buffer_monochrome = False
-            buffer_gaussian = False
-            buffer_laplacian = False
-
-            if self.configuration.global_parameters_buffering_level > 0:
-                buffer_laplacian = True
-            if self.configuration.global_parameters_buffering_level > 1:
-                buffer_gaussian = True
-            if self.configuration.global_parameters_buffering_level > 2:
-                buffer_original = True
-            if self.configuration.global_parameters_buffering_level > 3:
-                buffer_monochrome = True
+            buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian  = \
+                Frames.set_buffering(self.configuration.global_parameters_buffering_level)
 
             if self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.protocol("+++ Buffering level is " +
-                                       str(self.configuration.global_parameters_buffering_level) + " +++",
-                                       self.attached_log_file)
+                                       str(self.configuration.global_parameters_buffering_level) +
+                                       " +++", self.attached_log_file)
             if buffer_original:
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
-                self.my_timer.create('Read all frames')
             try:
                 self.frames = Frames(self.configuration, names, type=input_type,
                                 convert_to_grayscale=convert_to_grayscale,
                                 progress_signal=self.work_current_progress_signal,
                                 buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
                                 buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
-                if buffer_original and self.configuration.global_parameters_protocol_level > 1:
+                if self.configuration.global_parameters_protocol_level > 1:
                     Miscellaneous.protocol(
-                                "           Number of images read: " + str(self.frames.number) +
+                                "           Number of images: " + str(self.frames.number) +
                                 ", image shape: " + str(self.frames.shape), self.attached_log_file,
                                 precede_with_timestamp=False)
                 elif self.configuration.global_parameters_protocol_level > 1:
@@ -218,13 +207,47 @@ class Workflow(QtCore.QObject):
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
                                            self.attached_log_file)
-                if buffer_original:
-                    self.my_timer.stop('Read all frames')
                 self.work_next_task_signal.emit("Next job")
                 return
-            if buffer_original:
-                self.my_timer.stop('Read all frames')
 
+            # Look up the available RAM (without paging)
+            virtual_memory = dict(psutil.virtual_memory()._asdict())
+            available_ram = float(virtual_memory['available']) / 1.e9
+
+            # Compute the approximate RAM usage of this job at the selected buffering level.
+            needed_ram = self.frames.compute_required_buffer_size(
+                self.configuration.global_parameters_buffering_level)
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol(
+                    "           RAM required (Gbytes): " + str(needed_ram) + ", available: " +
+                    str(available_ram), self.attached_log_file, precede_with_timestamp=False)
+
+            # If the required RAM is not available, test if lowering the buffering level would help.
+            if needed_ram > available_ram:
+                recommended_level = None
+                for level in range(self.configuration.global_parameters_buffering_level-1, -1, -1):
+                    alternative_ram = self.frames.compute_required_buffer_size(level)
+                    if alternative_ram < available_ram:
+                        recommended_level = level
+                        break
+
+                # If an appropriate level was found, write it as a recommendation to the protocol.
+                if self.configuration.global_parameters_protocol_level > 0:
+                    if recommended_level is not None:
+                        Miscellaneous.protocol("Error: Too little RAM for chosen buffering level,"
+                                               " recommended level: " + str(recommended_level)  +
+                                               ", continuing with next job\n",
+                                               self.attached_log_file)
+                    else:
+                        Miscellaneous.protocol("Error: Too little RAM for this job, "
+                                               "continuing with the next one\n",
+                                               self.attached_log_file)
+
+                # Continue with the next job.
+                self.work_next_task_signal.emit("Next job")
+                return
+
+            # The RAM seems to be sufficient, continue with ranking frames.
             self.work_next_task_signal.emit("Rank frames")
 
         # Job type is 'postproc'.

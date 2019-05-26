@@ -92,14 +92,12 @@ class StackFrames(object):
         for ap in self.alignment_points.alignment_points:
             AlignmentPoints.initialize_ap_stacking_buffer(ap, self.frames.color)
 
-        # The arrays for the stacked image and the summation buffer need to accommodate three
-        # color channels in the case of color images.
+        # The summation buffer needs to accommodate three color channels in the case of color
+        # images.
         if self.frames.color:
             self.stacked_image_buffer = zeros([self.dim_y, self.dim_x, 3], dtype=float32)
-            self.stacked_image = zeros([self.dim_y, self.dim_x, 3], dtype=int16)
         else:
             self.stacked_image_buffer = zeros([self.dim_y, self.dim_x], dtype=float32)
-            self.stacked_image = zeros([self.dim_y, self.dim_x], dtype=int16)
 
         # If the alignment point patches do not cover the entire frame, a background image must
         # be computed and blended in. At this point it is not yet clear if this is necessary.
@@ -201,11 +199,11 @@ class StackFrames(object):
         #       (AP box) of a single AP.
         #   0.5 between those areas. After blurring the mask, values in these transition
         #       regions will show a smooth transition between APs and background.
-        mask_intermediate = where((self.number_single_frame_contributions == 0), 0., 0.5)
+        self.mask = where((self.number_single_frame_contributions == 0), float32(0.), float32(0.5))
         self.mask = where((
         logical_or(self.number_single_frame_contributions > self.alignment_points.stack_size,
                       self.sum_single_frame_weights > single_stack_size_float)), 1.,
-                      mask_intermediate)
+                      self.mask)
 
         # Apply a Gaussian blur to the mask to make transitions smoother.
         blur_width = self.configuration.stack_frames_gauss_width

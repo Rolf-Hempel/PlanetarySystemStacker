@@ -370,6 +370,38 @@ class Frames(object):
 
     """
 
+    @staticmethod
+    def set_buffering(buffering_level):
+        """
+        Decide on the objects to be buffered, depending on "buffering_level" configuration
+        parameter.
+
+        :param buffering_level: Buffering level parameter as set in configuration.
+        :return: Tuple of four booleans:
+                 buffer_original: Keep all original frames in buffer.
+                 buffer_monochrome: Keep the monochrome version of  all original frames in buffer.
+                 buffer_gaussian: Keep the monochrome version with Gaussian blur added of  all
+                                  frames in buffer.
+                 buffer_laplacian: Keep the Laplacian of Gaussian (LoG) of the monochrome version of
+                                   all frames in buffer.
+        """
+
+        buffer_original = False
+        buffer_monochrome = False
+        buffer_gaussian = False
+        buffer_laplacian = False
+
+        if buffering_level > 0:
+            buffer_laplacian = True
+        if buffering_level > 1:
+            buffer_gaussian = True
+        if buffering_level > 2:
+            buffer_original = True
+        if buffering_level > 3:
+            buffer_monochrome = True
+
+        return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
+
     def __init__(self, configuration, names, type='video', convert_to_grayscale=False,
                  progress_signal=None, buffer_original=True, buffer_monochrome=False,
                  buffer_gaussian=True, buffer_laplacian=True):
@@ -419,6 +451,9 @@ class Frames(object):
         self.laplacian_available = None
         self.laplacian_available_index = None
 
+        # Initialize the list of original frames.
+        self.frames_original = None
+
         # Compute the scaling value for Laplacian computation.
         self.alpha = 1. / 256.
 
@@ -441,26 +476,6 @@ class Frames(object):
         else:
             raise TypeError("Frame type " + str(self.dt0) + " not supported")
 
-        # If the original frames are to be buffered, read them in one go. In this case, a progress
-        # bar is displayed in the main GUI.
-        if self.buffer_original:
-            self.frames_original = []
-            self.signal_step_size = max(int(self.number / 10), 1)
-            for frame_index in range(self.number):
-                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
-                    self.progress_signal.emit("Read all frames",
-                                              int((frame_index / self.number) * 100.))
-                # Read the next frame.
-                self.frames_original.append(self.reader.read_frame())
-
-            self.reader.close()
-
-        # If original frames are not buffered, initialize an empty frame list, so frames can be
-        # read later in non-consecutive order.
-        else:
-            self.frames_original = [None for index in range(self.number)]
-
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
         # Laplacians.
         colors = ['red', 'green', 'blue', 'panchromatic']
@@ -473,6 +488,71 @@ class Frames(object):
         self.frames_monochrome_blurred_laplacian = [None for index in range(self.number)]
         self.used_alignment_points = None
 
+    def compute_required_buffer_size(self, buffering_level):
+        """
+        Compute the RAM required to store original images and their derivatives, and other objects
+        which scale with the image size.
+
+        Additional to the original images and their derivatives, the following large objects are
+        allocated during the workflow:
+            align_frames.mean_frame: image pixels (int32)
+            align_frames.mean_frame_original: image pixels (int32)
+            alignment_points, reference boxes: < 2 * image pixels (int32)
+            alignment_points, stacking buffers: < 2 * image pixels * colors (float32)
+            stack_frames.stacked_image_buffer: image pixels * colors (float32)
+            stack_frames.number_single_frame_contributions: image pixels (int32)
+            stack_frames.sum_single_frame_weights: image pixels (float32)
+            stack_frames.mask: image pixels (float32)
+            stack_frames.averaged_background: image pixels * colors (float32)
+            stack_frames.stacked_image: image pixels * colors (uint16)
+
+        :param buffering_level: Buffering level parameter.
+        :return: Number of required buffer space in bytes.
+        """
+
+        # Compute the number of image pixels.
+        number_pixel = self.shape[0] * self.shape[1]
+
+        # Compute the size of a monochrome image in bytes.
+        image_size_monochrome_bytes = number_pixel * self.depth / 8
+
+        # Compute the size of an original image in bytes.
+        if self.color:
+            image_size_bytes = 3 * image_size_monochrome_bytes
+        else:
+            image_size_bytes = image_size_monochrome_bytes
+
+        # Compute the size of the monochrome images with Gaussian blur added in bytes.
+        image_size_gaussian_bytes = number_pixel * 2
+
+        # Compute the size of a "Laplacian of Gaussian" in bytes. Remember that it is down-sampled.
+        image_size_laplacian_bytes = number_pixel / \
+                                     self.configuration.align_frames_sampling_stride ** 2
+
+        # Compute the buffer space per image, based on the buffering level.
+        buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian = \
+            Frames.set_buffering(buffering_level)
+        buffer_per_image = 0
+        if buffer_original:
+            buffer_per_image += image_size_bytes
+        if buffer_monochrome:
+            buffer_per_image += image_size_monochrome_bytes
+        if buffer_gaussian:
+            buffer_per_image += image_size_gaussian_bytes
+        if buffer_laplacian:
+            buffer_per_image += image_size_laplacian_bytes
+
+        # Multiply with the total number of frames.
+        buffer_for_all_images = buffer_per_image * self.number
+
+        # Compute the size of additional workspace objects allocated during the workflow.
+        buffer_additional_workspace = number_pixel * 46
+        if self.color:
+            buffer_additional_workspace += number_pixel * 36
+
+        # Return the total buffer space required.
+        return float(buffer_for_all_images + buffer_additional_workspace) / 1.e9
+
     def frames(self, index):
         """
         Read or look up the original frame object with a given index.
@@ -484,6 +564,27 @@ class Frames(object):
         if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
         # print ("Accessing frame " + str(index))
+
+        # If the original frames are to be buffered, read them in one go at the first call to this
+        # method. In this case, a progress bar is displayed in the main GUI.
+        if self.frames_original is None:
+            if self.buffer_original:
+                self.frames_original = []
+                self.signal_step_size = max(int(self.number / 10), 1)
+                for frame_index in range(self.number):
+                    # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                    if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                        self.progress_signal.emit("Read all frames",
+                                                  int((frame_index / self.number) * 100.))
+                    # Read the next frame.
+                    self.frames_original.append(self.reader.read_frame())
+
+                self.reader.close()
+
+            # If original frames are not buffered, initialize an empty frame list, so frames can be
+            # read later in non-consecutive order.
+            else:
+                self.frames_original = [None for index in range(self.number)]
 
         # The original frames are buffered. Just return the frame.
         if self.buffer_original:
