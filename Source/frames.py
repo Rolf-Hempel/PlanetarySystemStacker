@@ -27,10 +27,9 @@ from time import time
 
 import numpy as np
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
-    COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs, \
-    CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED
+    COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
+    convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED
 from math import ceil
-from scipy import misc
 
 from configuration import Configuration
 from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError
@@ -596,46 +595,11 @@ class Frames(object):
 
         # The frame has not been stored for re-use, read it.
         else:
-            if self.type == 'image':
-                if self.convert_to_grayscale:
-                    frame = misc.imread(self.names[index], mode='F')
-                else:
-                    frame = cvtColor(imread(self.names[index], -1), COLOR_BGR2RGB)
-            else:
-                frame = self.reader.read_frame(index)
+            frame = self.reader.read_frame(index)
 
             # Cache the frame just read.
             self.original_available = frame
             self.original_available_index = index
-
-            # For the first frame read, set image metadata.
-            if self.shape is None:
-                self.shape = frame.shape
-                # Monochrome images are stored as 2D arrays, color images as 3D.
-                if len(self.shape) == 2:
-                    self.color = False
-                elif len(self.shape) == 3:
-                    self.color = True
-                else:
-                    raise ShapeError("Image shape not supported")
-
-                self.dt0 = frame.dtype
-                # Set the depth value of all images to either 16 or 8 bits.
-                if self.dt0 == 'uint16':
-                    self.depth = 16
-                elif self.dt0 == 'uint8':
-                    self.depth = 8
-                else:
-                    raise TypeError("Frame type " + str(self.dt0) + " not supported")
-
-            # For every other frame, check for consistency.
-            else:
-                if len(frame.shape) != len(self.shape):
-                    raise ShapeError("Mixing grayscale and color images not supported")
-                elif frame.shape != self.shape:
-                    raise ShapeError("Images have different size")
-                if frame.dtype != self.dt0:
-                    raise TypeError("Images have different type")
 
             return frame
 
@@ -669,7 +633,7 @@ class Frames(object):
             # If frames are in color mode produce a B/W version.
             if self.color:
                 if self.color_index == 3:
-                    frame_mono = cvtColor(frame_original, COLOR_BGR2GRAY)
+                    frame_mono = cvtColor(frame_original, COLOR_RGB2GRAY)
                 else:
                     frame_mono = frame_original[:, :, self.color_index]
             # Frames are in B/W mode already
@@ -846,7 +810,7 @@ def access_pattern(frames_object, average_frame_percent):
     :return: Total time in seconds.
     """
 
-    number = frames.number
+    number = frames_object.number
     average_frame_number = max(
         ceil(number * average_frame_percent / 100.), 1)
     start = time()
@@ -872,14 +836,33 @@ def access_pattern(frames_object, average_frame_percent):
 
     return time() - start
 
+def access_pattern_simple(frames_object, average_frame_percent):
+    """
+    Simulate the access pattern of PSS to frame data, without any other activity in between. Return
+    the overall time.
+
+    :param frames_object: Frames object to access frames.
+    :param average_frame_percent: Percentage of frames for average image computation.
+    :return: Total time in seconds.
+    """
+
+    number = frames.number
+    start = time()
+
+    for rep_cnt in range(5):
+        for index in range(number):
+            frames_object.frames_mono_blurred(index)
+
+    return time() - start
+
 
 if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
-    type = 'image'
+    type = 'video'
     version = 'frames'
-    buffering_level = 2
+    buffering_level = 4
 
     if type == 'image':
         # names = glob('Images/2012_*.tif')
@@ -917,9 +900,6 @@ if __name__ == "__main__":
         except Exception as e:
             print("Error: " + e.message)
             exit()
-        frames_mono_3 = frames.frames_mono(3)
-        frames_mono_blurred_4 = frames.frames_mono_blurred(4)
-        frames_mono_blurred_laplacian_1 = frames.frames_mono_blurred_laplacian(1)
     else:
         try:
             frames = FramesOld(configuration, names, type=type, convert_to_grayscale=False)
@@ -932,6 +912,8 @@ if __name__ == "__main__":
     print("Number of images read: " + str(frames.number))
     print("Image shape: " + str(frames.shape))
 
+    # total_access_time = access_pattern_simple(frames,
+    #                                       configuration.align_frames_average_frame_percent)
     total_access_time = access_pattern(frames, configuration.align_frames_average_frame_percent)
 
     print("\nInitialization time: {0:7.3f}, frame accesses and variant computations: {1:7.3f},"
