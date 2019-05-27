@@ -29,7 +29,7 @@ from time import time
 from numpy import uint8, uint16, int32
 from PyQt5 import QtCore, QtGui, QtWidgets
 
-from exceptions import InternalError, NotSupportedError
+from exceptions import InternalError, NotSupportedError, Error
 from align_frames import AlignFrames
 from configuration import Configuration
 from frames import Frames
@@ -449,7 +449,7 @@ if __name__ == '__main__':
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
 

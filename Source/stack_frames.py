@@ -33,7 +33,7 @@ from skimage import img_as_uint, img_as_ubyte
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
-from exceptions import InternalError, NotSupportedError
+from exceptions import InternalError, NotSupportedError, Error
 from frames import Frames
 from rank_frames import RankFrames
 from timer import timer
@@ -588,7 +588,7 @@ if __name__ == "__main__":
         frames = Frames(configuration, names, type=type, convert_to_grayscale=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
     my_timer.stop('Read all frames')

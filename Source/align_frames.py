@@ -30,7 +30,7 @@ from scipy import ndimage
 from cv2 import imwrite
 
 from configuration import Configuration
-from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
+from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError, Error
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -211,8 +211,8 @@ class AlignFrames(object):
 
         else:
             raise NotSupportedError(
-                "Frame alignment mode " + self.configuration.align_frames_mode +
-                " not supported")
+                "Frame alignment mode '" + self.configuration.align_frames_mode +
+                "' not supported")
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
         self.frame_shifts = [None for i in range(self.frames.number)]
@@ -571,7 +571,7 @@ if __name__ == "__main__":
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + str(e))
         exit()
 

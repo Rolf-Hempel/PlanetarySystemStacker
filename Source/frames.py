@@ -32,7 +32,7 @@ from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2
 from math import ceil
 
 from configuration import Configuration
-from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError
+from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error
 from frames_old import FramesOld
 
 
@@ -897,14 +897,14 @@ if __name__ == "__main__":
             frames = Frames(configuration, names, type=type, convert_to_grayscale=False,
                             buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
                             buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
-        except Exception as e:
+        except Error as e:
             print("Error: " + e.message)
             exit()
     else:
         try:
             frames = FramesOld(configuration, names, type=type, convert_to_grayscale=False)
             frames.add_monochrome(configuration.frames_mono_channel)
-        except Exception as e:
+        except Error as e:
             print("Error: " + e.message)
             exit()
     initialization_time = time() - start

@@ -28,7 +28,7 @@ import matplotlib.pyplot as plt
 from configuration import Configuration
 from frames import Frames
 from miscellaneous import Miscellaneous
-from exceptions import NotSupportedError
+from exceptions import NotSupportedError, Error
 
 
 class RankFrames(object):
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
 

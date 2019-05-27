@@ -34,7 +34,7 @@ from numpy import uint16, uint8
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import PostprocDataObject
-from exceptions import NotSupportedError, InternalError, ArgumentError
+from exceptions import NotSupportedError, InternalError, ArgumentError, Error
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -84,7 +84,7 @@ class Workflow(QtCore.QObject):
             if self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.protocol("Number of threads used by mkl: " + str(mkl_get_max_threads()),
                                        self.attached_log_file, precede_with_timestamp=True)
-        except Exception as e:
+        except Error as e:
             Miscellaneous.protocol("mkl_rt.dll does not work (not a Windows system?): " + str(e),
                                    self.attached_log_file, precede_with_timestamp = True)
 
@@ -203,7 +203,7 @@ class Workflow(QtCore.QObject):
                     Miscellaneous.protocol(
                         "           Total number of frames: " + str(self.frames.number),
                         self.attached_log_file, precede_with_timestamp=False)
-            except Exception as e:
+            except Error as e:
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
                                            self.attached_log_file)
@@ -273,10 +273,20 @@ class Workflow(QtCore.QObject):
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start ranking images +++", self.attached_log_file)
         self.my_timer.create_no_check('Ranking images')
-        self.rank_frames = RankFrames(self.frames, self.configuration,
-                                      self.work_current_progress_signal)
-        self.rank_frames.frame_score()
-        self.my_timer.stop('Ranking images')
+
+        try:
+            self.rank_frames = RankFrames(self.frames, self.configuration,
+                                          self.work_current_progress_signal)
+            self.rank_frames.frame_score()
+            self.my_timer.stop('Ranking images')
+        except Error as e:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
+                                       self.attached_log_file)
+            self.my_timer.stop('Ranking images')
+            self.work_next_task_signal.emit("Next job")
+            return
+
         if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol(
                 "           Index of best frame: " + str(self.rank_frames.frame_ranks_max_index),
@@ -396,14 +406,14 @@ class Workflow(QtCore.QObject):
                             Miscellaneous.protocol("Error: No alternative stabilization patch"
                                                    " available, continue with next job\n",
                                                    self.attached_log_file)
-                            self.my_timer.stop('Global frame alignment')
-                            self.work_next_task_signal.emit("Next job")
-                            return
+                        self.my_timer.stop('Global frame alignment')
+                        self.work_next_task_signal.emit("Next job")
+                        return
                     # Continue with the next best stabilization patch.
                     else:
+                        y_low_opt, y_high_opt, x_low_opt, x_high_opt = \
+                            self.align_frames.alignment_rect_bounds[patch_index + 1]
                         if self.configuration.global_parameters_protocol_level > 0:
-                            y_low_opt, y_high_opt, x_low_opt, x_high_opt = \
-                                self.align_frames.alignment_rect_bounds[patch_index+1]
                             Miscellaneous.protocol("           Next alignment rectangle tried: " +
                                                    str(y_low_opt) + "<y<" + str(y_high_opt) +
                                        ", " + str(x_low_opt) + "<x<" +
@@ -414,7 +424,7 @@ class Workflow(QtCore.QObject):
         else:
             try:
                 self.align_frames.align_frames()
-            except NotSupportedError as e:
+            except Error as e:
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
                                            self.attached_log_file)

@@ -32,7 +32,7 @@ from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2
 from scipy import misc
 
 from configuration import Configuration
-from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError
+from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error
 # from frames import Frames
 
 
@@ -373,7 +373,7 @@ if __name__ == "__main__":
                                convert_to_grayscale=convert_to_grayscale)
         print("Frames old: Number of images read: " + str(frames_old.number))
         print("Image shape: " + str(frames_old.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
     end = time()
@@ -393,7 +393,7 @@ if __name__ == "__main__":
     #                     buffer_laplacian=False)
     #     print("\nFrames: Number of images: " + str(frames.number))
     #     print("Image shape: " + str(frames.shape))
-    # except Exception as e:
+    # except Error as e:
     #     print("Error: " + e.message)
     #     exit()
     #

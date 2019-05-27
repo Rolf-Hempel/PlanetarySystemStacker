@@ -31,7 +31,7 @@ from skimage.feature import register_translation
 
 from align_frames import AlignFrames
 from configuration import Configuration
-from exceptions import NotSupportedError
+from exceptions import NotSupportedError, Error
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -820,7 +820,7 @@ if __name__ == "__main__":
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
 

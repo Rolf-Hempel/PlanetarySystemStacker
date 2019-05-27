@@ -33,7 +33,7 @@ from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from alignment_point_editor import AlignmentPointEditorWidget
 from configuration import Configuration
-from exceptions import NotSupportedError, InternalError
+from exceptions import NotSupportedError, InternalError, Error
 from frames import Frames
 from rank_frames import RankFrames
 from stack_frames import StackFrames
@@ -93,7 +93,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
                         convert_to_grayscale=convert_to_grayscale)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + str(e))
         exit()
     my_timer.stop('Read all frames')

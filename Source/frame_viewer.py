@@ -39,7 +39,7 @@ from matplotlib.figure import Figure
 
 from align_frames import AlignFrames
 from configuration import Configuration
-from exceptions import NotSupportedError, InternalError
+from exceptions import NotSupportedError, InternalError, Error
 from frame_viewer_gui import Ui_frame_viewer
 from frames import Frames
 from miscellaneous import Miscellaneous
@@ -839,7 +839,7 @@ if __name__ == '__main__':
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
 

@@ -21,8 +21,14 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 class Error(Exception):
-    """Base class for exceptions in this module."""
-    pass
+    """Base class for exceptions in this module.
+
+    Attributes:
+        message -- explanation of the error
+    """
+
+    def __init__(self, message):
+        self.message = message
 
 class TypeError(Error):
     """Exception raised for type errors during input.
@@ -32,7 +38,7 @@ class TypeError(Error):
     """
 
     def __init__(self, message):
-        self.message = message
+        super(TypeError, self).__init__(message)
 
 class ShapeError(Error):
     """Exception raised if image shapes do not match during input.
@@ -42,7 +48,7 @@ class ShapeError(Error):
     """
 
     def __init__(self, message):
-        self.message = message
+        super(ShapeError, self).__init__(message)
 
 class NotSupportedError(Error):
     """Exception raised if a method is called which is not implemented yet.
@@ -52,7 +58,7 @@ class NotSupportedError(Error):
     """
 
     def __init__(self, message):
-        self.message = message
+        super(NotSupportedError, self).__init__(message)
 
 class ArgumentError(Error):
     """Exception raised if a method is called which an invalid argument.
@@ -62,7 +68,7 @@ class ArgumentError(Error):
     """
 
     def __init__(self, message):
-        self.message = message
+        super(ArgumentError, self).__init__(message)
 
 class WrongOrderingError(Error):
     """Exception raised if a method is called before required input is available.
@@ -72,7 +78,7 @@ class WrongOrderingError(Error):
     """
 
     def __init__(self, message):
-        self.message = message
+        super(WrongOrderingError, self).__init__(message)
 
 class InternalError(Error):
     """Exception raised if an internal error occurred which should never happen.
@@ -82,7 +88,7 @@ class InternalError(Error):
     """
 
     def __init__(self, message):
-        self.message = message
+        super(InternalError, self).__init__(message)
 
 class DivideByZeroError(Error):
     """Exception raised if an attempt is made to divide by zero.
@@ -92,7 +98,7 @@ class DivideByZeroError(Error):
         """
 
     def __init__(self, message):
-        self.message = message
+        super(DivideByZeroError, self).__init__(message)
 
 class IncompatibleVersionsError(Error):
     """Exception raised if data and program versions do not match.
@@ -102,4 +108,4 @@ class IncompatibleVersionsError(Error):
         """
 
     def __init__(self, message):
-        self.message = message
+        super(IncompatibleVersionsError, self).__init__(message)
