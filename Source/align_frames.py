@@ -252,6 +252,7 @@ class AlignFrames(object):
                     cog_frame_real = ndimage.measurements.center_of_mass(frame)
                     self.frame_shifts[idx] = [cog_reference_y - int(round(cog_frame_real[0])),
                                               cog_reference_x - int(round(cog_frame_real[1]))]
+                    number_processed += 1
                     continue
 
                 # In "Surface" mode three alignment algorithms can be chosen from. In each case
