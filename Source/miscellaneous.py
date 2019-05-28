@@ -731,13 +731,13 @@ class Miscellaneous(object):
             # of this correction to the original image. Clip values out of range.
             luminance_blurred = GaussianBlur(luminance, (0, 0), sigma, borderType=BORDER_DEFAULT)
             hsv[:, :, 2] = (luminance + amount * (luminance - luminance_blurred)).clip(min=0.,
-                                                                                       max=65025.)
+                                                                                       max=65535.)
             # Convert the image back to uint16.
             return cvtColor(hsv, COLOR_HSV2BGR).astype(uint16)
         # General case: Treat the entire image (B/W or color 16bit mode).
         else:
             image_blurred = GaussianBlur(image, (0, 0), sigma, borderType=BORDER_DEFAULT)
-            return (image + amount * (image - image_blurred)).clip(min=0., max=65025.).astype(
+            return (image + amount * (image - image_blurred)).clip(min=0., max=65535.).astype(
                 uint16)
 
     @staticmethod
@@ -765,7 +765,7 @@ class Miscellaneous(object):
             temp = zeros(max(width, height), dtype=float32)
 
         # Convert input image to floats.
-        fimg[0] = input_image / 65025.
+        fimg[0] = input_image / 65535.
 
         # Start with level 0. Store its Laplacian on level 1. The operator is separated in a
         # column and a row operator.
@@ -803,7 +803,7 @@ class Miscellaneous(object):
             hpass = lpass
 
         # At the end add the coarsest level and convert back to 16bit integer format.
-        fimg[0] = ((fimg[0] + fimg[lpass]) * 65025.).clip(min=0., max=65025.)
+        fimg[0] = ((fimg[0] + fimg[lpass]) * 65535.).clip(min=0., max=65535.)
         return fimg[0].astype(uint16)
 
     @staticmethod

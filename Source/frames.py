@@ -21,18 +21,18 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from glob import glob
-from os import path, remove
+from os import path, remove, listdir
 from pathlib import Path
 from time import time
 
-import numpy as np
+from numpy import uint8, uint16, float32, clip, zeros, float64, average, where
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
     convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED
 from math import ceil
 
 from configuration import Configuration
-from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error
+from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error, InternalError
 from frames_old import FramesOld
 
 
@@ -335,6 +335,157 @@ class ImageReader(object):
 
         self.opened = False
 
+
+class Calibration(object):
+    """
+    This class performs the dark / flat calibration of frames. Master frames are created from
+    video files or image directories. Flats, darks and the stacking input must match in terms of
+    types, shapes and color modes.
+
+    """
+
+    def __init__(self, depth):
+        """
+
+        :param depth: Dynamic range (either 8 or 16)
+        """
+
+        self.depth = depth
+        self.color = None
+        self.dtype = None
+        self.shape = None
+
+        self.master_dark_frame = None
+        self.master_dark_frame_uint8 = None
+        self.master_dark_frame_uint16 = None
+        self.dark_color = None
+        self.dark_dtype = None
+        self.dark_shape = None
+
+        self.master_flat_frame = None
+        self.flat_color = None
+        self.flat_dtype = None
+        self.flat_shape = None
+
+    def create_master(self, master_name):
+        """
+        Create a master frame by averaging a number of video frames or still images.
+
+        :param master_name: Path name of video file or image directory.
+        :return: Master frame (type float32)
+        """
+
+        # Case video file:
+        if Path(master_name).is_file():
+            extension = Path(master_name).suffix
+            if extension in ['.avi']:
+                reader = VideoReader()
+                frame_count, self.color, self.dtype, self.shape = reader.open(master_name)
+            else:
+                raise InternalError(
+                    "Unsupported file type '" + extension + "' specified for master frame "
+                                                            "construction")
+        # Case image directory:
+        elif Path(master_name).is_dir():
+            reader = ImageReader()
+            frame_count, self.color, self.dtype, self.shape = reader.open(listdir(master_name))
+        else:
+            raise InternalError("Cannot decide if input file is video or image directory")
+
+        # Sum all frames in a 64bit buffer.
+        master_frame_64 = zeros(self.shape, float64)
+        for index in range(frame_count):
+            master_frame_64 += reader.read_frame()
+
+        # Return the average frame as float32.
+        return (master_frame_64 / frame_count).astype(float32)
+
+    def create_master_dark(self, dark_name):
+        """
+        Create a master dark image.
+
+        :param dark_name: Path name of video file or image directory.
+        :return: -
+        """
+
+        # Create the master frame and save its attributes.
+        self.master_dark_frame = self.create_master(dark_name)
+        self.dark_color = self.color
+        self.dark_dtype = self.dtype
+        self.dark_shape = self.shape
+
+        # If a flat frame has been processed already, check for consistency.
+        if self.flat_color is not None:
+            if self.dark_color != self.flat_color or self.dark_dtype != self.flat_dtype or \
+                    self.dark_shape != self.flat_shape:
+                raise ArgumentError("Flat and dark frames do not match")
+
+        # If there is no master flat, create 8 and 16 bit versions of the master dark.
+        else:
+            if self.dark_dtype == uint8:
+                self.master_dark_frame_uint8 = self.master_dark_frame.astype(uint8)
+            else:
+                self.master_dark_frame_uint16 = self.master_dark_frame.astype(uint16)
+
+    def create_master_flat(self, flat_name):
+        """
+        Create a master flat image.
+
+        :param flat_name: Path name of video file or image directory.
+        :return: -
+        """
+
+        # Create the master frame and save its attributes.
+        self.master_flat_frame = self.create_master(flat_name)
+        self.master_flat_frame /= average(self.master_flat_frame)
+        self.flat_color = self.color
+        self.flat_dtype = self.dtype
+        self.flat_shape = self.shape
+
+        # If a dark frame has been processed already, check for consistency.
+        if self.dark_color is not None:
+            if self.dark_color != self.flat_color or self.dark_dtype != self.flat_dtype or \
+                    self.dark_shape != self.flat_shape:
+                raise ArgumentError("Flat and dark frames do not match")
+
+    def correct(self, frame):
+        """
+        Correct a stacking frame using a master dark and / or a master flat.
+
+        :param frame: Frame to be stacked.
+        :return: Frame corrected for dark/flat, same type as input frame.
+        """
+
+        # Case both darks and flats are available:
+        if self.master_dark_frame is not None and self.master_flat_frame is not None:
+            if self.depth == 8:
+                return clip(
+                    (frame.astype(float32) - self.master_dark_frame) * self.master_flat_frame, 0.,
+                    255.).astype(uint8)
+            else:
+                return clip(
+                    (frame.astype(float32) - self.master_dark_frame) * self.master_flat_frame, 0.,
+                    65535.).astype(uint16)
+
+        # Case only darks are available:
+        elif self.master_dark_frame is not None:
+            if self.depth == 8:
+                return where(frame >= self.master_dark_frame_uint8,
+                             frame - self.master_dark_frame_uint8, 0)
+            else:
+                return where(frame >= self.master_dark_frame_uint16,
+                             frame - self.master_dark_frame_uint16, 0)
+
+        # Case only flats are available:
+        elif self.master_flat_frame is not None:
+            if self.depth == 8:
+                return clip(frame * self.master_flat_frame, 0., 255.).astype(uint8)
+            else:
+                return clip(frame * self.master_flat_frame, 0., 65535.).astype(uint16)
+
+        # Case neither darks nor flats are available. No correction:
+        else:
+            return frame
 
 class Frames(object):
     """
@@ -679,8 +830,8 @@ class Frames(object):
             frame_mono = self.frames_mono(index)
 
             # If the mono image is 8bit, interpolate it to 16bit.
-            if frame_mono.dtype == np.uint8:
-                frame_mono = frame_mono.astype(np.uint16) * 256
+            if frame_mono.dtype == uint8:
+                frame_mono = frame_mono.astype(uint16) * 256
 
             # Compute a version of the frame with Gaussian blur added.
             frame_monochrome_blurred = GaussianBlur(frame_mono,

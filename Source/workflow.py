@@ -84,7 +84,7 @@ class Workflow(QtCore.QObject):
             if self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.protocol("Number of threads used by mkl: " + str(mkl_get_max_threads()),
                                        self.attached_log_file, precede_with_timestamp=True)
-        except Error as e:
+        except Exception as e:
             Miscellaneous.protocol("mkl_rt.dll does not work (not a Windows system?): " + str(e),
                                    self.attached_log_file, precede_with_timestamp = True)
 
@@ -209,6 +209,12 @@ class Workflow(QtCore.QObject):
                                            self.attached_log_file)
                 self.work_next_task_signal.emit("Next job")
                 return
+            except Exception as e:
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("Error: " + str(e) + ", continue with next job\n",
+                                           self.attached_log_file)
+                self.work_next_task_signal.emit("Next job")
+                return
 
             # Look up the available RAM (without paging)
             virtual_memory = dict(psutil.virtual_memory()._asdict())
@@ -282,6 +288,13 @@ class Workflow(QtCore.QObject):
         except Error as e:
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
+                                       self.attached_log_file)
+            self.my_timer.stop('Ranking images')
+            self.work_next_task_signal.emit("Next job")
+            return
+        except Exception as e:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("Error: " + str(e) + ", continue with next job\n",
                                        self.attached_log_file)
             self.my_timer.stop('Ranking images')
             self.work_next_task_signal.emit("Next job")
@@ -427,6 +440,13 @@ class Workflow(QtCore.QObject):
             except Error as e:
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
+                                           self.attached_log_file)
+                self.my_timer.stop('Global frame alignment')
+                self.work_next_task_signal.emit("Next job")
+                return
+            except Exception as e:
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("Error: " + str(e) + ", continue with next job\n",
                                            self.attached_log_file)
                 self.my_timer.stop('Global frame alignment')
                 self.work_next_task_signal.emit("Next job")
