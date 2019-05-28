@@ -35,7 +35,7 @@ from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import PostprocDataObject
 from exceptions import NotSupportedError, InternalError, ArgumentError, Error
-from frames import Frames
+from frames import Frames, Calibration
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
 from stack_frames import StackFrames
@@ -87,6 +87,35 @@ class Workflow(QtCore.QObject):
         except Exception as e:
             Miscellaneous.protocol("mkl_rt.dll does not work (not a Windows system?): " + str(e),
                                    self.attached_log_file, precede_with_timestamp = True)
+
+        self.calibration = Calibration()
+
+    @QtCore.pyqtSlot(str)
+    def execute_create_master_dark(self, dark_name):
+
+        # Create a new master dark.
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Creating a new master dark frame +++",
+                                   self.attached_log_file, precede_with_timestamp=True)
+        self.calibration.create_master_dark(dark_name)
+
+    @QtCore.pyqtSlot(str)
+    def execute_create_master_flat(self, flat_name):
+
+        # Create a new master flat.
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Creating a new master flat frame +++",
+                                   self.attached_log_file, precede_with_timestamp=True)
+        self.calibration.create_master_flat(flat_name)
+
+    @QtCore.pyqtSlot()
+    def execute_reset_masters(self):
+
+        # De-activate master frames.
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ De-activating master frames +++",
+                                   self.attached_log_file, precede_with_timestamp=True)
+        self.calibration.reset_masters()
 
     @QtCore.pyqtSlot(str, str, bool)
     def execute_frames(self, input_name, input_type, convert_to_grayscale):

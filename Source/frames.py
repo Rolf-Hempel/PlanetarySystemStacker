@@ -346,6 +346,14 @@ class Calibration(object):
     """
 
     def __init__(self):
+        self.reset_masters()
+
+    def reset_masters(self):
+        """
+        De-activate master dark and flat frames.
+
+        :return: -
+        """
 
         self.color = None
         self.dtype = None
@@ -662,6 +670,10 @@ class Frames(object):
 
         Additional to the original images and their derivatives, the following large objects are
         allocated during the workflow:
+            calibration.master_dark_frame: pixels * colors (float32)
+            calibration.master_dark_frame_uint8: pixels * colors (uint8)
+            calibration.master_dark_frame_uint16: pixels * colors (uint16)
+            calibration.master_flat_frame: pixels * colors (float32)
             align_frames.mean_frame: image pixels (int32)
             align_frames.mean_frame_original: image pixels (int32)
             alignment_points, reference boxes: < 2 * image pixels (int32)
@@ -713,9 +725,9 @@ class Frames(object):
         buffer_for_all_images = buffer_per_image * self.number
 
         # Compute the size of additional workspace objects allocated during the workflow.
-        buffer_additional_workspace = number_pixel * 46
+        buffer_additional_workspace = number_pixel * 57
         if self.color:
-            buffer_additional_workspace += number_pixel * 36
+            buffer_additional_workspace += number_pixel * 58
 
         # Return the total buffer space required.
         return float(buffer_for_all_images + buffer_additional_workspace) / 1.e9
