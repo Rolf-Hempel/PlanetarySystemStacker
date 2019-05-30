@@ -25,7 +25,7 @@ from itertools import chain
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, float32, zeros, empty, int32, uint8, uint16
+from numpy import arange, float32, zeros, empty, int32, uint8, uint16, float64
 from scipy import ndimage
 from cv2 import imwrite
 
@@ -204,8 +204,9 @@ class AlignFrames(object):
 
         elif self.configuration.align_frames_mode == "Planet":
             # For "Planetary" mode compute the center of gravity for the reference image.
-            cog_real = ndimage.measurements.center_of_mass(
-                self.frames.frames_mono_blurred(self.frame_ranks_max_index))
+            reference_frame = self.frames.frames_mono_blurred(self.frame_ranks_max_index).astype(
+                float32)
+            cog_real = ndimage.measurements.center_of_mass(reference_frame)
             cog_reference_y = int(round(cog_real[0]))
             cog_reference_x = int(round(cog_real[1]))
 
@@ -249,7 +250,7 @@ class AlignFrames(object):
                 if self.configuration.align_frames_mode == "Planet":
                     # In Planetary mode the shift of the "center of gravity" of the image is
                     # computed. This algorithm cannot fail.
-                    cog_frame_real = ndimage.measurements.center_of_mass(frame)
+                    cog_frame_real = ndimage.measurements.center_of_mass(frame.astype(float32))
                     self.frame_shifts[idx] = [cog_reference_y - int(round(cog_frame_real[0])),
                                               cog_reference_x - int(round(cog_frame_real[1]))]
                     number_processed += 1
