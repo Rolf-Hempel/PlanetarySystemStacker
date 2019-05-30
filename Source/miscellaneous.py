@@ -492,7 +492,7 @@ class Miscellaneous(object):
 
         # Set up a table which keeps deviation values from earlier iteration steps. This way,
         # deviation evaluations can be avoided at coordinates which have been visited before.
-        # Initialize deviations with the highest possible UINT32.
+        # Initialize deviations with an impossibly high value.
         dev_table[:,:] = 1.e30
 
         # Initialize the global optimum with the value at dy=dx=0.
@@ -549,7 +549,7 @@ class Miscellaneous(object):
             else:
                 for (dy, dx) in circle_1:
                     deviation = dev_table[dy, dx]
-                    if deviation == 1.e30:
+                    if deviation > 1.e29:
                         deviation = abs(
                             reference_box - frame[y_low - dy:y_high - dy,
                                             x_low - dx:x_high - dx]).sum()
@@ -572,6 +572,57 @@ class Miscellaneous(object):
 
         # If within the maximum search radius no optimum could be found, return [0, 0].
         return [0, 0], dev_r
+
+    @staticmethod
+    def search_local_match_full(reference_box, frame, y_low, y_high, x_low, x_high,
+                                    search_width,
+                                    sampling_stride, dev_table):
+        """
+        For all shifts with -search_width < shift < search_width in y, x between the box around the
+        alignment point in the mean frame and the corresponding box in the given frame compute the
+        deviation. Return the y and x offsets where the deviation is smallest. The global frame
+        shift is accounted for beforehand already.
+
+        :param reference_box: Image box around alignment point in mean frame.
+        :param frame: Given frame for which the local shift at the alignment point is to be
+                      computed.
+        :param y_low: Lower y coordinate limit of box in given frame, taking into account the
+                      global shift and the different sizes of the mean frame and the original
+                      frames.
+        :param y_high: Upper y coordinate limit
+        :param x_low: Lower x coordinate limit
+        :param x_high: Upper x coordinate limit
+        :param search_width: Maximum distance in y and x from origin of the search area
+        :param sampling_stride: Stride in both coordinate directions used in computing deviations
+        :param dev_table: Scratch table to be used internally for storing intermediate results,
+                          size: [2*search_width+1, 2*search_width+1], dtype=float32.
+        :return: ([shift_y, shift_x], [min_r]) with:
+                   shift_y, shift_x: shift values of minimum or [0, 0] if no optimum could be found.
+                   [dev_r]: list of minimum deviations for all steps until a local minimum is found.
+        """
+
+        # Set up a table which keeps deviation values from earlier iteration steps. This way,
+        # deviation evaluations can be avoided at coordinates which have been visited before.
+        # Initialize deviations with an impossibly high value.
+        dev_table[:, :] = 1.e30
+
+        if sampling_stride != 1:
+            for dy in range(-search_width, search_width + 1):
+                for dx in range(-search_width, search_width + 1):
+                    dev_table[search_width + dy, search_width + dx] = abs(
+                        reference_box[::sampling_stride, ::sampling_stride] - frame[
+                                              y_low - dy:y_high - dy:sampling_stride,
+                                              x_low - dx:x_high - dx:sampling_stride]).sum()
+        else:
+            for dy in range(-search_width, search_width + 1):
+                for dx in range(-search_width, search_width + 1):
+                    dev_table[search_width + dy, search_width + dx] = abs(
+                        reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
+
+        dy, dx = unravel_index(argmin(dev_table, axis=None), dev_table.shape)
+
+        # Return the coordinate shifts for the minimum position and the value at that position.
+        return [dy-search_width, dx-search_width], dev_table[dy, dx]
 
     @staticmethod
     def insert_cross(frame, y_center, x_center, cross_half_len, color):
@@ -935,12 +986,12 @@ if __name__ == "__main__":
     search_width = 20
     sampling_stride = 1
 
-    dev_table = empty((2 * search_width, 2 * search_width), dtype=float32)
+    dev_table = empty((2 * search_width + 1, 2 * search_width + 1), dtype=float32)
 
     # First try the standard method "search_local_match". Compute the displacement vector, and
     # print a comparison of the true and computed values.
     start = time()
-    rep_count = 100
+    rep_count = 1
     for iter in range(rep_count):
         [dy, dx], dev_r = Miscellaneous.search_local_match(reference_box, frame, y_low, y_high,
                                                            x_low, x_high, search_width,

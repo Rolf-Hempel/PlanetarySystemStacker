@@ -80,8 +80,8 @@ class AlignmentPoints(object):
         # Initialize the number of frames to be stacked at each AP.
         self.stack_size = None
 
-        self.dev_table = empty((2 * self.configuration.alignment_points_search_width,
-                               2 * self.configuration.alignment_points_search_width), dtype=float32)
+        self.dev_table = empty((2 * self.configuration.alignment_points_search_width + 1,
+                               2 * self.configuration.alignment_points_search_width + 1), dtype=float32)
 
     @staticmethod
     def ap_locations(num_pixels, min_boundary_distance, step_size, even):
