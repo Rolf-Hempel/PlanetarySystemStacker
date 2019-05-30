@@ -286,7 +286,7 @@ class StackFrames(object):
             frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
 
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-            if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+            if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                 self.progress_signal.emit("Stack frames", int((frame_index / self.frames.number)
                                                                   * 100.))
 

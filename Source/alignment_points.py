@@ -596,7 +596,7 @@ class AlignmentPoints(object):
                 frame = self.frames.frames_mono_blurred(frame_index)
 
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank frames at APs",
                                               int((frame_index / self.signal_loop_length) * 100.))
 
@@ -625,7 +625,7 @@ class AlignmentPoints(object):
                 frame = self.frames.frames_mono_blurred_laplacian(frame_index)
 
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank frames at APs",
                                               int((frame_index / self.signal_loop_length) * 100.))
 

@@ -82,7 +82,7 @@ class RankFrames(object):
         if method != Miscellaneous.local_contrast_laplace:
             for frame_index in range(self.frames.number):
                 frame = self.frames.frames_mono_blurred(frame_index)
-                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
                                               int((frame_index / self.number) * 100.))
                 self.frame_ranks.append(method(frame, self.configuration.rank_frames_pixel_stride))
@@ -90,7 +90,7 @@ class RankFrames(object):
             for frame_index in range(self.frames.number):
                 frame = self.frames.frames_mono_blurred_laplacian(frame_index)
                 # self.frame_ranks.append(mean((frame - frame.mean())**2))
-                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
                                               int((frame_index / self.number) * 100.))
                 self.frame_ranks.append(frame.var())

@@ -752,7 +752,7 @@ class Frames(object):
                 self.signal_step_size = max(int(self.number / 10), 1)
                 for frame_index in range(self.number):
                     # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                    if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                    if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                         self.progress_signal.emit("Read all frames",
                                                   int((frame_index / self.number) * 100.))
                     # Read the next frame.

@@ -241,7 +241,7 @@ class AlignFrames(object):
             # For all other frames: Compute the global shift, using the "blurred" monochrome image.
             else:
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and idx % self.signal_step_size == 0:
+                if self.progress_signal is not None and number_processed % self.signal_step_size == 1:
                     self.progress_signal.emit("Align all frames",
                                               int((number_processed / self.frames.number) * 100.))
 
