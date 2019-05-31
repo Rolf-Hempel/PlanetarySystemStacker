@@ -812,7 +812,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         # changed during editing.
         for ap in self.aps.alignment_points:
             if ap['reference_box'] is None:
-                self.aps.set_reference_box(ap, self.mean_frame)
+                self.aps.set_reference_box(ap, self.aps.mean_frame)
 
         # Reset the busy status of the higher-level GUI (to enable the "play" button) and
         # update the status of the higher-level GUI (if a reference to it was passed in "init").
