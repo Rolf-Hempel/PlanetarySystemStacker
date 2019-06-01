@@ -27,6 +27,7 @@ from time import time
 
 from numpy import uint8, uint16, float32, clip, zeros, float64, where, average
 from numpy import max as np_max
+from numpy import min as np_min
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
     convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED
@@ -418,6 +419,12 @@ class Calibration(object):
         self.dark_dtype = self.dtype
         self.dark_shape = self.shape
 
+        # Create 8 and 16 bit versions of the master dark.
+        if self.dark_dtype == uint8:
+            self.master_dark_frame_uint8 = self.master_dark_frame.astype(uint8)
+        else:
+            self.master_dark_frame_uint16 = self.master_dark_frame.astype(uint16)
+
         # If a flat frame has been processed already, check for consistency. If master frames do not
         # match, remove the master flat.
         if self.inverse_master_flat_frame is not None:
@@ -427,13 +434,6 @@ class Calibration(object):
                 self.flat_color = None
                 self.flat_dtype = None
                 self.flat_shape = None
-
-        # If there is no master flat, create 8 and 16 bit versions of the master dark.
-        else:
-            if self.dark_dtype == uint8:
-                self.master_dark_frame_uint8 = self.master_dark_frame.astype(uint8)
-            else:
-                self.master_dark_frame_uint16 = self.master_dark_frame.astype(uint16)
 
     def create_master_flat(self, flat_name):
         """
@@ -469,6 +469,7 @@ class Calibration(object):
 
         # Compute the inverse master flat (float32) so that its entries are close to one.
         self.inverse_master_flat_frame = average_flat_frame / flat_frame
+        return self.inverse_master_flat_frame
 
     def flats_darks_match(self, color, dtype, shape):
         """
@@ -585,9 +586,9 @@ class Frames(object):
 
         return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
 
-    def __init__(self, configuration, names, type='video', convert_to_grayscale=False,
-                 progress_signal=None, buffer_original=True, buffer_monochrome=False,
-                 buffer_gaussian=True, buffer_laplacian=True):
+    def __init__(self, configuration, names, type='video', calibration=None,
+                 convert_to_grayscale=False, progress_signal=None, buffer_original=True,
+                 buffer_monochrome=False, buffer_gaussian=True, buffer_laplacian=True):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
@@ -596,6 +597,7 @@ class Frames(object):
         :param names: In case "video": name of the video file. In case "image": list of names for
                       all images.
         :param type: Either "video" or "image".
+        :param calibration: (Optional) calibration object for darks/flats correction.
         :param convert_to_grayscale: If "True", convert frames to grayscale if they are RGB.
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
                                 (str, int) with the current activity (str) and the progress in
@@ -615,6 +617,7 @@ class Frames(object):
 
         self.configuration = configuration
         self.names = names
+        self.calibration = calibration
         self.progress_signal = progress_signal
         self.type = type
         self.convert_to_grayscale = convert_to_grayscale
@@ -658,6 +661,12 @@ class Frames(object):
             self.depth = 8
         else:
             raise TypeError("Frame type " + str(self.dt0) + " not supported")
+
+        # If the darks / flats of the calibration object do not match the current reader, remove
+        # the calibration object.
+        if self.calibration:
+            if not self.calibration.flats_darks_match(self.color, self.dt0, self.shape):
+                self.calibration = None
 
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
         # Laplacians.
@@ -763,8 +772,12 @@ class Frames(object):
                     if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                         self.progress_signal.emit("Read all frames",
                                                   int((frame_index / self.number) * 100.))
-                    # Read the next frame.
-                    self.frames_original.append(self.reader.read_frame())
+                    # Read the next frame. If dark/flat correction is active, do the corrections.
+                    if self.calibration:
+                        self.frames_original.append(self.calibration.correct(
+                            self.reader.read_frame()))
+                    else:
+                        self.frames_original.append(self.reader.read_frame())
 
                 self.reader.close()
 
@@ -781,9 +794,13 @@ class Frames(object):
         if self.original_available_index == index:
             return self.original_available
 
-        # The frame has not been stored for re-use, read it.
+        # The frame has not been stored for re-use, read it. If dark/flat correction is active, do
+        # the corrections.
         else:
-            frame = self.reader.read_frame(index)
+            if self.calibration:
+                frame = self.calibration.correct(self.reader.read_frame(index))
+            else:
+                frame = self.reader.read_frame(index)
 
             # Cache the frame just read.
             self.original_available = frame
@@ -1052,6 +1069,8 @@ if __name__ == "__main__":
     version = 'frames'
     buffering_level = 4
 
+    name_flats = None
+    name_darks = None
     if type == 'image':
         # names = glob('Images/2012_*.tif')
         # names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
@@ -1060,9 +1079,33 @@ if __name__ == "__main__":
     else:
         names = 'Videos/another_short_video.avi'
         # names = 'Videos/Moon_Tile-024_043939.avi'
+        name_flats = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Flat.avi'
+        name_darks = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Dark.avi'
 
     # Get configuration parameters.
     configuration = Configuration()
+
+    # Initialize the Dark / Flat correction.
+    if name_darks or name_flats:
+        calibration = Calibration()
+    else:
+        calibration = None
+
+    # Create the master dark if requested.
+    if name_darks:
+        calibration.create_master_dark(name_darks)
+        print("Master dark created, shape: " + str(calibration.master_dark_frame.shape))
+        dark_min = np_min(calibration.master_dark_frame)
+        dark_max = np_max(calibration.master_dark_frame)
+        print("Dark min: " + str(dark_min) + ", Dark max: " + str(dark_max))
+
+    # Create the master flat if requested.
+    if name_flats:
+        calibration.create_master_flat(name_flats)
+        print("Master flat created, shape: " + str(calibration.inverse_master_flat_frame.shape))
+        flat_min = np_min(calibration.inverse_master_flat_frame)
+        flat_max = np_max(calibration.inverse_master_flat_frame)
+        print("Flat min: " + str(flat_min) + ", Flat max: " + str(flat_max))
 
     # Decide on the objects to be buffered, depending on configuration parameter.
     buffer_original = False
@@ -1082,7 +1125,8 @@ if __name__ == "__main__":
     start = time()
     if version == 'frames':
         try:
-            frames = Frames(configuration, names, type=type, convert_to_grayscale=False,
+            frames = Frames(configuration, names, type=type, calibration=calibration,
+                            convert_to_grayscale=False,
                             buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
                             buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
         except Error as e:
