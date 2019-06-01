@@ -25,7 +25,7 @@ from os import path, remove, listdir
 from pathlib import Path
 from time import time
 
-from numpy import uint8, uint16, float32, clip, zeros, float64, where
+from numpy import uint8, uint16, float32, clip, zeros, float64, where, average
 from numpy import max as np_max
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
@@ -366,7 +366,7 @@ class Calibration(object):
         self.dark_dtype = None
         self.dark_shape = None
 
-        self.master_flat_frame = None
+        self.inverse_master_flat_frame = None
         self.flat_color = None
         self.flat_dtype = None
         self.flat_shape = None
@@ -420,10 +420,10 @@ class Calibration(object):
 
         # If a flat frame has been processed already, check for consistency. If master frames do not
         # match, remove the master flat.
-        if self.master_flat_frame is not None:
+        if self.inverse_master_flat_frame is not None:
             if self.dark_color != self.flat_color or self.dark_dtype != self.flat_dtype or \
                     self.dark_shape != self.flat_shape:
-                self.master_flat_frame = None
+                self.inverse_master_flat_frame = None
                 self.flat_color = None
                 self.flat_dtype = None
                 self.flat_shape = None
@@ -444,8 +444,8 @@ class Calibration(object):
         """
 
         # Create the master frame and save its attributes.
-        self.master_flat_frame = self.create_master(flat_name)
-        self.master_flat_frame /= np_max(self.master_flat_frame)
+        flat_frame = self.create_master(flat_name)
+        average_flat_frame = average(flat_frame)
         self.flat_color = self.color
         self.flat_dtype = self.dtype
         self.flat_shape = self.shape
@@ -461,6 +461,14 @@ class Calibration(object):
                 self.dark_color = None
                 self.dark_dtype = None
                 self.dark_shape = None
+            # If there is a matching dark frame, use it to correct the flat frame. Avoid zeros in
+            # places where darks and flats are the same (hot pixels??).
+            else:
+                flat_frame = where(flat_frame > self.master_dark_frame,
+                             flat_frame - self.master_dark_frame, average_flat_frame)
+
+        # Compute the inverse master flat (float32) so that its entries are close to one.
+        self.inverse_master_flat_frame = average_flat_frame / flat_frame
 
     def flats_darks_match(self, color, dtype, shape):
         """
@@ -484,19 +492,19 @@ class Calibration(object):
         """
 
         # Case both darks and flats are available:
-        if self.master_dark_frame is not None and self.master_flat_frame is not None:
+        if self.master_dark_frame is not None and self.inverse_master_flat_frame is not None:
             if self.dtype == uint8:
                 return clip(
-                    (frame.astype(float32) - self.master_dark_frame) * self.master_flat_frame, 0.,
+                    (frame.astype(float32) - self.master_dark_frame) * self.inverse_master_flat_frame, 0.,
                     255.).astype(uint8)
             else:
                 return clip(
-                    (frame.astype(float32) - self.master_dark_frame) * self.master_flat_frame, 0.,
+                    (frame.astype(float32) - self.master_dark_frame) * self.inverse_master_flat_frame, 0.,
                     65535.).astype(uint16)
 
         # Case only flats are available:
-        elif self.master_flat_frame is not None:
-            return (frame * self.master_flat_frame).astype(self.dtype)
+        elif self.inverse_master_flat_frame is not None:
+            return (frame * self.inverse_master_flat_frame).astype(self.dtype)
 
         # Case only darks are available:
         elif self.master_dark_frame is not None:
