@@ -508,7 +508,7 @@ class Calibration(object):
         # Case both darks and flats are available:
         else:
             return clip(
-                (frame.astype(float32) - self.master_dark_frame) * self.inverse_master_flat_frame,
+                (frame - self.master_dark_frame) * self.inverse_master_flat_frame,
                 0., self.high_value).astype(self.dtype)
 
 
