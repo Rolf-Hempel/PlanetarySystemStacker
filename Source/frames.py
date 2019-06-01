@@ -361,11 +361,11 @@ class Calibration(object):
         self.shape = None
 
         self.master_dark_frame = None
-        self.master_dark_frame_uint8 = None
-        self.master_dark_frame_uint16 = None
+        self.master_dark_frame_uint = None
         self.dark_color = None
         self.dark_dtype = None
         self.dark_shape = None
+        self.high_value = None
 
         self.inverse_master_flat_frame = None
         self.flat_color = None
@@ -421,9 +421,11 @@ class Calibration(object):
 
         # Create 8 and 16 bit versions of the master dark.
         if self.dark_dtype == uint8:
-            self.master_dark_frame_uint8 = self.master_dark_frame.astype(uint8)
+            self.master_dark_frame_uint = self.master_dark_frame.astype(uint8)
+            self.high_value = 255.
         else:
-            self.master_dark_frame_uint16 = self.master_dark_frame.astype(uint16)
+            self.master_dark_frame_uint = self.master_dark_frame.astype(uint16)
+            self.high_value = 65535.
 
         # If a flat frame has been processed already, check for consistency. If master frames do not
         # match, remove the master flat.
@@ -456,8 +458,7 @@ class Calibration(object):
             if self.dark_color != self.flat_color or self.dark_dtype != self.flat_dtype or \
                     self.dark_shape != self.flat_shape:
                 self.master_dark_frame = None
-                self.master_dark_frame_uint8 = None
-                self.master_dark_frame_uint16 = None
+                self.master_dark_frame_uint = None
                 self.dark_color = None
                 self.dark_dtype = None
                 self.dark_shape = None
@@ -469,7 +470,6 @@ class Calibration(object):
 
         # Compute the inverse master flat (float32) so that its entries are close to one.
         self.inverse_master_flat_frame = average_flat_frame / flat_frame
-        return self.inverse_master_flat_frame
 
     def flats_darks_match(self, color, dtype, shape):
         """
@@ -492,33 +492,24 @@ class Calibration(object):
         :return: Frame corrected for dark/flat, same type as input frame.
         """
 
-        # Case both darks and flats are available:
-        if self.master_dark_frame is not None and self.inverse_master_flat_frame is not None:
-            if self.dtype == uint8:
-                return clip(
-                    (frame.astype(float32) - self.master_dark_frame) * self.inverse_master_flat_frame, 0.,
-                    255.).astype(uint8)
-            else:
-                return clip(
-                    (frame.astype(float32) - self.master_dark_frame) * self.inverse_master_flat_frame, 0.,
-                    65535.).astype(uint16)
+        # Case neither darks nor flats are available:
+        if self.master_dark_frame is None and self.inverse_master_flat_frame is None:
+            return frame
 
         # Case only flats are available:
-        elif self.inverse_master_flat_frame is not None:
+        elif self.master_dark_frame is None:
             return (frame * self.inverse_master_flat_frame).astype(self.dtype)
 
         # Case only darks are available:
-        elif self.master_dark_frame is not None:
-            if self.dtype == uint8:
-                return where(frame >= self.master_dark_frame_uint8,
-                             frame - self.master_dark_frame_uint8, 0)
-            else:
-                return where(frame >= self.master_dark_frame_uint16,
-                             frame - self.master_dark_frame_uint16, 0)
+        elif self.inverse_master_flat_frame is None:
+            return where(frame > self.master_dark_frame_uint,
+                         frame - self.master_dark_frame_uint, 0)
 
-        # Case neither darks nor flats are available. No correction:
+        # Case both darks and flats are available:
         else:
-            return frame
+            return clip(
+                (frame.astype(float32) - self.master_dark_frame) * self.inverse_master_flat_frame,
+                0., self.high_value).astype(self.dtype)
 
 
 class Frames(object):
