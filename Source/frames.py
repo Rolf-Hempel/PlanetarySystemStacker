@@ -79,13 +79,10 @@ class VideoReader(object):
 
         try:
             # Create the VideoCapture object.
-            print("Position 0, master_name: " + file_path)
             self.cap = VideoCapture(file_path)
-            print("Position 1")
 
             # Read the first frame.
             ret, self.last_frame_read = self.cap.read()
-            print("Position 2")
             if not ret:
                 raise IOError("Error in reading first video frame")
 
@@ -352,8 +349,15 @@ class Calibration(QtCore.QObject):
 
     report_calibration_error_signal = QtCore.pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, configuration):
+        """
+        Initialize the  object for dark / flat calibration.
+
+        :param configuration: Configuration object with parameters
+        """
+
         super(Calibration, self).__init__()
+        self.configuration = configuration
         self.reset_masters()
 
     def reset_masters(self):
@@ -415,14 +419,18 @@ class Calibration(QtCore.QObject):
             if extension in ['.avi']:
                 reader = VideoReader()
                 frame_count, input_color, input_dtype, input_shape = reader.open(master_name)
+                self.configuration.hidden_parameters_current_dir = str(Path(master_name).parent)
             else:
                 raise InternalError(
                     "Unsupported file type '" + extension + "' specified for master frame "
                                                             "construction")
         # Case image directory:
         elif Path(master_name).is_dir():
+            names = listdir(master_name)
+            names = [path.join(master_name, name) for name in names]
             reader = ImageReader()
-            frame_count, input_color, input_dtype, input_shape = reader.open(listdir(master_name))
+            frame_count, input_color, input_dtype, input_shape = reader.open(names)
+            self.configuration.hidden_parameters_current_dir = str(master_name)
         else:
             raise InternalError("Cannot decide if input file is video or image directory")
 
@@ -1185,7 +1193,7 @@ if __name__ == "__main__":
 
     # Initialize the Dark / Flat correction.
     if name_darks or name_flats:
-        calibration = Calibration()
+        calibration = Calibration(configuration)
     else:
         calibration = None
 

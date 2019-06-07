@@ -92,7 +92,7 @@ class Workflow(QtCore.QObject):
                                    self.attached_log_file, precede_with_timestamp = True)
 
         # Create the calibration object, used for potential flat / dark corrections.
-        self.calibration = Calibration()
+        self.calibration = Calibration(self.configuration)
 
     @QtCore.pyqtSlot(list)
     def execute_create_master_dark(self, dark_names):

@@ -945,7 +945,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                         self.ui.pushButton_next_job, self.ui.menuFile,
                                         self.ui.menuEdit, self.ui.menuCalibrate], False)
             self.activate_gui_elements([self.ui.pushButton_pause], True)
-            if self.job_index:
+            if self.job_index < self.job_number:
                 self.write_status_bar("Busy processing " + self.job_names[self.job_index], "black")
 
         # In manual mode, activate buttons and menu entries. Update the status bar.
