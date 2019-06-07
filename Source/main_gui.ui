@@ -255,8 +255,21 @@
     </property>
     <addaction name="actionEdit_configuration"/>
    </widget>
+   <widget class="QMenu" name="menuCalibrate">
+    <property name="title">
+     <string>Calibrate</string>
+    </property>
+    <addaction name="actionDe_activate_master_frames"/>
+    <addaction name="separator"/>
+    <addaction name="actionLoad_master_dark_frame"/>
+    <addaction name="actionLoad_master_flat_frame"/>
+    <addaction name="separator"/>
+    <addaction name="actionCreate_new_master_dark_frame"/>
+    <addaction name="actionCreate_new_master_flat_frame"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
+   <addaction name="menuCalibrate"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
   <action name="actionLoad_video_directory">
@@ -313,6 +326,31 @@
   <action name="actionEdit_postproc_config">
    <property name="text">
     <string>Edit postproc config</string>
+   </property>
+  </action>
+  <action name="actionDe_activate_master_frames">
+   <property name="text">
+    <string>De-activate master frames</string>
+   </property>
+  </action>
+  <action name="actionLoad_master_dark_frame">
+   <property name="text">
+    <string>Load master dark frame</string>
+   </property>
+  </action>
+  <action name="actionLoad_master_flat_frame">
+   <property name="text">
+    <string>Load master flat frame</string>
+   </property>
+  </action>
+  <action name="actionCreate_new_master_dark_frame">
+   <property name="text">
+    <string>Create new master dark frame</string>
+   </property>
+  </action>
+  <action name="actionCreate_new_master_flat_frame">
+   <property name="text">
+    <string>Create new master flat frame</string>
    </property>
   </action>
  </widget>

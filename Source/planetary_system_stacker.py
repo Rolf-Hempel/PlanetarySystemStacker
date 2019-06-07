@@ -26,6 +26,7 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 from sys import exit, argv
 from os import remove
 from pathlib import Path
+from numpy import max as np_max
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 
@@ -33,7 +34,8 @@ from main_gui import Ui_MainWindow
 
 from configuration import Configuration
 from configuration_editor import ConfigurationEditor
-from job_editor import JobEditor
+from frames import Frames
+from job_editor import JobEditor, FileDialog
 from rectangular_patch_editor import RectangularPatchEditorWidget
 from frame_viewer import FrameViewerWidget
 from alignment_points import AlignmentPoints
@@ -52,6 +54,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
     """
 
+    signal_reset_masters = QtCore.pyqtSignal()
+    signal_load_master_dark = QtCore.pyqtSignal(str)
+    signal_load_master_flat = QtCore.pyqtSignal(str)
     signal_frames = QtCore.pyqtSignal(str, str, bool)
     signal_rank_frames = QtCore.pyqtSignal()
     signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
@@ -118,19 +123,32 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.actionEdit_configuration.triggered.connect(self.edit_configuration)
         self.ui.actionLoad_config.triggered.connect(self.load_config_file)
         self.ui.actionSave_config.triggered.connect(self.save_config_file)
+        self.ui.actionDe_activate_master_frames.triggered.connect(self.reset_masters)
+        self.ui.actionLoad_master_dark_frame.triggered.connect(self.load_master_dark)
+        self.ui.actionLoad_master_flat_frame.triggered.connect(self.load_master_flat)
+        self.ui.actionCreate_new_master_dark_frame.triggered.connect(self.create_master_dark)
+        self.ui.actionCreate_new_master_flat_frame.triggered.connect(self.create_master_flat)
 
         # Create the workflow thread and start it.
         self.thread = QtCore.QThread()
         self.workflow = Workflow(self)
         self.workflow.moveToThread(self.thread)
+        self.workflow.master_dark_created_signal.connect(self.master_dark_created)
+        self.workflow.master_flat_created_signal.connect(self.master_flat_created)
+        self.workflow.calibration.report_calibration_error_signal.connect(self.report_calibration_error)
         self.workflow.work_next_task_signal.connect(self.work_next_task)
         self.workflow.work_current_progress_signal.connect(self.set_current_progress)
+        self.workflow.set_main_gui_busy_signal.connect(self.gui_set_busy)
         self.workflow.set_status_bar_signal.connect(self.write_status_bar)
         # self.workflow.set_status_signal.connect(self.set_status)
         # self.workflow.set_error_signal.connect(self.show_error_message)
         self.thread.start()
 
-        # Connect signals to start activities on the workflow thread (in method "work_next_task").
+        # Connect signals to start activities on the workflow thread (e.g. in method
+        # "work_next_task").
+        self.signal_reset_masters.connect(self.workflow.calibration.reset_masters)
+        self.signal_load_master_dark.connect(self.workflow.calibration.load_master_dark)
+        self.signal_load_master_flat.connect(self.workflow.calibration.load_master_flat)
         self.signal_frames.connect(self.workflow.execute_frames)
         self.signal_rank_frames.connect(self.workflow.execute_rank_frames)
         self.signal_align_frames.connect(self.workflow.execute_align_frames)
@@ -280,6 +298,185 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Open the job editor widget.
         self.display_widget(JobEditor(self))
 
+    def reset_masters(self):
+        """
+        This method is invoked by selecting "Reset master frames" from the "Calibration" menu. The
+        signal is caught on the workflow thread, where the method "execute_reset_masters" is
+        executed.
+
+        :return: -
+        """
+
+        self.signal_reset_masters.emit()
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ De-activating master dark / flat frames +++",
+                                   self.workflow.attached_log_file)
+
+    def create_master_dark(self):
+        """
+        Open a file dialog for entering a video file or image directory with dark frames. When the
+        FileDialog closes, it sends a signal (with the path name as payload) to the corresponding
+        slot on the workflow thread. There the actual master dark computation is performed.
+
+        :return: -
+        """
+
+        options = QtWidgets.QFileDialog.Options()
+        message = "Select a video file / a folder with image files for computing a master dark" \
+                  " frame"
+
+        file_dialog = FileDialog(self, message,
+                                      self.configuration.hidden_parameters_current_dir,
+                                      "Videos (*.avi)", options=options)
+        file_dialog.setNameFilters(["Still image folder / video file (*.avi)"])
+
+        # The list of strings (length 1) with the path name to the dark frames is sent by the
+        # FileDialog via the signal "signal_dialog_ready".
+        file_dialog.signal_dialog_ready.connect(self.workflow.execute_create_master_dark)
+        file_dialog.exec_()
+
+    @QtCore.pyqtSlot(bool)
+    def master_dark_created(self, success):
+        """
+        Called from the workflow thread when it has created a master dark frame. This method is
+        used to save the image to disk.
+
+        :param success: A flag indicating if the dark frame was created successfully. Only if true,
+                        write the resulting image to disk.
+        :return: -
+        """
+
+        if success:
+            options = QtWidgets.QFileDialog.Options()
+            master_dark_file = QtWidgets.QFileDialog.getSaveFileName(self,
+                                "Choose a file name for the new master dark frame",
+                                self.configuration.hidden_parameters_current_dir,
+                                "Images (*.tiff)", options=options)
+
+            if master_dark_file[0]:
+                Frames.save_image(master_dark_file[0],
+                                self.workflow.calibration.master_dark_frame,
+                                color=self.workflow.calibration.dark_color, avoid_overwriting=False)
+                # Remember the current directory for next file dialog.
+                self.configuration.hidden_parameters_current_dir = \
+                    str(Path(master_dark_file[0]).parents[0])
+                if self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol("           The master dark frame was written to: " +
+                                           str(master_dark_file[0]), self.workflow.attached_log_file,
+                                           precede_with_timestamp=False)
+
+        # Re-activate GUI elements.
+        self.gui_set_busy(False)
+
+    def load_master_dark(self):
+        """
+        This method is invoked by selecting "Load master dark" from the "Calibration" menu. It
+        opens a file dialog for selecting a TIFF file with a master dark frame.
+
+        :return: -
+        """
+
+        options = QtWidgets.QFileDialog.Options()
+        master_dark_file = QtWidgets.QFileDialog.getOpenFileName(self,
+                            "Select image file containing a master dark frame",
+                            self.configuration.hidden_parameters_current_dir,
+                            "Images (*.tiff)", options=options)
+
+        if master_dark_file[0]:
+            self.signal_load_master_dark.emit(master_dark_file[0])
+            # Remember the current directory for next file dialog.
+            self.configuration.hidden_parameters_current_dir = str(
+                Path(master_dark_file[0]).parents[0])
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("+++ Loading master dark frame +++",
+                                       self.workflow.attached_log_file)
+
+    def create_master_flat(self):
+        """
+        Open a file dialog for entering a video file or image directory with flat frames. When the
+        FileDialog closes, it sends a signal (with the path name as payload) to the corresponding
+        slot on the workflow thread. There the actual master flat computation is performed.
+
+        :return: -
+        """
+
+        options = QtWidgets.QFileDialog.Options()
+        message = "Select a video file / a folder with image files for computing a master flat" \
+                  " frame"
+
+        file_dialog = FileDialog(self, message,
+                                      self.configuration.hidden_parameters_current_dir,
+                                      "Videos (*.avi)", options=options)
+        file_dialog.setNameFilters(["Still image folder / video file (*.avi)"])
+
+        # The list of strings (length 1) with the path name to the flat frames is sent by the
+        # FileDialog via the signal "signal_dialog_ready".
+        file_dialog.signal_dialog_ready.connect(self.workflow.execute_create_master_flat)
+        file_dialog.exec_()
+
+    @QtCore.pyqtSlot(bool)
+    def master_flat_created(self, success):
+        """
+        Called from the workflow thread when it has created a master flat frame. This method is
+        used to save the image to disk.
+
+        :param success: A flag indicating if the dark frame was created successfully. Only if true,
+                        write the resulting image to disk.
+        :return: -
+        """
+
+        if success:
+            options = QtWidgets.QFileDialog.Options()
+            master_flat_file = QtWidgets.QFileDialog.getSaveFileName(self,
+                                "Choose a file name for the new master flat frame",
+                                self.configuration.hidden_parameters_current_dir,
+                                "Images (*.tiff)", options=options)
+
+            if master_flat_file[0]:
+                Frames.save_image(master_flat_file[0],
+                                self.workflow.calibration.master_flat_frame,
+                                color=self.workflow.calibration.flat_color,
+                                avoid_overwriting=False)
+                # Remember the current directory for next file dialog.
+                self.configuration.hidden_parameters_current_dir = str(
+                    Path(master_flat_file[0]).parents[0])
+                if self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol("           The master flat frame was written to: " +
+                                           str(master_flat_file[0]), self.workflow.attached_log_file,
+                                           precede_with_timestamp=False)
+
+        # Re-activate GUI elements.
+        self.gui_set_busy(False)
+
+    def load_master_flat(self):
+        """
+        This method is invoked by selecting "Load master flat" from the "Calibration" menu. It
+        opens a file dialog for selecting a TIFF file with a master flat frame.
+
+        :return: -
+        """
+
+        options = QtWidgets.QFileDialog.Options()
+        master_flat_file = QtWidgets.QFileDialog.getOpenFileName(self,
+                                "Select image file containing a master dark frame",
+                                self.configuration.hidden_parameters_current_dir,
+                                "Images (*.tiff)", options=options)
+
+        if master_flat_file[0]:
+            self.signal_load_master_flat.emit(master_flat_file[0])
+            # Remember the current directory for next file dialog.
+            self.configuration.hidden_parameters_current_dir = str(
+                Path(master_flat_file[0]).parents[0])
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("+++ Loading master flat frame +++",
+                                       self.workflow.attached_log_file)
+
+    @QtCore.pyqtSlot(str)
+    def report_calibration_error(self, message):
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("           " + message,
+                                   self.workflow.attached_log_file, precede_with_timestamp=False)
+
     def go_back(self):
         """
         Repeat processing steps as specified via the choice of the "comboBox_back" button. The user
@@ -290,10 +487,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Get the choice of the combobox button.
         task = self.ui.comboBox_back.currentText()
-        Miscellaneous.protocol("", self.workflow.attached_log_file,
-                               precede_with_timestamp=False)
-        Miscellaneous.protocol("+++ Repeating from task: " + task + " +++",
-                               self.workflow.attached_log_file)
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("", self.workflow.attached_log_file,
+                                   precede_with_timestamp=False)
+            Miscellaneous.protocol("+++ Repeating from task: " + task + " +++",
+                                   self.workflow.attached_log_file)
 
         # If the end of the job queue was reached, reverse the last job index increment.
         if self.job_index == self.job_number and self.job_index>0:
@@ -710,6 +908,16 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.comboBox_back.setCurrentIndex(0)
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
 
+    @QtCore.pyqtSlot(bool)
+    def gui_set_busy(self, busy):
+        """
+        Set the main GUI busy / not busy, and update its status.
+
+        :param busy: Flag indicating if the main GUI is to be set busy.
+        :return: -
+        """
+        self.busy = busy
+        self.update_status()
 
     def update_status(self):
         """
@@ -735,13 +943,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 self.activate_gui_elements([self.ui.comboBox_back], True)
             self.activate_gui_elements([self.ui.pushButton_start,
                                         self.ui.pushButton_next_job, self.ui.menuFile,
-                                        self.ui.menuEdit], False)
+                                        self.ui.menuEdit, self.ui.menuCalibrate], False)
             self.activate_gui_elements([self.ui.pushButton_pause], True)
-            self.write_status_bar("Busy processing " + self.job_names[self.job_index], "black")
+            if self.job_index:
+                self.write_status_bar("Busy processing " + self.job_names[self.job_index], "black")
 
         # In manual mode, activate buttons and menu entries. Update the status bar.
         else:
-            self.activate_gui_elements([self.ui.menuFile, self.ui.menuEdit], True)
+            self.activate_gui_elements([self.ui.menuFile, self.ui.menuEdit, self.ui.menuCalibrate], True)
             self.activate_gui_elements([self.ui.pushButton_pause], False)
             if self.activity == "Next job":
                 self.activate_gui_elements([self.ui.actionSave, self.ui.actionSave_as], True)
@@ -761,7 +970,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 if len(activated_buttons) > 1:
                     for button in activated_buttons[1:]:
                         message += ", or '" + self.button_get_description(button) + "'"
-                message += ", or exit the program with 'Quit'."
+                message += ", define new jobs (File/Open), or exit the program with 'Quit'."
                 self.write_status_bar(message, "red")
             else:
                 self.write_status_bar("Load new jobs, or quit.", "red")

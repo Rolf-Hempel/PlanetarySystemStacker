@@ -2,11 +2,12 @@
 
 # Form implementation generated from reading ui file 'main_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.12
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -103,6 +104,8 @@ class Ui_MainWindow(object):
         self.menuFile.setObjectName("menuFile")
         self.menuEdit = QtWidgets.QMenu(self.menubar)
         self.menuEdit.setObjectName("menuEdit")
+        self.menuCalibrate = QtWidgets.QMenu(self.menubar)
+        self.menuCalibrate.setObjectName("menuCalibrate")
         MainWindow.setMenuBar(self.menubar)
         self.statusBar = QtWidgets.QStatusBar(MainWindow)
         self.statusBar.setObjectName("statusBar")
@@ -127,6 +130,16 @@ class Ui_MainWindow(object):
         self.actionEdit_configuration.setObjectName("actionEdit_configuration")
         self.actionEdit_postproc_config = QtWidgets.QAction(MainWindow)
         self.actionEdit_postproc_config.setObjectName("actionEdit_postproc_config")
+        self.actionDe_activate_master_frames = QtWidgets.QAction(MainWindow)
+        self.actionDe_activate_master_frames.setObjectName("actionDe_activate_master_frames")
+        self.actionLoad_master_dark_frame = QtWidgets.QAction(MainWindow)
+        self.actionLoad_master_dark_frame.setObjectName("actionLoad_master_dark_frame")
+        self.actionLoad_master_flat_frame = QtWidgets.QAction(MainWindow)
+        self.actionLoad_master_flat_frame.setObjectName("actionLoad_master_flat_frame")
+        self.actionCreate_new_master_dark_frame = QtWidgets.QAction(MainWindow)
+        self.actionCreate_new_master_dark_frame.setObjectName("actionCreate_new_master_dark_frame")
+        self.actionCreate_new_master_flat_frame = QtWidgets.QAction(MainWindow)
+        self.actionCreate_new_master_flat_frame.setObjectName("actionCreate_new_master_flat_frame")
         self.menuFile.addAction(self.actionLoad_video_directory)
         self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionSave)
@@ -137,8 +150,16 @@ class Ui_MainWindow(object):
         self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionQuit)
         self.menuEdit.addAction(self.actionEdit_configuration)
+        self.menuCalibrate.addAction(self.actionDe_activate_master_frames)
+        self.menuCalibrate.addSeparator()
+        self.menuCalibrate.addAction(self.actionLoad_master_dark_frame)
+        self.menuCalibrate.addAction(self.actionLoad_master_flat_frame)
+        self.menuCalibrate.addSeparator()
+        self.menuCalibrate.addAction(self.actionCreate_new_master_dark_frame)
+        self.menuCalibrate.addAction(self.actionCreate_new_master_flat_frame)
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuEdit.menuAction())
+        self.menubar.addAction(self.menuCalibrate.menuAction())
 
         self.retranslateUi(MainWindow)
         self.comboBox_back.setCurrentIndex(-1)
@@ -161,6 +182,7 @@ class Ui_MainWindow(object):
         self.pushButton_quit.setText(_translate("MainWindow", "Quit"))
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.menuEdit.setTitle(_translate("MainWindow", "Edit"))
+        self.menuCalibrate.setTitle(_translate("MainWindow", "Calibrate"))
         self.actionLoad_video_directory.setText(_translate("MainWindow", "Open"))
         self.actionLoad_config.setText(_translate("MainWindow", "Load configuration"))
         self.actionLoad_config.setToolTip(_translate("MainWindow", "Load configuration from \".pss\" file"))
@@ -173,4 +195,10 @@ class Ui_MainWindow(object):
         self.actionQuit.setText(_translate("MainWindow", "Quit"))
         self.actionEdit_configuration.setText(_translate("MainWindow", "Edit configuration"))
         self.actionEdit_postproc_config.setText(_translate("MainWindow", "Edit postproc config"))
+        self.actionDe_activate_master_frames.setText(_translate("MainWindow", "De-activate master frames"))
+        self.actionLoad_master_dark_frame.setText(_translate("MainWindow", "Load master dark frame"))
+        self.actionLoad_master_flat_frame.setText(_translate("MainWindow", "Load master flat frame"))
+        self.actionCreate_new_master_dark_frame.setText(_translate("MainWindow", "Create new master dark frame"))
+        self.actionCreate_new_master_flat_frame.setText(_translate("MainWindow", "Create new master flat frame"))
+
 

@@ -44,8 +44,11 @@ from timer import timer
 
 class Workflow(QtCore.QObject):
 
+    master_dark_created_signal = QtCore.pyqtSignal(bool)
+    master_flat_created_signal = QtCore.pyqtSignal(bool)
     work_next_task_signal = QtCore.pyqtSignal(str)
     work_current_progress_signal = QtCore.pyqtSignal(str, int)
+    set_main_gui_busy_signal = QtCore.pyqtSignal(bool)
     set_status_bar_signal = QtCore.pyqtSignal(str, str)
 
     def __init__(self, main_gui):
@@ -88,25 +91,57 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol("mkl_rt.dll does not work (not a Windows system?): " + str(e),
                                    self.attached_log_file, precede_with_timestamp = True)
 
+        # Create the calibration object, used for potential flat / dark corrections.
         self.calibration = Calibration()
 
-    @QtCore.pyqtSlot(str)
-    def execute_create_master_dark(self, dark_name):
-
+    @QtCore.pyqtSlot(list)
+    def execute_create_master_dark(self, dark_names):
         # Create a new master dark.
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Creating a new master dark frame +++",
                                    self.attached_log_file, precede_with_timestamp=True)
-        self.calibration.create_master_dark(dark_name)
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol("           Input frames: " + dark_names[0],
+                self.attached_log_file, precede_with_timestamp=False)
 
-    @QtCore.pyqtSlot(str)
-    def execute_create_master_flat(self, flat_name):
+        try:
+            self.set_main_gui_busy_signal.emit(True)
+            self.calibration.create_master_dark(dark_names[0])
+            # if self.configuration.global_parameters_protocol_level > 0 and \
+            #         self.calibration.master_flat_removed:
+            #     Miscellaneous.protocol("           A non-matching master flat was de-activated",
+            #         self.attached_log_file, precede_with_timestamp=False)
+            self.master_dark_created_signal.emit(True)
+        except Error as e:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("           Error in creating master dark frame: " + str(e),
+                                       self.attached_log_file, precede_with_timestamp=False)
+                self.master_dark_created_signal.emit(False)
+
+    @QtCore.pyqtSlot(list)
+    def execute_create_master_flat(self, flat_names):
 
         # Create a new master flat.
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Creating a new master flat frame +++",
                                    self.attached_log_file, precede_with_timestamp=True)
-        self.calibration.create_master_flat(flat_name)
+        if self.configuration.global_parameters_protocol_level > 1:
+            Miscellaneous.protocol("           Input frames: " + flat_names[0],
+                self.attached_log_file, precede_with_timestamp=False)
+
+        try:
+            self.set_main_gui_busy_signal.emit(True)
+            self.calibration.create_master_flat(flat_names[0])
+            # if self.configuration.global_parameters_protocol_level > 0 and \
+            #         self.calibration.master_dark_removed:
+            #     Miscellaneous.protocol("           A non-matching master dark was de-activated",
+            #         self.attached_log_file, precede_with_timestamp=False)
+            self.master_flat_created_signal.emit(True)
+        except Error as e:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("           Error in creating master flat frame: " + str(e) + ", flat frame calibration de-activated",
+                                       self.attached_log_file, precede_with_timestamp=False)
+                self.master_flat_created_signal.emit(False)
 
     @QtCore.pyqtSlot()
     def execute_reset_masters(self):
@@ -219,6 +254,7 @@ class Workflow(QtCore.QObject):
                     Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
             try:
                 self.frames = Frames(self.configuration, names, type=input_type,
+                                calibration=self.calibration,
                                 convert_to_grayscale=convert_to_grayscale,
                                 progress_signal=self.work_current_progress_signal,
                                 buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
@@ -228,10 +264,23 @@ class Workflow(QtCore.QObject):
                                 "           Number of images: " + str(self.frames.number) +
                                 ", image shape: " + str(self.frames.shape), self.attached_log_file,
                                 precede_with_timestamp=False)
-                elif self.configuration.global_parameters_protocol_level > 1:
-                    Miscellaneous.protocol(
-                        "           Total number of frames: " + str(self.frames.number),
-                        self.attached_log_file, precede_with_timestamp=False)
+                    if self.frames.calibration_matches:
+                        if self.calibration.master_dark_frame_adapted is not None and \
+                                self.calibration.inverse_master_flat_frame is not None:
+                            Miscellaneous.protocol(
+                                "           Dark / flat frame calibration is active",
+                                self.attached_log_file, precede_with_timestamp=False)
+                        elif self.calibration.master_dark_frame_adapted is not None:
+                            Miscellaneous.protocol("           Dark frame calibration is active",
+                                self.attached_log_file, precede_with_timestamp=False)
+                        elif self.calibration.inverse_master_flat_frame is not None:
+                            Miscellaneous.protocol("           Flat frame calibration is active",
+                                self.attached_log_file, precede_with_timestamp=False)
+                    else:
+                        Miscellaneous.protocol(
+                            "           No matching master dark / flat frames found, "
+                            "calibration de-activated",
+                            self.attached_log_file, precede_with_timestamp=False)
             except Error as e:
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
@@ -589,7 +638,8 @@ class Workflow(QtCore.QObject):
                                    " frames +++", self.attached_log_file)
         self.stack_frames.stack_frames()
 
-        if self.configuration.global_parameters_protocol_level > 1:
+        if self.configuration.global_parameters_protocol_level > 1 and \
+                len(self.alignment_points.alignment_points) > 0:
             Miscellaneous.protocol("\n           Distribution of shifts at alignment points:",
                                    self.attached_log_file, precede_with_timestamp=False)
             Miscellaneous.protocol(self.stack_frames.print_shift_table() + "\n",

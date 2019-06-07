@@ -24,6 +24,7 @@ from glob import glob
 from os import path, remove, listdir
 from pathlib import Path
 from time import time
+from PyQt5 import QtCore
 
 from numpy import uint8, uint16, float32, clip, zeros, float64, where, average
 from numpy import max as np_max
@@ -78,10 +79,13 @@ class VideoReader(object):
 
         try:
             # Create the VideoCapture object.
+            print("Position 0, master_name: " + file_path)
             self.cap = VideoCapture(file_path)
+            print("Position 1")
 
             # Read the first frame.
             ret, self.last_frame_read = self.cap.read()
+            print("Position 2")
             if not ret:
                 raise IOError("Error in reading first video frame")
 
@@ -338,7 +342,7 @@ class ImageReader(object):
         self.opened = False
 
 
-class Calibration(object):
+class Calibration(QtCore.QObject):
     """
     This class performs the dark / flat calibration of frames. Master frames are created from
     video files or image directories. Flats, darks and the stacking input must match in terms of
@@ -346,7 +350,10 @@ class Calibration(object):
 
     """
 
+    report_calibration_error_signal = QtCore.pyqtSignal(str)
+
     def __init__(self):
+        super(Calibration, self).__init__()
         self.reset_masters()
 
     def reset_masters(self):
@@ -356,28 +363,50 @@ class Calibration(object):
         :return: -
         """
 
+        self.reset_master_dark()
+        self.reset_master_flat()
+
         self.color = None
-        self.dtype = None
         self.shape = None
+        self.dtype = None
+
+    def reset_master_dark(self):
+        """
+        De-activate a master dark frame.
+
+        :return: -
+        """
 
         self.master_dark_frame = None
-        self.master_dark_frame_uint = None
+        self.master_dark_frame_adapted = None
+        self.high_value = None
         self.dark_color = None
         self.dark_dtype = None
         self.dark_shape = None
-        self.high_value = None
 
+    def reset_master_flat(self):
+        """
+        De-activate a master flat frame.
+
+        :return: -
+        """
+
+        self.master_flat_frame = None
         self.inverse_master_flat_frame = None
         self.flat_color = None
         self.flat_dtype = None
         self.flat_shape = None
 
-    def create_master(self, master_name):
+    def create_master(self, master_name, output_dtype=uint16):
         """
         Create a master frame by averaging a number of video frames or still images.
 
         :param master_name: Path name of video file or image directory.
-        :return: Master frame (type float32)
+        :param output_dtype: Data type of resulting master frame, one of:
+                             - uint8 (high value = 255)
+                             - uint16 (high value = 65535)
+                             default: uint16
+        :return: Master frame
         """
 
         # Case video file:
@@ -385,7 +414,7 @@ class Calibration(object):
             extension = Path(master_name).suffix
             if extension in ['.avi']:
                 reader = VideoReader()
-                frame_count, self.color, self.dtype, self.shape = reader.open(master_name)
+                frame_count, input_color, input_dtype, input_shape = reader.open(master_name)
             else:
                 raise InternalError(
                     "Unsupported file type '" + extension + "' specified for master frame "
@@ -393,96 +422,171 @@ class Calibration(object):
         # Case image directory:
         elif Path(master_name).is_dir():
             reader = ImageReader()
-            frame_count, self.color, self.dtype, self.shape = reader.open(listdir(master_name))
+            frame_count, input_color, input_dtype, input_shape = reader.open(listdir(master_name))
         else:
             raise InternalError("Cannot decide if input file is video or image directory")
 
         # Sum all frames in a 64bit buffer.
-        master_frame_64 = zeros(self.shape, float64)
+        master_frame_64 = zeros(input_shape, float64)
         for index in range(frame_count):
             master_frame_64 += reader.read_frame()
 
-        # Return the average frame as float32.
-        return (master_frame_64 / frame_count).astype(float32)
+        # Return the average frame in the format specified.
+        if output_dtype == input_dtype:
+            return (master_frame_64 / frame_count).astype(output_dtype)
+        elif output_dtype == uint8 and input_dtype == uint16:
+            factor = 1./(frame_count*256)
+            return (master_frame_64 * factor).astype(output_dtype)
+        elif output_dtype == uint16 and input_dtype == uint8:
+            factor = 256. / frame_count
+            return (master_frame_64 * factor).astype(output_dtype)
+        else:
+            raise ArgumentError("Cannot convert dtype from " + str(input_dtype) + " to " +
+                                str(output_dtype))
 
-    def create_master_dark(self, dark_name):
+    def create_master_dark(self, dark_name, load_from_file=False):
         """
-        Create a master dark image.
+        Create a master dark image, or read it from a file.
 
-        :param dark_name: Path name of video file or image directory.
+        :param dark_name: If a new master frame is to be created, path name of video file or image
+                          directory. Otherwise the file name (TIFF) of the master frame.
+        :param load_from_file: True, if to be loaded from file. False, if to be created anew.
         :return: -
         """
 
-        # Create the master frame and save its attributes.
-        self.master_dark_frame = self.create_master(dark_name)
-        self.dark_color = self.color
-        self.dark_dtype = self.dtype
-        self.dark_shape = self.shape
+        # Reset a master dark frame if previously allocated.
+        self.reset_master_dark()
 
-        # Create 8 and 16 bit versions of the master dark.
-        if self.dark_dtype == uint8:
-            self.master_dark_frame_uint = self.master_dark_frame.astype(uint8)
-            self.high_value = 255.
+        # Create the master frame or read it from a file.
+        if load_from_file:
+            self.master_dark_frame = imread(dark_name, IMREAD_UNCHANGED)
+            if self.master_dark_frame.dtype == uint8:
+                self.master_dark_frame = (self.master_dark_frame * 256).astype(uint16)
         else:
-            self.master_dark_frame_uint = self.master_dark_frame.astype(uint16)
-            self.high_value = 65535.
+            self.master_dark_frame = self.create_master(dark_name, output_dtype=uint16)
+
+        self.shape = self.dark_shape = self.master_dark_frame.shape
+        self.color = self.dark_color = (len(self.dark_shape) == 3)
+        self.dark_dtype = self.master_dark_frame.dtype
+
 
         # If a flat frame has been processed already, check for consistency. If master frames do not
         # match, remove the master flat.
         if self.inverse_master_flat_frame is not None:
-            if self.dark_color != self.flat_color or self.dark_dtype != self.flat_dtype or \
-                    self.dark_shape != self.flat_shape:
-                self.inverse_master_flat_frame = None
-                self.flat_color = None
-                self.flat_dtype = None
-                self.flat_shape = None
+            if self.dark_color != self.flat_color or self.dark_shape != self.flat_shape:
+                self.reset_master_flat()
+                # Send a message to the main GUI indicating that a non-matching master flat is
+                # removed.
+                self.report_calibration_error_signal.emit(
+                    "A non-matching master flat was de-activated")
 
-    def create_master_flat(self, flat_name):
+    def load_master_dark(self, dark_name):
         """
-        Create a master flat image.
+        Read a master dark frame from disk and initialize its metadata.
 
-        :param flat_name: Path name of video file or image directory.
+        :param dark_name: Path name of master dark frame (type TIFF)
         :return: -
         """
 
-        # Create the master frame and save its attributes.
-        flat_frame = self.create_master(flat_name)
-        average_flat_frame = average(flat_frame)
-        self.flat_color = self.color
-        self.flat_dtype = self.dtype
-        self.flat_shape = self.shape
+        self.create_master_dark(dark_name, load_from_file=True)
+
+    def create_master_flat(self, flat_name, load_from_file=False):
+        """
+        Create a master flat image, or read it from a file.
+
+        :param flat_name: If a new master frame is to be created, path name of video file or image
+                          directory. Otherwise the file name (TIFF) of the master frame.
+        :param load_from_file: True, if to be loaded from file. False, if to be created anew.
+        :return: -
+        """
+
+        # Reset a master flat frame if previously allocated.
+        self.reset_master_flat()
+
+        # Create the master frame or read it from a file.
+        if load_from_file:
+            self.master_flat_frame = imread(flat_name, IMREAD_UNCHANGED)
+            if self.master_flat_frame.dtype == uint8:
+                self.master_flat_frame = (self.master_flat_frame * 256).astype(uint16)
+        else:
+            self.master_flat_frame = self.create_master(flat_name, output_dtype=uint16)
+
+        self.shape = self.flat_shape = self.master_flat_frame.shape
+        self.color = self.flat_color = (len(self.flat_shape) == 3)
+        self.flat_dtype = self.master_flat_frame.dtype
 
         # If a dark frame has been processed already, check for consistency. If master frames do not
         # match, remove the master dark.
         if self.master_dark_frame is not None:
-            if self.dark_color != self.flat_color or self.dark_dtype != self.flat_dtype or \
-                    self.dark_shape != self.flat_shape:
-                self.master_dark_frame = None
-                self.master_dark_frame_uint = None
-                self.dark_color = None
-                self.dark_dtype = None
-                self.dark_shape = None
-            # If there is a matching dark frame, use it to correct the flat frame. Avoid zeros in
-            # places where darks and flats are the same (hot pixels??).
-            else:
-                flat_frame = where(flat_frame > self.master_dark_frame,
-                             flat_frame - self.master_dark_frame, average_flat_frame)
+            if self.dark_color != self.flat_color or self.dark_shape != self.flat_shape:
+                self.reset_master_dark()
+                # Send a message to the main GUI indicating that a non-matching master dark is removed.
+                self.report_calibration_error_signal.emit("A non-matching master dark was de-activated")
+
+        average_flat_frame = average(self.master_flat_frame).astype(uint16)
+
+        # If a new flat frame is to be constructed, apply a dark frame (if available).
+        if not load_from_file:
+            if self.master_dark_frame is not None:
+                # If there is a matching dark frame, use it to correct the flat frame. Avoid zeros in
+                # places where darks and flats are the same (hot pixels??).
+                self.master_flat_frame = where(self.master_flat_frame > self.master_dark_frame,
+                                               self.master_flat_frame - self.master_dark_frame,
+                                               average_flat_frame)
 
         # Compute the inverse master flat (float32) so that its entries are close to one.
-        self.inverse_master_flat_frame = average_flat_frame / flat_frame
+        if average_flat_frame > 0:
+            self.inverse_master_flat_frame = (average_flat_frame / self.master_flat_frame).astype(float32)
+        else:
+            self.reset_master_flat()
+            raise InternalError("Invalid input for flat frame computation")
 
-    def flats_darks_match(self, color, dtype, shape):
+    def load_master_flat(self, flat_name):
+        """
+        Read a master flat frame from disk and initialize its metadata.
+
+        :param flat_name: Path name of master flat frame (type TIFF)
+        :return: -
+        """
+
+        try:
+            self.create_master_flat(flat_name, load_from_file=True)
+
+        # Send a signal to the main GUI and trigger error message printing there.
+        except Error as e:
+            self.report_calibration_error_signal.emit("Error in loading master flat: " + str(e) + ", flat correction de-activated")
+
+    def flats_darks_match(self, color, shape):
         """
         Check if the master flat / master dark match frame attributes.
 
         :param color: True, if frames are in color; False otherwise.
-        :param dtype: Numpy type, either uint8 or uint16.
         :param shape: Tuple with the shape of a single frame; (num_px_y, num_px_x, 3) for color,
                       (num_px_y, num_px_x) for B/W.
         :return: True, if attributes match; False otherwise.
         """
 
-        return color == self.color and dtype == self.dtype and shape == self.shape
+        return color == self.color and shape == self.shape
+
+    def adapt_frame_type(self, frame_dtype):
+        """
+        Adapt the type of the master frames to the type of frames to be corrected.
+
+        :param frame_dtype: Dtype of frames to be corrected. Either uint8 or uint16.
+        :return: -
+        """
+
+        self.dtype = frame_dtype
+
+        if self.master_dark_frame is None:
+            self.high_value = None
+            self.master_dark_frame_adapted = None
+        elif frame_dtype == uint8:
+            self.high_value = 255
+            self.master_dark_frame_adapted = (self.master_dark_frame / 256.).astype(uint8)
+        elif frame_dtype == uint16:
+            self.high_value = 65535
+            self.master_dark_frame_adapted = self.master_dark_frame
 
     def correct(self, frame):
         """
@@ -493,22 +597,22 @@ class Calibration(object):
         """
 
         # Case neither darks nor flats are available:
-        if self.master_dark_frame is None and self.inverse_master_flat_frame is None:
+        if self.master_dark_frame_adapted is None and self.inverse_master_flat_frame is None:
             return frame
 
         # Case only flats are available:
-        elif self.master_dark_frame is None:
+        elif self.master_dark_frame_adapted is None:
             return (frame * self.inverse_master_flat_frame).astype(self.dtype)
 
         # Case only darks are available:
         elif self.inverse_master_flat_frame is None:
-            return where(frame > self.master_dark_frame_uint,
-                         frame - self.master_dark_frame_uint, 0)
+            return where(frame > self.master_dark_frame_adapted,
+                         frame - self.master_dark_frame_adapted, 0)
 
         # Case both darks and flats are available:
         else:
             return clip(
-                (frame - self.master_dark_frame) * self.inverse_master_flat_frame,
+                (frame - self.master_dark_frame_adapted) * self.inverse_master_flat_frame,
                 0., self.high_value).astype(self.dtype)
 
 
@@ -653,11 +757,14 @@ class Frames(object):
         else:
             raise TypeError("Frame type " + str(self.dt0) + " not supported")
 
-        # If the darks / flats of the calibration object do not match the current reader, remove
-        # the calibration object.
+        # Check if the darks / flats of the calibration object match the current reader.
         if self.calibration:
-            if not self.calibration.flats_darks_match(self.color, self.dt0, self.shape):
-                self.calibration = None
+            self.calibration_matches = self.calibration.flats_darks_match(self.color, self.shape)
+            # If there are matching darks or flats, adapt their type to the current frame type.
+            if self.calibration_matches:
+                self.calibration.adapt_frame_type(self.dt0)
+        else:
+            self.calibration_matches = False
 
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
         # Laplacians.
@@ -764,7 +871,7 @@ class Frames(object):
                         self.progress_signal.emit("Read all frames",
                                                   int((frame_index / self.number) * 100.))
                     # Read the next frame. If dark/flat correction is active, do the corrections.
-                    if self.calibration:
+                    if self.calibration_matches:
                         self.frames_original.append(self.calibration.correct(
                             self.reader.read_frame()))
                     else:
@@ -788,7 +895,7 @@ class Frames(object):
         # The frame has not been stored for re-use, read it. If dark/flat correction is active, do
         # the corrections.
         else:
-            if self.calibration:
+            if self.calibration_matches:
                 frame = self.calibration.correct(self.reader.read_frame(index))
             else:
                 frame = self.reader.read_frame(index)
