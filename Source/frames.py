@@ -24,18 +24,19 @@ from glob import glob
 from os import path, remove, listdir
 from pathlib import Path
 from time import time
-from PyQt5 import QtCore
 
-from numpy import uint8, uint16, float32, clip, zeros, float64, where, average
-from numpy import max as np_max
-from numpy import min as np_min
+from PyQt5 import QtCore
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
     convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED
 from math import ceil
+from numpy import max as np_max
+from numpy import min as np_min
+from numpy import uint8, uint16, float32, clip, zeros, float64, where, average
 
 from configuration import Configuration
-from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error, InternalError
+from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error, \
+    InternalError
 from frames_old import FramesOld
 
 
@@ -443,7 +444,7 @@ class Calibration(QtCore.QObject):
         if output_dtype == input_dtype:
             return (master_frame_64 / frame_count).astype(output_dtype)
         elif output_dtype == uint8 and input_dtype == uint16:
-            factor = 1./(frame_count*256)
+            factor = 1. / (frame_count * 256)
             return (master_frame_64 * factor).astype(output_dtype)
         elif output_dtype == uint16 and input_dtype == uint8:
             factor = 256. / frame_count
@@ -476,7 +477,6 @@ class Calibration(QtCore.QObject):
         self.shape = self.dark_shape = self.master_dark_frame.shape
         self.color = self.dark_color = (len(self.dark_shape) == 3)
         self.dark_dtype = self.master_dark_frame.dtype
-
 
         # If a flat frame has been processed already, check for consistency. If master frames do not
         # match, remove the master flat.
@@ -528,23 +528,26 @@ class Calibration(QtCore.QObject):
         if self.master_dark_frame is not None:
             if self.dark_color != self.flat_color or self.dark_shape != self.flat_shape:
                 self.reset_master_dark()
-                # Send a message to the main GUI indicating that a non-matching master dark is removed.
-                self.report_calibration_error_signal.emit("A non-matching master dark was de-activated")
+                # Send a message to the main GUI indicating that a non-matching master dark is
+                # removed.
+                self.report_calibration_error_signal.emit(
+                    "A non-matching master dark was de-activated")
 
         average_flat_frame = average(self.master_flat_frame).astype(uint16)
 
         # If a new flat frame is to be constructed, apply a dark frame (if available).
         if not load_from_file:
             if self.master_dark_frame is not None:
-                # If there is a matching dark frame, use it to correct the flat frame. Avoid zeros in
-                # places where darks and flats are the same (hot pixels??).
+                # If there is a matching dark frame, use it to correct the flat frame. Avoid zeros
+                # in places where darks and flats are the same (hot pixels??).
                 self.master_flat_frame = where(self.master_flat_frame > self.master_dark_frame,
                                                self.master_flat_frame - self.master_dark_frame,
                                                average_flat_frame)
 
         # Compute the inverse master flat (float32) so that its entries are close to one.
         if average_flat_frame > 0:
-            self.inverse_master_flat_frame = (average_flat_frame / self.master_flat_frame).astype(float32)
+            self.inverse_master_flat_frame = (average_flat_frame / self.master_flat_frame).astype(
+                float32)
         else:
             self.reset_master_flat()
             raise InternalError("Invalid input for flat frame computation")
@@ -562,7 +565,8 @@ class Calibration(QtCore.QObject):
 
         # Send a signal to the main GUI and trigger error message printing there.
         except Error as e:
-            self.report_calibration_error_signal.emit("Error in loading master flat: " + str(e) + ", flat correction de-activated")
+            self.report_calibration_error_signal.emit(
+                "Error in loading master flat: " + str(e) + ", flat correction de-activated")
 
     def flats_darks_match(self, color, shape):
         """
@@ -755,7 +759,7 @@ class Frames(object):
             raise TypeError("Image type " + self.type + " not supported")
 
         self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
-                                                    convert_to_grayscale=self.convert_to_grayscale)
+            convert_to_grayscale=self.convert_to_grayscale)
 
         # Set the depth value of all images to either 16 or 8 bits.
         if self.dt0 == 'uint16':
@@ -1146,6 +1150,7 @@ def access_pattern(frames_object, average_frame_percent):
         frames_object.frames_mono_blurred(index)
 
     return time() - start
+
 
 def access_pattern_simple(frames_object, average_frame_percent):
     """

@@ -23,26 +23,24 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 
 """
 
-from sys import exit, argv
 from os import remove
 from pathlib import Path
-from numpy import max as np_max
+from sys import exit, argv
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 
-from main_gui import Ui_MainWindow
-
+from alignment_point_editor import AlignmentPointEditorWidget
+from alignment_points import AlignmentPoints
 from configuration import Configuration
 from configuration_editor import ConfigurationEditor
+from frame_viewer import FrameViewerWidget
 from frames import Frames
 from job_editor import JobEditor, FileDialog
-from rectangular_patch_editor import RectangularPatchEditorWidget
-from frame_viewer import FrameViewerWidget
-from alignment_points import AlignmentPoints
-from alignment_point_editor import AlignmentPointEditorWidget
-from shift_distribution_viewer import ShiftDistributionViewerWidget
-from postproc_editor import PostprocEditorWidget
+from main_gui import Ui_MainWindow
 from miscellaneous import Miscellaneous
+from postproc_editor import PostprocEditorWidget
+from rectangular_patch_editor import RectangularPatchEditorWidget
+from shift_distribution_viewer import ShiftDistributionViewerWidget
 from workflow import Workflow
 
 
@@ -135,7 +133,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.workflow.moveToThread(self.thread)
         self.workflow.master_dark_created_signal.connect(self.master_dark_created)
         self.workflow.master_flat_created_signal.connect(self.master_flat_created)
-        self.workflow.calibration.report_calibration_error_signal.connect(self.report_calibration_error)
+        self.workflow.calibration.report_calibration_error_signal.connect(
+            self.report_calibration_error)
         self.workflow.work_next_task_signal.connect(self.work_next_task)
         self.workflow.work_current_progress_signal.connect(self.set_current_progress)
         self.workflow.set_main_gui_busy_signal.connect(self.gui_set_busy)
@@ -250,7 +249,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         options = QtWidgets.QFileDialog.Options()
         filename = QtWidgets.QFileDialog.getOpenFileName(self, "Load configuration file",
-                    self.configuration.hidden_parameters_current_dir, "*.pss", options=options)
+                                                 self.configuration.hidden_parameters_current_dir,
+                                                 "*.pss", options=options)
         file_name = filename[0]
 
         # If a valid file was selected, read parameters from the file and open the configuration
@@ -272,8 +272,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Open the file chooser.
         options = QtWidgets.QFileDialog.Options()
         filename = QtWidgets.QFileDialog.getSaveFileName(self, "Save configuration file",
-                    self.configuration.hidden_parameters_current_dir, "Config file (*.pss)",
-                    options=options)
+                                                 self.configuration.hidden_parameters_current_dir,
+                                                 "Config file (*.pss)",
+                                                 options=options)
 
         # Store file only if the chooser did not return with a cancel.
         file_name = filename[0]
@@ -326,8 +327,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                   " frame"
 
         file_dialog = FileDialog(self, message,
-                                      self.configuration.hidden_parameters_current_dir,
-                                      "Videos (*.avi)", options=options)
+                                 self.configuration.hidden_parameters_current_dir,
+                                 "Videos (*.avi)", options=options)
         file_dialog.setNameFilters(["Still image folder / video file (*.avi)"])
 
         # The list of strings (length 1) with the path name to the dark frames is sent by the
@@ -349,20 +350,23 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         if success:
             options = QtWidgets.QFileDialog.Options()
             master_dark_file = QtWidgets.QFileDialog.getSaveFileName(self,
-                                "Choose a file name for the new master dark frame",
-                                self.configuration.hidden_parameters_current_dir,
-                                "Images (*.tiff)", options=options)
+                                                 "Choose a file name for the new master dark frame",
+                                                 self.configuration.hidden_parameters_current_dir,
+                                                 "Images (*.tiff)",
+                                                 options=options)
 
             if master_dark_file[0]:
                 Frames.save_image(master_dark_file[0],
-                                self.workflow.calibration.master_dark_frame,
-                                color=self.workflow.calibration.dark_color, avoid_overwriting=False)
+                                  self.workflow.calibration.master_dark_frame,
+                                  color=self.workflow.calibration.dark_color,
+                                  avoid_overwriting=False)
                 # Remember the current directory for next file dialog.
                 self.configuration.hidden_parameters_current_dir = \
                     str(Path(master_dark_file[0]).parents[0])
                 if self.configuration.global_parameters_protocol_level > 1:
                     Miscellaneous.protocol("           The master dark frame was written to: " +
-                                           str(master_dark_file[0]), self.workflow.attached_log_file,
+                                           str(master_dark_file[0]),
+                                           self.workflow.attached_log_file,
                                            precede_with_timestamp=False)
 
         # Re-activate GUI elements.
@@ -378,9 +382,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         options = QtWidgets.QFileDialog.Options()
         master_dark_file = QtWidgets.QFileDialog.getOpenFileName(self,
-                            "Select image file containing a master dark frame",
-                            self.configuration.hidden_parameters_current_dir,
-                            "Images (*.tiff)", options=options)
+                                                 "Select image file containing a master dark frame",
+                                                 self.configuration.hidden_parameters_current_dir,
+                                                 "Images (*.tiff)", options=options)
 
         if master_dark_file[0]:
             self.signal_load_master_dark.emit(master_dark_file[0])
@@ -405,8 +409,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                   " frame"
 
         file_dialog = FileDialog(self, message,
-                                      self.configuration.hidden_parameters_current_dir,
-                                      "Videos (*.avi)", options=options)
+                                 self.configuration.hidden_parameters_current_dir,
+                                 "Videos (*.avi)", options=options)
         file_dialog.setNameFilters(["Still image folder / video file (*.avi)"])
 
         # The list of strings (length 1) with the path name to the flat frames is sent by the
@@ -428,21 +432,23 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         if success:
             options = QtWidgets.QFileDialog.Options()
             master_flat_file = QtWidgets.QFileDialog.getSaveFileName(self,
-                                "Choose a file name for the new master flat frame",
-                                self.configuration.hidden_parameters_current_dir,
-                                "Images (*.tiff)", options=options)
+                                                 "Choose a file name for the new master flat frame",
+                                                 self.configuration.hidden_parameters_current_dir,
+                                                 "Images (*.tiff)",
+                                                 options=options)
 
             if master_flat_file[0]:
                 Frames.save_image(master_flat_file[0],
-                                self.workflow.calibration.master_flat_frame,
-                                color=self.workflow.calibration.flat_color,
-                                avoid_overwriting=False)
+                                  self.workflow.calibration.master_flat_frame,
+                                  color=self.workflow.calibration.flat_color,
+                                  avoid_overwriting=False)
                 # Remember the current directory for next file dialog.
                 self.configuration.hidden_parameters_current_dir = str(
                     Path(master_flat_file[0]).parents[0])
                 if self.configuration.global_parameters_protocol_level > 1:
                     Miscellaneous.protocol("           The master flat frame was written to: " +
-                                           str(master_flat_file[0]), self.workflow.attached_log_file,
+                                           str(master_flat_file[0]),
+                                           self.workflow.attached_log_file,
                                            precede_with_timestamp=False)
 
         # Re-activate GUI elements.
@@ -458,9 +464,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         options = QtWidgets.QFileDialog.Options()
         master_flat_file = QtWidgets.QFileDialog.getOpenFileName(self,
-                                "Select image file containing a master dark frame",
-                                self.configuration.hidden_parameters_current_dir,
-                                "Images (*.tiff)", options=options)
+                                                 "Select image file containing a master dark frame",
+                                                 self.configuration.hidden_parameters_current_dir,
+                                                 "Images (*.tiff)", options=options)
 
         if master_flat_file[0]:
             self.signal_load_master_flat.emit(master_flat_file[0])
@@ -494,7 +500,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                    self.workflow.attached_log_file)
 
         # If the end of the job queue was reached, reverse the last job index increment.
-        if self.job_index == self.job_number and self.job_index>0:
+        if self.job_index == self.job_number and self.job_index > 0:
             self.job_index -= 1
 
         # Restart from the specified task within the current job.
@@ -511,7 +517,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.job_index -= 1
             self.display_widget(None, display=False)
             self.work_next_task("Read frames")
-
 
     def play(self):
         """
@@ -598,10 +603,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # thread with the four coordinate index bounds.
                 rpew = RectangularPatchEditorWidget(self, self.workflow.frames.frames_mono(
                     self.workflow.rank_frames.frame_ranks_max_index)[border:-border,
-                    border:-border], "With 'ctrl' and the left mouse button pressed, draw a "
-                                     "rectangular patch to be used for frame alignment. Or just "
-                                     "press 'OK / Cancel' (automatic selection).",
-                                      self.signal_align_frames)
+                                                          border:-border],
+                                        "With 'ctrl' and the left mouse button pressed, draw a "
+                                        "rectangular patch to be used for frame alignment. Or just "
+                                        "press 'OK / Cancel' (automatic selection).",
+                                        self.signal_align_frames)
 
                 self.display_widget(rpew)
                 rpew.viewer.setFocus()
@@ -646,8 +652,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # When the editor is finished, it sends a signal (last argument) to the workflow
                 # thread with the four coordinate index bounds.
                 rpew = RectangularPatchEditorWidget(self, self.workflow.align_frames.mean_frame,
-                    "With 'crtl' and the left mouse button pressed, draw a rectangle to set the ROI,"
-                    " or just press 'OK' (no ROI).", self.signal_set_roi)
+                    "With 'crtl' and the left mouse button pressed, draw a rectangle to set the"
+                    " ROI, or just press 'OK' (no ROI).", self.signal_set_roi)
 
                 self.display_widget(rpew)
                 rpew.viewer.setFocus()
@@ -672,14 +678,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # Initialize the AlignmentPoints object.
                 self.workflow.my_timer.create_no_check('Initialize alignment point object')
                 self.workflow.alignment_points = AlignmentPoints(self.workflow.configuration,
-                    self.workflow.frames, self.workflow.rank_frames, self.workflow.align_frames,
-                    progress_signal=self.workflow.work_current_progress_signal)
+                     self.workflow.frames, self.workflow.rank_frames, self.workflow.align_frames,
+                     progress_signal=self.workflow.work_current_progress_signal)
                 self.workflow.my_timer.stop('Initialize alignment point object')
                 # Open the alignment point editor.
                 apew = AlignmentPointEditorWidget(self, self.workflow.configuration,
-                                                               self.workflow.align_frames,
-                                                               self.workflow.alignment_points,
-                                                               self.signal_set_alignment_points)
+                                                  self.workflow.align_frames,
+                                                  self.workflow.alignment_points,
+                                                  self.signal_set_alignment_points)
 
                 self.display_widget(apew)
                 apew.viewer.setFocus()
@@ -736,7 +742,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             else:
                 self.signal_save_postprocessed_image.emit(
                     self.workflow.configuration.postproc_data_object.versions[
-                    self.workflow.configuration.postproc_data_object.version_selected].image)
+                        self.workflow.configuration.postproc_data_object.version_selected].image)
             self.busy = True
 
         elif self.activity == "Next job":
@@ -775,7 +781,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
-            "Save result as 16bit Tiff image", self.workflow.stacked_image_name ,
+            "Save result as 16bit Tiff image", self.workflow.stacked_image_name,
             "Image Files (*.tiff)", options=options)
 
         if filename and extension:
@@ -788,7 +794,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         quit_msg = "This is a placeholder for the manual activity " + activity + \
                    ". press OK when you want to continue with the workflow."
         QtWidgets.QMessageBox.question(self, 'Message', quit_msg,
-                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No, QtWidgets.QMessageBox.No)
+                                       QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
+                                       QtWidgets.QMessageBox.No)
 
     def show_current_progress_widgets(self, show):
         """
@@ -819,7 +826,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.show_current_progress_widgets(True)
         self.ui.label_current_progress.setText(activity)
         self.ui.progressBar_current.setValue(percent)
-
 
     def show_batch_progress_widgets(self, show, value=0):
         """
@@ -881,7 +887,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         elif self.activity == "Postprocessing":
             if self.workflow.job_type == 'stacking':
                 self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                                'Select stack size', 'Set ROI', 'Set alignment points',
+                                                'Select stack size', 'Set ROI',
+                                                'Set alignment points',
                                                 'Compute frame qualities', 'Stack frames',
                                                 'Save stacked image', 'Postprocessing'])
             # This is to be added for both job types.
@@ -889,7 +896,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         elif self.activity == "Save postprocessed image":
             if self.workflow.job_type == 'stacking':
                 self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                                'Select stack size', 'Set ROI', 'Set alignment points',
+                                                'Select stack size', 'Set ROI',
+                                                'Set alignment points',
                                                 'Compute frame qualities', 'Stack frames',
                                                 'Save stacked image', 'Postprocessing',
                                                 'Save postprocessed image'])
@@ -898,7 +906,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         elif self.activity == "Next job":
             if self.workflow.job_type == 'stacking':
                 self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                                'Select stack size', 'Set ROI', 'Set alignment points',
+                                                'Select stack size', 'Set ROI',
+                                                'Set alignment points',
                                                 'Compute frame qualities', 'Stack frames',
                                                 'Save stacked image'])
                 if self.workflow.configuration.global_parameters_include_postprocessing:
@@ -950,7 +959,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # In manual mode, activate buttons and menu entries. Update the status bar.
         else:
-            self.activate_gui_elements([self.ui.menuFile, self.ui.menuEdit, self.ui.menuCalibrate], True)
+            self.activate_gui_elements([self.ui.menuFile, self.ui.menuEdit, self.ui.menuCalibrate],
+                                       True)
             self.activate_gui_elements([self.ui.pushButton_pause], False)
             if self.activity == "Next job":
                 self.activate_gui_elements([self.ui.actionSave, self.ui.actionSave_as], True)
@@ -978,7 +988,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         self.show_batch_progress_widgets(self.job_number > 1)
         if self.job_number > 0:
-            self.ui.progressBar_batch.setValue(int(100*self.job_index/self.job_number))
+            self.ui.progressBar_batch.setValue(int(100 * self.job_index / self.job_number))
 
     def button_get_description(self, element):
         """
