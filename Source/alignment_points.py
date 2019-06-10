@@ -111,15 +111,10 @@ class AlignmentPoints(object):
 
         # Compute the AP locations, separately for even and odd rows.
         if even:
-            locations = []
-            for i in range(num_interior_even):
-                locations.append(int(min_boundary_distance + i * distance_corrected))
+            locations = [int(min_boundary_distance + i * distance_corrected) for i in range(num_interior_even)]
         else:
-            locations = []
-            for i in range(num_interior_odd):
-                locations.append(int(
-                    min_boundary_distance + 0.5 * distance_corrected +
-                    i * distance_corrected))
+            locations = [int(min_boundary_distance + 0.5 * distance_corrected +
+                             i * distance_corrected) for i in range(num_interior_odd)]
         return locations
 
     def create_ap_grid(self):
@@ -336,19 +331,12 @@ class AlignmentPoints(object):
         :return: -
         """
 
-        # Initialize the reduced AP list.
-        new_alignment_point_list = []
-
         # Create list with unique identifiers of all items on the list.
         ap_list_ids = [id(ap_list_item) for ap_list_item in ap_list]
 
-        # If the identifier of an alignment point does not match any list item, keep it.
-        for ap in self.alignment_points:
-            if id(ap) not in ap_list_ids:
-                new_alignment_point_list.append(ap)
-
         # Replace the original AP list with the reduced one.
-        self.alignment_points = new_alignment_point_list
+        # If the identifier of an alignment point does not match any list item, keep it.
+        self.alignment_points = [ap for ap in self.alignment_points if id(ap) not in ap_list_ids]
 
     def replace_alignment_point(self, ap_old, ap_new):
         """
@@ -515,11 +503,8 @@ class AlignmentPoints(object):
                  If no AP satisfies the condition, return an empty list.
         """
 
-        ap_list = []
-        for ap in self.alignment_points:
-            if y_low <= ap['y'] <= y_high and x_low <= ap['x'] <= x_high:
-                ap_list.append(ap)
-        return ap_list
+        return [ap for ap in self.alignment_points if y_low <= ap['y'] <= y_high and
+                x_low <= ap['x'] <= x_high]
 
     @staticmethod
     def find_neighbor(ap_y, ap_x, alignment_points):

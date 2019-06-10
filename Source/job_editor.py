@@ -52,11 +52,8 @@ class FileDialog(QtWidgets.QFileDialog):
         :return: -
         """
 
-        inds = self.tree.selectionModel().selectedIndexes()
-        files = []
-        for i in inds:
-            if i.column() == 0:
-                files.append(self.directory().filePath(str(i.data())))
+        files = [self.directory().filePath(str(i.data())) for i in
+                 self.tree.selectionModel().selectedIndexes() if i.column() == 0]
         self.signal_dialog_ready.emit(files)
         self.close()
 
@@ -172,14 +169,8 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         """
 
         # Get the selected items from the central job list widget.
-        items = self.job_list_widget.selectedItems()
-        remove_list = []
-        for item in items:
-            remove_list.append(str(item.text()))
-        input_names = []
-        for item in self.job_names:
-            if item not in remove_list:
-                input_names.append(item)
+        remove_list = [str(item.text()) for item in self.job_list_widget.selectedItems()]
+        input_names = [item for item in self.job_names if item not in remove_list]
 
         # Update the current job name list, and re-draw the job list widget.
         self.job_names = input_names

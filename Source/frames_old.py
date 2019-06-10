@@ -236,9 +236,7 @@ class FramesOld(object):
         """
 
         # For every frame initialize the list with used alignment points.
-        self.used_alignment_points = []
-        for frame_index in range(self.number):
-            self.used_alignment_points.append([])
+        self.used_alignment_points = [[] for frame_index in range(self.number)]
 
     def add_monochrome(self, color):
         """
