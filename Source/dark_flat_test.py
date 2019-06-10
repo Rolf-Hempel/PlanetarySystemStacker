@@ -40,7 +40,7 @@ out_flat = VideoWriter(video_flat, fourcc, 20.0, (nx, ny))
 while (True):
     # Capture frame-by-frame
     ret, frame = cap.read()
-    if ret == True:
+    if ret is True:
         frame_flat_applied = create_flat(frame)
         frame_dark_added = frame_flat_applied + dark
         frame_processed = clip(frame_dark_added, 0, 255)
