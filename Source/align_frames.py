@@ -391,11 +391,8 @@ class AlignFrames(object):
         # Compute global offsets of current frame relative to intersection frame. Start with
         # Initializing lists which for each frame give the dy and dx displacements between the
         # reference frame and current frame.
-        self.dy = []
-        self.dx = []
-        for idx in range(self.frames.number):
-            self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
-            self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
+        self.dy = [self.intersection_shape[0][0] - self.frame_shifts[idx][0] for idx in range(self.frames.number)]
+        self.dx = [self.intersection_shape[1][0] - self.frame_shifts[idx][1] for idx in range(self.frames.number)]
 
         # If the number of frames is not specified explicitly, compute it from configuration.
         if average_frame_number is not None:
@@ -485,11 +482,8 @@ class AlignFrames(object):
                                     x_max+self.intersection_shape_original[1][0]]]
 
         # Re-compute global offsets of current frame relative to reference frame.
-        self.dy = []
-        self.dx = []
-        for idx in range(self.frames.number):
-            self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
-            self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
+        self.dy = [self.intersection_shape[0][0] - self.frame_shifts[idx][0] for idx in range(self.frames.number)]
+        self.dx = [self.intersection_shape[1][0] - self.frame_shifts[idx][1] for idx in range(self.frames.number)]
 
         self.ROI_set = True
 
