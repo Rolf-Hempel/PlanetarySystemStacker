@@ -170,10 +170,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         # Get the selected items from the central job list widget.
         remove_list = [str(item.text()) for item in self.job_list_widget.selectedItems()]
-        input_names = [item for item in self.job_names if item not in remove_list]
 
         # Update the current job name list, and re-draw the job list widget.
-        self.job_names = input_names
+        self.job_names = [item for item in self.job_names if item not in remove_list]
         self.populate_job_list()
 
     def accept(self):
