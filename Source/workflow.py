@@ -199,8 +199,7 @@ class Workflow(QtCore.QObject):
         # "names".
         else:  # input_type = 'image'
             self.job_type = 'stacking'
-            names = listdir(input_name)
-            names = [join(input_name, name) for name in names]
+            names = [join(input_name, name) for name in listdir(input_name)]
             self.stacked_image_name = input_name + self.configuration.stack_frames_suffix + '.tiff'
             self.attached_log_name = input_name + '_stacking-log.txt'
 
