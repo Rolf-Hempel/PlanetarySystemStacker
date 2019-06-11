@@ -764,7 +764,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
 
         self.aphbw_slider_value.setValue(half_box_width * 2)
         self.aphbw_label_display.setText(str(half_box_width * 2))
-        self.apst_slider_value.setValue(int(round(structure_threshold * 100)))
+        self.apst_slider_value.setValue(round(structure_threshold * 100))
         self.apst_label_display.setText(str(structure_threshold))
         self.apbt_slider_value.setValue(brightness_threshold)
         self.apbt_label_display.setText(str(brightness_threshold))

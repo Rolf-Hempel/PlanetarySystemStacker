@@ -93,7 +93,7 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
     # translation is non-linear in order to add resolution at small values.
     @staticmethod
     def radius_to_integer(radius):
-        return max(min(int(round(radius * 10.)), 99), 1)
+        return max(min(round(radius * 10.), 99), 1)
 
     @staticmethod
     def integer_to_radius(int):

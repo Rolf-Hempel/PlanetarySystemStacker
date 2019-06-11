@@ -151,7 +151,7 @@ if __name__ == "__main__":
     print ("")
     num_frames = len(rank_frames.frame_ranks)
     frame_percent = 10
-    num_frames_stacked = max(1, int(round(num_frames*frame_percent/100.)))
+    num_frames_stacked = max(1, round(num_frames*frame_percent/100.))
     print ("Percent of frames to be stacked: ", str(frame_percent), ", numnber: "
            + str(num_frames_stacked))
     quality_cutoff = rank_frames.frame_ranks[rank_frames.quality_sorted_indices[num_frames_stacked]]

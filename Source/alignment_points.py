@@ -397,10 +397,10 @@ class AlignmentPoints(object):
             return None
 
         # Compute new values for patch and box sizes.
-        half_patch_width_new_int = int(round(half_box_width *
+        half_patch_width_new_int = round(half_box_width *
                                              self.configuration.alignment_points_half_patch_width /
-                                             self.configuration.alignment_points_half_box_width))
-        half_box_width_new_int = int(round(half_box_width))
+                                             self.configuration.alignment_points_half_box_width)
+        half_box_width_new_int = round(half_box_width)
 
         # Compute resized patch bounds. If resizing hits the image boundary on at least one side,
         # the operation is aborted.
@@ -567,7 +567,7 @@ class AlignmentPoints(object):
         # Compute the frequency of progress signals in the computational loop.
         if self.progress_signal is not None:
             self.signal_loop_length = max(self.frames.number, 1)
-            self.signal_step_size = max(int(round(self.frames.number / 10)), 1)
+            self.signal_step_size = max(round(self.frames.number / 10), 1)
 
         # Initialize a list which for each AP contains the qualities of all frames at this point.
         for alignment_point in self.alignment_points:

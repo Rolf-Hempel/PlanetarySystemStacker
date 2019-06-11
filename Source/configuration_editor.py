@@ -114,8 +114,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.aphbw_label_display.setText(str(self.config_copy.alignment_points_half_box_width * 2))
         self.apsw_slider_value.setValue(self.config_copy.alignment_points_search_width)
         self.apsw_label_display.setText(str(self.config_copy.alignment_points_search_width))
-        self.apst_slider_value.setValue(
-            int(round(self.config_copy.alignment_points_structure_threshold * 100)))
+        self.apst_slider_value.setValue(round(self.config_copy.alignment_points_structure_threshold * 100))
         self.apst_label_display.setText(str(self.config_copy.alignment_points_structure_threshold))
         self.apbt_slider_value.setValue(self.config_copy.alignment_points_brightness_threshold)
         self.apbt_label_display.setText(str(self.config_copy.alignment_points_brightness_threshold))
