@@ -299,7 +299,7 @@ class Workflow(QtCore.QObject):
 
             # Look up the available RAM (without paging)
             virtual_memory = dict(psutil.virtual_memory()._asdict())
-            available_ram = float(virtual_memory['available']) / 1.e9
+            available_ram = virtual_memory['available'] / 1e9
 
             # Compute the approximate RAM usage of this job at the selected buffering level.
             needed_ram = self.frames.compute_required_buffer_size(

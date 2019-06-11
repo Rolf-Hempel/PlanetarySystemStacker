@@ -816,7 +816,7 @@ class Miscellaneous(object):
             temp = zeros(max(width, height), dtype=float32)
 
         # Convert input image to floats.
-        fimg[0] = input_image / 65535.
+        fimg[0] = input_image / 65535
 
         # Start with level 0. Store its Laplacian on level 1. The operator is separated in a
         # column and a row operator.

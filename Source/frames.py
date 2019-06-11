@@ -857,7 +857,7 @@ class Frames(object):
             buffer_additional_workspace += number_pixel * 58
 
         # Return the total buffer space required.
-        return float(buffer_for_all_images + buffer_additional_workspace) / 1.e9
+        return (buffer_for_all_images + buffer_additional_workspace) / 1e9
 
     def frames(self, index):
         """

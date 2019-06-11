@@ -98,16 +98,14 @@ class AlignmentPoints(object):
 
         # The number of interior alignment boxes in general is not an integer. Round to the next
         # higher number.
-        num_interior_odd = int(
-            ceil(float(num_pixels - 2 * min_boundary_distance) / float(step_size)))
+        num_interior_odd = int(ceil((num_pixels - 2 * min_boundary_distance) / step_size))
         # Because alignment points are arranged in a staggered grid, in even rows there is one point
         # more.
         num_interior_even = num_interior_odd + 1
 
         # The precise distance between alignment points will differ slightly from the specified
         # step_size. Compute the exact distance. Integer locations will be rounded later.
-        distance_corrected = float(num_pixels - 2 * min_boundary_distance) / float(
-            num_interior_odd)
+        distance_corrected = (num_pixels - 2 * min_boundary_distance) / num_interior_odd
 
         # Compute the AP locations, separately for even and odd rows.
         if even:
@@ -200,8 +198,7 @@ class AlignmentPoints(object):
 
                     # Check if the fraction of dark pixels exceeds a threshold.
                     box = alignment_point['reference_box']
-                    fraction = (box < brightness_threshold).sum() / float(
-                        box.shape[0] * box.shape[1])
+                    fraction = (box < brightness_threshold).sum() / (box.shape[0] * box.shape[1])
                     if fraction > self.configuration.alignment_points_dim_fraction_threshold:
 
                         # Compute the center of mass of the brightness distribution within the box,

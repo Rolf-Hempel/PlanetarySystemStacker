@@ -488,9 +488,9 @@ class StackFrames(object):
         # Scale the image buffer such that entries are in the interval [0., 1.]. Then convert the
         # float image buffer to 16bit int (or 48bit in color mode).
         if self.frames.depth == 8:
-            self.stacked_image = img_as_uint(self.stacked_image_buffer / float(255))
+            self.stacked_image = img_as_uint(self.stacked_image_buffer / 255)
         else:
-            self.stacked_image = img_as_uint(self.stacked_image_buffer / 65535.0)
+            self.stacked_image = img_as_uint(self.stacked_image_buffer / 65535)
 
         return self.stacked_image
 
