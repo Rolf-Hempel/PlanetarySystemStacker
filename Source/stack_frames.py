@@ -311,8 +311,8 @@ class StackFrames(object):
                 # current frame and mean frame, global shift of current frame, and the local warp
                 # shift at this alignment point. The first two components are accounted for by dy,
                 # dx.
-                total_shift_y = round(dy - shift_y)
-                total_shift_x = round(dx - shift_x)
+                total_shift_y = int(round(dy - shift_y))
+                total_shift_x = int(round(dx - shift_x))
                 self.my_timer.stop('Stacking: compute AP shifts')
 
                 # Add the shifted alignment point patch to the AP's stacking buffer.

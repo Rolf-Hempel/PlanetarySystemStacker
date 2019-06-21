@@ -207,8 +207,8 @@ class AlignFrames(object):
             reference_frame = self.frames.frames_mono_blurred(self.frame_ranks_max_index).astype(
                 float32)
             cog_real = ndimage.measurements.center_of_mass(reference_frame)
-            cog_reference_y = round(cog_real[0])
-            cog_reference_x = round(cog_real[1])
+            cog_reference_y = int(round(cog_real[0]))
+            cog_reference_x = int(round(cog_real[1]))
 
         else:
             raise NotSupportedError(
@@ -251,8 +251,8 @@ class AlignFrames(object):
                     # In Planetary mode the shift of the "center of gravity" of the image is
                     # computed. This algorithm cannot fail.
                     cog_frame_real = ndimage.measurements.center_of_mass(frame.astype(float32))
-                    self.frame_shifts[idx] = [cog_reference_y - round(cog_frame_real[0]),
-                                              cog_reference_x - round(cog_frame_real[1])]
+                    self.frame_shifts[idx] = [cog_reference_y - int(round(cog_frame_real[0])),
+                                              cog_reference_x - int(round(cog_frame_real[1]))]
                     number_processed += 1
                     continue
 
