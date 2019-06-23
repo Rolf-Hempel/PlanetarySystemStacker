@@ -27,6 +27,7 @@ import matplotlib.pyplot as plt
 from math import ceil
 from numpy import arange, float32, zeros, empty, int32, uint8, uint16
 from scipy import ndimage
+#from scipy.misc import imsave
 from cv2 import imwrite
 
 from configuration import Configuration
@@ -189,6 +190,7 @@ class AlignFrames(object):
         :return: -
         """
 
+        print("Align Frames mode: ", self.configuration.align_frames_mode)
         if self.configuration.align_frames_mode == "Surface":
             # For "Surface" mode the alignment rectangle has to be selected first.
             if self.x_low_opt is None:
@@ -204,11 +206,23 @@ class AlignFrames(object):
 
         elif self.configuration.align_frames_mode == "Planet":
             # For "Planetary" mode compute the center of gravity for the reference image.
-            cog_real = ndimage.measurements.center_of_mass(
-                self.frames.frames_mono_blurred(self.frame_ranks_max_index))
+            ref_image = self.frames.frames_mono_blurred(self.frame_ranks_max_index)
+             
+            # use a black and white image for calculating Center of Mass:
+            threshold = (ref_image.max()+ref_image.min())/2
+            bw = 1.0*(ref_image >= threshold)
+            # imsave('ref_image.png', ref_image)
+            
+            cog_real = ndimage.measurements.center_of_mass(bw)
             cog_reference_y = int(round(cog_real[0]))
             cog_reference_x = int(round(cog_real[1]))
 
+            if cog_reference_y < 0 or cog_reference_x < 0:
+                print("WARNING: negative coords for center of mass for reference image (", 
+                      cog_reference_x, cog_reference_y, ")")
+            if cog_reference_y > ref_image.shape[0] or cog_reference_x > ref_image.shape[1]:
+                print("WARNING: coords for center of mass seem too large for reference image with size ", ref_image.shape)
+            print("Center of Mass of Reference Picture: (", cog_reference_x, cog_reference_y, ")")
         else:
             raise NotSupportedError(
                 "Frame alignment mode " + self.configuration.align_frames_mode +
@@ -249,9 +263,14 @@ class AlignFrames(object):
                 if self.configuration.align_frames_mode == "Planet":
                     # In Planetary mode the shift of the "center of gravity" of the image is
                     # computed. This algorithm cannot fail.
-                    cog_frame_real = ndimage.measurements.center_of_mass(frame)
+                    
+                    # Use black and white image for Center of Mass calculation
+                    bw = 1.0*(frame >= threshold)
+                    
+                    cog_frame_real = ndimage.measurements.center_of_mass(bw)
                     self.frame_shifts[idx] = [cog_reference_y - int(round(cog_frame_real[0])),
                                               cog_reference_x - int(round(cog_frame_real[1]))]
+                    print (idx, self.frame_shifts[idx])
                     continue
 
                 # In "Surface" mode three alignment algorithms can be chosen from. In each case
