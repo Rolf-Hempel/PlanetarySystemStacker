@@ -240,7 +240,7 @@ if __name__ == "__main__":
     """
 
     ####################################### Specify test case ######################################
-    redirect_stdout = True
+    redirect_stdout = False
     show_results = True
     # input_type = 'video'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
@@ -253,7 +253,9 @@ if __name__ == "__main__":
     ####################################### Specify test case end ##################################
 
     # Redirect standard output to a file if requested.
+    protocol_file = None
     if redirect_stdout:
+        print("Redirecting stdout, please check Protocol.txt file in input directory.", file=sys.stderr)
         stdout_saved = sys.stdout
         protocol_file = open(os.path.join(input_directory, 'Protocol.txt'), 'a')
         sys.stdout = protocol_file
@@ -301,26 +303,34 @@ if __name__ == "__main__":
             # Interrupt the workflow to display resulting images only if requested.
             if show_results:
                 # Show the full average frame.
+                print ("Full average frame:")
                 plt.imshow(average, cmap='Greys_r')
                 plt.show()
     
                 if roi:
                     # Show the ROI average frame.
+                    print ("ROI average frame")
                     plt.imshow(average_roi, cmap='Greys_r')
                     plt.show()
     
                 # Show alignment points and patches
+                print ("Alignment Points and patches:")
                 plt.imshow(color_image_with_aps)
                 plt.show()
     
                 # Convert the stacked image to 8bit and show in Window.
+                print("8bit stacked image:")
                 plt.imshow(img_as_ubyte(stacked_image))
                 plt.show()
     except:
         exec_info = sys.exc_info()
+        if protocol_file is None:
+            traceback.print_tb(exec_info[2])
+        else:
+            traceback.print_tb(exec_info[2], file=protocol_file)
         print(exec_info[1])
-        traceback.print_tb(exec_info[2])
     else:
         # Redirect stdout back to normal.
         if redirect_stdout:
             sys.stdout = stdout_saved
+            protocol_file.close()
