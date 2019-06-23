@@ -24,6 +24,7 @@ import ctypes
 import glob
 import sys
 import os
+import traceback
 
 import matplotlib.pyplot as plt
 from skimage import img_as_ubyte
@@ -84,13 +85,14 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
 
     # Get configuration parameters.
     configuration = Configuration()
+    configuration.align_frames_method = 'Planet'
 
     # Read the frames.
     print("+++ Start reading frames")
     my_timer.create('Read all frames')
     try:
         frames = Frames(configuration, names, type=input_type,
-                        convert_to_grayscale=convert_to_grayscale)
+                        convert_to_grayscale=convert_to_grayscale, buffer_gaussian=False, buffer_laplacian=False)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Exception as e:
@@ -238,12 +240,12 @@ if __name__ == "__main__":
     """
 
     ####################################### Specify test case ######################################
-    redirect_stdout = False
+    redirect_stdout = True
     show_results = True
-    input_type = 'video'
-    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
-    # input_type = 'image'
-    # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
+    # input_type = 'video'
+    # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
+    input_type = 'image'
+    input_directory = 'D:/Bilder/2019/06/2019-06-17_MondJupiter'
     convert_to_grayscale = False
     automatic_ap_creation = True
     roi = None
@@ -272,6 +274,8 @@ if __name__ == "__main__":
     # For images, it is assumed that the input directory contains one or several directories with
     # image files.
     else:
+        if input_type != 'image':
+            print("WARNING: Wrong input spec, assuming 'image'")
         input_directory_content = os.listdir(input_directory)
         # input_names = [dir for dir in input_directory_content if os.path.isdir(dir)]
         input_names = []
@@ -280,36 +284,43 @@ if __name__ == "__main__":
             if os.path.isdir(dir_abs):
                 input_names.append(dir_abs)
 
+    print("Inputs: ", input_names)
+    
     # Start the processing workflow in batch mode for all AVIs / file directories.
-    for input_name in input_names:
-        if roi:
-            average, average_roi, color_image_with_aps, stacked_image = workflow(input_name,
-                input_type=input_type, roi=roi, convert_to_grayscale=convert_to_grayscale,
-                automatic_ap_creation=automatic_ap_creation)
-        else:
-            average, color_image_with_aps, stacked_image = workflow(input_name,
-                input_type=input_type, convert_to_grayscale=convert_to_grayscale,
-                automatic_ap_creation=automatic_ap_creation)
-
-        # Interrupt the workflow to display resulting images only if requested.
-        if show_results:
-            # Show the full average frame.
-            plt.imshow(average, cmap='Greys_r')
-            plt.show()
-
+    try:
+        for input_name in input_names:
             if roi:
-                # Show the ROI average frame.
-                plt.imshow(average_roi, cmap='Greys_r')
+                average, average_roi, color_image_with_aps, stacked_image = workflow(input_name,
+                    input_type=input_type, roi=roi, convert_to_grayscale=convert_to_grayscale,
+                    automatic_ap_creation=automatic_ap_creation)
+            else:
+                average, color_image_with_aps, stacked_image = workflow(input_name,
+                    input_type=input_type, convert_to_grayscale=convert_to_grayscale,
+                    automatic_ap_creation=automatic_ap_creation)
+    
+            # Interrupt the workflow to display resulting images only if requested.
+            if show_results:
+                # Show the full average frame.
+                plt.imshow(average, cmap='Greys_r')
                 plt.show()
-
-            # Show alignment points and patches
-            plt.imshow(color_image_with_aps)
-            plt.show()
-
-            # Convert the stacked image to 8bit and show in Window.
-            plt.imshow(img_as_ubyte(stacked_image))
-            plt.show()
-
-    # Redirect stdout back to normal.
-    if redirect_stdout:
-        sys.stdout = stdout_saved
+    
+                if roi:
+                    # Show the ROI average frame.
+                    plt.imshow(average_roi, cmap='Greys_r')
+                    plt.show()
+    
+                # Show alignment points and patches
+                plt.imshow(color_image_with_aps)
+                plt.show()
+    
+                # Convert the stacked image to 8bit and show in Window.
+                plt.imshow(img_as_ubyte(stacked_image))
+                plt.show()
+    except:
+        exec_info = sys.exc_info()
+        print(exec_info[1])
+        traceback.print_tb(exec_info[2])
+    else:
+        # Redirect stdout back to normal.
+        if redirect_stdout:
+            sys.stdout = stdout_saved
