@@ -50,6 +50,7 @@ class ConfigurationParameters(object):
         self.alignment_points_search_width = None
         self.alignment_points_structure_threshold = None
         self.alignment_points_brightness_threshold = None
+        self.alignment_points_brightness_threshold_factor = None
         self.alignment_points_frame_percent = None
 
     def set_defaults(self):
@@ -72,12 +73,14 @@ class ConfigurationParameters(object):
         self.align_frames_average_frame_percent = 5
         self.alignment_points_search_width = 10
         self.alignment_points_frame_percent = 10
+        self.alignment_points_brightness_threshold_factor = 256
         self.set_defaults_ap_editing()
 
     def set_defaults_ap_editing(self):
         self.alignment_points_half_box_width = 20
         self.alignment_points_structure_threshold = 0.05
         self.alignment_points_brightness_threshold = 10
+        self.alignment_points_brightness_threshold_factor = 256
 
     def copy_from_config_object(self, configuration_object):
         self.hidden_parameters_current_dir = configuration_object.hidden_parameters_current_dir
@@ -114,6 +117,8 @@ class ConfigurationParameters(object):
             configuration_object.alignment_points_structure_threshold
         self.alignment_points_brightness_threshold = \
             configuration_object.alignment_points_brightness_threshold
+        self.alignment_points_brightness_threshold_factor = \
+            configuration_object.alignment_points_brightness_threshold_factor
         self.alignment_points_frame_percent = configuration_object.alignment_points_frame_percent
 
 
@@ -154,6 +159,7 @@ class Configuration(object):
         self.alignment_points_method = 'SteepestDescent'
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
+        self.alignment_points_brightness_threshold_factor = 256
 
         self.stack_frames_suffix = "_pss"
         self.stack_frames_background_fraction = 0.3
@@ -242,6 +248,7 @@ class Configuration(object):
             configuration_parameters.alignment_points_structure_threshold
         self.alignment_points_brightness_threshold = \
             configuration_parameters.alignment_points_brightness_threshold
+        # Note aligment_points_brightness_threshold_factor is constant and not stored in config.
         self.alignment_points_frame_percent = \
             configuration_parameters.alignment_points_frame_percent
 
@@ -289,6 +296,7 @@ class Configuration(object):
             self.alignment_points_structure_threshold
         configuration_parameters.alignment_points_brightness_threshold = \
             self.alignment_points_brightness_threshold
+        # Note alignment_points_brightness_threshold_factor is constant and not stored.
         configuration_parameters.alignment_points_frame_percent = \
             self.alignment_points_frame_percent
 
@@ -338,6 +346,7 @@ class Configuration(object):
                                                                   'structure threshold')
         self.alignment_points_brightness_threshold = conf.getint('Alignment points',
                                                                  'brightness threshold')
+        # Note: alignment_points_brightness_threshold_factor is not stored in config.
         self.alignment_points_frame_percent = conf.getint('Alignment points', 'frame percent')
 
     def store_all_parameters_to_config_parser(self):
@@ -399,6 +408,7 @@ class Configuration(object):
                            str(self.alignment_points_structure_threshold))
         self.set_parameter('Alignment points', 'brightness threshold',
                            str(self.alignment_points_brightness_threshold))
+        # note alignment_points_brightness_threshold_factor is not stored.
         self.set_parameter('Alignment points', 'frame percent',
                            str(self.alignment_points_frame_percent))
 

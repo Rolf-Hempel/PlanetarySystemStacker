@@ -207,7 +207,8 @@ class AlignFrames(object):
         elif self.configuration.align_frames_mode == "Planet":
             # For "Planetary" mode compute the center of gravity for the reference image.
             reference_frame = self.frames.frames_mono_blurred(self.frame_ranks_max_index)
-            threshold = self.configuration.alignment_points_brightness_threshold * 256
+            threshold = self.configuration.alignment_points_brightness_threshold * \
+                self.configuration.aligment_points_brigthness_threshold_factor
             reference_frame = 1.0*(reference_frame >= threshold)
             cog_real = ndimage.measurements.center_of_mass(reference_frame)
             cog_reference_y = int(round(cog_real[0]))
