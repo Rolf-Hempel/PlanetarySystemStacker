@@ -427,8 +427,7 @@ class Calibration(QtCore.QObject):
                                                             "construction")
         # Case image directory:
         elif Path(master_name).is_dir():
-            names = listdir(master_name)
-            names = [path.join(master_name, name) for name in names]
+            names = [path.join(master_name, name) for name in listdir(master_name)]
             reader = ImageReader()
             frame_count, input_color, input_dtype, input_shape = reader.open(names)
             self.configuration.hidden_parameters_current_dir = str(master_name)
