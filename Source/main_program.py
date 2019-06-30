@@ -24,6 +24,7 @@ import ctypes
 import glob
 import sys
 import os
+import traceback
 
 import matplotlib.pyplot as plt
 from skimage import img_as_ubyte
@@ -90,7 +91,9 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
     my_timer.create('Read all frames')
     try:
         frames = Frames(configuration, names, type=input_type,
-                        convert_to_grayscale=convert_to_grayscale)
+                        convert_to_grayscale=convert_to_grayscale,
+                        buffer_original=False, buffer_monochrome=False,
+                        buffer_gaussian=True, buffer_laplacian=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Error as e:
@@ -242,7 +245,7 @@ if __name__ == "__main__":
     show_results = True
     input_type = 'video'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
-    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Saturn'
+    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
     # input_type = 'image'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
     convert_to_grayscale = False
@@ -252,7 +255,10 @@ if __name__ == "__main__":
     ####################################### Specify test case end ##################################
 
     # Redirect standard output to a file if requested.
+    protocol_file = None
     if redirect_stdout:
+        print("Redirecting stdout, please check Protocol.txt file in input directory.",
+              file=sys.stderr)
         stdout_saved = sys.stdout
         protocol_file = open(os.path.join(input_directory, 'Protocol.txt'), 'a')
         sys.stdout = protocol_file
@@ -273,6 +279,8 @@ if __name__ == "__main__":
     # For images, it is assumed that the input directory contains one or several directories with
     # image files.
     else:
+        if input_type != 'image':
+            print("WARNING: Wrong input spec, assuming 'image'")
         input_directory_content = os.listdir(input_directory)
         # input_names = [dir for dir in input_directory_content if os.path.isdir(dir)]
         input_names = []
@@ -288,35 +296,44 @@ if __name__ == "__main__":
         print("+++ No files found to process")
 
     # Start the processing workflow in batch mode for all AVIs / file directories.
-    for input_name in input_names:
-        if roi:
-            average, average_roi, color_image_with_aps, stacked_image = workflow(input_name,
-                input_type=input_type, roi=roi, convert_to_grayscale=convert_to_grayscale,
-                automatic_ap_creation=automatic_ap_creation)
-        else:
-            average, color_image_with_aps, stacked_image = workflow(input_name,
-                input_type=input_type, convert_to_grayscale=convert_to_grayscale,
-                automatic_ap_creation=automatic_ap_creation)
-
-        # Interrupt the workflow to display resulting images only if requested.
-        if show_results:
-            # Show the full average frame.
-            plt.imshow(average, cmap='Greys_r')
-            plt.show()
-
+    try:
+        for input_name in input_names:
             if roi:
-                # Show the ROI average frame.
-                plt.imshow(average_roi, cmap='Greys_r')
+                average, average_roi, color_image_with_aps, stacked_image = workflow(input_name,
+                    input_type=input_type, roi=roi, convert_to_grayscale=convert_to_grayscale,
+                    automatic_ap_creation=automatic_ap_creation)
+            else:
+                average, color_image_with_aps, stacked_image = workflow(input_name,
+                    input_type=input_type, convert_to_grayscale=convert_to_grayscale,
+                    automatic_ap_creation=automatic_ap_creation)
+
+            # Interrupt the workflow to display resulting images only if requested.
+            if show_results:
+                # Show the full average frame.
+                plt.imshow(average, cmap='Greys_r')
                 plt.show()
 
-            # Show alignment points and patches
-            plt.imshow(color_image_with_aps)
-            plt.show()
+                if roi:
+                    # Show the ROI average frame.
+                    plt.imshow(average_roi, cmap='Greys_r')
+                    plt.show()
 
-            # Convert the stacked image to 8bit and show in Window.
-            plt.imshow(img_as_ubyte(stacked_image))
-            plt.show()
+                # Show alignment points and patches
+                plt.imshow(color_image_with_aps)
+                plt.show()
+
+                # Convert the stacked image to 8bit and show in Window.
+                plt.imshow(img_as_ubyte(stacked_image))
+                plt.show()
+    except:
+        exec_info = sys.exc_info()
+        if protocol_file is None:
+            traceback.print_tb(exec_info[2])
+        else:
+            traceback.print_tb(exec_info[2], file=protocol_file)
+        print(exec_info[1])
 
     # Redirect stdout back to normal.
     if redirect_stdout:
         sys.stdout = stdout_saved
+        protocol_file.close()

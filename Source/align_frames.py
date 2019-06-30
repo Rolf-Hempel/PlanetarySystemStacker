@@ -25,7 +25,8 @@ from itertools import chain
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, float32, zeros, empty, int32, uint8, uint16, float64
+from numpy import arange, float32, zeros, empty, int32, uint8, uint16, float64, uint32
+from numpy import max as np_max
 from scipy import ndimage
 from cv2 import imwrite
 
@@ -204,11 +205,8 @@ class AlignFrames(object):
 
         elif self.configuration.align_frames_mode == "Planet":
             # For "Planetary" mode compute the center of gravity for the reference image.
-            reference_frame = self.frames.frames_mono_blurred(self.frame_ranks_max_index).astype(
-                float32)
-            cog_real = ndimage.measurements.center_of_mass(reference_frame)
-            cog_reference_y = int(round(cog_real[0]))
-            cog_reference_x = int(round(cog_real[1]))
+            cog_reference_y, cog_reference_x = AlignFrames.center_of_gravity(
+                self.frames.frames_mono_blurred(self.frame_ranks_max_index))
 
         else:
             raise NotSupportedError(
@@ -250,9 +248,9 @@ class AlignFrames(object):
                 if self.configuration.align_frames_mode == "Planet":
                     # In Planetary mode the shift of the "center of gravity" of the image is
                     # computed. This algorithm cannot fail.
-                    cog_frame_real = ndimage.measurements.center_of_mass(frame.astype(float32))
-                    self.frame_shifts[idx] = [cog_reference_y - int(round(cog_frame_real[0])),
-                                              cog_reference_x - int(round(cog_frame_real[1]))]
+                    cog_frame = AlignFrames.center_of_gravity(frame)
+                    self.frame_shifts[idx] = [cog_reference_y - cog_frame[0],
+                                              cog_reference_x - cog_frame[1]]
                     number_processed += 1
                     continue
 
@@ -372,6 +370,36 @@ class AlignFrames(object):
         if len(self.failed_index_list) > 0:
             raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
                                 " frames: " + str(self.failed_index_list))
+
+    @staticmethod
+    def center_of_gravity(frame):
+        """
+        Comppute (y, x) pixel coordinates of the center of gravity for a given monochrome frame.
+        Raise an error if the computed cog is outside the frame index bounds.
+
+        :param frame: Monochrome frame (2D numpy array)
+        :return: Integer pixel coordinates (center_y, center_x) of center of gravity
+        """
+
+        # Only pixels brighter than half the maximum image brightness are included.
+        threshold = (np_max(frame)/2).astype(frame.dtype)
+
+        # The center of gravity is computed for a binary version of the image where all pixels
+        # brighter than the threshold are set to 1, and all others are set to 0.
+        cog_real = ndimage.measurements.center_of_mass(uint8(1)*(frame >= threshold))
+
+        # Round pixel coordinates to the nearest integers.
+        cog_y = int(round(cog_real[0]))
+        cog_x = int(round(cog_real[1]))
+
+        # If the computed center of gravity is outside the frame bounds, raise an error (should be
+        # impossible).
+        if not 0 < cog_y < frame.shape[0] or not 0 < cog_x < frame.shape[1]:
+            raise InternalError(
+                "Center of gravity coordinates [" + str(cog_y) + ", " + str(
+                    cog_x) + "] of reference frame are out of bounds")
+
+        return cog_y, cog_x
 
     def average_frame(self, average_frame_number=None, color=False):
         """
