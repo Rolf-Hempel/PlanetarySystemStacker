@@ -69,8 +69,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
         names = input_name
     # For single image input, the Frames constructor expects a list of image file names for "names".
     else:
-        names = os.listdir(input_name)
-        names = [os.path.join(input_name, name) for name in names]
+        names = [os.path.join(input_name, name) for name in os.listdir(input_name)]
     stacked_image_name = input_name + '.stacked.tiff'
 
     # The name of the alignment point visualization file is derived from the input video name or
@@ -236,7 +235,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
 
 if __name__ == "__main__":
     """
-    This File contains a test main program. It goes through the whole process without using a 
+    This File contains a test main program. It goes through the whole process without using a
     graphical unser interface. It is not intended to be used in production runs.
     """
 
