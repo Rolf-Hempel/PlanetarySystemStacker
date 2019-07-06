@@ -575,7 +575,7 @@ class ImageProcessor(QtCore.QThread):
             if layer.amount > 0.:
                 new_image = Miscellaneous.gaussian_sharpen(new_image, layer.amount, layer.radius,
                                                            luminance_only=layer.luminance_only)
-            elif -1. < layer.amount < 0.:
+            elif -1. <= layer.amount < 0.:
                 new_image = Miscellaneous.gaussian_blur(new_image, -layer.amount, layer.radius,
                                                            luminance_only=layer.luminance_only)
 
