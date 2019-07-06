@@ -25,7 +25,8 @@ from sys import argv, stdout
 from time import sleep
 
 from PyQt5 import QtWidgets, QtCore
-from cv2 import imread, cvtColor, COLOR_BGR2RGB
+from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, BORDER_DEFAULT
+from numpy import uint16
 from math import sqrt
 
 from configuration import Configuration, PostprocLayer
@@ -566,10 +567,17 @@ class ImageProcessor(QtCore.QThread):
         # Initialize the new image with the original image.
         new_image = input_image
 
-        # Apply all sharpening layers.
+        # Apply all sharpening layers. If the amount is positive, sharpen the image. A negative
+        # amount between -1 and 0 means that the image is to be softened with a Gaussian kernel.
+        # In this case If the sign of the amount is reversed and taken as the weight with which the
+        # softened image is mixed with the original one.
         for layer in layers:
-            new_image = Miscellaneous.gaussian_sharpen(new_image, layer.amount, layer.radius,
-                                                       luminance_only=layer.luminance_only)
+            if layer.amount > 0.:
+                new_image = Miscellaneous.gaussian_sharpen(new_image, layer.amount, layer.radius,
+                                                           luminance_only=layer.luminance_only)
+            elif -1. < layer.amount < 0.:
+                new_image = Miscellaneous.gaussian_blur(new_image, -layer.amount, layer.radius,
+                                                           luminance_only=layer.luminance_only)
 
         # Store the result in the central data object.
         return new_image

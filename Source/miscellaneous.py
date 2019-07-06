@@ -792,6 +792,45 @@ class Miscellaneous(object):
                 uint16)
 
     @staticmethod
+    def gaussian_blur(input_image, amount, radius, luminance_only=False):
+        """
+        Soften an image with a Gaussian kernel. The input image can be B/W or color.
+
+        :param input_image: Input image, type uint16
+        :param amount: Amount of blurring, between 0. and 1.
+        :param radius: Radius of Gaussian kernel (in pixels)
+        :param luminance_only: True, if only the luminance channel of a color image is to be
+                               blurred. Default is False.
+        :return: The blurred image (B/W or color, as input), type uint16
+        """
+
+        color = len(input_image.shape) == 3
+
+        # Translate the kernel radius into standard deviation.
+        sigma = radius / 3
+
+        # Convert the image to floating point format.
+        image = input_image.astype(float32)
+
+        # Special case: Only blur the luminance channel of a color image.
+        if color and luminance_only:
+            hsv = cvtColor(image, COLOR_BGR2HSV)
+            luminance = hsv[:, :, 2]
+
+            # Apply a Gaussian blur filter, subtract it from the original image, and add a multiple
+            # of this correction to the original image. Clip values out of range.
+            luminance_blurred = GaussianBlur(luminance, (0, 0), sigma, borderType=BORDER_DEFAULT)
+            hsv[:, :, 2] = (luminance_blurred*amount + luminance*(1.-amount)).clip(min=0.,
+                                                                                       max=65535.)
+            # Convert the image back to uint16.
+            return cvtColor(hsv, COLOR_HSV2BGR).astype(uint16)
+        # General case: Treat the entire image (B/W or color 16bit mode).
+        else:
+            image_blurred = GaussianBlur(image, (0, 0), sigma, borderType=BORDER_DEFAULT)
+            return (image_blurred*amount + image*(1.-amount)).clip(min=0., max=65535.).astype(
+                uint16)
+
+    @staticmethod
     def wavelet_sharpen(input_image, amount, radius):
         """
         Sharpen a B/W or color image with wavelets. The underlying algorithm was taken from the
