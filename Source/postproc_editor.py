@@ -102,11 +102,20 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
 
     @staticmethod
     def amount_to_integer(amount):
-        return max(0, min(int(round(sqrt(50. * amount))), 100))
+        # If amount < 0: Apply Gaussian blur instead of sharpening. The transition between both
+        # models is at slider position 20.
+        if amount <= 0.:
+            x = 20.*amount + 20.
+        else:
+            x = sqrt(32.*amount) + 20.
+        return max(0, min(int(round(x)), 100))
 
     @staticmethod
     def integer_to_amount(integer):
-        return 0.02 * integer ** 2
+        if integer <= 20:
+            return 0.05*integer - 1.
+        else:
+            return ((integer-20)**2) / 32.
 
     def horizontalSlider_radius_changed(self):
         """
