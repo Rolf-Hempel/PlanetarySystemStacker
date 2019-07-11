@@ -149,8 +149,8 @@ class Miscellaneous(object):
         frame_int32 = frame[::stride, ::stride].astype('int32')
         dx = sobel(frame_int32, 0)  # vertical derivative
         dy = sobel(frame_int32, 1)  # horizontal derivative
-        mag = hypot(dx, dy)  # magnitude
-        return sum(mag)
+
+        return sum(hypot(dx, dy))
 
     @staticmethod
     def local_contrast(frame, stride):
@@ -167,9 +167,8 @@ class Miscellaneous(object):
         # Remove a row or column, respectively, to make the dx and dy arrays of the same shape.
         dx = diff(frame_strided)[1:, :]  # remove the first row
         dy = diff(frame_strided, axis=0)[:, 1:]  # remove the first column
-        dnorm = sqrt(dx ** 2 + dy ** 2)
 
-        return average(dnorm)
+        return average(hypot(dx, dy))
 
     @staticmethod
     def translation(frame_0, frame_1, shape):
