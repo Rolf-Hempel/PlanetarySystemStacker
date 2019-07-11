@@ -982,9 +982,9 @@ class Frames(object):
             self.color_index = colors.index(self.configuration.frames_mono_channel)
         else:
             raise ArgumentError("Invalid color selected for channel extraction")
-        self.frames_monochrome = [None for index in range(self.number)]
-        self.frames_monochrome_blurred = [None for index in range(self.number)]
-        self.frames_monochrome_blurred_laplacian = [None for index in range(self.number)]
+        self.frames_monochrome = [None] * self.number
+        self.frames_monochrome_blurred = [None] *self.number
+        self.frames_monochrome_blurred_laplacian = [None] *self.number
         self.used_alignment_points = None
 
     def compute_required_buffer_size(self, buffering_level):
@@ -1091,7 +1091,7 @@ class Frames(object):
             # If original frames are not buffered, initialize an empty frame list, so frames can be
             # read later in non-consecutive order.
             else:
-                self.frames_original = [None for index in range(self.number)]
+                self.frames_original = [None] *self.number
 
         # The original frames are buffered. Just return the frame.
         if self.buffer_original:

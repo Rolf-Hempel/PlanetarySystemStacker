@@ -214,7 +214,7 @@ class AlignFrames(object):
                 "' not supported")
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
-        self.frame_shifts = [None for i in range(self.frames.number)]
+        self.frame_shifts = [None] * self.frames.number
 
         # Initialize lists with info on failed frames.
         self.dev_r_list = []
