@@ -65,8 +65,7 @@ class Miscellaneous(object):
         sharpness_y = average(np_abs(dy))
 
         # Return the sharpness in the direction where it is minimal.
-        sharpness = min(sharpness_x, sharpness_y)
-        return sharpness
+        return min(sharpness_x, sharpness_y)
 
     @staticmethod
     def quality_measure_threshold(frame, black_threshold=40.):
@@ -134,9 +133,8 @@ class Miscellaneous(object):
         :return: Measure for amount of local structure in the image (scalar)
         """
 
-        sharpness = Laplacian(frame[::stride, ::stride], CV_32F).var()
         # sharpness = sum(laplace(frame[::stride, ::stride])**2)
-        return sharpness
+        return Laplacian(frame[::stride, ::stride], CV_32F).var()
 
     @staticmethod
     def local_contrast_sobel(frame, stride):
@@ -152,8 +150,7 @@ class Miscellaneous(object):
         dx = sobel(frame_int32, 0)  # vertical derivative
         dy = sobel(frame_int32, 1)  # horizontal derivative
         mag = hypot(dx, dy)  # magnitude
-        sharpness = sum(mag)
-        return sharpness
+        return sum(mag)
 
     @staticmethod
     def local_contrast(frame, stride):
@@ -171,8 +168,8 @@ class Miscellaneous(object):
         dx = diff(frame_strided)[1:, :]  # remove the first row
         dy = diff(frame_strided, axis=0)[:, 1:]  # remove the first column
         dnorm = sqrt(dx ** 2 + dy ** 2)
-        sharpness = average(dnorm)
-        return sharpness
+
+        return average(dnorm)
 
     @staticmethod
     def translation(frame_0, frame_1, shape):
@@ -396,8 +393,7 @@ class Miscellaneous(object):
         for r in range(search_width + 1):
             # Create an enumerator which produces shift values [dy, dx] in a circular pattern
             # with radius "r".
-            circle_r = Miscellaneous.circle_around(0, 0, r)
-            for (dy, dx) in circle_r:
+            for (dy, dx) in Miscellaneous.circle_around(0, 0, r):
                 reference_stack[index, :, :] = reference_frame[y_low + dy:y_high + dy,
                                                x_low + dx:x_high + dx]
                 displacements.append([dy, dx])
