@@ -36,12 +36,13 @@ from math import ceil
 from numpy import max as np_max
 from numpy import min as np_min
 from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, \
-    frombuffer, dtype
+    frombuffer, dtype, moveaxis
 
 from configuration import Configuration
 from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error, \
     InternalError
 from frames_old import FramesOld
+from astropy.io import fits
 
 
 class VideoReader(object):
@@ -345,7 +346,7 @@ class VideoReader(object):
             header = self.read_ser_header(file_path)
 
         if header['PixelDepthPerPlane'] <= 8:
-            PixelDepthPerPlane = uint8
+            PixelDepthPerPlane = dtype(uint8)
         else:
             # FireCapture uses "LittleEndian".
             # Until FireCatpure 2.7 this flag was not set properly.
@@ -1308,8 +1309,13 @@ class Frames(object):
         # the BGR representation assumed by OpenCV.
         if color:
             imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
+            hdu = fits.PrimaryHDU(moveaxis(cvtColor(image, COLOR_RGB2BGR), -1, 0))
         else:
             imwrite(str(filename), image)
+            hdu = fits.PrimaryHDU(image)
+
+        hdu.header['CREATOR'] = 'PlanetarySystemStacker'
+        hdu.writeto(str(filename.replace('.tiff', '.fits')), overwrite=True)
 
 
 def access_pattern(frames_object, average_frame_percent):
