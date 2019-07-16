@@ -345,7 +345,7 @@ class VideoReader(object):
             header = self.read_ser_header(file_path)
 
         if header['PixelDepthPerPlane'] <= 8:
-            PixelDepthPerPlane = uint8
+            PixelDepthPerPlane = dtype(uint8)
         else:
             # FireCapture uses "LittleEndian".
             # Until FireCatpure 2.7 this flag was not set properly.
