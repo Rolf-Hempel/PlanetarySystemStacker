@@ -26,7 +26,7 @@ from sys import stdout
 from time import time
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
-    putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT
+    putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
     empty, argmin, stack, sin, uint8, full, uint32, isnan, float32, int32, uint16
@@ -134,7 +134,7 @@ class Miscellaneous(object):
         """
 
         # sharpness = sum(laplace(frame[::stride, ::stride])**2)
-        return Laplacian(frame[::stride, ::stride], CV_32F).var()
+        return meanStdDev(Laplacian(frame[::stride, ::stride], CV_32F))[1][0][0]
 
     @staticmethod
     def local_contrast_sobel(frame, stride):

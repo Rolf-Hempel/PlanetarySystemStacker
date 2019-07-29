@@ -24,6 +24,7 @@ from glob import glob
 from time import time
 from numpy import array, full
 import matplotlib.pyplot as plt
+from cv2 import meanStdDev
 
 from configuration import Configuration
 from frames import Frames
@@ -93,7 +94,7 @@ class RankFrames(object):
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
                                               int((frame_index / self.number) * 100.))
-                self.frame_ranks.append(frame.var())
+                self.frame_ranks.append(meanStdDev(frame)[1][0][0])
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank all frames", 100)
