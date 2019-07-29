@@ -26,7 +26,7 @@ from warnings import filterwarnings
 from cv2 import GaussianBlur
 import matplotlib.pyplot as plt
 from numpy import int as np_int
-from numpy import zeros, full, empty, float32, int16, int32, newaxis, arange, count_nonzero, \
+from numpy import zeros, full, empty, float32, int32, newaxis, arange, count_nonzero, \
     where, sqrt, logical_or
 from skimage import img_as_uint, img_as_ubyte
 

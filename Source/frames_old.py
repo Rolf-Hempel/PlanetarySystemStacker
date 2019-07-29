@@ -25,7 +25,6 @@ from os import path, remove
 from pathlib import Path
 from time import time
 
-import matplotlib.pyplot as plt
 import numpy as np
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs

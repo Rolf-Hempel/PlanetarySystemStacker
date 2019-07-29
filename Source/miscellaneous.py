@@ -29,10 +29,9 @@ from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY
     putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin, uint8, full, uint32, isnan, float32, int32, uint16
+    empty, argmin, stack, sin, uint8, float32, uint16
 from math import exp
 from numpy import min as np_min
-from numpy import nan as np_nan
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel

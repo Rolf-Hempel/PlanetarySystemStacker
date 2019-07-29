@@ -25,8 +25,7 @@ from sys import argv, stdout
 from time import sleep
 
 from PyQt5 import QtWidgets, QtCore
-from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, BORDER_DEFAULT
-from numpy import uint16
+from cv2 import imread, cvtColor, COLOR_BGR2RGB
 from math import sqrt
 
 from configuration import Configuration, PostprocLayer
