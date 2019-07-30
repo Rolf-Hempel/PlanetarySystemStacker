@@ -149,7 +149,8 @@ class Miscellaneous(object):
         dx = sobel(frame_int32, 0)  # vertical derivative
         dy = sobel(frame_int32, 1)  # horizontal derivative
         mag = hypot(dx, dy)  # magnitude
-        return sum(mag)
+
+        return mag.sum(axis=0)
 
     @staticmethod
     def local_contrast(frame, stride):
