@@ -162,7 +162,7 @@ class Miscellaneous(object):
         # Remove a row or column, respectively, to make the dx and dy arrays of the same shape.
         dx = diff(frame_strided)[1:, :]  # remove the first row
         dy = diff(frame_strided, axis=0)[:, 1:]  # remove the first column
-        dnorm = sqrt(dx ** 2 + dy ** 2)
+        dnorm = hypot(dx, dy)
 
         return average(dnorm)
 
