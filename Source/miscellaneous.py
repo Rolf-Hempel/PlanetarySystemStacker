@@ -78,8 +78,8 @@ class Miscellaneous(object):
         :return:
         """
 
-        sum_horizontal = sum(sum(abs((frame[:, 2:] - frame[:, :-2])[frame[:, 1:-1] > black_threshold])))
-        sum_vertical = sum(sum(abs((frame[2:, :] - frame[:-2, :])[frame[1:-1, :] > black_threshold])))
+        sum_horizontal = abs((frame[:, 2:] - frame[:, :-2])[frame[:, 1:-1] > black_threshold]).sum()
+        sum_vertical = abs((frame[2:, :] - frame[:-2, :])[frame[1:-1, :] > black_threshold]).sum()
 
         return min(sum_horizontal, sum_vertical)
 
@@ -107,12 +107,12 @@ class Miscellaneous(object):
 
         # If most pixels are bright enough, compensate for different pixel counts.
         if mask_fraction > min_fraction:
-            sum_horizontal = sum(sum(abs((frame[:, stride_2:] - frame[:, :-stride_2])[mask[:, stride:-stride]]))) / mask_fraction
-            sum_vertical = sum(sum(abs((frame[stride_2:, :] - frame[:-stride_2, :])[mask[stride:-stride, :]]))) / mask_fraction
+            sum_horizontal = abs((frame[:, stride_2:] - frame[:, :-stride_2])[mask[:, stride:-stride]]).sum() / mask_fraction
+            sum_vertical = abs((frame[stride_2:, :] - frame[:-stride_2, :])[mask[stride:-stride, :]]).sum() / mask_fraction
         # If many pixels are too dim, penalize this patch by not compensating for pixel count.
         else:
-            sum_horizontal = sum(sum(abs((frame[:, stride_2:] - frame[:, :-stride_2])[mask[:, stride:-stride]])))
-            sum_vertical = sum(sum(abs((frame[stride_2:, :] - frame[:-stride_2, :])[mask[stride:-stride, :]])))
+            sum_horizontal = abs((frame[:, stride_2:] - frame[:, :-stride_2])[mask[:, stride:-stride]]).sum()
+            sum_vertical = abs((frame[stride_2:, :] - frame[:-stride_2, :])[mask[stride:-stride, :]]).sum()
 
         return min(sum_horizontal, sum_vertical)
 
