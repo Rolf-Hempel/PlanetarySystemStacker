@@ -28,6 +28,7 @@ from pathlib import Path
 from sys import exit, argv
 
 from PyQt5 import QtWidgets, QtCore, QtGui
+from numpy import uint8, uint16
 
 from alignment_point_editor import AlignmentPointEditorWidget
 from alignment_points import AlignmentPoints
@@ -42,6 +43,82 @@ from postproc_editor import PostprocEditorWidget
 from rectangular_patch_editor import RectangularPatchEditorWidget
 from shift_distribution_viewer import ShiftDistributionViewerWidget
 from workflow import Workflow
+from exceptions import NotSupportedError
+
+
+class DisplayImage(QtWidgets.QGraphicsView):
+    """
+    This is an auxiliary class for debugging purposes. It opens a separate window where images
+    can be displayed and updated during the computational steps. Activities are triggered from the
+    workflow thread using signals.
+    """
+
+    def __init__(self):
+        """
+        Initialize the display window with a standard position and size. The window is resized later
+        as required by the images to be displayed.
+        """
+        super().__init__()
+        self.title = 'PyQt5 image'
+        self.setWindowTitle(self.title)
+        self.left = 100
+        self.top = 100
+        self.width = 640
+        self.height = 480
+        self.setGeometry(self.left, self.top, self.width, self.height)
+
+        # Create the window scene and add a (so far undefined) photo object to it.
+        self._scene = QtWidgets.QGraphicsScene()
+        self._photo = QtWidgets.QGraphicsPixmapItem()
+        self._scene.addItem(self._photo)
+        self.setScene(self._scene)
+        self.show()
+
+    def convert_image_to_pixmap(self, image):
+        """
+        Convert a color or monochrome image (stored as a Numpy array of type uint8 or uint16) into
+        a pixmap object.
+
+        :param image: Numpy array of type uint8 or uint16, size: (size_y, size_x [, 3])
+        :return: QPixmap object holding the image
+        """
+
+        # Convert image to 8bit if necessary.
+        if image.dtype == uint16:
+            image_uint8 = (image / 256.).astype(uint8)
+        elif image.dtype == uint8:
+            image_uint8 = image
+        else:
+            raise NotSupportedError("Attempt to set a photo with type neither"
+                                    " uint8 nor uint16")
+        self.shape_y = image_uint8.shape[0]
+        self.shape_x = image_uint8.shape[1]
+
+        # The image is monochrome:
+        if len(image_uint8.shape) == 2:
+            qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
+                                    QtGui.QImage.Format_Grayscale8)
+        # The image is RGB color.
+        else:
+            qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, 3 * self.shape_x,
+                                    QtGui.QImage.Format_RGB888)
+        return QtGui.QPixmap(qt_image)
+
+    def update_image(self, new_image):
+        """
+        Replace the image with a new one.
+
+        :param new_image: Image, stored as a Numpy array of type uint8 or uint16,
+                          size: (size_y, size_x [, 3])
+        :return: -
+        """
+
+        pixmap = self.convert_image_to_pixmap(new_image)
+        self._photo.setPixmap(pixmap)
+
+        # Fit the display window to the size of the image.
+        self.resize(pixmap.width(), pixmap.height())
+        self.repaint()
 
 
 class PlanetarySystemStacker(QtWidgets.QMainWindow):
@@ -139,6 +216,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.workflow.work_current_progress_signal.connect(self.set_current_progress)
         self.workflow.set_main_gui_busy_signal.connect(self.gui_set_busy)
         self.workflow.set_status_bar_signal.connect(self.write_status_bar)
+        self.workflow.create_image_window_signal.connect(self.create_image_window)
+        self.workflow.update_image_window_signal.connect(self.update_image_window)
+        self.workflow.terminate_image_window_signal.connect(self.terminate_image_window)
         # self.workflow.set_status_signal.connect(self.set_status)
         # self.workflow.set_error_signal.connect(self.show_error_message)
         self.thread.start()
@@ -197,6 +277,37 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.write_status_bar(
                 "Specify video(s) or dir(s) with image files to be stacked, or single image "
                 "files for postprocessing (menu: File / Open).", 'red')
+
+        # Initialize objects.
+        self.image_window = None
+
+    @QtCore.pyqtSlot()
+    def create_image_window(self):
+        """
+        On request of the workflow thread open a separate window for displaying images in debugging.
+
+        :return: -
+        """
+        self.image_window = DisplayImage()
+
+    @QtCore.pyqtSlot(object)
+    def update_image_window(self, image):
+        """
+        Replace the image in the image window with a new one sent from the workflow thread.
+
+        :param image: Numpy array of type uint8 or uint16, size: (size_y, size_x [, 3])
+        :return: -
+        """
+        self.image_window.update_image(image)
+
+    @QtCore.pyqtSlot()
+    def terminate_image_window(self):
+        """
+        Close the separate image window on request of the workflow thread.
+
+        :return: -
+        """
+        del self.image_window
 
     def automatic_changed(self):
         """

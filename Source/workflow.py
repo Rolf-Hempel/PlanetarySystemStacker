@@ -49,6 +49,9 @@ class Workflow(QtCore.QObject):
     work_current_progress_signal = QtCore.pyqtSignal(str, int)
     set_main_gui_busy_signal = QtCore.pyqtSignal(bool)
     set_status_bar_signal = QtCore.pyqtSignal(str, str)
+    create_image_window_signal = QtCore.pyqtSignal()
+    update_image_window_signal = QtCore.pyqtSignal(object)
+    terminate_image_window_signal = QtCore.pyqtSignal()
 
     def __init__(self, main_gui):
         super(Workflow, self).__init__()
