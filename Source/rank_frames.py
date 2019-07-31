@@ -24,6 +24,7 @@ from glob import glob
 from time import time
 from numpy import array, full
 import matplotlib.pyplot as plt
+from cv2 import meanStdDev
 
 from configuration import Configuration
 from frames import Frames
@@ -93,13 +94,12 @@ class RankFrames(object):
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
                                               int((frame_index / self.number) * 100.))
-                self.frame_ranks.append(frame.var())
+                self.frame_ranks.append(meanStdDev(frame)[1][0][0])
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank all frames", 100)
         # Sort the frame indices in descending order of quality.
-        self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),
-                                                            key=lambda i: i[1], reverse=True)]
+        self.quality_sorted_indices = sorted(range(len(self.frame_ranks)), key=self.frame_ranks.__getitem__, reverse=True)
 
         # Set the index of the best frame, and normalize all quality values.
         self.frame_ranks_max_index = self.quality_sorted_indices[0]

@@ -28,6 +28,7 @@ from math import ceil
 from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, uint32
 from scipy import ndimage
 from skimage.feature import register_translation
+from cv2 import meanStdDev
 
 from align_frames import AlignFrames
 from configuration import Configuration
@@ -624,8 +625,7 @@ class AlignmentPoints(object):
                                      alignment_point['patch_x_high'] + self.align_frames.dx[
                                          frame_index]) / self.configuration.align_frames_sampling_stride)
                     # Compute the frame quality and append it to the list for this alignment point.
-                    alignment_point['frame_qualities'].append(
-                        frame[y_low:y_high, x_low:x_high].var())
+                    alignment_point['frame_qualities'].append(meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0])
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank frames at APs", 100)
@@ -635,9 +635,8 @@ class AlignmentPoints(object):
         # For each alignment point sort the computed quality ranks in descending order.
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):
             # Truncate the list to the number of frames to be stacked for each alignmeent point.
-            alignment_point['best_frame_indices'] = [b[0] for b in sorted(
-                enumerate(alignment_point['frame_qualities']), key=lambda i: i[1],
-                reverse=True)[:self.stack_size]]
+            alignment_point['best_frame_indices'] = sorted(range(len(alignment_point['frame_qualities'])),
+                                                    key=alignment_point['frame_qualities'].__getitem__, reverse=True)[:self.stack_size]
             # Add this alignment point to the AP lists of those frames where the AP is to be used.
             for frame_index in alignment_point['best_frame_indices']:
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)

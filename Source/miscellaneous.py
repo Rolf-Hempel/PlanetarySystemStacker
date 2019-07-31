@@ -26,13 +26,12 @@ from sys import stdout
 from time import time
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
-    putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT
+    putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin, uint8, full, uint32, isnan, float32, int32, uint16
+    empty, argmin, stack, sin, uint8, float32, uint16
 from math import exp
 from numpy import min as np_min
-from numpy import nan as np_nan
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
@@ -79,10 +78,9 @@ class Miscellaneous(object):
         :return:
         """
 
-        sum_horizontal = sum(sum(abs(frame[:, 2:] - frame[:, :-2]) * (
-                frame[:, 1:-1] > black_threshold)))
-        sum_vertical = sum(sum(abs(frame[2:, :] - frame[:-2, :]) * (
-                frame[1:-1, :] > black_threshold)))
+        sum_horizontal = sum(sum(abs((frame[:, 2:] - frame[:, :-2])[frame[:, 1:-1] > black_threshold])))
+        sum_vertical = sum(sum(abs((frame[2:, :] - frame[:-2, :])[frame[1:-1, :] > black_threshold])))
+
         return min(sum_horizontal, sum_vertical)
 
     @staticmethod
@@ -109,16 +107,12 @@ class Miscellaneous(object):
 
         # If most pixels are bright enough, compensate for different pixel counts.
         if mask_fraction > min_fraction:
-            sum_horizontal = sum(sum(abs(frame[:, stride_2:] - frame[:, :-stride_2]) *
-                                     mask[:, stride:-stride])) / mask_fraction
-            sum_vertical = sum(sum(abs(frame[stride_2:, :] - frame[:-stride_2, :]) *
-                                   mask[stride:-stride, :])) / mask_fraction
+            sum_horizontal = sum(sum(abs((frame[:, stride_2:] - frame[:, :-stride_2])[mask[:, stride:-stride]]))) / mask_fraction
+            sum_vertical = sum(sum(abs((frame[stride_2:, :] - frame[:-stride_2, :])[mask[stride:-stride, :]]))) / mask_fraction
         # If many pixels are too dim, penalize this patch by not compensating for pixel count.
         else:
-            sum_horizontal = sum(sum(abs(frame[:, stride_2:] - frame[:, :-stride_2]) *
-                                     mask[:, stride:-stride]))
-            sum_vertical = sum(sum(abs(frame[stride_2:, :] - frame[:-stride_2, :]) *
-                                   mask[stride:-stride, :]))
+            sum_horizontal = sum(sum(abs((frame[:, stride_2:] - frame[:, :-stride_2])[mask[:, stride:-stride]])))
+            sum_vertical = sum(sum(abs((frame[stride_2:, :] - frame[:-stride_2, :])[mask[stride:-stride, :]])))
 
         return min(sum_horizontal, sum_vertical)
 
@@ -134,7 +128,7 @@ class Miscellaneous(object):
         """
 
         # sharpness = sum(laplace(frame[::stride, ::stride])**2)
-        return Laplacian(frame[::stride, ::stride], CV_32F).var()
+        return meanStdDev(Laplacian(frame[::stride, ::stride], CV_32F))[1][0][0]
 
     @staticmethod
     def local_contrast_sobel(frame, stride):
@@ -150,7 +144,8 @@ class Miscellaneous(object):
         dx = sobel(frame_int32, 0)  # vertical derivative
         dy = sobel(frame_int32, 1)  # horizontal derivative
         mag = hypot(dx, dy)  # magnitude
-        return sum(mag)
+
+        return mag.sum(axis=0)
 
     @staticmethod
     def local_contrast(frame, stride):
