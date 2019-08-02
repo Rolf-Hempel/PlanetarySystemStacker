@@ -639,7 +639,11 @@ class Workflow(QtCore.QObject):
         # Allocate StackFrames object.
         self.stack_frames = StackFrames(self.configuration, self.frames, self.align_frames,
                                         self.alignment_points, self.my_timer,
-                                        progress_signal=self.work_current_progress_signal)
+                                        progress_signal=self.work_current_progress_signal,
+                                        debug=False,
+                                        create_image_window_signal=self.create_image_window_signal,
+                                        update_image_window_signal=self.update_image_window_signal,
+                                        terminate_image_window_signal=self.terminate_image_window_signal)
 
         # Stack all frames.
         if self.configuration.global_parameters_protocol_level > 0:

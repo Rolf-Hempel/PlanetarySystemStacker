@@ -26,17 +26,18 @@ from sys import stdout
 from time import time
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
-    putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev
+    putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev,\
+    resize
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin, uint8, float32, uint16
+    empty, argmin, stack, sin, uint8, float32, uint16, full
 from math import exp
 from numpy import min as np_min
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
 
-from exceptions import DivideByZeroError
+from exceptions import DivideByZeroError, ArgumentError
 
 
 class Miscellaneous(object):
@@ -652,6 +653,48 @@ class Miscellaneous(object):
             for x in range(x_center - cross_half_len, x_center + cross_half_len + 1):
                 if 0 <= x < shape_x:
                     frame[y_center, x] = rgb
+
+    @staticmethod
+    def compose_image(image_list, scale_factor=1, border=5):
+        """
+        Arrange a list of monochrome images horizontally in a single image, with constant gaps in
+        between. If images are of different size, center-align them vertically. Optionally, the
+        resulting image can be re-scaled with the same factor in x and y directions.
+
+        :param image_list: List containing images (all of the same dtype)
+        :param scale_factor: Scaling factor for the resulting composite image
+        :param border: Width of black border and gaps between images
+        :return: Composite image of the same dtype as the image_list items
+        """
+
+        shapes_y = [image.shape[0] for image in image_list]
+        shapes_x = [image.shape[1] for image in image_list]
+        max_shape_y = max(shapes_y)
+        sum_shape_x = sum(shapes_x)
+
+        # Check if all images of the list are of the same type.
+        type = image_list[0].dtype
+        for image in image_list[1:]:
+            if image.dtype != type:
+                raise ArgumentError("Trying to compose images of different types")
+
+        # Compute the dimensions of the composite image. The border and the gaps between images are
+        # 5 pixels wide.
+        composite_dim_y = max_shape_y + 2 * border
+        composite_dim_x = sum_shape_x + border * (len(image_list) + 1)
+
+        # Allocate the composite image.
+        composite = full((composite_dim_y, composite_dim_x), 0, dtype=type)
+
+        # Copy the images into the composite image.
+        x_pos = border
+        for index, image in enumerate(image_list):
+            y_pos = int((composite_dim_y - shapes_y[index]) / 2)
+            composite[y_pos: y_pos + shapes_y[index], x_pos: x_pos + shapes_x[index]] = image
+            x_pos += shapes_x[index] + border
+
+        # Return the resized composite image.
+        return resize(composite, None, fx=float(scale_factor), fy=float(scale_factor))
 
     @staticmethod
     def circle_around(y, x, r):
