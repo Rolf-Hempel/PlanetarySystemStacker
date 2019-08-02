@@ -25,10 +25,8 @@ from itertools import chain
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, float32, zeros, empty, int32, uint8, uint16, float64, uint32
-from numpy import max as np_max
-from scipy import ndimage
-from cv2 import imwrite
+from numpy import float32, zeros, empty, int32, uint8, uint16
+from cv2 import imwrite, moments, threshold, THRESH_BINARY
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError, Error
@@ -381,16 +379,18 @@ class AlignFrames(object):
         :return: Integer pixel coordinates (center_y, center_x) of center of gravity
         """
 
-        # Only pixels brighter than half the maximum image brightness are included.
-        threshold = (np_max(frame)/2).astype(frame.dtype)
+        # Convert the grayscale image to binary image, where all pixels
+        # brighter than the half the maximum image brightness are set to 1,
+        # and all others are set to 0.
+        thresh = threshold(frame, frame.max()/2, 1, THRESH_BINARY)[1]
 
-        # The center of gravity is computed for a binary version of the image where all pixels
-        # brighter than the threshold are set to 1, and all others are set to 0.
-        cog_real = ndimage.measurements.center_of_mass(uint8(1)*(frame >= threshold))
+        # Calculate moments of binary image
+        M = moments(thresh)
 
-        # Round pixel coordinates to the nearest integers.
-        cog_y = int(round(cog_real[0]))
-        cog_x = int(round(cog_real[1]))
+        # Calculate coordinates for center of gravity and round pixel
+        # coordinates to the nearest integers.
+        cog_x = round(M["m10"] / M["m00"])
+        cog_y = round(M["m01"] / M["m00"])
 
         # If the computed center of gravity is outside the frame bounds, raise an error (should be
         # impossible).
