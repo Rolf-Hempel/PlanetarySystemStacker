@@ -77,6 +77,9 @@ class Workflow(QtCore.QObject):
         self.output_redirected = False
         self.protocol_file = None
 
+        # Switch alignment point debugging on / off.
+        self.debug_AP = False
+
         # The following code works on Windows systems only. It is not necessary, though.
         try:
             mkl_rt = CDLL('mkl_rt.dll')
@@ -640,7 +643,7 @@ class Workflow(QtCore.QObject):
         self.stack_frames = StackFrames(self.configuration, self.frames, self.align_frames,
                                         self.alignment_points, self.my_timer,
                                         progress_signal=self.work_current_progress_signal,
-                                        debug=False,
+                                        debug=self.debug_AP,
                                         create_image_window_signal=self.create_image_window_signal,
                                         update_image_window_signal=self.update_image_window_signal,
                                         terminate_image_window_signal=self.terminate_image_window_signal)

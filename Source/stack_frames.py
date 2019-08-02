@@ -121,7 +121,7 @@ class StackFrames(object):
         self.debug = debug
         self.scale_factor = 3
         self.border = 2
-        self.image_delay = 1
+        self.image_delay = 0.2
         self.create_image_window_signal = create_image_window_signal
         self.update_image_window_signal = update_image_window_signal
         self.terminate_image_window_signal = terminate_image_window_signal
@@ -337,28 +337,32 @@ class StackFrames(object):
                 # In debug mode: visualize shifted patch of the first AP and compare it with the
                 # corresponding patch of the reference frame.
                 if self.debug and not alignment_point_index:
+                    frame_mono = self.frames.frames_mono(frame_index)
                     y_low = alignment_point['patch_y_low']
                     y_high = alignment_point['patch_y_high']
                     x_low = alignment_point['patch_x_low']
                     x_high = alignment_point['patch_x_high']
                     reference_patch = self.alignment_points.mean_frame[y_low:y_high, x_low:x_high]
-                    frame_mono = self.frames.frames_mono(frame_index)
-
-                    print("Preparing for AP visualization")
+                    # If the original depth was 8bit, reduce the reference patch to the same depth.
+                    if frame_mono.dtype == uint8:
+                        reference_patch = (reference_patch/256).astype(uint8)
                     try:
+                        # Cut out the globally stabilized and the de-warped patches
                         frame_stabilized = frame_mono[y_low+dy:y_high+dy, x_low+dx:x_high+dx]
                         frame_dewarped = frame_mono[y_low+total_shift_y:y_high+total_shift_y,
                                          x_low+total_shift_x:x_high+total_shift_x]
+                        # Compose the three patches into a single image and send it to the
+                        # visualization window.
                         composed_image = Miscellaneous.compose_image([reference_patch,
-                                            frame_stabilized, frame_dewarped])
-                        imshow('Patch', composed_image)
-                        waitKey(0)
-                        destroyAllWindows()
-                        print ("Sending update image window signal")
-                        # self.update_image_window_signal.emit(composed_image)
+                                            frame_stabilized, frame_dewarped],
+                                            scale_factor=self.scale_factor,
+                                            border=self.border)
+                        self.update_image_window_signal.emit(composed_image)
                     except Exception as e:
                         print (str(e))
 
+                    # Insert a delay to keep the current frame long enough in the visualization
+                    # window.
                     sleep(self.image_delay)
 
                 # Add the shifted alignment point patch to the AP's stacking buffer.
