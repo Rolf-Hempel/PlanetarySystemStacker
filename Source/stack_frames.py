@@ -24,7 +24,7 @@ from glob import glob
 from warnings import filterwarnings
 from time import sleep
 
-from cv2 import GaussianBlur, imshow, waitKey, destroyAllWindows
+from cv2 import GaussianBlur, FONT_HERSHEY_SIMPLEX, putText, resize
 import matplotlib.pyplot as plt
 from numpy import int as np_int
 from numpy import zeros, full, empty, float32, int32, newaxis, arange, count_nonzero, \
@@ -121,7 +121,7 @@ class StackFrames(object):
         self.debug = debug
         self.scale_factor = 3
         self.border = 2
-        self.image_delay = 0.2
+        self.image_delay = 0.5
         self.create_image_window_signal = create_image_window_signal
         self.update_image_window_signal = update_image_window_signal
         self.terminate_image_window_signal = terminate_image_window_signal
@@ -343,17 +343,34 @@ class StackFrames(object):
                     x_low = alignment_point['patch_x_low']
                     x_high = alignment_point['patch_x_high']
                     reference_patch = (self.alignment_points.mean_frame[y_low:y_high, x_low:x_high]).astype(uint16)
+                    reference_patch = resize(reference_patch, None,
+                                              fx=float(self.scale_factor),
+                                              fy=float(self.scale_factor))
 
                     try:
                         # Cut out the globally stabilized and the de-warped patches
                         frame_stabilized = frame_mono_blurred[y_low+dy:y_high+dy, x_low+dx:x_high+dx]
+                        frame_stabilized = resize(frame_stabilized, None,
+                                                  fx=float(self.scale_factor),
+                                                  fy=float(self.scale_factor))
+                        font = FONT_HERSHEY_SIMPLEX
+                        fontScale = 0.5
+                        fontColor = (0, 255, 0)
+                        lineType = 1
+                        putText(frame_stabilized, 'stabilized: ' + str(dy) + ', ' + str(dx),
+                                (5, 25), font, fontScale, fontColor, lineType)
+
                         frame_dewarped = frame_mono_blurred[y_low+total_shift_y:y_high+total_shift_y,
                                          x_low+total_shift_x:x_high+total_shift_x]
+                        frame_dewarped = resize(frame_dewarped, None,
+                                                  fx=float(self.scale_factor),
+                                                  fy=float(self.scale_factor))
+                        putText(frame_dewarped, 'de-warped: ' + str(shift_y) + ', ' + str(shift_x),
+                                (5, 25), font, fontScale, fontColor, lineType)
                         # Compose the three patches into a single image and send it to the
                         # visualization window.
-                        composed_image = Miscellaneous.compose_image([reference_patch,
-                                            frame_stabilized, frame_dewarped],
-                                            scale_factor=self.scale_factor,
+                        composed_image = Miscellaneous.compose_image([frame_stabilized,
+                                            reference_patch, frame_dewarped],
                                             border=self.border)
                         self.update_image_window_signal.emit(composed_image)
                     except Exception as e:

@@ -156,7 +156,7 @@ class MatplotlibWidget(Canvas):
             if self.patch_quality_cutoff is not None:
                 self.patch_quality_cutoff.remove()
             quality_cutoff = self.rank_frames.frame_ranks[
-                self.rank_frames.quality_sorted_indices[alignment_points_frame_number]]
+                self.rank_frames.quality_sorted_indices[alignment_points_frame_number-1]]
             x_cutoff = full((self.rank_frames.number,), quality_cutoff)
             self.line_quality_cutoff, = plt.plot(x_cutoff, self.y, lw=1, color='orange')
             width = 1. - quality_cutoff
