@@ -28,7 +28,7 @@ from cv2 import GaussianBlur, imshow, waitKey, destroyAllWindows
 import matplotlib.pyplot as plt
 from numpy import int as np_int
 from numpy import zeros, full, empty, float32, int32, newaxis, arange, count_nonzero, \
-    where, sqrt, logical_or, uint8
+    where, sqrt, logical_or, uint16
 from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
@@ -337,19 +337,17 @@ class StackFrames(object):
                 # In debug mode: visualize shifted patch of the first AP and compare it with the
                 # corresponding patch of the reference frame.
                 if self.debug and not alignment_point_index:
-                    frame_mono = self.frames.frames_mono(frame_index)
+                    frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
                     y_low = alignment_point['patch_y_low']
                     y_high = alignment_point['patch_y_high']
                     x_low = alignment_point['patch_x_low']
                     x_high = alignment_point['patch_x_high']
-                    reference_patch = self.alignment_points.mean_frame[y_low:y_high, x_low:x_high]
-                    # If the original depth was 8bit, reduce the reference patch to the same depth.
-                    if frame_mono.dtype == uint8:
-                        reference_patch = (reference_patch/256).astype(uint8)
+                    reference_patch = (self.alignment_points.mean_frame[y_low:y_high, x_low:x_high]).astype(uint16)
+
                     try:
                         # Cut out the globally stabilized and the de-warped patches
-                        frame_stabilized = frame_mono[y_low+dy:y_high+dy, x_low+dx:x_high+dx]
-                        frame_dewarped = frame_mono[y_low+total_shift_y:y_high+total_shift_y,
+                        frame_stabilized = frame_mono_blurred[y_low+dy:y_high+dy, x_low+dx:x_high+dx]
+                        frame_dewarped = frame_mono_blurred[y_low+total_shift_y:y_high+total_shift_y,
                                          x_low+total_shift_x:x_high+total_shift_x]
                         # Compose the three patches into a single image and send it to the
                         # visualization window.

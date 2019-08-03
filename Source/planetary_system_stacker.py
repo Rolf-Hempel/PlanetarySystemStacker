@@ -117,7 +117,7 @@ class DisplayImage(QtWidgets.QGraphicsView):
         self._photo.setPixmap(pixmap)
 
         # Fit the display window to the size of the image.
-        self.resize(pixmap.width(), pixmap.height())
+        self.resize(pixmap.width()+10, pixmap.height()+10)
         self.repaint()
 
 
