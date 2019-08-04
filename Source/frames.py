@@ -32,6 +32,7 @@ from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2
     COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
     convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED, \
     COLOR_BayerRG2RGB, COLOR_BayerGR2RGB, COLOR_BayerGB2RGB, COLOR_BayerBG2RGB
+from cv2 import mean as cv_mean
 from math import ceil
 from numpy import max as np_max
 from numpy import min as np_min
@@ -942,6 +943,10 @@ class Frames(object):
         self.laplacian_available = None
         self.laplacian_available_index = None
 
+        # Set a flag that no monochrome image has been computed before.
+        self.first_monochrome = True
+        self.average_brightness_first_frame = None
+
         # Initialize the list of original frames.
         self.frames_original = None
 
@@ -1152,6 +1157,23 @@ class Frames(object):
             # Frames are in B/W mode already
             else:
                 frame_mono = frame_original
+
+            # Normalize the overall frame brightness.
+            frame_type = frame_mono.dtype
+            if self.first_monochrome:
+                self.average_brightness_first_frame = cv_mean(frame_mono)[0]
+                frame_mono = frame_mono.astype(frame_type)
+                self.first_monochrome = False
+            else:
+                average_brightness_current_frame = cv_mean(frame_mono)[0]
+                frame_mono = frame_mono * self.average_brightness_first_frame / \
+                                average_brightness_current_frame
+                # Clip the pixel values to the range allowed.
+                if frame_type == uint8:
+                    clip(frame_mono, 0, 255, out=frame_mono)
+                else:
+                    clip(frame_mono, 0, 65535, out=frame_mono)
+                frame_mono = frame_mono.astype(frame_type)
 
             # If the monochrome frames are buffered, store it at the current index.
             if self.buffer_monochrome:

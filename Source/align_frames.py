@@ -434,6 +434,7 @@ class AlignFrames(object):
         # Create an empty numpy buffer. The first and second dimensions are the y and x
         # coordinates. For color frames add a third dimension. Add all frames to the buffer.
         if color:
+            type = self.frames.dt0
             self.mean_frame = zeros([self.intersection_shape[0][1] - self.intersection_shape[0][0],
                  self.intersection_shape[1][1] - self.intersection_shape[1][0], 3], dtype=float32)
             for idx in range(self.average_frame_number):
@@ -443,26 +444,27 @@ class AlignFrames(object):
                     self.intersection_shape[1][0] - shifts[idx][1]:
                     self.intersection_shape[1][1] - shifts[idx][1], :]
         else:
+            type = uint16
             self.mean_frame = zeros([self.intersection_shape[0][1] - self.intersection_shape[0][0],
                                      self.intersection_shape[1][1] - self.intersection_shape[1][0]],
                                      dtype=float32)
             for idx in range(self.average_frame_number):
-                self.mean_frame += self.frames.frames_mono(self.quality_sorted_indices[idx]) \
+                self.mean_frame += self.frames.frames_mono_blurred(self.quality_sorted_indices[idx]) \
                     [self.intersection_shape[0][0] - shifts[idx][0]:
                     self.intersection_shape[0][1] - shifts[idx][0],
                     self.intersection_shape[1][0] - shifts[idx][1]:
                     self.intersection_shape[1][1] - shifts[idx][1]]
 
         # Compute the mean frame by dividing by the number of frames, and convert values to 16bit.
-        if self.frames.dt0 == uint8:
+        if type == uint8:
             scaling = 256. / self.average_frame_number
-        elif self.frames.dt0 == uint16:
+        elif type == uint16:
             scaling = 1. / self.average_frame_number
         else:
             raise NotSupportedError("Attempt to compute the average frame from images with type"
                                     " neither uint8 nor uint16")
 
-        self.mean_frame = (self.mean_frame[:,:]*scaling).astype(int32)
+        self.mean_frame = (self.mean_frame*scaling).astype(int32)
 
         return self.mean_frame
 
