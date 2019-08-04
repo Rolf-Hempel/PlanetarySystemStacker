@@ -188,7 +188,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
             if ap['reference_box'] is not None:
                 continue
             count_updates += 1
-            AlignmentPoints.set_reference_box(ap, align_frames.mean_frame)
+            AlignmentPoints.set_reference_box(ap, alignment_points.mean_frame)
         print("Buffers allocated for " + str(count_updates) + " alignment points.")
 
     # Produce an overview image showing all alignment points.

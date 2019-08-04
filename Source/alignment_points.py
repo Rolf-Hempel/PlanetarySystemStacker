@@ -25,10 +25,10 @@ from time import time
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, uint32
+from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, int32, uint16
 from scipy import ndimage
 from skimage.feature import register_translation
-from cv2 import meanStdDev
+from cv2 import meanStdDev, GaussianBlur
 
 from align_frames import AlignFrames
 from configuration import Configuration
@@ -66,7 +66,11 @@ class AlignmentPoints(object):
         self.rank_frames = rank_frames
         self.align_frames = align_frames
         self.progress_signal = progress_signal
-        self.mean_frame = align_frames.mean_frame
+
+        # Apply a low-pass filter on the mean frame as a preparation for shift detection.
+        self.mean_frame = GaussianBlur(align_frames.mean_frame.astype(uint16),
+                                        (self.configuration.frames_gauss_width,
+                                        self.configuration.frames_gauss_width), 0).astype(int32)
         self.num_pixels_y = self.mean_frame.shape[0]
         self.num_pixels_x = self.mean_frame.shape[1]
         self.alignment_points_dropped_dim = None
