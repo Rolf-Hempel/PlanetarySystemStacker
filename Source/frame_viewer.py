@@ -460,7 +460,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         # Be careful: Indices are counted from 0, while widget contents are counted from 1 (to make
         # it easier for the user.
         self.quality_index = 0
-        self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index] + 1
+        self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index]
 
         # Start with ordering frames by quality. This can be changed by the user using a radio
         # button.
@@ -482,12 +482,12 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.slider_frames.setMinimum(1)
         self.slider_frames.setMaximum(self.frames.number)
         self.slider_frames.setValue(self.quality_index + 1)
-        self.spinBox_chronological.setValue(self.quality_index)
-        self.spinBox_quality.setValue(self.quality_index + 1)
         self.spinBox_chronological.setMinimum(1)
         self.spinBox_chronological.setMaximum(self.frames.number)
+        self.spinBox_chronological.setValue(self.frame_index + 1)
         self.spinBox_quality.setMinimum(1)
         self.spinBox_quality.setMaximum(self.frames.number)
+        self.spinBox_quality.setValue(self.quality_index + 1)
         self.radioButton_quality.setChecked(True)
 
         self.spinBox_number_frames.setMaximum(self.frames.number)
