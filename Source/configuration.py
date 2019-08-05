@@ -40,6 +40,7 @@ class ConfigurationParameters(object):
         self.global_parameters_store_protocol_with_result = None
         self.global_parameters_buffering_level = None
         self.global_parameters_include_postprocessing = None
+        self.global_parameters_image_format = None
         self.frames_gauss_width = None
         self.align_frames_mode = None
         self.align_frames_automation = None
@@ -58,12 +59,13 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_y0 = 100
         self.hidden_parameters_main_window_width = 1200
         self.hidden_parameters_main_window_height = 800
-        self.global_parameters_version = "Planetary System Stacker 0.5.0"
+        self.global_parameters_version = "Planetary System Stacker 0.6.0"
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = False
         self.global_parameters_store_protocol_with_result = False
         self.global_parameters_buffering_level = 2
         self.global_parameters_include_postprocessing = False
+        self.global_parameters_image_format = "tiff"
         self.frames_gauss_width = 7
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
@@ -100,6 +102,8 @@ class ConfigurationParameters(object):
             configuration_object.global_parameters_buffering_level
         self.global_parameters_include_postprocessing = \
             configuration_object.global_parameters_include_postprocessing
+        self.global_parameters_image_format = \
+            configuration_object.global_parameters_image_format
         self.frames_gauss_width = configuration_object.frames_gauss_width
         self.align_frames_mode = configuration_object.align_frames_mode
         self.align_frames_automation = configuration_object.align_frames_automation
@@ -119,7 +123,7 @@ class ConfigurationParameters(object):
 
 class Configuration(object):
     def __init__(self):
-        self.global_parameters_version = "Planetary System Stacker 0.5.0"
+        self.global_parameters_version = "Planetary System Stacker 0.6.0"
 
         # The config file for persistent parameter storage is located in the user's home
         # directory, as is the detailed logfile.
@@ -227,6 +231,8 @@ class Configuration(object):
             configuration_parameters.global_parameters_buffering_level
         self.global_parameters_include_postprocessing = \
             configuration_parameters.global_parameters_include_postprocessing
+        self.global_parameters_image_format = \
+            configuration_parameters.global_parameters_image_format
         self.frames_gauss_width = configuration_parameters.frames_gauss_width
         self.align_frames_mode = configuration_parameters.align_frames_mode
         self.align_frames_automation = configuration_parameters.align_frames_automation
@@ -271,6 +277,8 @@ class Configuration(object):
             self.global_parameters_store_protocol_with_result
         configuration_parameters.global_parameters_include_postprocessing = \
             self.global_parameters_include_postprocessing
+        configuration_parameters.global_parameters_image_format = \
+            self.global_parameters_image_format
 
         configuration_parameters.frames_gauss_width = self.frames_gauss_width
 
@@ -323,6 +331,8 @@ class Configuration(object):
         self.global_parameters_buffering_level = conf.getint('Global parameters', 'buffering level')
         self.global_parameters_include_postprocessing = conf.getboolean(
             'Global parameters', 'include postprocessing')
+        self.global_parameters_image_format = conf.get(
+            'Global parameters', 'image format')
         self.frames_gauss_width = conf.getint('Frames', 'gauss width')
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
@@ -376,6 +386,8 @@ class Configuration(object):
                            str(self.global_parameters_buffering_level))
         self.set_parameter('Global parameters', 'include postprocessing',
                            str(self.global_parameters_include_postprocessing))
+        self.set_parameter('Global parameters', 'image format',
+                           self.global_parameters_image_format)
 
         self.config_parser_object.add_section('Frames')
         self.set_parameter('Frames', 'gauss width', str(self.frames_gauss_width))
@@ -514,12 +526,13 @@ class PostprocDataObject(object):
         self.blinking = False
         self.version_compared = 0
 
-    def set_postproc_input_image(self, image_original, name_original):
+    def set_postproc_input_image(self, image_original, name_original, image_format):
         """
         Set the input image and associated file name for postprocessing, and set derived variables.
 
         :param image_original: Image file (16bit Tiff) holding the input for postprocessing
         :param name_original: Path name of the original image.
+        :param image_format: Image format, either 'tiff' or 'fits'.
         :return: -
         """
 
@@ -529,22 +542,23 @@ class PostprocDataObject(object):
 
         # Set the standard path to the resulting image using the provided file suffix.
         self.file_name_processed = PostprocDataObject.set_file_name_processed(
-            self.file_name_original, self.postproc_suffix)
+            self.file_name_original, self.postproc_suffix, image_format)
 
         for version in self.versions:
             version.set_image(self.image_original)
 
     @staticmethod
-    def set_file_name_processed(file_name_original, postproc_suffix):
+    def set_file_name_processed(file_name_original, postproc_suffix, image_format):
         """
         Derive the postprocessing output file name from the name of postprocessing input.
 
         :param file_name_original: Postprocessing input file name (e.g. result from stacking)
         :param postproc_suffix: Additional suffix to be inserted before file extension.
+        :param image_format: Image format, either 'tiff' or 'fits'.
         :return: Name of postprocessing result.
         """
 
-        return splitext(file_name_original)[0] + postproc_suffix + '.tiff'
+        return splitext(file_name_original)[0] + postproc_suffix + '.' + image_format
 
     def initialize_versions(self):
         """

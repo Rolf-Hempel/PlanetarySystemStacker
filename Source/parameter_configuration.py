@@ -271,6 +271,12 @@ class Ui_ConfigurationDialog(object):
         self.spp_checkBox = QtWidgets.QCheckBox(ConfigurationDialog)
         self.spp_checkBox.setObjectName("spp_checkBox")
         self.GridLayout.addWidget(self.spp_checkBox, 11, 0, 1, 2)
+        self.gpif_label_parameter = QtWidgets.QLabel(ConfigurationDialog)
+        self.gpif_label_parameter.setObjectName("gpif_label_parameter")
+        self.GridLayout.addWidget(self.gpif_label_parameter, 11, 2, 1, 1)
+        self.gpif_comboBox = QtWidgets.QComboBox(ConfigurationDialog)
+        self.gpif_comboBox.setObjectName("gpif_comboBox")
+        self.GridLayout.addWidget(self.gpif_comboBox, 11, 4, 1, 1)
         self.GridLayout.setColumnStretch(0, 5)
 
         self.retranslateUi(ConfigurationDialog)
@@ -353,4 +359,6 @@ class Ui_ConfigurationDialog(object):
         self.spp_checkBox.setToolTip(_translate("ConfigurationDialog", "Postprocess the stacked image immediately after stacking,\n"
 "rather than in a separate job"))
         self.spp_checkBox.setText(_translate("ConfigurationDialog", "Stacking plus postprocessing"))
+        self.gpif_label_parameter.setToolTip(_translate("ConfigurationDialog", "Stacked and postprocessed images can be written either in \"tiff\" or \"fits\" format."))
+        self.gpif_label_parameter.setText(_translate("ConfigurationDialog", "Write images as"))
 

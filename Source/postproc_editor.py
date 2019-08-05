@@ -364,9 +364,9 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
-                            "Save result as 16bit Tiff image",
+                            "Save result as 16bit Tiff or Fits image",
                             self.postproc_data_object.file_name_processed,
-                            "Image Files (*.tiff)", options=options)
+                            "Image Files (*.tiff *.fits)", options=options)
 
         if filename and extension:
             Frames.save_image(filename,
@@ -623,7 +623,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         self.configuration = configuration
         self.postproc_data_object = self.configuration.postproc_data_object
-        self.postproc_data_object.set_postproc_input_image(image_original, name_original)
+        self.postproc_data_object.set_postproc_input_image(image_original, name_original,
+                                                self.configuration.global_parameters_image_format)
         self.signal_save_postprocessed_image = signal_save_postprocessed_image
 
         self.buttonBox.accepted.connect(self.accept)

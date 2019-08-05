@@ -190,7 +190,8 @@ class Workflow(QtCore.QObject):
             # it can be checked if an image was computed in the workflow thread.
             self.postprocessed_image = None
             self.postprocessed_image_name = PostprocDataObject.set_file_name_processed(
-                input_name, self.configuration.postproc_suffix)
+                input_name, self.configuration.postproc_suffix,
+                self.configuration.global_parameters_image_format)
             self.attached_log_name = splitext(input_name)[0] + '_postproc-log.txt'
 
         # For video file input, the Frames constructor expects the video file name for "names".
@@ -198,7 +199,8 @@ class Workflow(QtCore.QObject):
             self.job_type = 'stacking'
             names = input_name
             self.stacked_image_name = splitext(input_name)[0] + \
-                                      self.configuration.stack_frames_suffix + '.tiff'
+                                      self.configuration.stack_frames_suffix + '.' + \
+                                      self.configuration.global_parameters_image_format
             self.attached_log_name = splitext(input_name)[0] + '_stacking-log.txt'
 
         # For single image input, the Frames constructor expects a list of image file names for
@@ -206,7 +208,8 @@ class Workflow(QtCore.QObject):
         else:  # input_type = 'image'
             self.job_type = 'stacking'
             names = [join(input_name, name) for name in listdir(input_name)]
-            self.stacked_image_name = input_name + self.configuration.stack_frames_suffix + '.tiff'
+            self.stacked_image_name = input_name + self.configuration.stack_frames_suffix + '.' + \
+                                      self.configuration.global_parameters_image_format
             self.attached_log_name = input_name + '_stacking-log.txt'
 
         # Redirect stdout to a file if requested.
@@ -692,7 +695,8 @@ class Workflow(QtCore.QObject):
             self.postproc_input_image = self.stack_frames.stacked_image
             self.postproc_input_name = self.stacked_image_name
             self.postprocessed_image_name = PostprocDataObject.set_file_name_processed(
-                self.stacked_image_name, self.configuration.postproc_suffix)
+                self.stacked_image_name, self.configuration.postproc_suffix,
+                self.configuration.global_parameters_image_format)
             self.work_next_task_signal.emit("Postprocessing")
         else:
             self.work_next_task_signal.emit("Next job")

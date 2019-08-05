@@ -697,6 +697,19 @@ rather than in a separate job</string>
      </property>
     </widget>
    </item>
+   <item row="11" column="2">
+    <widget class="QLabel" name="gpif_label_parameter">
+     <property name="toolTip">
+      <string>Stacked and postprocessed images can be written either in &quot;tiff&quot; or &quot;fits&quot; format.</string>
+     </property>
+     <property name="text">
+      <string>Write images as</string>
+     </property>
+    </widget>
+   </item>
+   <item row="11" column="4">
+    <widget class="QComboBox" name="gpif_comboBox"/>
+   </item>
   </layout>
  </widget>
  <resources/>

@@ -70,6 +70,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.gpspwr_checkBox.stateChanged.connect(self.gpspwr_changed)
         self.gppl_spinBox.valueChanged['int'].connect(self.gppl_changed)
         self.gpbl_spinBox.valueChanged['int'].connect(self.gpbl_changed)
+        self.gpif_comboBox.addItem('tiff')
+        self.gpif_comboBox.addItem('fits')
+        self.gpif_comboBox.activated[str].connect(self.gpif_changed)
         self.aphbw_slider_value.valueChanged['int'].connect(self.aphbw_changed)
         self.apsw_slider_value.valueChanged['int'].connect(self.apsw_changed)
         self.apst_slider_value.valueChanged['int'].connect(self.apst_changed)
@@ -109,6 +112,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.config_copy.global_parameters_store_protocol_with_result)
         self.gppl_spinBox.setValue(self.config_copy.global_parameters_protocol_level)
         self.gpbl_spinBox.setValue(self.config_copy.global_parameters_buffering_level)
+        index = self.gpif_comboBox.findText(self.config_copy.global_parameters_image_format,
+                                           QtCore.Qt.MatchFixedString)
+        if index >= 0:
+            self.gpif_comboBox.setCurrentIndex(index)
 
         self.aphbw_slider_value.setValue(self.config_copy.alignment_points_half_box_width * 2)
         self.aphbw_label_display.setText(str(self.config_copy.alignment_points_half_box_width * 2))
@@ -188,6 +195,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
     def gpbl_changed(self, value):
         self.config_copy.global_parameters_buffering_level = value
+
+    def gpif_changed(self, value):
+        self.config_copy.global_parameters_image_format = value
 
     def aphbw_changed(self, value):
         self.config_copy.alignment_points_half_box_width = int(value / 2)
@@ -333,6 +343,12 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                 self.configuration.global_parameters_include_postprocessing:
             self.configuration.global_parameters_include_postprocessing = \
                 self.config_copy.global_parameters_include_postprocessing
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_image_format != \
+                self.configuration.global_parameters_image_format:
+            self.configuration.global_parameters_image_format = \
+                self.config_copy.global_parameters_image_format
             self.configuration.configuration_changed = True
 
         # Set dependent parameters.

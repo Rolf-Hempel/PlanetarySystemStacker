@@ -1290,7 +1290,8 @@ class Frames(object):
     @staticmethod
     def save_image(filename, image, color=False, avoid_overwriting=True):
         """
-        Save an image to a file.
+        Save an image to a file. If "avoid_overwriting" is set to False, images can have either
+        ".tiff" or ".fits" format.
 
         :param filename: Name of the file where the image is to be written
         :param image: ndarray object containing the image data
@@ -1323,21 +1324,27 @@ class Frames(object):
                 if not suffix:
                     filename += '.tiff'
 
-        # Don't care if a file with the given name exists. Overwrite it if necessary.
-        elif path.exists(filename):
-            remove(filename)
+        elif Path(filename).suffix == '.tiff':
+            # Don't care if a file with the given name exists. Overwrite it if necessary.
+            if path.exists(filename):
+                remove(filename)
+            # Write the image to the file. Before writing, convert the internal RGB representation into
+            # the BGR representation assumed by OpenCV.
+            if color:
+                imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
+            else:
+                imwrite(str(filename), image)
 
-        # Write the image to the file. Before writing, convert the internal RGB representation into
-        # the BGR representation assumed by OpenCV.
-        if color:
-            imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
-            hdu = fits.PrimaryHDU(moveaxis(cvtColor(image, COLOR_RGB2BGR), -1, 0))
+        elif Path(filename).suffix == '.fits':
+            if color:
+                hdu = fits.PrimaryHDU(moveaxis(cvtColor(image, COLOR_RGB2BGR), -1, 0))
+            else:
+                hdu = fits.PrimaryHDU(image)
+            hdu.header['CREATOR'] = 'PlanetarySystemStacker'
+            hdu.writeto(filename, overwrite=True)
+
         else:
-            imwrite(str(filename), image)
-            hdu = fits.PrimaryHDU(image)
-
-        hdu.header['CREATOR'] = 'PlanetarySystemStacker'
-        hdu.writeto(str(filename.replace('.tiff', '.fits')), overwrite=True)
+            raise TypeError("Attempt to write image format other than 'tiff' or 'fits'")
 
 def access_pattern(frames_object, average_frame_percent):
     """

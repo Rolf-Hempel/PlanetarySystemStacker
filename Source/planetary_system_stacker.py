@@ -885,15 +885,15 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
     def save_result_as(self):
         """
-        save the result as 16bit Tiff at a location selected by the user.
+        save the result as 16bit Tiff or Fits at a location selected by the user.
 
         :return: -
         """
 
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
-            "Save result as 16bit Tiff image", self.workflow.stacked_image_name,
-            "Image Files (*.tiff)", options=options)
+            "Save result as 16bit Tiff or Fits image", self.workflow.stacked_image_name,
+            "Image Files (*.tiff *.fits)", options=options)
 
         if filename and extension:
             self.workflow.frames.save_image(filename, self.workflow.stack_frames.stacked_image,
