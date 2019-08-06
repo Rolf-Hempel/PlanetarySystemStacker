@@ -30,7 +30,8 @@ import gc
 import psutil
 from PyQt5 import QtCore
 from cv2 import imread, cvtColor, COLOR_BGR2RGB
-from numpy import uint16, uint8
+from numpy import uint16, uint8, ndarray
+from astropy.io import fits
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
@@ -355,7 +356,37 @@ class Workflow(QtCore.QObject):
 
         # Job type is 'postproc'.
         else:
-            input_image = imread(self.postproc_input_name, -1)
+            name, suffix = splitext(self.postproc_input_name)
+            if suffix == '.fits':
+                # Hier ist noch ein Problem: "input_image" hat bei einem Farbbild z.B. den Shape:
+                # (3, 516, 678), während Numpy erwarten würde: (516, 578, 3). Die Farbdaten sind
+                # also nicht hintereinander gespeichert, sondern die drei Farbauszüge sind
+                # hintereinander gespeichert. Gibt es eine Möglichkeit, ein FITS-Bild so einzulesen,
+                # dass OpcnCV / Numpy hinterher damit zurechtkommt?
+                #
+                # Der folgende Code funktioniert, ist aber natürlich sehr unschön!
+                #
+                input_image = fits.getdata(self.postproc_input_name, ext=0)
+                sh = input_image.shape
+                typ = input_image.dtype
+                if len(sh) == 3:
+                    col, ny, nx = sh
+                    input_image_new = ndarray((ny, nx, col), dtype=typ)
+                    for y in range(ny):
+                        for x in range(nx):
+                            for color in range(3):
+                                input_image_new[y, x, color] = input_image[color, y, x]
+                    input_image = input_image_new
+                elif len(sh) == 2:
+                    ny, nx = sh
+                    input_image_new = ndarray((nx, ny), dtype=typ)
+                    for y in range(ny):
+                        for x in range(nx):
+                            input_image_new[x, y] = input_image[y, x]
+                    input_image = input_image_new
+
+            else:
+                input_image = imread(self.postproc_input_name, -1)
 
             # If color image, convert to RGB mode.
             if len(input_image.shape) == 3:
