@@ -356,22 +356,7 @@ class Workflow(QtCore.QObject):
 
         # Job type is 'postproc'.
         else:
-            name, suffix = splitext(self.postproc_input_name)
-
-            # Case FITS format:
-            if suffix == '.fits':
-                self.postproc_input_image = moveaxis(fits.getdata(self.postproc_input_name, ext=0),
-                                                     0, -1).copy()
-
-            # Case TIFF format:
-            else:
-                input_image = imread(self.postproc_input_name, -1)
-
-                # If color image, convert to RGB mode.
-                if len(input_image.shape) == 3:
-                    self.postproc_input_image = cvtColor(input_image, COLOR_BGR2RGB)
-                else:
-                    self.postproc_input_image = input_image
+            self.postproc_input_image = Frames.read_image(self.postproc_input_name)
 
             # Convert 8 bit to 16 bit.
             if self.postproc_input_image.dtype == uint8:

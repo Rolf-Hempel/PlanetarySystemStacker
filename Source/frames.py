@@ -24,6 +24,7 @@ import datetime
 import struct
 from glob import glob
 from os import path, remove, listdir, stat
+from os.path import splitext
 from pathlib import Path
 from time import time
 
@@ -657,7 +658,7 @@ class Calibration(QtCore.QObject):
         Create a master dark image, or read it from a file.
 
         :param dark_name: If a new master frame is to be created, path name of video file or image
-                          directory. Otherwise the file name (TIFF) of the master frame.
+                          directory. Otherwise the file name (Tiff or Fits) of the master frame.
         :param load_from_file: True, if to be loaded from file. False, if to be created anew.
         :return: -
         """
@@ -667,7 +668,7 @@ class Calibration(QtCore.QObject):
 
         # Create the master frame or read it from a file.
         if load_from_file:
-            self.master_dark_frame = imread(dark_name, IMREAD_UNCHANGED)
+            self.master_dark_frame = Frames.read_image(dark_name)
             if self.master_dark_frame.dtype == uint8:
                 self.master_dark_frame = (self.master_dark_frame * 256).astype(uint16)
         else:
@@ -702,7 +703,7 @@ class Calibration(QtCore.QObject):
         Create a master flat image, or read it from a file.
 
         :param flat_name: If a new master frame is to be created, path name of video file or image
-                          directory. Otherwise the file name (TIFF) of the master frame.
+                          directory. Otherwise the file name (Tiff or Fits) of the master frame.
         :param load_from_file: True, if to be loaded from file. False, if to be created anew.
         :return: -
         """
@@ -712,7 +713,7 @@ class Calibration(QtCore.QObject):
 
         # Create the master frame or read it from a file.
         if load_from_file:
-            self.master_flat_frame = imread(flat_name, IMREAD_UNCHANGED)
+            self.master_flat_frame = Frames.read_image(flat_name)
             if self.master_flat_frame.dtype == uint8:
                 self.master_flat_frame = (self.master_flat_frame * 256).astype(uint16)
         else:
@@ -1295,7 +1296,8 @@ class Frames(object):
 
         :param filename: Name of the file where the image is to be written
         :param image: ndarray object containing the image data
-        :param color: If True, a three channel RGB image is to be saved. Otherwise, monochrome.
+        :param color: If True, a three channel RGB image is to be saved. Otherwise, it is assumed
+                      that the image is monochrome.
         :param avoid_overwriting: If True, append a string to the input name if necessary so that
                                   it does not match any existing file. If False, overwrite
                                   an existing file.
@@ -1345,6 +1347,36 @@ class Frames(object):
 
         else:
             raise TypeError("Attempt to write image format other than 'tiff' or 'fits'")
+
+    @staticmethod
+    def read_image(filename):
+        """
+        Read an image (either in Tiff or Fits format) from a file.
+
+        :param filename: Path name of the input image.
+        :return: RGB or monochrome image.
+        """
+
+        name, suffix = splitext(filename)
+
+        # Case FITS format:
+        if suffix == '.fits':
+            image = moveaxis(fits.getdata(filename, ext=0), 0, -1).copy()
+
+        # Case TIFF format:
+        elif suffix == '.tiff':
+            input_image = imread(filename, IMREAD_UNCHANGED)
+
+            # If color image, convert to RGB mode.
+            if len(input_image.shape) == 3:
+                image = cvtColor(input_image, COLOR_BGR2RGB)
+            else:
+                image = input_image
+
+        else:
+            raise TypeError("Attempt to read image format other than 'tiff' or 'fits'")
+
+        return image
 
 def access_pattern(frames_object, average_frame_percent):
     """

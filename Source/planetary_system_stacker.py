@@ -463,7 +463,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             master_dark_file = QtWidgets.QFileDialog.getSaveFileName(self,
                                                  "Choose a file name for the new master dark frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*.tiff)",
+                                                 "Images (*.tiff *.fits)",
                                                  options=options)
 
             if master_dark_file[0]:
@@ -486,7 +486,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     def load_master_dark(self):
         """
         This method is invoked by selecting "Load master dark" from the "Calibration" menu. It
-        opens a file dialog for selecting a TIFF file with a master dark frame.
+        opens a file dialog for selecting a Tiff or Fits file with a master dark frame.
 
         :return: -
         """
@@ -495,7 +495,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         master_dark_file = QtWidgets.QFileDialog.getOpenFileName(self,
                                                  "Select image file containing a master dark frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*.tiff)", options=options)
+                                                 "Images (*.tiff *.fits)", options=options)
 
         if master_dark_file[0]:
             self.signal_load_master_dark.emit(master_dark_file[0])
@@ -545,7 +545,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             master_flat_file = QtWidgets.QFileDialog.getSaveFileName(self,
                                                  "Choose a file name for the new master flat frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*.tiff)",
+                                                 "Images (*.tiff *.fits)",
                                                  options=options)
 
             if master_flat_file[0]:
@@ -568,7 +568,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     def load_master_flat(self):
         """
         This method is invoked by selecting "Load master flat" from the "Calibration" menu. It
-        opens a file dialog for selecting a TIFF file with a master flat frame.
+        opens a file dialog for selecting a Tiff or Fits file with a master flat frame.
 
         :return: -
         """
@@ -577,7 +577,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         master_flat_file = QtWidgets.QFileDialog.getOpenFileName(self,
                                                  "Select image file containing a master dark frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*.tiff)", options=options)
+                                                 "Images (*.tiff *.fits)", options=options)
 
         if master_flat_file[0]:
             self.signal_load_master_flat.emit(master_flat_file[0])
