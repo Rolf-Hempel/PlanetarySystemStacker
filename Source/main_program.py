@@ -24,7 +24,9 @@ import ctypes
 import glob
 import sys
 import os
+import platform
 import traceback
+from ctypes import CDLL
 
 import matplotlib.pyplot as plt
 from skimage import img_as_ubyte
@@ -262,7 +264,11 @@ if __name__ == "__main__":
         protocol_file = open(os.path.join(input_directory, 'Protocol.txt'), 'a')
         sys.stdout = protocol_file
 
-    mkl_rt = ctypes.CDLL('mkl_rt.dll')
+    if platform.system() == 'Windows':
+        mkl_rt = CDLL('mkl_rt.dll')
+    else:
+        mkl_rt = CDLL('libmkl_rt.so')
+
     mkl_get_max_threads = mkl_rt.mkl_get_max_threads
 
     def mkl_set_num_threads(cores):

@@ -23,6 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 import sys
 from ctypes import CDLL, byref, c_int
 from os import listdir
+import platform
 from os.path import splitext, join
 
 import gc
@@ -80,9 +81,13 @@ class Workflow(QtCore.QObject):
         # Switch alignment point debugging on / off.
         self.debug_AP = False
 
-        # The following code works on Windows systems only. It is not necessary, though.
+        # The following code works on Windows and Linux systems only. It is not necessary, though.
         try:
-            mkl_rt = CDLL('mkl_rt.dll')
+            if platform.system() == 'Windows':
+                mkl_rt = CDLL('mkl_rt.dll')
+            else:
+                mkl_rt = CDLL('libmkl_rt.so')
+
             mkl_get_max_threads = mkl_rt.mkl_get_max_threads
 
             def mkl_set_num_threads(cores):
@@ -94,8 +99,9 @@ class Workflow(QtCore.QObject):
                     "Number of threads used by mkl: " + str(mkl_get_max_threads()),
                     self.attached_log_file, precede_with_timestamp=True)
         except Exception as e:
-            Miscellaneous.protocol("mkl_rt.dll does not work (not a Windows system?): " + str(e),
-                                   self.attached_log_file, precede_with_timestamp=True)
+            Miscellaneous.protocol(
+                "Warning: mkl_rt.dll does not work (not a Windows or Linux system?). "
+                + str(e), self.attached_log_file, precede_with_timestamp=True)
 
         # Create the calibration object, used for potential flat / dark corrections.
         self.calibration = Calibration(self.configuration)
