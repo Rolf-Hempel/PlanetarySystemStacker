@@ -320,11 +320,17 @@ class VideoReader(object):
             else:
                 header['PixelDataOrganization'] = 'BB GG RR'
 
-        header['DateTime_Decoded'] = datetime.datetime(1, 1, 1) + \
-            datetime.timedelta(microseconds=header['DateTime'] // 10)
+        try:
+            header['DateTime_Decoded'] = datetime.datetime(1, 1, 1) + \
+                datetime.timedelta(microseconds=header['DateTime'] // 10)
+        except Exception:
+            header['DateTime_Decoded'] = None
 
-        header['DateTime_UTC_Decoded'] = datetime.datetime(1, 1, 1) + \
-            datetime.timedelta(microseconds=header['DateTime_UTC'] // 10)
+        try:
+            header['DateTime_UTC_Decoded'] = datetime.datetime(1, 1, 1) + \
+                datetime.timedelta(microseconds=header['DateTime_UTC'] // 10)
+        except Exception:
+            header['DateTime_UTC_Decoded'] = None
 
         # Check, if FireCature metadata is available
         if 'fps=' in header['Telescope']:
