@@ -22,19 +22,17 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 from glob import glob
 from warnings import filterwarnings
-from time import sleep
 
-from cv2 import GaussianBlur, FONT_HERSHEY_SIMPLEX, putText, resize
+from cv2 import GaussianBlur
 import matplotlib.pyplot as plt
 from numpy import int as np_int
 from numpy import zeros, full, empty, float32, int32, newaxis, arange, count_nonzero, \
-    where, sqrt, logical_or, uint16
+    where, sqrt, logical_or
 from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
-from miscellaneous import Miscellaneous
 from exceptions import InternalError, NotSupportedError, Error
 from frames import Frames
 from rank_frames import RankFrames
@@ -49,8 +47,7 @@ class StackFrames(object):
     """
 
     def __init__(self, configuration, frames, align_frames, alignment_points, my_timer,
-                 progress_signal=None, debug=False, create_image_window_signal=None,
-                 update_image_window_signal=None, terminate_image_window_signal=None):
+                 progress_signal=None):
         """
         Initialze the StackFrames object. In particular, allocate empty numpy arrays used in the
         stacking process for buffering and the final stacked image. The size of all those objects
@@ -113,18 +110,6 @@ class StackFrames(object):
         # buffer. The second buffer is initialized with a small value to avoid divide by zero.
         self.number_single_frame_contributions = full([self.dim_y, self.dim_x], 0, dtype=int32)
         self.sum_single_frame_weights = full([self.dim_y, self.dim_x], 0.0001, dtype=float32)
-
-        # Prepare for debugging the local de-warping: In each frame a shifted AP patch can be
-        # compared to the corresponding section of the reference frame. This is visualized in a
-        # separate GUI window. Visualization control is done via three signals passed from the
-        # workflow thread.
-        self.debug = debug
-        self.scale_factor = 3
-        self.border = 2
-        self.image_delay = 0.5
-        self.create_image_window_signal = create_image_window_signal
-        self.update_image_window_signal = update_image_window_signal
-        self.terminate_image_window_signal = terminate_image_window_signal
 
         self.my_timer.stop('Stacking: AP initialization')
 
@@ -295,9 +280,10 @@ class StackFrames(object):
         self.shift_distribution = full((self.configuration.alignment_points_search_width*2,), 0,
                                           dtype=np_int)
 
-        # In debug mode: Prepare for de-warp visualization.
-        if self.debug:
-            self.create_image_window_signal.emit()
+        # If multi-level AP matching is selected, prepare the required level information for each
+        # alignment point.
+        if self.configuration.alignment_points_method == 'MultiLevel':
+            self.alignment_points.set_reference_boxes()
 
         # Go through the list of all frames.
         for frame_index in range(self.frames.number):
@@ -333,52 +319,6 @@ class StackFrames(object):
                 total_shift_y = int(round(dy - shift_y))
                 total_shift_x = int(round(dx - shift_x))
                 self.my_timer.stop('Stacking: compute AP shifts')
-
-                # In debug mode: visualize shifted patch of the first AP and compare it with the
-                # corresponding patch of the reference frame.
-                if self.debug and not alignment_point_index:
-                    frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
-                    y_low = alignment_point['patch_y_low']
-                    y_high = alignment_point['patch_y_high']
-                    x_low = alignment_point['patch_x_low']
-                    x_high = alignment_point['patch_x_high']
-                    reference_patch = (self.alignment_points.mean_frame[y_low:y_high, x_low:x_high]).astype(uint16)
-                    reference_patch = resize(reference_patch, None,
-                                              fx=float(self.scale_factor),
-                                              fy=float(self.scale_factor))
-
-                    try:
-                        # Cut out the globally stabilized and the de-warped patches
-                        frame_stabilized = frame_mono_blurred[y_low+dy:y_high+dy, x_low+dx:x_high+dx]
-                        frame_stabilized = resize(frame_stabilized, None,
-                                                  fx=float(self.scale_factor),
-                                                  fy=float(self.scale_factor))
-                        font = FONT_HERSHEY_SIMPLEX
-                        fontScale = 0.5
-                        fontColor = (0, 255, 0)
-                        lineType = 1
-                        putText(frame_stabilized, 'stabilized: ' + str(dy) + ', ' + str(dx),
-                                (5, 25), font, fontScale, fontColor, lineType)
-
-                        frame_dewarped = frame_mono_blurred[y_low+total_shift_y:y_high+total_shift_y,
-                                         x_low+total_shift_x:x_high+total_shift_x]
-                        frame_dewarped = resize(frame_dewarped, None,
-                                                  fx=float(self.scale_factor),
-                                                  fy=float(self.scale_factor))
-                        putText(frame_dewarped, 'de-warped: ' + str(shift_y) + ', ' + str(shift_x),
-                                (5, 25), font, fontScale, fontColor, lineType)
-                        # Compose the three patches into a single image and send it to the
-                        # visualization window.
-                        composed_image = Miscellaneous.compose_image([frame_stabilized,
-                                            reference_patch, frame_dewarped],
-                                            border=self.border)
-                        self.update_image_window_signal.emit(composed_image)
-                    except Exception as e:
-                        print (str(e))
-
-                    # Insert a delay to keep the current frame long enough in the visualization
-                    # window.
-                    sleep(self.image_delay)
 
                 # Add the shifted alignment point patch to the AP's stacking buffer.
                 self.my_timer.start('Stacking: remapping and adding')
@@ -431,10 +371,6 @@ class StackFrames(object):
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Stack frames", 100)
-
-        # In debug mode: Close de-warp visualization window.
-        if self.debug:
-            self.terminate_image_window_signal.emit()
 
         # If a background image is being computed, divide the buffer by the number of contributions.
         if self.number_stacking_holes > 0:

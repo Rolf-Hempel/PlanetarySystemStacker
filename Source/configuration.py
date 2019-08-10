@@ -155,7 +155,7 @@ class Configuration(object):
         self.alignment_points_rank_method = "Laplace"
         self.alignment_points_rank_pixel_stride = 2
         self.alignment_points_de_warp = True
-        self.alignment_points_method = 'SteepestDescent'
+        self.alignment_points_method = 'MultiLevel'
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
 
@@ -444,10 +444,18 @@ class Configuration(object):
         self.alignment_points_half_patch_width = max(int(
             round((self.alignment_points_half_box_width * 3) / 2)),
             self.alignment_points_half_box_width + self.alignment_points_search_width)
+
         # Set the AP distance per coordinate direction such that adjacent patches overlap by 1/6
         # of their width.
         self.alignment_points_step_size = int(
             round((self.alignment_points_half_patch_width * 5) / 3))
+
+        # If multi-level AP matching is selected, initialize the number of levels and AP box
+        # factors.
+        if self.alignment_points_method == "MultiLevel":
+            self.alignment_points_number_levels = 3
+            self.alignment_points_box_factors = [1.0, 1.5, 1.5]
+
         # Initialze the number of frames to be stacked. It will be computed from the corresponding
         # percentage. The user, however, can override this value with a (more precise) figure
         # during the workflow.

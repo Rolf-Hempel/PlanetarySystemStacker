@@ -21,14 +21,15 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from glob import glob
-from time import time
+from time import time, sleep
 
 import matplotlib.pyplot as plt
 from math import ceil
 from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, int32, uint16
 from scipy import ndimage
 from skimage.feature import register_translation
-from cv2 import meanStdDev, GaussianBlur
+from cv2 import meanStdDev, GaussianBlur, destroyAllWindows, waitKey, imshow, FONT_HERSHEY_SIMPLEX,\
+    putText, resize
 
 from align_frames import AlignFrames
 from configuration import Configuration
@@ -71,6 +72,17 @@ class AlignmentPoints(object):
         self.mean_frame = GaussianBlur(align_frames.mean_frame.astype(uint16),
                                         (self.configuration.frames_gauss_width,
                                         self.configuration.frames_gauss_width), 0).astype(int32)
+
+        if self.configuration.alignment_points_method == 'MultiLevel':
+            self.mean_frames = [self.mean_frame]
+
+            for level in range(1, self.configuration.alignment_points_number_levels + 1):
+                stride = 2**level
+
+                self.mean_frames.append(GaussianBlur(align_frames.mean_frame[::stride, ::stride].astype(uint16),
+                                           (self.configuration.frames_gauss_width,
+                                            self.configuration.frames_gauss_width), 0).astype(int32))
+
         self.num_pixels_y = self.mean_frame.shape[0]
         self.num_pixels_x = self.mean_frame.shape[1]
         self.alignment_points_dropped_dim = None
@@ -87,6 +99,12 @@ class AlignmentPoints(object):
 
         self.dev_table = empty((2 * self.configuration.alignment_points_search_width + 1,
                                2 * self.configuration.alignment_points_search_width + 1), dtype=float32)
+
+        self.debug_AP = False
+        self.update_image_window_signal = None
+        self.scale_factor = None
+        self.border = None
+        self.image_delay = None
 
     @staticmethod
     def ap_locations(num_pixels, min_boundary_distance, step_size, even):
@@ -471,6 +489,52 @@ class AlignmentPoints(object):
               alignment_point['box_x_low']:alignment_point['box_x_high']]
         alignment_point['reference_box'] = box
 
+    def set_reference_boxes(self):
+        """
+        This method is used if multi-level AP matching is selected. In this case a hierarchy of
+        reference boxes with different resolution is constructed. Level 0 is the original frame,
+        and each higher level has half the pixel count in x and y as compared to the previous level.
+
+        This method is invoked when all APs are set, just before stacking.
+
+        :return: -
+        """
+
+        for ap_index, alignment_point in enumerate(self.alignment_points):
+            half_box_width_finest = alignment_point['x'] - alignment_point['box_x_low']
+            y_finest = alignment_point['y']
+            x_finest = alignment_point['x']
+
+            alignment_point['y_levels'] = []
+            alignment_point['x_levels'] = []
+            alignment_point['half_box_widths'] = []
+            alignment_point['reference_boxes'] = []
+
+            for level in range(self.configuration.alignment_points_number_levels):
+                half_box_width = int(
+                    round(half_box_width_finest * self.configuration.alignment_points_box_factors[
+                        level] / 2 ** level))
+
+                y_level = int(round(y_finest / 2 ** level))
+                x_level = int(round(x_finest / 2 ** level))
+
+                alignment_point['y_levels'].append(y_level * 2 ** level)
+                alignment_point['x_levels'].append(x_level * 2 ** level)
+                alignment_point['half_box_widths'].append(half_box_width * 2 ** level)
+                alignment_point['reference_boxes'].append(
+                    self.mean_frames[level][y_level - half_box_width:y_level + half_box_width,
+                    x_level - half_box_width:x_level + half_box_width])
+
+            # if self.debug_AP and not ap_index:
+            #     print('half_box_width_finest: ' + str(half_box_width_finest))
+            #     for level in range(self.configuration.alignment_points_number_levels):
+            #         print(str(alignment_point['y_levels'][level]) + ", " + str(
+            #             alignment_point['x_levels'][level]) + ", " + str(
+            #             alignment_point['half_box_widths'][level]))
+            #         imshow(str(level), alignment_point['reference_boxes'][level])
+            #         waitKey(0)
+            #         destroyAllWindows()
+
     @staticmethod
     def initialize_ap_stacking_buffer(alignment_point, color):
         """
@@ -645,6 +709,22 @@ class AlignmentPoints(object):
             for frame_index in alignment_point['best_frame_indices']:
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)
 
+    def prepare_for_debugging(self, update_image_window_signal):
+        """
+        The effect of de-warping is to be visualized in the GUI. To this end, method
+         "compute_shift_alignment_point" for each frame sends an image to the GUI. The image
+         visualizes the effect of global frame stabilization and local de-warping at the given AP.
+
+        :param update_image_window_signal:
+        :return:
+        """
+
+        self.debug_AP = True
+        self.update_image_window_signal = update_image_window_signal
+        self.scale_factor = 3
+        self.border = 2
+        self.image_delay = 8.
+
     def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
                                       de_warp=True):
         """
@@ -687,16 +767,16 @@ class AlignmentPoints(object):
         # The offsets dy and dx are caused by two effects: First, the mean frame is smaller
         # than the original frames. It only contains their intersection. And second, because the
         # given frame is globally shifted as compared to the mean frame.
-        dy = self.align_frames.dy[frame_index]
-        dx = self.align_frames.dx[frame_index]
+        dy_global = self.align_frames.dy[frame_index]
+        dx_global = self.align_frames.dx[frame_index]
 
         if de_warp:
             # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
             if self.configuration.alignment_points_method == 'Subpixel':
                 # Cut out the alignment box from the given frame. Take into account the offsets
                 # explained above.
-                box_in_frame = frame_mono_blurred[y_low + dy:y_high + dy,
-                               x_low + dx:x_high + dx]
+                box_in_frame = frame_mono_blurred[y_low + dy_global:y_high + dy_global,
+                               x_low + dx_global:x_high + dx_global]
                 shift_pixel, error, diffphase = register_translation(
                     reference_box, box_in_frame, 10, space='real')
 
@@ -704,15 +784,15 @@ class AlignmentPoints(object):
             elif self.configuration.alignment_points_method == 'CrossCorrelation':
                 # Cut out the alignment box from the given frame. Take into account the offsets
                 # explained above.
-                box_in_frame = frame_mono_blurred[y_low + dy:y_high + dy,
-                                                  x_low + dx:x_high + dx]
+                box_in_frame = frame_mono_blurred[y_low + dy_global:y_high + dy_global,
+                                                  x_low + dx_global:x_high + dx_global]
                 shift_pixel = Miscellaneous.translation(reference_box,
                                                         box_in_frame, box_in_frame.shape)
 
             # Use a local search (see method "search_local_match" below.
             elif self.configuration.alignment_points_method == 'RadialSearch':
                 shift_pixel, dev_r = Miscellaneous.search_local_match(reference_box,
-                    frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                    frame_mono_blurred, y_low + dy_global, y_high + dy_global, x_low + dx_global, x_high + dx_global,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride,
                     sub_pixel=self.configuration.alignment_points_local_search_subpixel)
@@ -720,13 +800,136 @@ class AlignmentPoints(object):
             # Use the steepest descent search method.
             elif self.configuration.alignment_points_method == 'SteepestDescent':
                 shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(reference_box,
-                    frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                    frame_mono_blurred, y_low + dy_global, y_high + dy_global, x_low + dx_global, x_high + dx_global,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride, self.dev_table)
+
+            # Use the multi-level steepest descent search method.
+            elif self.configuration.alignment_points_method == 'MultiLevel':
+                shift_pixel_levels = Miscellaneous.search_local_match_multilevel(alignment_point,
+                    frame_mono_blurred, dy_global, dx_global,
+                    self.configuration.alignment_points_number_levels,
+                    self.configuration.alignment_points_sampling_stride)
+                # The full shift is contained in the level 0 entry.
+                shift_pixel = shift_pixel_levels[0]
+
             else:
                 raise NotSupportedError("The point shift computation method " +
                                         self.configuration.alignment_points_method +
                                         " is not implemented")
+
+            # In debug mode: visualize shifted patch of the first AP and compare it with the
+            # corresponding patch of the reference frame.
+            if self.debug_AP and not alignment_point_index:
+
+                font = FONT_HERSHEY_SIMPLEX
+                fontScale = 0.5
+                fontColor = (0, 255, 0)
+                lineType = 1
+
+                if self.configuration.alignment_points_method == 'MultiLevel':
+                    # Special case 'MultiLevel': The de-warp effect is visualized at all scales.
+                    try:
+                        partial_images = []
+                        dy_warp = 0
+                        dx_warp = 0
+                        for level in reversed(
+                                range(self.configuration.alignment_points_number_levels)):
+                            shift_pixel_level = shift_pixel_levels[level]
+                            stride = 2 ** level
+                            reference_patch = alignment_point['reference_boxes'][level].astype(uint16)
+                            reference_patch = resize(reference_patch, None,
+                                                     fx=float(self.scale_factor),
+                                                     fy=float(self.scale_factor))
+
+
+                            y_level = alignment_point['y_levels'][level] + dy_global - dy_warp
+                            x_level = alignment_point['x_levels'][level] + dx_global - dx_warp
+                            half_box_width = alignment_point['half_box_widths'][level]
+                            frame_stabilized = frame_mono_blurred[
+                                               y_level - half_box_width:y_level + half_box_width:stride,
+                                               x_level - half_box_width:x_level + half_box_width:stride]
+                            frame_stabilized = resize(frame_stabilized, None,
+                                                      fx=float(self.scale_factor),
+                                                      fy=float(self.scale_factor))
+                            putText(frame_stabilized,
+                                    str(dy_global - dy_warp) + ', ' + str(dx_global - dx_warp),
+                                    (5, 25), font, fontScale, fontColor, lineType)
+
+                            dy_warp = shift_pixel_level[0]
+                            dx_warp = shift_pixel_level[1]
+                            y_level = alignment_point['y_levels'][level] + dy_global - dy_warp
+                            x_level = alignment_point['x_levels'][level] + dx_global - dx_warp
+                            frame_dewarped = frame_mono_blurred[
+                                             y_level - half_box_width:y_level + half_box_width:stride,
+                                             x_level - half_box_width:x_level + half_box_width:stride]
+                            frame_dewarped = resize(frame_dewarped, None,
+                                                    fx=float(self.scale_factor),
+                                                    fy=float(self.scale_factor))
+                            putText(frame_dewarped,
+                                    str(dy_warp) + ', ' + str(dx_warp),
+                                    (5, 25), font, fontScale, fontColor, lineType)
+
+                            partial_images.append(frame_stabilized)
+                            partial_images.append(reference_patch)
+                            partial_images.append(frame_dewarped)
+
+                        # Compose the three patches into a single image and send it to the
+                        # visualization window.
+                        composed_image = Miscellaneous.compose_image(partial_images,
+                                                                     border=self.border)
+                        self.update_image_window_signal.emit(composed_image)
+                    except Exception as e:
+                        print(str(e))
+
+                else:
+                    # For alignment methods other than 'multilevel' the de-warp visualization is
+                    # only done at the original image scale.
+                    total_shift_y = int(round(dy_global - shift_pixel[0]))
+                    total_shift_x = int(round(dx_global - shift_pixel[1]))
+
+                    y_low = alignment_point['patch_y_low']
+                    y_high = alignment_point['patch_y_high']
+                    x_low = alignment_point['patch_x_low']
+                    x_high = alignment_point['patch_x_high']
+                    reference_patch = (self.mean_frame[y_low:y_high, x_low:x_high]).astype(uint16)
+                    reference_patch = resize(reference_patch, None,
+                                             fx=float(self.scale_factor),
+                                             fy=float(self.scale_factor))
+
+                    try:
+                        # Cut out the globally stabilized and the de-warped patches
+                        frame_stabilized = frame_mono_blurred[y_low + dy_global:y_high + dy_global,
+                                           x_low + dx_global:x_high + dx_global]
+                        frame_stabilized = resize(frame_stabilized, None,
+                                                  fx=float(self.scale_factor),
+                                                  fy=float(self.scale_factor))
+                        putText(frame_stabilized,
+                                'stabilized: ' + str(dy_global) + ', ' + str(dx_global),
+                                (5, 25), font, fontScale, fontColor, lineType)
+
+                        frame_dewarped = frame_mono_blurred[
+                                         y_low + total_shift_y:y_high + total_shift_y,
+                                         x_low + total_shift_x:x_high + total_shift_x]
+                        frame_dewarped = resize(frame_dewarped, None,
+                                                fx=float(self.scale_factor),
+                                                fy=float(self.scale_factor))
+                        putText(frame_dewarped,
+                                'de-warped: ' + str(shift_pixel[0]) + ', ' + str(shift_pixel[1]),
+                                (5, 25), font, fontScale, fontColor, lineType)
+                        # Compose the three patches into a single image and send it to the
+                        # visualization window.
+                        composed_image = Miscellaneous.compose_image([frame_stabilized,
+                                                                      reference_patch,
+                                                                      frame_dewarped],
+                                                                     border=self.border)
+                        self.update_image_window_signal.emit(composed_image)
+                    except Exception as e:
+                        print(str(e))
+
+                # Insert a delay to keep the current frame long enough in the visualization
+                # window.
+                sleep(self.image_delay)
 
             # Return the computed shift vector.
             return shift_pixel

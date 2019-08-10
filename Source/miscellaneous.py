@@ -566,6 +566,76 @@ class Miscellaneous(object):
         return [0, 0], dev_r
 
     @staticmethod
+    def search_local_match_multilevel(alignment_point,
+                    frame, dy_global, dx_global, number_levels,
+                    alignment_points_sampling_stride):
+        """
+        Measure the warp shift at various levels, starting with the coarsest one. At each level
+        determine the best location in a circle of radius 1 around the optimum found at the
+        previous level. Since the pixel count at each level is doubled as compared to the previous
+        one, the total shift value gets more and more refined.
+
+        :param alignment_point: AP at which the warp shift is to be measured.
+        :param frame: Given frame (with low-pass filter applied) for which the local shift at
+                      the alignment point is to be measured.
+        :param dy_global: Global y shift measured in frame stabilization.
+        :param dx_global: Global x shift measured in frame stabilization.
+        :param number_levels: Number of levels, with level 0 being the original frame.
+        :param alignment_points_sampling_stride: Stride in both coordinate directions used in
+                                                 computing deviations (so far not used)
+        :return: [shift_y, shift_x]: Total warp shift including contributions from all levels.
+        """
+
+        # Initialize the total warp shift (including contributions from all levels).
+        dy_warp = 0
+        dx_warp = 0
+        de_warp_shifts = [None] * number_levels
+
+        # Measure and accumulate shifts at all levels starting with the coarsest one.
+        for level in reversed(range(number_levels)):
+
+            # The "reference_box" already contains strided data. The current frame is only given in
+            # full resolution. At each level a strided window centered around the shifted AP position
+            # (including shifts from all previous levels) is compared with the reference box.
+            stride = 2 ** level
+            reference_box = alignment_point['reference_boxes'][level]
+
+            # Compute the AP position including shifts from all previous levels.
+            y_level = alignment_point['y_levels'][level] + dy_global - dy_warp
+            x_level = alignment_point['x_levels'][level] + dx_global - dx_warp
+            half_box_width = alignment_point['half_box_widths'][level]
+
+            # Initialize the global optimum with the value at dy=dx=0.
+            y_low = y_level - half_box_width
+            y_high = y_level + half_box_width
+            x_low = x_level - half_box_width
+            x_high = x_level + half_box_width
+            deviation_min = abs(
+                reference_box - frame[y_low:y_high:stride, x_low:x_high:stride]).sum()
+            dy_min = 0
+            dx_min = 0
+
+            # Go through a circle with radius 1 and compare the matches with the center match.
+            circle_1 = Miscellaneous.circle_around(dy_min, dx_min, 1)
+            for (dy, dx) in circle_1:
+                dy_strided = dy * stride
+                dx_strided = dx * stride
+                deviation = abs(
+                    reference_box - frame[y_low - dy_strided:y_high - dy_strided:stride,
+                                    x_low - dx_strided:x_high - dx_strided:stride]).sum()
+                # If the match is better, update the optimal point.
+                if deviation < deviation_min:
+                    deviation_min, dy_min, dx_min = deviation, dy_strided, dx_strided
+
+            # Include this level's shift in the total warp shift.
+            dy_warp += dy_min
+            dx_warp += dx_min
+            de_warp_shifts[level] = [dy_warp, dx_warp]
+
+        # Return the warp shifts for all levels.
+        return de_warp_shifts
+
+    @staticmethod
     def search_local_match_full(reference_box, frame, y_low, y_high, x_low, x_high,
                                     search_width,
                                     sampling_stride, dev_table):
