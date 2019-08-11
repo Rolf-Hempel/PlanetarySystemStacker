@@ -567,8 +567,8 @@ class Miscellaneous(object):
 
     @staticmethod
     def search_local_match_multilevel(alignment_point,
-                    frame, dy_global, dx_global, number_levels,
-                    alignment_points_sampling_stride):
+                    frame, dy_global, dx_global, number_levels, alignment_points_noise_levels,
+                    alignment_points_iterations, alignment_points_sampling_stride):
         """
         Measure the warp shift at various levels, starting with the coarsest one. At each level
         determine the best location in a circle of radius 1 around the optimum found at the
@@ -581,6 +581,10 @@ class Miscellaneous(object):
         :param dy_global: Global y shift measured in frame stabilization.
         :param dx_global: Global x shift measured in frame stabilization.
         :param number_levels: Number of levels, with level 0 being the original frame.
+        :param alignment_points_noise_levels: List, for each level: Width of Gaussian filter
+                                              to be applied to frame befor matching.
+        :param alignment_points_iterations: List, for each level: Number of iterations for AP
+                                            matching.
         :param alignment_points_sampling_stride: Stride in both coordinate directions used in
                                                  computing deviations (so far not used)
         :return: [shift_y, shift_x]: Total warp shift including contributions from all levels.
@@ -610,22 +614,43 @@ class Miscellaneous(object):
             y_high = y_level + half_box_width
             x_low = x_level - half_box_width
             x_high = x_level + half_box_width
-            deviation_min = abs(
-                reference_box - frame[y_low:y_high:stride, x_low:x_high:stride]).sum()
+            if level == 0:
+                deviation_min = abs(
+                    reference_box - frame[y_low:y_high:stride, x_low:x_high:stride]).sum()
+            else:
+                deviation_min = abs(
+                    reference_box - GaussianBlur(frame[y_low:y_high:stride, x_low:x_high:stride],
+                                                 (alignment_points_noise_levels[level],
+                                                  alignment_points_noise_levels[level]), 0)).sum()
             dy_min = 0
             dx_min = 0
 
-            # Go through a circle with radius 1 and compare the matches with the center match.
-            circle_1 = Miscellaneous.circle_around(dy_min, dx_min, 1)
-            for (dy, dx) in circle_1:
-                dy_strided = dy * stride
-                dx_strided = dx * stride
-                deviation = abs(
-                    reference_box - frame[y_low - dy_strided:y_high - dy_strided:stride,
-                                    x_low - dx_strided:x_high - dx_strided:stride]).sum()
-                # If the match is better, update the optimal point.
-                if deviation < deviation_min:
-                    deviation_min, dy_min, dx_min = deviation, dy_strided, dx_strided
+            for iteration in range(alignment_points_iterations[level]):
+                # Go through a circle with radius 1 and compare the matches with the center match.
+                circle_1 = Miscellaneous.circle_around(0, 0, 1)
+                deviation_min_1, dy_min_1, dx_min_1  = 1.e30, None, None
+                for (dy, dx) in circle_1:
+                    dy_strided = dy_min + dy * stride
+                    dx_strided = dx_min + dx * stride
+                    if level == 0:
+                        deviation = abs(
+                            reference_box - frame[y_low - dy_strided:y_high - dy_strided:stride,
+                                            x_low - dx_strided:x_high - dx_strided:stride]).sum()
+                    else:
+                        deviation = abs(
+                            reference_box - GaussianBlur(
+                                frame[y_low - dy_strided:y_high - dy_strided:stride,
+                                x_low - dx_strided:x_high - dx_strided:stride],
+                                (alignment_points_noise_levels[level],
+                                 alignment_points_noise_levels[level]), 0)).sum()
+                    # If the match is better, update the optimal point.
+                    if deviation < deviation_min_1:
+                        deviation_min_1, dy_min_1, dx_min_1 = deviation, dy_strided, dx_strided
+
+                if deviation_min_1 < deviation_min:
+                    deviation_min, dy_min, dx_min = deviation_min_1, dy_min_1, dx_min_1
+                else:
+                    break
 
             # Include this level's shift in the total warp shift.
             dy_warp += dy_min

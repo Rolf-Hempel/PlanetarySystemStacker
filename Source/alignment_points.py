@@ -723,7 +723,7 @@ class AlignmentPoints(object):
         self.update_image_window_signal = update_image_window_signal
         self.scale_factor = 3
         self.border = 2
-        self.image_delay = 8.
+        self.image_delay = 0.2
 
     def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
                                       de_warp=True):
@@ -809,6 +809,8 @@ class AlignmentPoints(object):
                 shift_pixel_levels = Miscellaneous.search_local_match_multilevel(alignment_point,
                     frame_mono_blurred, dy_global, dx_global,
                     self.configuration.alignment_points_number_levels,
+                    self.configuration.alignment_points_noise_levels,
+                    self.configuration.alignment_points_iterations,
                     self.configuration.alignment_points_sampling_stride)
                 # The full shift is contained in the level 0 entry.
                 shift_pixel = shift_pixel_levels[0]
@@ -846,9 +848,11 @@ class AlignmentPoints(object):
                             y_level = alignment_point['y_levels'][level] + dy_global - dy_warp
                             x_level = alignment_point['x_levels'][level] + dx_global - dx_warp
                             half_box_width = alignment_point['half_box_widths'][level]
-                            frame_stabilized = frame_mono_blurred[
-                                               y_level - half_box_width:y_level + half_box_width:stride,
-                                               x_level - half_box_width:x_level + half_box_width:stride]
+                            frame_stabilized = GaussianBlur(frame_mono_blurred[
+                                    y_level - half_box_width:y_level + half_box_width:stride,
+                                    x_level - half_box_width:x_level + half_box_width:stride],
+                                        (self.configuration.alignment_points_noise_levels[level],
+                                        self.configuration.alignment_points_noise_levels[level]), 0)
                             frame_stabilized = resize(frame_stabilized, None,
                                                       fx=float(self.scale_factor),
                                                       fy=float(self.scale_factor))
@@ -860,9 +864,11 @@ class AlignmentPoints(object):
                             dx_warp = shift_pixel_level[1]
                             y_level = alignment_point['y_levels'][level] + dy_global - dy_warp
                             x_level = alignment_point['x_levels'][level] + dx_global - dx_warp
-                            frame_dewarped = frame_mono_blurred[
-                                             y_level - half_box_width:y_level + half_box_width:stride,
-                                             x_level - half_box_width:x_level + half_box_width:stride]
+                            frame_dewarped = GaussianBlur(frame_mono_blurred[
+                                    y_level - half_box_width:y_level + half_box_width:stride,
+                                    x_level - half_box_width:x_level + half_box_width:stride],
+                                        (self.configuration.alignment_points_noise_levels[level],
+                                        self.configuration.alignment_points_noise_levels[level]), 0)
                             frame_dewarped = resize(frame_dewarped, None,
                                                     fx=float(self.scale_factor),
                                                     fy=float(self.scale_factor))

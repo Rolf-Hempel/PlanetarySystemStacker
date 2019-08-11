@@ -80,7 +80,7 @@ class Workflow(QtCore.QObject):
         self.protocol_file = None
 
         # Switch alignment point debugging on / off.
-        self.debug_AP = True
+        self.debug_AP = False
 
         # The following code works on Windows and Linux systems only. It is not necessary, though.
         try:
@@ -657,7 +657,17 @@ class Workflow(QtCore.QObject):
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start stacking " + str(self.alignment_points.stack_size) +
                                    " frames +++", self.attached_log_file)
-        self.stack_frames.stack_frames()
+        try:
+            self.stack_frames.stack_frames()
+        except Exception as e:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("Error: " + str(e) + ", continue with next job\n",
+                                       self.attached_log_file)
+            self.work_next_task_signal.emit("Next job")
+            # In debug mode: Close de-warp visualization window.
+            if self.debug_AP:
+                self.terminate_image_window_signal.emit()
+            return
 
         # In debug mode: Close de-warp visualization window.
         if self.debug_AP:

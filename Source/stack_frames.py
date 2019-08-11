@@ -310,7 +310,11 @@ class StackFrames(object):
                     de_warp=self.configuration.alignment_points_de_warp)
 
                 # Increment the counter corresponding to the 2D warp shift.
-                self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
+                try:
+                    self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
+                except:
+                    print ("Error: shift dy: " + str(shift_y) + ", dx: " + str(shift_x) +
+                           " too large for statistics vector.")
 
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
