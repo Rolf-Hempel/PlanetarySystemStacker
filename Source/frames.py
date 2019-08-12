@@ -404,8 +404,7 @@ class ImageReader(object):
     """
     The ImageReader deals with the import of frames from a list of single images. Frames can
     be read either consecutively, or at an arbitrary frame index. It is assumed that the
-    lexicographic order of file names corresponds to their chronological order. Eventually, all
-    common image types (such as .tiff, .png, .jpg) should be supported.
+    lexicographic order of file names corresponds to their chronological order.
     """
 
     def __init__(self):
@@ -448,7 +447,7 @@ class ImageReader(object):
                 # Remember to do the conversion when reading frames later on.
                 self.convert_to_grayscale = True
             else:
-                self.last_frame_read = imread(self.file_path_list[0], IMREAD_UNCHANGED)
+                self.last_frame_read = Frames.read_image(self.file_path_list[0])
 
             # Look up metadata.
             self.last_read = 0
@@ -1365,12 +1364,15 @@ class Frames(object):
 
         name, suffix = splitext(filename)
 
+        # Make sure files with extensions written in large print can be read as well.
+        suffix = suffix.lower()
+
         # Case FITS format:
         if suffix == '.fits':
             image = moveaxis(fits.getdata(filename, ext=0), 0, -1).copy()
 
-        # Case TIFF format:
-        elif suffix == '.tiff':
+        # Case other supported image formats:
+        elif suffix == '.tiff' or suffix == '.tif' or suffix == '.png' or suffix == '.jpg':
             input_image = imread(filename, IMREAD_UNCHANGED)
 
             # If color image, convert to RGB mode.
@@ -1380,7 +1382,8 @@ class Frames(object):
                 image = input_image
 
         else:
-            raise TypeError("Attempt to read image format other than 'tiff' or 'fits'")
+            raise TypeError("Attempt to read image format other than 'tiff', 'tif',"
+                            " '.png', '.jpg' or 'fits'")
 
         return image
 

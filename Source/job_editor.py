@@ -189,10 +189,10 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.job_types = []
         for job in self.job_names:
             if Path(job).is_file():
-                extension = Path(job).suffix
+                extension = Path(job).suffix.lower()
                 if extension in video_extensions:
                     self.job_types.append('video')
-                elif Path(job).suffix in image_extensions:
+                elif extension in image_extensions:
                     self.job_types.append('postproc')
                 else:
                     raise InternalError("Unsupported file type '" + extension + "' specified for job")
