@@ -80,8 +80,8 @@ class AlignmentPoints(object):
                 stride = 2**level
 
                 self.mean_frames.append(GaussianBlur(align_frames.mean_frame[::stride, ::stride].astype(uint16),
-                                           (self.configuration.frames_gauss_width,
-                                            self.configuration.frames_gauss_width), 0).astype(int32))
+                                           (self.configuration.alignment_points_mean_frame_noise[level],
+                                            self.configuration.alignment_points_mean_frame_noise[level]), 0).astype(int32))
 
         self.num_pixels_y = self.mean_frame.shape[0]
         self.num_pixels_x = self.mean_frame.shape[1]

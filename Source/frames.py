@@ -1370,7 +1370,7 @@ class Frames(object):
             image = moveaxis(fits.getdata(filename, ext=0), 0, -1).copy()
 
         # Case TIFF format:
-        elif suffix == '.tiff':
+        elif suffix == '.tiff' or suffix == '.tif' or suffix == '.png' or suffix == '.jpg':
             input_image = imread(filename, IMREAD_UNCHANGED)
 
             # If color image, convert to RGB mode.
@@ -1380,7 +1380,8 @@ class Frames(object):
                 image = input_image
 
         else:
-            raise TypeError("Attempt to read image format other than 'tiff' or 'fits'")
+            raise TypeError("Attempt to read image format other than 'tiff', 'tif',"
+                            " '.png', '.jpg' or 'fits'")
 
         return image
 
