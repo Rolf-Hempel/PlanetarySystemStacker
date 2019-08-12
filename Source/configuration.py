@@ -454,10 +454,10 @@ class Configuration(object):
         # factors.
         if self.alignment_points_method == "MultiLevel":
             self.alignment_points_number_levels = 2
-            self.alignment_points_box_factors = [1., 2.5, 1.5]
-            self.alignment_points_noise_levels = [1, 9, 7]
-            self.alignment_points_mean_frame_noise = [1, 5, 5]
-            self.alignment_points_iterations = [3, 3, 3]
+            self.alignment_points_box_factors = [1., 1.5, 1.5]
+            self.alignment_points_noise_levels = [1, 7, 5]
+            self.alignment_points_mean_frame_noise = [7, 7, 5]
+            self.alignment_points_iterations = [4, 3, 3]
 
         # Initialze the number of frames to be stacked. It will be computed from the corresponding
         # percentage. The user, however, can override this value with a (more precise) figure

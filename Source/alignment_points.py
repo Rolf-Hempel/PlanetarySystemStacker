@@ -74,14 +74,22 @@ class AlignmentPoints(object):
                                         self.configuration.frames_gauss_width), 0).astype(int32)
 
         if self.configuration.alignment_points_method == 'MultiLevel':
-            self.mean_frames = [self.mean_frame]
+            self.mean_frames = []
 
-            for level in range(1, self.configuration.alignment_points_number_levels + 1):
+            for level in range(0, self.configuration.alignment_points_number_levels):
                 stride = 2**level
 
                 self.mean_frames.append(GaussianBlur(align_frames.mean_frame[::stride, ::stride].astype(uint16),
                                            (self.configuration.alignment_points_mean_frame_noise[level],
                                             self.configuration.alignment_points_mean_frame_noise[level]), 0).astype(int32))
+
+            self.mean_frame = self.mean_frames[0]
+
+        else:
+            # Apply a low-pass filter on the mean frame as a preparation for shift detection.
+            self.mean_frame = GaussianBlur(align_frames.mean_frame.astype(uint16),
+                                           (self.configuration.frames_gauss_width,
+                                            self.configuration.frames_gauss_width), 0).astype(int32)
 
         self.num_pixels_y = self.mean_frame.shape[0]
         self.num_pixels_x = self.mean_frame.shape[1]
@@ -806,14 +814,22 @@ class AlignmentPoints(object):
 
             # Use the multi-level steepest descent search method.
             elif self.configuration.alignment_points_method == 'MultiLevel':
-                shift_pixel_levels = Miscellaneous.search_local_match_multilevel(alignment_point,
-                    frame_mono_blurred, dy_global, dx_global,
-                    self.configuration.alignment_points_number_levels,
-                    self.configuration.alignment_points_noise_levels,
-                    self.configuration.alignment_points_iterations,
-                    self.configuration.alignment_points_sampling_stride)
-                # The full shift is contained in the level 0 entry.
-                shift_pixel = shift_pixel_levels[0]
+                try:
+                    shift_pixel_levels = Miscellaneous.search_local_match_multilevel(alignment_point,
+                        frame_mono_blurred, dy_global, dx_global,
+                        self.configuration.alignment_points_number_levels,
+                        self.configuration.alignment_points_noise_levels,
+                        self.configuration.alignment_points_iterations,
+                        self.configuration.alignment_points_sampling_stride)
+                    # The full shift is contained in the level 0 entry.
+                    shift_pixel = shift_pixel_levels[0]
+                except:
+                    # Close to the boundary the multi-level method can fail. In this case switch
+                    # over to steepest descent.
+                    shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(reference_box,
+                        frame_mono_blurred, y_low + dy_global, y_high + dy_global, x_low + dx_global,
+                        x_high + dx_global, self.configuration.alignment_points_search_width,
+                        self.configuration.alignment_points_sampling_stride, self.dev_table)
 
             else:
                 raise NotSupportedError("The point shift computation method " +
