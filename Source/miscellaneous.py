@@ -477,7 +477,7 @@ class Miscellaneous(object):
         :param sampling_stride: Stride in both coordinate directions used in computing deviations
         :param dev_table: Scratch table to be used internally for storing intermediate results,
                           size: [2*search_width, 2*search_width], dtype=float32.
-        :return: ([shift_y, shift_x], [min_r]) with:
+        :return: ([shift_y, shift_x], [dev_r]) with:
                    shift_y, shift_x: shift values of minimum or [0, 0] if no optimum could be found.
                    [dev_r]: list of minimum deviations for all steps until a local minimum is found.
         """
@@ -587,7 +587,9 @@ class Miscellaneous(object):
                                             matching.
         :param alignment_points_sampling_stride: Stride in both coordinate directions used in
                                                  computing deviations (so far not used)
-        :return: [shift_y, shift_x]: Total warp shift including contributions from all levels.
+        :return: ([shift_y, shift_x], dev) with:
+                   shift_y, shift_x: Total warp shift including contributions from all levels.
+                   dev: Remaining deviation of shifted patch relative to reference frame.
         """
 
         # Initialize the total warp shift (including contributions from all levels).
@@ -657,8 +659,8 @@ class Miscellaneous(object):
             dx_warp += dx_min
             de_warp_shifts[level] = [dy_warp, dx_warp]
 
-        # Return the warp shifts for all levels.
-        return de_warp_shifts
+        # Return the warp shifts for all levels and remaining deviation.
+        return de_warp_shifts, deviation_min
 
     @staticmethod
     def search_local_match_full(reference_box, frame, y_low, y_high, x_low, x_high,

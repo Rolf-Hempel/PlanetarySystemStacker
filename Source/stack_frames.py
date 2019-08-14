@@ -305,7 +305,7 @@ class StackFrames(object):
 
                 # Compute the local warp shift for this frame.
                 self.my_timer.start('Stacking: compute AP shifts')
-                [shift_y, shift_x] = self.alignment_points.compute_shift_alignment_point(
+                [shift_y, shift_x], deviation = self.alignment_points.compute_shift_alignment_point(
                     frame_mono_blurred, frame_index, alignment_point_index,
                     de_warp=self.configuration.alignment_points_de_warp)
 

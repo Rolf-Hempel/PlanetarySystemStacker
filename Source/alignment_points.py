@@ -22,6 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 from glob import glob
 from time import time, sleep
+from decimal import Decimal
 
 import matplotlib.pyplot as plt
 from math import ceil
@@ -731,7 +732,7 @@ class AlignmentPoints(object):
         self.update_image_window_signal = update_image_window_signal
         self.scale_factor = 3
         self.border = 2
-        self.image_delay = 0.2
+        self.image_delay = 3.
 
     def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
                                       de_warp=True):
@@ -762,7 +763,9 @@ class AlignmentPoints(object):
         :param alignment_point_index: Index of the selected alignment point
         :param de_warp: If True, include local warp shift computation. If False, only apply
                         global frame shift.
-        :return: Local shift vector [dy, dx]
+        :return: ([dy, dx], deviation) with:
+                 [dy, dx]: Local shift vector.
+                 deviation: remaining difference of patch relative to reference frame.
         """
 
         alignment_point = self.alignment_points[alignment_point_index]
@@ -771,6 +774,9 @@ class AlignmentPoints(object):
         x_low = alignment_point['box_x_low']
         x_high = alignment_point['box_x_high']
         reference_box = alignment_point['reference_box']
+
+        # Initialize the remaining deviation to an impossibly large value.
+        deviation = 1.e30
 
         # The offsets dy and dx are caused by two effects: First, the mean frame is smaller
         # than the original frames. It only contains their intersection. And second, because the
@@ -811,11 +817,12 @@ class AlignmentPoints(object):
                     frame_mono_blurred, y_low + dy_global, y_high + dy_global, x_low + dx_global, x_high + dx_global,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride, self.dev_table)
+                deviation = dev_r[-1]
 
             # Use the multi-level steepest descent search method.
             elif self.configuration.alignment_points_method == 'MultiLevel':
                 try:
-                    shift_pixel_levels = Miscellaneous.search_local_match_multilevel(alignment_point,
+                    shift_pixel_levels, deviation = Miscellaneous.search_local_match_multilevel(alignment_point,
                         frame_mono_blurred, dy_global, dx_global,
                         self.configuration.alignment_points_number_levels,
                         self.configuration.alignment_points_noise_levels,
@@ -830,6 +837,7 @@ class AlignmentPoints(object):
                         frame_mono_blurred, y_low + dy_global, y_high + dy_global, x_low + dx_global,
                         x_high + dx_global, self.configuration.alignment_points_search_width,
                         self.configuration.alignment_points_sampling_stride, self.dev_table)
+                    deviation = dev_r[-1]
 
             else:
                 raise NotSupportedError("The point shift computation method " +
@@ -891,6 +899,9 @@ class AlignmentPoints(object):
                             putText(frame_dewarped,
                                     str(dy_warp) + ', ' + str(dx_warp),
                                     (5, 25), font, fontScale, fontColor, lineType)
+                            putText(frame_dewarped,
+                                    "{:.2E}".format(Decimal(str(deviation))),
+                                    (5, 45), font, fontScale, fontColor, lineType)
 
                             partial_images.append(frame_stabilized)
                             partial_images.append(reference_patch)
@@ -953,11 +964,11 @@ class AlignmentPoints(object):
                 # window.
                 sleep(self.image_delay)
 
-            # Return the computed shift vector.
-            return shift_pixel
+            # Return the computed shift vector and the remaining deviation.
+            return shift_pixel, float(deviation)
         else:
             # If no de-warping is computed, just return the zero vector.
-            return [0, 0]
+            return [0, 0], float(deviation)
 
     def show_alignment_points(self, image):
         """
