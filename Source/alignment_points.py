@@ -714,6 +714,7 @@ class AlignmentPoints(object):
             # Truncate the list to the number of frames to be stacked for each alignmeent point.
             alignment_point['best_frame_indices'] = sorted(range(len(alignment_point['frame_qualities'])),
                                                     key=alignment_point['frame_qualities'].__getitem__, reverse=True)[:self.stack_size]
+            alignment_point['best_frame_indices_consecutive'] = sorted(alignment_point['best_frame_indices'])
             # Add this alignment point to the AP lists of those frames where the AP is to be used.
             for frame_index in alignment_point['best_frame_indices']:
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)

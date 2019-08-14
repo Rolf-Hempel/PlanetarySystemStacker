@@ -273,22 +273,71 @@ class StackFrames(object):
         :return: -
         """
 
-        # First find out if there are holes between AP patches.
-        self.prepare_for_stack_blending()
-
         # Initialize the array for shift distribution statistics.
-        self.shift_distribution = full((self.configuration.alignment_points_search_width*2,), 0,
-                                          dtype=np_int)
+        self.shift_distribution = full((self.configuration.alignment_points_search_width * 2,), 0,
+                                       dtype=np_int)
 
         # If multi-level AP matching is selected, prepare the required level information for each
         # alignment point.
         if self.configuration.alignment_points_method == 'MultiLevel':
             self.alignment_points.set_reference_boxes()
 
+        for alignment_point in self.alignment_points.alignment_points:
+            alignment_point['shifts_y'] = []
+            alignment_point['shifts_x'] = []
+            alignment_point['deviations'] = []
+            alignment_point['frame_indices'] = []
+
+        # Go through the list of all frames.
+        for frame_index in range(self.frames.number):
+            frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
+            for alignment_point_index in self.frames.used_alignment_points[frame_index]:
+                alignment_point = self.alignment_points.alignment_points[alignment_point_index]
+
+                # Compute the local warp shift for this frame.
+                self.my_timer.start('Stacking: compute AP shifts')
+                [shift_y, shift_x], deviation = self.alignment_points.compute_shift_alignment_point(
+                    frame_mono_blurred, frame_index, alignment_point_index,
+                    de_warp=self.configuration.alignment_points_de_warp)
+                alignment_point['shifts_y'].append(shift_y)
+                alignment_point['shifts_x'].append(shift_x)
+                alignment_point['deviations'].append(deviation)
+                alignment_point['frame_indices'].append(frame_index)
+
+                # Increment the counter corresponding to the 2D warp shift.
+                try:
+                    self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
+                except:
+                    print ("Error: shift dy: " + str(shift_y) + ", dx: " + str(shift_x) +
+                           " too large for statistics vector.")
+
+        # Shorten the list of frames to be used at each alignment point.
+        factor = 0.5
+        self.alignment_points.stack_size = max(1, int(round(self.alignment_points.stack_size * factor)))
+
+        self.frames.reset_alignment_point_lists()
+        for alignment_point_index, alignment_point in enumerate(self.alignment_points.alignment_points):
+
+            # del alignment_point['best_frame_indices'][self.alignment_points.stack_size:]
+            index_list = sorted(
+                range(len(alignment_point['deviations'])),
+                key=alignment_point['deviations'].__getitem__, reverse=False)[:self.alignment_points.stack_size]
+            alignment_point['best_frame_indices'] = [alignment_point['frame_indices'][i] for i in index_list]
+            alignment_point['shifts_y'] = [alignment_point['shifts_y'][i] for i in index_list]
+            alignment_point['shifts_x'] = [alignment_point['shifts_x'][i] for i in index_list]
+
+            alignment_point['best_frame_indices_consecutive'] = sorted(
+                alignment_point['best_frame_indices'])
+            # Add this alignment point to the AP lists of those frames where the AP is to be used.
+            for frame_index in alignment_point['best_frame_indices']:
+                self.frames.used_alignment_points[frame_index].append(alignment_point_index)
+
+        # First find out if there are holes between AP patches.
+        self.prepare_for_stack_blending()
+
         # Go through the list of all frames.
         for frame_index in range(self.frames.number):
             frame = self.frames.frames(frame_index)
-            frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
 
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
             if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
@@ -302,19 +351,10 @@ class StackFrames(object):
             # Go through all alignment points for which this frame was found to be among the best.
             for alignment_point_index in self.frames.used_alignment_points[frame_index]:
                 alignment_point = self.alignment_points.alignment_points[alignment_point_index]
-
-                # Compute the local warp shift for this frame.
-                self.my_timer.start('Stacking: compute AP shifts')
-                [shift_y, shift_x], deviation = self.alignment_points.compute_shift_alignment_point(
-                    frame_mono_blurred, frame_index, alignment_point_index,
-                    de_warp=self.configuration.alignment_points_de_warp)
-
-                # Increment the counter corresponding to the 2D warp shift.
-                try:
-                    self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
-                except:
-                    print ("Error: shift dy: " + str(shift_y) + ", dx: " + str(shift_x) +
-                           " too large for statistics vector.")
+                frame_index_at_ap = alignment_point['best_frame_indices'].index(frame_index)
+                shift_y = alignment_point['shifts_y'][frame_index_at_ap]
+                shift_x = alignment_point['shifts_x'][frame_index_at_ap]
+                deviation = alignment_point['deviations'][frame_index_at_ap]
 
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
@@ -584,7 +624,7 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        names = 'Videos/short_video.avi'
+        names = 'Videos/2019-05-26-0115_4-L-Jupiter_ZWO ASI290MM Mini_short.avi'
     print(names)
 
     my_timer.create('Execution over all')
