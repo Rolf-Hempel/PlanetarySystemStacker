@@ -154,6 +154,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         QtWidgets.QWidget.__init__(self, parent)
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+
+        # This line is necessary to show the menubar on Linux. On Windows it does not hurt.
         self.ui.menubar.setNativeMenuBar(False)
 
         # Make sure that the progress widgets retain their size when hidden.
