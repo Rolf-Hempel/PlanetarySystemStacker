@@ -101,7 +101,8 @@ class Workflow(QtCore.QObject):
                     self.attached_log_file, precede_with_timestamp=True)
         except Exception as e:
             Miscellaneous.protocol(
-                "Warning: mkl_rt.dll / libmkl_rt.so does not work (not a Windows or Linux system?). "
+                "Warning: mkl_rt.dll / libmkl_rt.so does not work (not a Windows or Linux system, "
+                "or Intel Math Kernel Library not installed?). "
                 + str(e), self.attached_log_file, precede_with_timestamp=True)
 
         # Create the calibration object, used for potential flat / dark corrections.
