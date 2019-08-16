@@ -154,6 +154,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         QtWidgets.QWidget.__init__(self, parent)
         self.ui = Ui_MainWindow()
         self.ui.setupUi(self)
+        self.ui.menubar.setNativeMenuBar(False)
 
         # Make sure that the progress widgets retain their size when hidden.
         size_policy = self.ui.label_current_progress.sizePolicy()
