@@ -33,4 +33,4 @@ coll = COLLECT(exe,
                a.datas,
                strip=False,
                upx=True,
-               name='planetary_system_stacker')
+               name='PlanetarySystemStacker')
