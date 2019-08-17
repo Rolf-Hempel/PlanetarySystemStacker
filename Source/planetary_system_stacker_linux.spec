@@ -9,7 +9,7 @@ astropy_path, = astropy.__path__
 a = Analysis(['planetary_system_stacker.py'],
              pathex=['/home/rolf/Pycharm-Projects/PlanetarySystemStacker/Source'],
              binaries=[],
-             datas=[('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/Documentation/Icon/PSS-Icon-64.ico', '.' ),
+             datas=[('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/Documentation/Icon/PSS-Icon-64.jpg', '.' ),
              ('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/Documentation/PlanetarySystemStacker_User-Guide.pdf', '.' ),
              ('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/Source/Videos/*', 'Videos' ),
              (astropy_path, 'astropy')],
