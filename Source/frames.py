@@ -1347,7 +1347,7 @@ class Frames(object):
             if color:
                 image = moveaxis(flip(image, 0), -1, 0)
             else:
-                image = flip(image, axis=0)
+                image = flip(image, 0)
             hdu = fits.PrimaryHDU(image)
             hdu.header['CREATOR'] = 'PlanetarySystemStacker'
             hdu.writeto(filename, overwrite=True)
