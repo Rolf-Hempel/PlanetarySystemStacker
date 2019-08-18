@@ -38,7 +38,7 @@ from math import ceil
 from numpy import max as np_max
 from numpy import min as np_min
 from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, \
-    frombuffer, dtype, moveaxis
+    frombuffer, dtype, moveaxis, flip
 
 from configuration import Configuration
 from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error, \
@@ -1370,9 +1370,20 @@ class Frames(object):
         # Case FITS format:
         if suffix == '.fit' or suffix == '.fits':
             image = fits.getdata(filename)
+
+            # FITS output file from AS3 is 16bit depth file, even though BITPIX
+            # has been set to "-32", which would suggest "numpy.float32"
+            # https://docs.astropy.org/en/stable/io/fits/usage/image.html
+            # To process this data in PSS, do "round()" and convert numpy array to "np.uint16"
+            if image.dtype == '>f4':
+                image = image.round().astype(uint16)
+
             # If color image, move axis to be able to process the content
             if len(image.shape) == 3:
                 image = moveaxis(image, 0, -1).copy()
+
+            # Flip image horizontally to recover orignal orientation
+            image = flip(image, axis=0)
 
         # Case other supported image formats:
         elif suffix == '.tiff' or suffix == '.tif' or suffix == '.png' or suffix == '.jpg':

@@ -360,13 +360,6 @@ class Workflow(QtCore.QObject):
             # Convert 8 bit to 16 bit.
             if self.postproc_input_image.dtype == uint8:
                 self.postproc_input_image = self.postproc_input_image.astype(uint16) * 256
-
-            # FITS output file from AS3 is 16bit depth file, even though BITPIX
-            # has been set to "-32", which would suggest "numpy.float32"
-            # https://docs.astropy.org/en/stable/io/fits/usage/image.html
-            # To process this data in PSS, do "round()" and convert numpy array to "np.uint16"
-            elif self.postproc_input_image.dtype == '>f4':
-                self.postproc_input_image = self.postproc_input_image.round().astype(uint16)
             self.work_next_task_signal.emit("Postprocessing")
 
     @QtCore.pyqtSlot()
