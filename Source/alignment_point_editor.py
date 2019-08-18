@@ -717,7 +717,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
 
         # If the mean frame type is not uint8, values correspond to 16bit resolution.
         if align_frames.mean_frame.dtype != uint8:
-            self.mean_frame = align_frames.mean_frame[:,:]/256.
+            self.mean_frame = align_frames.mean_frame / 256
         else:
             self.mean_frame = align_frames.mean_frame
 

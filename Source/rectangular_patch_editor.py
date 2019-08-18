@@ -370,7 +370,7 @@ class RectangularPatchEditorWidget(QtWidgets.QFrame, Ui_rectangular_patch_editor
         # Convert the frame into uint8 format. If the frame type is uint16, values
         # correspond to 16bit resolution.
         if frame.dtype == uint16 or frame.dtype == int32:
-            self.frame = (frame[:, :] / 256.).astype(uint8)
+            self.frame = (frame / 256).astype(uint8)
         elif frame.dtype == uint8:
             self.frame = frame
         else:
