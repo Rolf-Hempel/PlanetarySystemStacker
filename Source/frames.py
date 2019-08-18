@@ -1368,8 +1368,11 @@ class Frames(object):
         suffix = suffix.lower()
 
         # Case FITS format:
-        if suffix == '.fits':
-            image = moveaxis(fits.getdata(filename, ext=0), 0, -1).copy()
+        if suffix == '.fit' or suffix == '.fits':
+            image = fits.getdata(filename)
+            # If color image, move axis to be able to process the content
+            if len(image.shape) == 3:
+                image = moveaxis(image, 0, -1).copy()
 
         # Case other supported image formats:
         elif suffix == '.tiff' or suffix == '.tif' or suffix == '.png' or suffix == '.jpg':
@@ -1383,7 +1386,7 @@ class Frames(object):
 
         else:
             raise TypeError("Attempt to read image format other than 'tiff', 'tif',"
-                            " '.png', '.jpg' or 'fits'")
+                            " '.png', '.jpg' or 'fit', 'fits'")
 
         return image
 
