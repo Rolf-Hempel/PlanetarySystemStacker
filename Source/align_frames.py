@@ -453,6 +453,13 @@ class AlignFrames(object):
                     self.intersection_shape[1][0] - shifts[idx][1]:
                     self.intersection_shape[1][1] - shifts[idx][1]]
 
+            # for idx in range(self.frames.number-1, self.frames.number-1-self.average_frame_number, -1):
+            #     self.mean_frame += self.frames.frames_mono(idx) \
+            #         [self.intersection_shape[0][0] - self.frame_shifts[idx][0]:
+            #         self.intersection_shape[0][1] - self.frame_shifts[idx][0],
+            #         self.intersection_shape[1][0] - self.frame_shifts[idx][1]:
+            #         self.intersection_shape[1][1] - self.frame_shifts[idx][1]]
+
         # Compute the mean frame by dividing by the number of frames, and convert values to 16bit.
         if self.frames.dt0 == uint8:
             scaling = 256. / self.average_frame_number
