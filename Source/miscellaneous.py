@@ -57,8 +57,8 @@ class Miscellaneous(object):
         """
 
         # Compute for each point the local gradient in both coordinate directions.
-        dx = diff(frame)[:, :]
-        dy = diff(frame, axis=0)[:, :]
+        dx = diff(frame)
+        dy = diff(frame, axis=0)
 
         # Compute the sharpness per coordinate direction as the 1-norm of point values.
         sharpness_x = average(np_abs(dx))
@@ -103,7 +103,7 @@ class Miscellaneous(object):
         stride_2 = 2 * stride
 
         # Compute a mask for all pixels which are bright enough (to avoid background noise).
-        mask = frame[:, :] > black_threshold
+        mask = frame > black_threshold
         mask_fraction = mask.sum() / frame_size
 
         # If most pixels are bright enough, compensate for different pixel counts.

@@ -32,7 +32,7 @@ from PyQt5 import QtCore
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
     convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED, \
-    COLOR_BayerRG2RGB, COLOR_BayerGR2RGB, COLOR_BayerGB2RGB, COLOR_BayerBG2RGB
+    COLOR_BayerRG2RGB, COLOR_BayerGR2RGB, COLOR_BayerGB2RGB, COLOR_BayerBG2RGB, flip
 from cv2 import mean as cv_mean
 from math import ceil
 from numpy import max as np_max
@@ -1343,10 +1343,12 @@ class Frames(object):
                 imwrite(str(filename), image)
 
         elif Path(filename).suffix == '.fits':
+            # Flip image horizontally to preserve orientation
             if color:
-                hdu = fits.PrimaryHDU(moveaxis(cvtColor(image, COLOR_RGB2BGR), -1, 0))
+                image = moveaxis(flip(image, 0), -1, 0)
             else:
-                hdu = fits.PrimaryHDU(image)
+                image = flip(image, 0)
+            hdu = fits.PrimaryHDU(image)
             hdu.header['CREATOR'] = 'PlanetarySystemStacker'
             hdu.writeto(filename, overwrite=True)
 
@@ -1368,8 +1370,22 @@ class Frames(object):
         suffix = suffix.lower()
 
         # Case FITS format:
-        if suffix == '.fits':
-            image = moveaxis(fits.getdata(filename, ext=0), 0, -1).copy()
+        if suffix == '.fit' or suffix == '.fits':
+            image = fits.getdata(filename)
+
+            # FITS output file from AS3 is 16bit depth file, even though BITPIX
+            # has been set to "-32", which would suggest "numpy.float32"
+            # https://docs.astropy.org/en/stable/io/fits/usage/image.html
+            # To process this data in PSS, do "round()" and convert numpy array to "np.uint16"
+            if image.dtype == '>f4':
+                image = image.round().astype(uint16)
+
+            # If color image, move axis to be able to process the content
+            if len(image.shape) == 3:
+                image = moveaxis(image, 0, -1).copy()
+
+            # Flip image horizontally to recover orignal orientation
+            image = flip(image, 0)
 
         # Case other supported image formats:
         elif suffix == '.tiff' or suffix == '.tif' or suffix == '.png' or suffix == '.jpg':
@@ -1383,7 +1399,7 @@ class Frames(object):
 
         else:
             raise TypeError("Attempt to read image format other than 'tiff', 'tif',"
-                            " '.png', '.jpg' or 'fits'")
+                            " '.png', '.jpg' or 'fit', 'fits'")
 
         return image
 

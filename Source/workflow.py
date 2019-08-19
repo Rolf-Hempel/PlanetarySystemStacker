@@ -29,9 +29,7 @@ from os.path import splitext, join
 import gc
 import psutil
 from PyQt5 import QtCore
-from cv2 import imread, cvtColor, COLOR_BGR2RGB, COLOR_GRAY2RGB, COLOR_RGB2GRAY
-from numpy import uint16, uint8, ndarray, moveaxis
-from astropy.io import fits
+from numpy import uint16, uint8
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
