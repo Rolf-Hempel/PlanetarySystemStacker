@@ -999,10 +999,61 @@ class Miscellaneous(object):
             logfile.write(output_string + "\n")
 
     @staticmethod
+    def print_stacking_parameters(configuration, logfile):
+        """
+        Print a table with all stacking parameters.
+
+        :param configuration: Object holding all configuration parameters.
+        :param logfile: logfile or None (no logging)
+        :return: -
+        """
+
+        # Compile all parameters and their values to be printed.
+        parameters = [["Noise level (add Gaussian blur)", str(configuration.frames_gauss_width)],
+                      ["Frame stabilization mode", configuration.align_frames_mode]]
+
+        # The following parameters are only active in "Surface" mode.
+        if configuration.align_frames_mode == "Surface":
+            parameters = parameters + [
+                ["Automatic frame stabilization", str(configuration.align_frames_automation)],
+                ["Stabilization patch size (% of frame size)",
+                 str(int(round(100. / configuration.align_frames_rectangle_scale_factor)))],
+                ["Stabilization search width (pixels)",
+                 str(configuration.align_frames_search_width)]]
+
+        # Continue with general parameters.
+        parameters = parameters + [["Percentage of best frames for reference frame computation",
+                                    str(configuration.align_frames_average_frame_percent)],
+                                   ["Alignment box width (pixels)",
+                                    str(2 * configuration.alignment_points_half_box_width)],
+                                   ["Max. alignment search width (pixels)",
+                                    str(configuration.alignment_points_search_width)],
+                                   ["Minimum structure",
+                                    str(configuration.alignment_points_structure_threshold)],
+                                   ["Minimum brightness",
+                                    str(configuration.alignment_points_brightness_threshold)],
+                                   ["Percentage of best frames to be stacked",
+                                    str(configuration.alignment_points_frame_percent)]
+                                   ]
+
+        output_string = "\n           Stacking parameters:                                         | Value   |\n" \
+                        "           ------------------------------------------------------------------------" \
+                        "\n          "
+
+        # Extend the output string with a line for every parameter to be printed.
+        for line in parameters:
+            output_string += " {0:60s} | {1:8s}|\n          ".format(line[0], line[1])
+
+        # Write the complete table.
+        Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
+
+    @staticmethod
     def print_postproc_parameters(layers, logfile):
         """
         Print a table with postprocessing layer info for the selected postprocessing version.
 
+        :param layers: Object holding postprocessing parameters for all active layers.
+        :param logfile: logfile or None (no logging)
         :return: -
         """
 

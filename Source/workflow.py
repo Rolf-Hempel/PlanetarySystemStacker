@@ -255,6 +255,9 @@ class Workflow(QtCore.QObject):
         self.my_timer.create('Execution over all')
 
         if self.job_type == 'stacking':
+            # Write parameters to the protocol.
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.print_stacking_parameters(self.configuration, self.attached_log_file)
             # Decide on the objects to be buffered, depending on configuration parameter.
             buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian = \
                 Frames.set_buffering(self.configuration.global_parameters_buffering_level)
