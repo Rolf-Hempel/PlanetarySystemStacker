@@ -1344,10 +1344,9 @@ class Frames(object):
 
         elif Path(filename).suffix == '.fits':
             # Flip image horizontally to preserve orientation
+            image = flip(image, 0)
             if color:
-                image = moveaxis(flip(image, 0), -1, 0)
-            else:
-                image = flip(image, 0)
+                image = moveaxis(image, -1, 0)
             hdu = fits.PrimaryHDU(image)
             hdu.header['CREATOR'] = 'PlanetarySystemStacker'
             hdu.writeto(filename, overwrite=True)
