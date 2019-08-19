@@ -1369,7 +1369,7 @@ class Frames(object):
         suffix = suffix.lower()
 
         # Case FITS format:
-        if suffix == '.fit' or suffix == '.fits':
+        if suffix in ('.fit', '.fits'):
             image = fits.getdata(filename)
 
             # FITS output file from AS3 is 16bit depth file, even though BITPIX
@@ -1387,7 +1387,7 @@ class Frames(object):
             image = flip(image, 0)
 
         # Case other supported image formats:
-        elif suffix == '.tiff' or suffix == '.tif' or suffix == '.png' or suffix == '.jpg':
+        elif suffix in ('.tiff', '.tif', '.png', '.jpg'):
             input_image = imread(filename, IMREAD_UNCHANGED)
 
             # If color image, convert to RGB mode.
