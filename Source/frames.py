@@ -22,6 +22,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 import datetime
 import struct
+import PIL
 from glob import glob
 from os import path, remove, listdir, stat
 from os.path import splitext
@@ -38,7 +39,7 @@ from math import ceil
 from numpy import max as np_max
 from numpy import min as np_min
 from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, \
-    frombuffer, dtype, moveaxis
+    frombuffer, dtype, moveaxis, array
 
 from configuration import Configuration
 from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error, \
@@ -1389,13 +1390,15 @@ class Frames(object):
         # Case other supported image formats:
         elif suffix in ('.tiff', '.tif', '.png', '.jpg'):
             input_image = imread(filename, IMREAD_UNCHANGED)
-
-            # If color image, convert to RGB mode.
-            if len(input_image.shape) == 3:
-                image = cvtColor(input_image, COLOR_BGR2RGB)
+            if input_image is not None:
+                # If color image, convert to RGB mode.
+                if len(input_image.shape) == 3:
+                    image = cvtColor(input_image, COLOR_BGR2RGB)
+                else:
+                    image = input_image
             else:
-                image = input_image
-
+                # PIL imports the image data in RGB, so do not need to do BGR2RGB
+                image = array(PIL.Image.open(filename))
         else:
             raise TypeError("Attempt to read image format other than 'tiff', 'tif',"
                             " '.png', '.jpg' or 'fit', 'fits'")
