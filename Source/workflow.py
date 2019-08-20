@@ -575,7 +575,7 @@ class Workflow(QtCore.QObject):
     def execute_set_roi(self, y_min, y_max, x_min, x_max):
 
         self.set_status_bar_processing_phase("setting the ROI")
-        if self.configuration.global_parameters_protocol_level > 0 and y_min == 0 and y_max == 0:
+        if self.configuration.global_parameters_protocol_level > 0 and y_min != 0 or y_max != 0:
             Miscellaneous.protocol("+++ Start setting a ROI and computing a new average frame +++",
                                    self.attached_log_file)
         self.my_timer.create_no_check('Setting ROI and new reference')
