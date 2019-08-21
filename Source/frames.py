@@ -442,24 +442,20 @@ class ImageReader(object):
         try:
             self.frame_count = len(self.file_path_list)
 
+            self.last_frame_read = Frames.read_image(self.file_path_list[0])
+
             if convert_to_grayscale:
-                self.last_frame_read = imread(self.file_path_list[0], IMREAD_GRAYSCALE)
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
                 # Remember to do the conversion when reading frames later on.
                 self.convert_to_grayscale = True
-            else:
-                self.last_frame_read = Frames.read_image(self.file_path_list[0])
 
             # Look up metadata.
             self.last_read = 0
             self.shape = self.last_frame_read.shape
             self.color = (len(self.shape) == 3)
             self.dtype = self.last_frame_read.dtype
-        except:
-            raise IOError("Error in reading first frame")
-
-        # If in color mode, swap B and R channels to convert from cv2 to standard RGB.
-        if self.color:
-            self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
+        except Exception as ex:
+            raise IOError("Error in reading first frame: " + str(ex))
 
         self.opened = True
         self.just_opened = True
@@ -509,12 +505,9 @@ class ImageReader(object):
         # A new frame has to be read. First check if the index is not out of bounds.
         if 0 <= self.last_read < self.frame_count:
             try:
+                self.last_frame_read = Frames.read_image(self.file_path_list[self.last_read])
                 if self.convert_to_grayscale:
-                    self.last_frame_read = imread(self.file_path_list[self.last_read],
-                                                  IMREAD_GRAYSCALE)
-                else:
-                    self.last_frame_read = imread(self.file_path_list[self.last_read],
-                                                  IMREAD_UNCHANGED)
+                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
             except:
                 raise IOError("Error in reading image frame, index: " + str(index))
         else:
