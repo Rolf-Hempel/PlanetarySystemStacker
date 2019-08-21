@@ -124,7 +124,7 @@ class Workflow(QtCore.QObject):
             #     Miscellaneous.protocol("           A non-matching master flat was de-activated",
             #         self.attached_log_file, precede_with_timestamp=False)
             self.master_dark_created_signal.emit(True)
-        except Error as e:
+        except Exception as e:
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("           Error in creating master dark frame: " + str(e),
                                        self.attached_log_file, precede_with_timestamp=False)
@@ -358,7 +358,20 @@ class Workflow(QtCore.QObject):
 
         # Job type is 'postproc'.
         else:
-            self.postproc_input_image = Frames.read_image(self.postproc_input_name)
+            try:
+                self.postproc_input_image = Frames.read_image(self.postproc_input_name)
+            except Error as e:
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
+                                           self.attached_log_file)
+                self.work_next_task_signal.emit("Next job")
+                return
+            except Exception as e:
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("Error: " + str(e) + ", continue with next job\n",
+                                           self.attached_log_file)
+                self.work_next_task_signal.emit("Next job")
+                return
 
             # Convert 8 bit to 16 bit.
             if self.postproc_input_image.dtype == uint8:

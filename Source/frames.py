@@ -455,7 +455,7 @@ class ImageReader(object):
             self.color = (len(self.shape) == 3)
             self.dtype = self.last_frame_read.dtype
         except Exception as ex:
-            raise IOError("Error in reading first frame: " + str(ex))
+            raise IOError("Reading first frame: " + str(ex))
 
         self.opened = True
         self.just_opened = True
@@ -508,11 +508,11 @@ class ImageReader(object):
                 self.last_frame_read = Frames.read_image(self.file_path_list[self.last_read])
                 if self.convert_to_grayscale:
                     self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
-            except:
-                raise IOError("Error in reading image frame, index: " + str(index))
+            except Exception as ex:
+                raise IOError("Reading image with index: " + str(index) + ", " + str(ex))
         else:
-            raise ArgumentError("Error in reading image frame, index: " + str(index) +
-                                " is out of bounds")
+            raise ArgumentError("Reading image with index: " + str(index) +
+                                ", index is out of bounds")
 
         # Check if the metadata match.
         shape = self.last_frame_read.shape
@@ -666,7 +666,12 @@ class Calibration(QtCore.QObject):
 
         # Create the master frame or read it from a file.
         if load_from_file:
-            self.master_dark_frame = Frames.read_image(dark_name)
+            try:
+                self.master_dark_frame = Frames.read_image(dark_name)
+            except Exception as e:
+                self.report_calibration_error_signal.emit("Error: " + str(e))
+                return
+
             if self.master_dark_frame.dtype == uint8:
                 self.master_dark_frame = (self.master_dark_frame * 256).astype(uint16)
         else:
@@ -711,7 +716,12 @@ class Calibration(QtCore.QObject):
 
         # Create the master frame or read it from a file.
         if load_from_file:
-            self.master_flat_frame = Frames.read_image(flat_name)
+            try:
+                self.master_flat_frame = Frames.read_image(flat_name)
+            except Exception as e:
+                self.report_calibration_error_signal.emit("Error: " + str(e))
+                return
+
             if self.master_flat_frame.dtype == uint8:
                 self.master_flat_frame = (self.master_flat_frame * 256).astype(uint16)
         else:
@@ -1382,6 +1392,8 @@ class Frames(object):
         # Case other supported image formats:
         elif suffix in ('.tiff', '.tif', '.png', '.jpg'):
             input_image = imread(filename, IMREAD_UNCHANGED)
+            if input_image is None:
+                raise IOError("Cannot read image file. Possible cause: Path contains non-ascii characters")
 
             # If color image, convert to RGB mode.
             if len(input_image.shape) == 3:
