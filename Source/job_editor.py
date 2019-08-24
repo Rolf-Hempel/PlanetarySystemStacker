@@ -81,7 +81,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.setObjectName("configuration_editor")
 
-        self.setFixedSize(900, 600)
+        # The following line was deactivated. Otherwise the instructions under the joblist
+        # would not show completely on full HD monitors.
+        # self.setFixedSize(900, 600)
 
         self.parent_gui = parent_gui
         self.configuration = self.parent_gui.configuration
