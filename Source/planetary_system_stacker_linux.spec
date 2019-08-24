@@ -29,7 +29,7 @@ exe = EXE(pyz,
           debug=False,
           strip=False,
           upx=True,
-          console=False )
+          console=True )   # To get rid of the console window, change value to False.
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,
