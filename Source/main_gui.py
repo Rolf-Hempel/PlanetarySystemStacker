@@ -2,12 +2,11 @@
 
 # Form implementation generated from reading ui file 'main_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12
+# Created by: PyQt5 UI code generator 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 
 class Ui_MainWindow(object):
     def setupUi(self, MainWindow):
@@ -106,6 +105,8 @@ class Ui_MainWindow(object):
         self.menuEdit.setObjectName("menuEdit")
         self.menuCalibrate = QtWidgets.QMenu(self.menubar)
         self.menuCalibrate.setObjectName("menuCalibrate")
+        self.menuAbout_PSS = QtWidgets.QMenu(self.menubar)
+        self.menuAbout_PSS.setObjectName("menuAbout_PSS")
         MainWindow.setMenuBar(self.menubar)
         self.statusBar = QtWidgets.QStatusBar(MainWindow)
         self.statusBar.setObjectName("statusBar")
@@ -140,6 +141,8 @@ class Ui_MainWindow(object):
         self.actionCreate_new_master_dark_frame.setObjectName("actionCreate_new_master_dark_frame")
         self.actionCreate_new_master_flat_frame = QtWidgets.QAction(MainWindow)
         self.actionCreate_new_master_flat_frame.setObjectName("actionCreate_new_master_flat_frame")
+        self.actionAbout = QtWidgets.QAction(MainWindow)
+        self.actionAbout.setObjectName("actionAbout")
         self.menuFile.addAction(self.actionLoad_video_directory)
         self.menuFile.addSeparator()
         self.menuFile.addAction(self.actionSave)
@@ -157,9 +160,11 @@ class Ui_MainWindow(object):
         self.menuCalibrate.addSeparator()
         self.menuCalibrate.addAction(self.actionCreate_new_master_dark_frame)
         self.menuCalibrate.addAction(self.actionCreate_new_master_flat_frame)
+        self.menuAbout_PSS.addAction(self.actionAbout)
         self.menubar.addAction(self.menuFile.menuAction())
         self.menubar.addAction(self.menuEdit.menuAction())
         self.menubar.addAction(self.menuCalibrate.menuAction())
+        self.menubar.addAction(self.menuAbout_PSS.menuAction())
 
         self.retranslateUi(MainWindow)
         self.comboBox_back.setCurrentIndex(-1)
@@ -183,6 +188,7 @@ class Ui_MainWindow(object):
         self.menuFile.setTitle(_translate("MainWindow", "File"))
         self.menuEdit.setTitle(_translate("MainWindow", "Edit"))
         self.menuCalibrate.setTitle(_translate("MainWindow", "Calibrate"))
+        self.menuAbout_PSS.setTitle(_translate("MainWindow", "Info"))
         self.actionLoad_video_directory.setText(_translate("MainWindow", "Open"))
         self.actionLoad_config.setText(_translate("MainWindow", "Load configuration"))
         self.actionLoad_config.setToolTip(_translate("MainWindow", "Load configuration from \".pss\" file"))
@@ -200,5 +206,5 @@ class Ui_MainWindow(object):
         self.actionLoad_master_flat_frame.setText(_translate("MainWindow", "Load master flat frame"))
         self.actionCreate_new_master_dark_frame.setText(_translate("MainWindow", "Create new master dark frame"))
         self.actionCreate_new_master_flat_frame.setText(_translate("MainWindow", "Create new master flat frame"))
-
+        self.actionAbout.setText(_translate("MainWindow", "About PSS"))
 

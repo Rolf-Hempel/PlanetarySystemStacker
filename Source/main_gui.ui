@@ -267,9 +267,16 @@
     <addaction name="actionCreate_new_master_dark_frame"/>
     <addaction name="actionCreate_new_master_flat_frame"/>
    </widget>
+   <widget class="QMenu" name="menuAbout_PSS">
+    <property name="title">
+     <string>Info</string>
+    </property>
+    <addaction name="actionAbout"/>
+   </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
    <addaction name="menuCalibrate"/>
+   <addaction name="menuAbout_PSS"/>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
   <action name="actionLoad_video_directory">
@@ -351,6 +358,11 @@
   <action name="actionCreate_new_master_flat_frame">
    <property name="text">
     <string>Create new master flat frame</string>
+   </property>
+  </action>
+  <action name="actionAbout">
+   <property name="text">
+    <string>About PSS</string>
    </property>
   </action>
  </widget>

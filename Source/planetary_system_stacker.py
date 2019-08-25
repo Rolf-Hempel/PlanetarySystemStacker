@@ -23,10 +23,16 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 
 """
 
+import os
+import platform
 from os import remove
 from pathlib import Path
 from sys import exit, argv
 
+import cv2
+import matplotlib
+import numpy as np
+import psutil
 from PyQt5 import QtWidgets, QtCore, QtGui
 from numpy import uint8, uint16
 
@@ -34,6 +40,7 @@ from alignment_point_editor import AlignmentPointEditorWidget
 from alignment_points import AlignmentPoints
 from configuration import Configuration
 from configuration_editor import ConfigurationEditor
+from exceptions import NotSupportedError
 from frame_viewer import FrameViewerWidget
 from frames import Frames
 from job_editor import JobEditor, FileDialog
@@ -43,7 +50,6 @@ from postproc_editor import PostprocEditorWidget
 from rectangular_patch_editor import RectangularPatchEditorWidget
 from shift_distribution_viewer import ShiftDistributionViewerWidget
 from workflow import Workflow
-from exceptions import NotSupportedError
 
 
 class DisplayImage(QtWidgets.QGraphicsView):
@@ -206,6 +212,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.actionLoad_master_flat_frame.triggered.connect(self.load_master_flat)
         self.ui.actionCreate_new_master_dark_frame.triggered.connect(self.create_master_dark)
         self.ui.actionCreate_new_master_flat_frame.triggered.connect(self.create_master_flat)
+        self.ui.actionAbout.triggered.connect(self.about_pss)
 
         # Create the workflow thread and start it.
         self.thread = QtCore.QThread()
@@ -1158,6 +1165,46 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         """
 
         self.ui.statusBar.showMessage(self.ui.statusBar.currentMessage() + append_message)
+
+    def about_pss(self):
+
+        USER = os.environ['USERNAME']
+        PC = platform.node()
+        OS = '{0} {1} {2}'.format(platform.system(), platform.release(), platform.architecture()[0])
+        PYTHON_VERSION = platform.python_version()
+        QT_VERSION = QtCore.qVersion()
+        CPU = psutil.cpu_count()
+        MEMORY = psutil.virtual_memory()[0] / 1024 ** 3
+        MATPLOTLIB_VERSION = matplotlib.__version__
+        OPENCV_VERSION = cv2.__version__
+        NUMPY_VERSION = np.__version__
+
+        CONTENT = ('''       {0}
+        \n
+        System overview:
+        PC: {2}
+        CPU Cores: {9}
+        Memory: {10:.1f} [GB]
+        OS: {3}
+        User: {1}
+        \n
+        Software versions used:
+        Python: {4}
+        Qt: {5}
+        Matplotlib: {6}
+        OpenCV: {7}
+        Numpy: {8}'''.format(self.configuration.global_parameters_version, USER, PC, OS,
+                             PYTHON_VERSION, QT_VERSION,
+                             MATPLOTLIB_VERSION, OPENCV_VERSION, NUMPY_VERSION, CPU,
+                             MEMORY))
+
+        msgBox = QtWidgets.QMessageBox()
+        msgBox.setIcon(QtWidgets.QMessageBox.Information)
+        msgBox.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
+        msgBox.setText(CONTENT)
+        msgBox.setWindowTitle("About PlanetarySystemStacker")
+        msgBox.setStandardButtons(QtWidgets.QMessageBox.Ok)
+        msgBox.exec()
 
     def closeEvent(self, event=None):
         """
