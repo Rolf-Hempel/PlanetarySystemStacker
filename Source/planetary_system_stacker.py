@@ -24,6 +24,7 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 """
 
 import os
+import getpass
 import platform
 from os import remove
 from pathlib import Path
@@ -1168,7 +1169,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
     def about_pss(self):
 
-        USER = os.environ['USERNAME']
+        USER = getpass.getuser()
         PC = platform.node()
         OS = '{0} {1} {2}'.format(platform.system(), platform.release(), platform.architecture()[0])
         PYTHON_VERSION = platform.python_version()
