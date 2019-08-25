@@ -25,14 +25,13 @@ from os import path, remove
 from pathlib import Path
 from time import time
 
-import matplotlib.pyplot as plt
 import numpy as np
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs
 from scipy import misc
 
 from configuration import Configuration
-from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError
+from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error
 # from frames import Frames
 
 
@@ -236,9 +235,7 @@ class FramesOld(object):
         """
 
         # For every frame initialize the list with used alignment points.
-        self.used_alignment_points = []
-        for frame_index in range(self.number):
-            self.used_alignment_points.append([])
+        self.used_alignment_points = [[] for frame_index in range(self.number)]
 
     def add_monochrome(self, color):
         """
@@ -373,7 +370,7 @@ if __name__ == "__main__":
                                convert_to_grayscale=convert_to_grayscale)
         print("Frames old: Number of images read: " + str(frames_old.number))
         print("Image shape: " + str(frames_old.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
     end = time()
@@ -393,7 +390,7 @@ if __name__ == "__main__":
     #                     buffer_laplacian=False)
     #     print("\nFrames: Number of images: " + str(frames.number))
     #     print("Image shape: " + str(frames.shape))
-    # except Exception as e:
+    # except Error as e:
     #     print("Error: " + e.message)
     #     exit()
     #

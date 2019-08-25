@@ -24,11 +24,12 @@ from glob import glob
 from time import time
 from numpy import array, full
 import matplotlib.pyplot as plt
+from cv2 import meanStdDev
 
 from configuration import Configuration
 from frames import Frames
 from miscellaneous import Miscellaneous
-from exceptions import NotSupportedError
+from exceptions import NotSupportedError, Error
 
 
 class RankFrames(object):
@@ -82,7 +83,7 @@ class RankFrames(object):
         if method != Miscellaneous.local_contrast_laplace:
             for frame_index in range(self.frames.number):
                 frame = self.frames.frames_mono_blurred(frame_index)
-                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
                                               int((frame_index / self.number) * 100.))
                 self.frame_ranks.append(method(frame, self.configuration.rank_frames_pixel_stride))
@@ -90,16 +91,15 @@ class RankFrames(object):
             for frame_index in range(self.frames.number):
                 frame = self.frames.frames_mono_blurred_laplacian(frame_index)
                 # self.frame_ranks.append(mean((frame - frame.mean())**2))
-                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
                                               int((frame_index / self.number) * 100.))
-                self.frame_ranks.append(frame.var())
+                self.frame_ranks.append(meanStdDev(frame)[1][0][0])
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank all frames", 100)
         # Sort the frame indices in descending order of quality.
-        self.quality_sorted_indices = [b[0] for b in sorted(enumerate(self.frame_ranks),
-                                                            key=lambda i: i[1], reverse=True)]
+        self.quality_sorted_indices = sorted(range(len(self.frame_ranks)), key=self.frame_ranks.__getitem__, reverse=True)
 
         # Set the index of the best frame, and normalize all quality values.
         self.frame_ranks_max_index = self.quality_sorted_indices[0]
@@ -128,7 +128,7 @@ if __name__ == "__main__":
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
 
@@ -151,7 +151,7 @@ if __name__ == "__main__":
     print ("")
     num_frames = len(rank_frames.frame_ranks)
     frame_percent = 10
-    num_frames_stacked = max(1, int(round(num_frames*frame_percent/100.)))
+    num_frames_stacked = max(1, round(num_frames*frame_percent/100.))
     print ("Percent of frames to be stacked: ", str(frame_percent), ", numnber: "
            + str(num_frames_stacked))
     quality_cutoff = rank_frames.frame_ranks[rank_frames.quality_sorted_indices[num_frames_stacked]]

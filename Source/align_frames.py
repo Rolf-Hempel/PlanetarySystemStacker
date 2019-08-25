@@ -25,12 +25,11 @@ from itertools import chain
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, float32, zeros, empty, int32, uint8, uint16
-from scipy import ndimage
-from cv2 import imwrite
+from numpy import float32, zeros, empty, int32, uint8, uint16
+from cv2 import imwrite, moments, threshold, THRESH_BINARY
 
 from configuration import Configuration
-from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError
+from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError, Error
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -204,18 +203,16 @@ class AlignFrames(object):
 
         elif self.configuration.align_frames_mode == "Planet":
             # For "Planetary" mode compute the center of gravity for the reference image.
-            cog_real = ndimage.measurements.center_of_mass(
+            cog_reference_y, cog_reference_x = AlignFrames.center_of_gravity(
                 self.frames.frames_mono_blurred(self.frame_ranks_max_index))
-            cog_reference_y = int(round(cog_real[0]))
-            cog_reference_x = int(round(cog_real[1]))
 
         else:
             raise NotSupportedError(
-                "Frame alignment mode " + self.configuration.align_frames_mode +
-                " not supported")
+                "Frame alignment mode '" + self.configuration.align_frames_mode +
+                "' not supported")
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
-        self.frame_shifts = [None for i in range(self.frames.number)]
+        self.frame_shifts = [None] * self.frames.number
 
         # Initialize lists with info on failed frames.
         self.dev_r_list = []
@@ -240,7 +237,7 @@ class AlignFrames(object):
             # For all other frames: Compute the global shift, using the "blurred" monochrome image.
             else:
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and idx % self.signal_step_size == 0:
+                if self.progress_signal is not None and number_processed % self.signal_step_size == 1:
                     self.progress_signal.emit("Align all frames",
                                               int((number_processed / self.frames.number) * 100.))
 
@@ -249,9 +246,10 @@ class AlignFrames(object):
                 if self.configuration.align_frames_mode == "Planet":
                     # In Planetary mode the shift of the "center of gravity" of the image is
                     # computed. This algorithm cannot fail.
-                    cog_frame_real = ndimage.measurements.center_of_mass(frame)
-                    self.frame_shifts[idx] = [cog_reference_y - int(round(cog_frame_real[0])),
-                                              cog_reference_x - int(round(cog_frame_real[1]))]
+                    cog_frame = AlignFrames.center_of_gravity(frame)
+                    self.frame_shifts[idx] = [cog_reference_y - cog_frame[0],
+                                              cog_reference_x - cog_frame[1]]
+                    number_processed += 1
                     continue
 
                 # In "Surface" mode three alignment algorithms can be chosen from. In each case
@@ -371,6 +369,38 @@ class AlignFrames(object):
             raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
                                 " frames: " + str(self.failed_index_list))
 
+    @staticmethod
+    def center_of_gravity(frame):
+        """
+        Comppute (y, x) pixel coordinates of the center of gravity for a given monochrome frame.
+        Raise an error if the computed cog is outside the frame index bounds.
+
+        :param frame: Monochrome frame (2D numpy array)
+        :return: Integer pixel coordinates (center_y, center_x) of center of gravity
+        """
+
+        # Convert the grayscale image to binary image, where all pixels
+        # brighter than the half the maximum image brightness are set to 1,
+        # and all others are set to 0.
+        thresh = threshold(frame, frame.max()/2, 1, THRESH_BINARY)[1]
+
+        # Calculate moments of binary image
+        M = moments(thresh)
+
+        # Calculate coordinates for center of gravity and round pixel
+        # coordinates to the nearest integers.
+        cog_x = round(M["m10"] / M["m00"])
+        cog_y = round(M["m01"] / M["m00"])
+
+        # If the computed center of gravity is outside the frame bounds, raise an error (should be
+        # impossible).
+        if not 0 < cog_y < frame.shape[0] or not 0 < cog_x < frame.shape[1]:
+            raise InternalError(
+                "Center of gravity coordinates [" + str(cog_y) + ", " + str(
+                    cog_x) + "] of reference frame are out of bounds")
+
+        return cog_y, cog_x
+
     def average_frame(self, average_frame_number=None, color=False):
         """
         Compute an averaged frame from the best (monochrome) frames.
@@ -389,11 +419,8 @@ class AlignFrames(object):
         # Compute global offsets of current frame relative to intersection frame. Start with
         # Initializing lists which for each frame give the dy and dx displacements between the
         # reference frame and current frame.
-        self.dy = []
-        self.dx = []
-        for idx in range(self.frames.number):
-            self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
-            self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
+        self.dy = [self.intersection_shape[0][0] - self.frame_shifts[idx][0] for idx in range(self.frames.number)]
+        self.dx = [self.intersection_shape[1][0] - self.frame_shifts[idx][1] for idx in range(self.frames.number)]
 
         # If the number of frames is not specified explicitly, compute it from configuration.
         if average_frame_number is not None:
@@ -435,7 +462,7 @@ class AlignFrames(object):
             raise NotSupportedError("Attempt to compute the average frame from images with type"
                                     " neither uint8 nor uint16")
 
-        self.mean_frame = (self.mean_frame[:,:]*scaling).astype(int32)
+        self.mean_frame = (self.mean_frame*scaling).astype(int32)
 
         return self.mean_frame
 
@@ -483,11 +510,8 @@ class AlignFrames(object):
                                     x_max+self.intersection_shape_original[1][0]]]
 
         # Re-compute global offsets of current frame relative to reference frame.
-        self.dy = []
-        self.dx = []
-        for idx in range(self.frames.number):
-            self.dy.append(self.intersection_shape[0][0] - self.frame_shifts[idx][0])
-            self.dx.append(self.intersection_shape[1][0] - self.frame_shifts[idx][1])
+        self.dy = [self.intersection_shape[0][0] - self.frame_shifts[idx][0] for idx in range(self.frames.number)]
+        self.dx = [self.intersection_shape[1][0] - self.frame_shifts[idx][1] for idx in range(self.frames.number)]
 
         self.ROI_set = True
 
@@ -571,7 +595,7 @@ if __name__ == "__main__":
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + str(e))
         exit()
 

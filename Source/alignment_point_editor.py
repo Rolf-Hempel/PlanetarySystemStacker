@@ -33,7 +33,7 @@ from align_frames import AlignFrames
 from alignment_point_editor_gui import Ui_alignment_point_editor
 from alignment_points import AlignmentPoints
 from configuration import Configuration, ConfigurationParameters
-from exceptions import InternalError, NotSupportedError
+from exceptions import InternalError, NotSupportedError, Error
 from frames import Frames
 from rank_frames import RankFrames
 
@@ -717,7 +717,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
 
         # If the mean frame type is not uint8, values correspond to 16bit resolution.
         if align_frames.mean_frame.dtype != uint8:
-            self.mean_frame = align_frames.mean_frame[:,:]/256.
+            self.mean_frame = align_frames.mean_frame / 256
         else:
             self.mean_frame = align_frames.mean_frame
 
@@ -764,7 +764,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
 
         self.aphbw_slider_value.setValue(half_box_width * 2)
         self.aphbw_label_display.setText(str(half_box_width * 2))
-        self.apst_slider_value.setValue(int(round(structure_threshold * 100)))
+        self.apst_slider_value.setValue(round(structure_threshold * 100))
         self.apst_label_display.setText(str(structure_threshold))
         self.apbt_slider_value.setValue(brightness_threshold)
         self.apbt_label_display.setText(str(brightness_threshold))
@@ -812,7 +812,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         # changed during editing.
         for ap in self.aps.alignment_points:
             if ap['reference_box'] is None:
-                self.aps.set_reference_box(ap, self.mean_frame)
+                self.aps.set_reference_box(ap, self.aps.mean_frame)
 
         # Reset the busy status of the higher-level GUI (to enable the "play" button) and
         # update the status of the higher-level GUI (if a reference to it was passed in "init").
@@ -844,7 +844,7 @@ if __name__ == '__main__':
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
 

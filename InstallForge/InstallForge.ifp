@@ -2,7 +2,7 @@
 ProjectFileVersion = "1.1"
 [General]
 Program name = PlanetarySystemStacker
-Program version = 0.5.0
+Program version = 0.6.0
 Windows 2000 = 0
 Windows XP = 0
 Windows Server 2003 = 0
@@ -57,7 +57,7 @@ Time = 2
 PlaySound = 0
 Allow = 0
 [Build]
-File = D:\SW-Development\Python\PlanetarySystemStacker\Windows_Installer\PlanetarySystemStacker_V0.5.0_Windows-Installer.exe
+File = D:\SW-Development\Python\PlanetarySystemStacker\Windows_Installer\PlanetarySystemStacker_V0.6.0_Windows-Installer.exe
 [Updater]
 Allow = 0
 1 = <appname>
@@ -73,15 +73,15 @@ Execdlls = 0
 [Languages]
 3
 [Files/Dirs]
-D:\SW-Development\Python\PlanetarySystemStacker\InstallForge\planetary_system_stacker\
-n/a
-[Folder]
 D:\SW-Development\Python\PlanetarySystemStacker\Documentation\Icon\PSS-Icon-64.ico
 12.6 KB
 ico
 D:\SW-Development\Python\PlanetarySystemStacker\Documentation\PlanetarySystemStacker_User-Guide.pdf
 1.4 MB
 pdf
+D:\SW-Development\Python\PlanetarySystemStacker\InstallForge\PlanetarySystemStacker\
+n/a
+[Folder]
 [Licence_Begin]
 33986
 {\rtf1\ansi\ansicpg1252\deff0\deflang1031\deflangfe1031\deftab708{\fonttbl{\f0\fmodern\fprq1\fcharset0 Courier New;}}
@@ -315,13 +315,13 @@ If the disclaimer of warranty and limitation of liability provided above cannot 
 [SCs]
 Desktop
 PlanetarySystemStacker
-<installpath>\planetary_system_stacker\planetary_system_stacker.exe
+<installpath>\PlanetarySystemStacker\planetary_system_stacker.exe
 
 <installpath>\PSS-Icon-64.ico
 0
 Startmenu
 PlanetarySystemStacker
-<installpath>\planetary_system_stacker\planetary_system_stacker.exe
+<installpath>\PlanetarySystemStacker\planetary_system_stacker.exe
 
 <installpath>\PSS-Icon-64.ico
 0

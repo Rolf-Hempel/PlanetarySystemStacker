@@ -93,7 +93,7 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
     # translation is non-linear in order to add resolution at small values.
     @staticmethod
     def radius_to_integer(radius):
-        return max(min(int(round(radius * 10.)), 99), 1)
+        return max(min(round(radius * 10.), 99), 1)
 
     @staticmethod
     def integer_to_radius(int):
@@ -101,11 +101,20 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
 
     @staticmethod
     def amount_to_integer(amount):
-        return max(0, min(int(round(sqrt(50. * amount))), 100))
+        # If amount < 0: Apply Gaussian blur instead of sharpening. The transition between both
+        # models is at slider position 20.
+        if amount <= 0.:
+            x = 20.*amount + 20.
+        else:
+            x = sqrt(32.*amount) + 20.
+        return max(0, min(int(round(x)), 100))
 
     @staticmethod
     def integer_to_amount(integer):
-        return 0.02 * integer ** 2
+        if integer <= 20:
+            return 0.05*integer - 1.
+        else:
+            return ((integer-20)**2) / 32.
 
     def horizontalSlider_radius_changed(self):
         """
@@ -355,9 +364,9 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
-                            "Save result as 16bit Tiff image",
+                            "Save result as 16bit Tiff or Fits image",
                             self.postproc_data_object.file_name_processed,
-                            "Image Files (*.tiff)", options=options)
+                            "Image Files (*.tiff *.fits)", options=options)
 
         if filename and extension:
             Frames.save_image(filename,
@@ -566,10 +575,17 @@ class ImageProcessor(QtCore.QThread):
         # Initialize the new image with the original image.
         new_image = input_image
 
-        # Apply all sharpening layers.
+        # Apply all sharpening layers. If the amount is positive, sharpen the image. A negative
+        # amount between -1 and 0 means that the image is to be softened with a Gaussian kernel.
+        # In this case If the sign of the amount is reversed and taken as the weight with which the
+        # softened image is mixed with the original one.
         for layer in layers:
-            new_image = Miscellaneous.gaussian_sharpen(new_image, layer.amount, layer.radius,
-                                                       luminance_only=layer.luminance_only)
+            if layer.amount > 0.:
+                new_image = Miscellaneous.gaussian_sharpen(new_image, layer.amount, layer.radius,
+                                                           luminance_only=layer.luminance_only)
+            elif -1. <= layer.amount < 0.:
+                new_image = Miscellaneous.gaussian_blur(new_image, -layer.amount, layer.radius,
+                                                           luminance_only=layer.luminance_only)
 
         # Store the result in the central data object.
         return new_image
@@ -607,7 +623,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         self.configuration = configuration
         self.postproc_data_object = self.configuration.postproc_data_object
-        self.postproc_data_object.set_postproc_input_image(image_original, name_original)
+        self.postproc_data_object.set_postproc_input_image(image_original, name_original,
+                                                self.configuration.global_parameters_image_format)
         self.signal_save_postprocessed_image = signal_save_postprocessed_image
 
         self.buttonBox.accepted.connect(self.accept)

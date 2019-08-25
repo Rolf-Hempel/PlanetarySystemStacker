@@ -26,18 +26,18 @@ from sys import stdout
 from time import time
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
-    putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT
+    putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev,\
+    resize
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin, uint8, full, uint32, isnan, float32, int32, uint16
+    empty, argmin, stack, sin, uint8, float32, uint16, full
 from math import exp
 from numpy import min as np_min
-from numpy import nan as np_nan
 from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
 
-from exceptions import DivideByZeroError
+from exceptions import DivideByZeroError, ArgumentError
 
 
 class Miscellaneous(object):
@@ -57,16 +57,15 @@ class Miscellaneous(object):
         """
 
         # Compute for each point the local gradient in both coordinate directions.
-        dx = diff(frame)[:, :]
-        dy = diff(frame, axis=0)[:, :]
+        dx = diff(frame)
+        dy = diff(frame, axis=0)
 
         # Compute the sharpness per coordinate direction as the 1-norm of point values.
         sharpness_x = average(np_abs(dx))
         sharpness_y = average(np_abs(dy))
 
         # Return the sharpness in the direction where it is minimal.
-        sharpness = min(sharpness_x, sharpness_y)
-        return sharpness
+        return min(sharpness_x, sharpness_y)
 
     @staticmethod
     def quality_measure_threshold(frame, black_threshold=40.):
@@ -80,10 +79,9 @@ class Miscellaneous(object):
         :return:
         """
 
-        sum_horizontal = sum(sum(abs(frame[:, 2:] - frame[:, :-2]) * (
-                frame[:, 1:-1] > black_threshold)))
-        sum_vertical = sum(sum(abs(frame[2:, :] - frame[:-2, :]) * (
-                frame[1:-1, :] > black_threshold)))
+        sum_horizontal = abs((frame[:, 2:] - frame[:, :-2])[frame[:, 1:-1] > black_threshold]).sum()
+        sum_vertical = abs((frame[2:, :] - frame[:-2, :])[frame[1:-1, :] > black_threshold]).sum()
+
         return min(sum_horizontal, sum_vertical)
 
     @staticmethod
@@ -105,21 +103,17 @@ class Miscellaneous(object):
         stride_2 = 2 * stride
 
         # Compute a mask for all pixels which are bright enough (to avoid background noise).
-        mask = frame[:, :] > black_threshold
+        mask = frame > black_threshold
         mask_fraction = mask.sum() / frame_size
 
         # If most pixels are bright enough, compensate for different pixel counts.
         if mask_fraction > min_fraction:
-            sum_horizontal = sum(sum(abs(frame[:, stride_2:] - frame[:, :-stride_2]) *
-                                     mask[:, stride:-stride])) / mask_fraction
-            sum_vertical = sum(sum(abs(frame[stride_2:, :] - frame[:-stride_2, :]) *
-                                   mask[stride:-stride, :])) / mask_fraction
+            sum_horizontal = abs((frame[:, stride_2:] - frame[:, :-stride_2])[mask[:, stride:-stride]]).sum() / mask_fraction
+            sum_vertical = abs((frame[stride_2:, :] - frame[:-stride_2, :])[mask[stride:-stride, :]]).sum() / mask_fraction
         # If many pixels are too dim, penalize this patch by not compensating for pixel count.
         else:
-            sum_horizontal = sum(sum(abs(frame[:, stride_2:] - frame[:, :-stride_2]) *
-                                     mask[:, stride:-stride]))
-            sum_vertical = sum(sum(abs(frame[stride_2:, :] - frame[:-stride_2, :]) *
-                                   mask[stride:-stride, :]))
+            sum_horizontal = abs((frame[:, stride_2:] - frame[:, :-stride_2])[mask[:, stride:-stride]]).sum()
+            sum_vertical = abs((frame[stride_2:, :] - frame[:-stride_2, :])[mask[stride:-stride, :]]).sum()
 
         return min(sum_horizontal, sum_vertical)
 
@@ -134,9 +128,8 @@ class Miscellaneous(object):
         :return: Measure for amount of local structure in the image (scalar)
         """
 
-        sharpness = Laplacian(frame[::stride, ::stride], CV_32F).var()
         # sharpness = sum(laplace(frame[::stride, ::stride])**2)
-        return sharpness
+        return meanStdDev(Laplacian(frame[::stride, ::stride], CV_32F))[1][0][0]
 
     @staticmethod
     def local_contrast_sobel(frame, stride):
@@ -152,8 +145,8 @@ class Miscellaneous(object):
         dx = sobel(frame_int32, 0)  # vertical derivative
         dy = sobel(frame_int32, 1)  # horizontal derivative
         mag = hypot(dx, dy)  # magnitude
-        sharpness = sum(mag)
-        return sharpness
+
+        return mag.sum(axis=0)
 
     @staticmethod
     def local_contrast(frame, stride):
@@ -170,9 +163,9 @@ class Miscellaneous(object):
         # Remove a row or column, respectively, to make the dx and dy arrays of the same shape.
         dx = diff(frame_strided)[1:, :]  # remove the first row
         dy = diff(frame_strided, axis=0)[:, 1:]  # remove the first column
-        dnorm = sqrt(dx ** 2 + dy ** 2)
-        sharpness = average(dnorm)
-        return sharpness
+        dnorm = hypot(dx, dy)
+
+        return average(dnorm)
 
     @staticmethod
     def translation(frame_0, frame_1, shape):
@@ -396,8 +389,7 @@ class Miscellaneous(object):
         for r in range(search_width + 1):
             # Create an enumerator which produces shift values [dy, dx] in a circular pattern
             # with radius "r".
-            circle_r = Miscellaneous.circle_around(0, 0, r)
-            for (dy, dx) in circle_r:
+            for (dy, dx) in Miscellaneous.circle_around(0, 0, r):
                 reference_stack[index, :, :] = reference_frame[y_low + dy:y_high + dy,
                                                x_low + dx:x_high + dx]
                 displacements.append([dy, dx])
@@ -492,7 +484,7 @@ class Miscellaneous(object):
 
         # Set up a table which keeps deviation values from earlier iteration steps. This way,
         # deviation evaluations can be avoided at coordinates which have been visited before.
-        # Initialize deviations with the highest possible UINT32.
+        # Initialize deviations with an impossibly high value.
         dev_table[:,:] = 1.e30
 
         # Initialize the global optimum with the value at dy=dx=0.
@@ -549,7 +541,7 @@ class Miscellaneous(object):
             else:
                 for (dy, dx) in circle_1:
                     deviation = dev_table[dy, dx]
-                    if deviation == 1.e30:
+                    if deviation > 1.e29:
                         deviation = abs(
                             reference_box - frame[y_low - dy:y_high - dy,
                                             x_low - dx:x_high - dx]).sum()
@@ -572,6 +564,57 @@ class Miscellaneous(object):
 
         # If within the maximum search radius no optimum could be found, return [0, 0].
         return [0, 0], dev_r
+
+    @staticmethod
+    def search_local_match_full(reference_box, frame, y_low, y_high, x_low, x_high,
+                                    search_width,
+                                    sampling_stride, dev_table):
+        """
+        For all shifts with -search_width < shift < search_width in y, x between the box around the
+        alignment point in the mean frame and the corresponding box in the given frame compute the
+        deviation. Return the y and x offsets where the deviation is smallest. The global frame
+        shift is accounted for beforehand already.
+
+        :param reference_box: Image box around alignment point in mean frame.
+        :param frame: Given frame for which the local shift at the alignment point is to be
+                      computed.
+        :param y_low: Lower y coordinate limit of box in given frame, taking into account the
+                      global shift and the different sizes of the mean frame and the original
+                      frames.
+        :param y_high: Upper y coordinate limit
+        :param x_low: Lower x coordinate limit
+        :param x_high: Upper x coordinate limit
+        :param search_width: Maximum distance in y and x from origin of the search area
+        :param sampling_stride: Stride in both coordinate directions used in computing deviations
+        :param dev_table: Scratch table to be used internally for storing intermediate results,
+                          size: [2*search_width+1, 2*search_width+1], dtype=float32.
+        :return: ([shift_y, shift_x], [min_r]) with:
+                   shift_y, shift_x: shift values of minimum or [0, 0] if no optimum could be found.
+                   [dev_r]: list of minimum deviations for all steps until a local minimum is found.
+        """
+
+        # Set up a table which keeps deviation values from earlier iteration steps. This way,
+        # deviation evaluations can be avoided at coordinates which have been visited before.
+        # Initialize deviations with an impossibly high value.
+        dev_table[:, :] = 1.e30
+
+        if sampling_stride != 1:
+            for dy in range(-search_width, search_width + 1):
+                for dx in range(-search_width, search_width + 1):
+                    dev_table[search_width + dy, search_width + dx] = abs(
+                        reference_box[::sampling_stride, ::sampling_stride] - frame[
+                                              y_low - dy:y_high - dy:sampling_stride,
+                                              x_low - dx:x_high - dx:sampling_stride]).sum()
+        else:
+            for dy in range(-search_width, search_width + 1):
+                for dx in range(-search_width, search_width + 1):
+                    dev_table[search_width + dy, search_width + dx] = abs(
+                        reference_box - frame[y_low - dy:y_high - dy, x_low - dx:x_high - dx]).sum()
+
+        dy, dx = unravel_index(argmin(dev_table, axis=None), dev_table.shape)
+
+        # Return the coordinate shifts for the minimum position and the value at that position.
+        return [dy-search_width, dx-search_width], dev_table[dy, dx]
 
     @staticmethod
     def insert_cross(frame, y_center, x_center, cross_half_len, color):
@@ -610,6 +653,48 @@ class Miscellaneous(object):
             for x in range(x_center - cross_half_len, x_center + cross_half_len + 1):
                 if 0 <= x < shape_x:
                     frame[y_center, x] = rgb
+
+    @staticmethod
+    def compose_image(image_list, scale_factor=1, border=5):
+        """
+        Arrange a list of monochrome images horizontally in a single image, with constant gaps in
+        between. If images are of different size, center-align them vertically. Optionally, the
+        resulting image can be re-scaled with the same factor in x and y directions.
+
+        :param image_list: List containing images (all of the same dtype)
+        :param scale_factor: Scaling factor for the resulting composite image
+        :param border: Width of black border and gaps between images
+        :return: Composite image of the same dtype as the image_list items
+        """
+
+        shapes_y = [image.shape[0] for image in image_list]
+        shapes_x = [image.shape[1] for image in image_list]
+        max_shape_y = max(shapes_y)
+        sum_shape_x = sum(shapes_x)
+
+        # Check if all images of the list are of the same type.
+        type = image_list[0].dtype
+        for image in image_list[1:]:
+            if image.dtype != type:
+                raise ArgumentError("Trying to compose images of different types")
+
+        # Compute the dimensions of the composite image. The border and the gaps between images are
+        # 5 pixels wide.
+        composite_dim_y = max_shape_y + 2 * border
+        composite_dim_x = sum_shape_x + border * (len(image_list) + 1)
+
+        # Allocate the composite image.
+        composite = full((composite_dim_y, composite_dim_x), 0, dtype=type)
+
+        # Copy the images into the composite image.
+        x_pos = border
+        for index, image in enumerate(image_list):
+            y_pos = int((composite_dim_y - shapes_y[index]) / 2)
+            composite[y_pos: y_pos + shapes_y[index], x_pos: x_pos + shapes_x[index]] = image
+            x_pos += shapes_x[index] + border
+
+        # Return the resized composite image.
+        return resize(composite, None, fx=float(scale_factor), fy=float(scale_factor))
 
     @staticmethod
     def circle_around(y, x, r):
@@ -731,13 +816,52 @@ class Miscellaneous(object):
             # of this correction to the original image. Clip values out of range.
             luminance_blurred = GaussianBlur(luminance, (0, 0), sigma, borderType=BORDER_DEFAULT)
             hsv[:, :, 2] = (luminance + amount * (luminance - luminance_blurred)).clip(min=0.,
-                                                                                       max=65025.)
+                                                                                       max=65535.)
             # Convert the image back to uint16.
             return cvtColor(hsv, COLOR_HSV2BGR).astype(uint16)
         # General case: Treat the entire image (B/W or color 16bit mode).
         else:
             image_blurred = GaussianBlur(image, (0, 0), sigma, borderType=BORDER_DEFAULT)
-            return (image + amount * (image - image_blurred)).clip(min=0., max=65025.).astype(
+            return (image + amount * (image - image_blurred)).clip(min=0., max=65535.).astype(
+                uint16)
+
+    @staticmethod
+    def gaussian_blur(input_image, amount, radius, luminance_only=False):
+        """
+        Soften an image with a Gaussian kernel. The input image can be B/W or color.
+
+        :param input_image: Input image, type uint16
+        :param amount: Amount of blurring, between 0. and 1.
+        :param radius: Radius of Gaussian kernel (in pixels)
+        :param luminance_only: True, if only the luminance channel of a color image is to be
+                               blurred. Default is False.
+        :return: The blurred image (B/W or color, as input), type uint16
+        """
+
+        color = len(input_image.shape) == 3
+
+        # Translate the kernel radius into standard deviation.
+        sigma = radius / 3
+
+        # Convert the image to floating point format.
+        image = input_image.astype(float32)
+
+        # Special case: Only blur the luminance channel of a color image.
+        if color and luminance_only:
+            hsv = cvtColor(image, COLOR_BGR2HSV)
+            luminance = hsv[:, :, 2]
+
+            # Apply a Gaussian blur filter, subtract it from the original image, and add a multiple
+            # of this correction to the original image. Clip values out of range.
+            luminance_blurred = GaussianBlur(luminance, (0, 0), sigma, borderType=BORDER_DEFAULT)
+            hsv[:, :, 2] = (luminance_blurred*amount + luminance*(1.-amount)).clip(min=0.,
+                                                                                       max=65535.)
+            # Convert the image back to uint16.
+            return cvtColor(hsv, COLOR_HSV2BGR).astype(uint16)
+        # General case: Treat the entire image (B/W or color 16bit mode).
+        else:
+            image_blurred = GaussianBlur(image, (0, 0), sigma, borderType=BORDER_DEFAULT)
+            return (image_blurred*amount + image*(1.-amount)).clip(min=0., max=65535.).astype(
                 uint16)
 
     @staticmethod
@@ -765,7 +889,7 @@ class Miscellaneous(object):
             temp = zeros(max(width, height), dtype=float32)
 
         # Convert input image to floats.
-        fimg[0] = input_image / 65025.
+        fimg[0] = input_image / 65535
 
         # Start with level 0. Store its Laplacian on level 1. The operator is separated in a
         # column and a row operator.
@@ -803,7 +927,7 @@ class Miscellaneous(object):
             hpass = lpass
 
         # At the end add the coarsest level and convert back to 16bit integer format.
-        fimg[0] = ((fimg[0] + fimg[lpass]) * 65025.).clip(min=0., max=65025.)
+        fimg[0] = ((fimg[0] + fimg[lpass]) * 65535.).clip(min=0., max=65535.)
         return fimg[0].astype(uint16)
 
     @staticmethod
@@ -875,10 +999,61 @@ class Miscellaneous(object):
             logfile.write(output_string + "\n")
 
     @staticmethod
+    def print_stacking_parameters(configuration, logfile):
+        """
+        Print a table with all stacking parameters.
+
+        :param configuration: Object holding all configuration parameters.
+        :param logfile: logfile or None (no logging)
+        :return: -
+        """
+
+        # Compile all parameters and their values to be printed.
+        parameters = [["Noise level (add Gaussian blur)", str(configuration.frames_gauss_width)],
+                      ["Frame stabilization mode", configuration.align_frames_mode]]
+
+        # The following parameters are only active in "Surface" mode.
+        if configuration.align_frames_mode == "Surface":
+            parameters = parameters + [
+                ["Automatic frame stabilization", str(configuration.align_frames_automation)],
+                ["Stabilization patch size (% of frame size)",
+                 str(int(round(100. / configuration.align_frames_rectangle_scale_factor)))],
+                ["Stabilization search width (pixels)",
+                 str(configuration.align_frames_search_width)]]
+
+        # Continue with general parameters.
+        parameters = parameters + [["Percentage of best frames for reference frame computation",
+                                    str(configuration.align_frames_average_frame_percent)],
+                                   ["Alignment box width (pixels)",
+                                    str(2 * configuration.alignment_points_half_box_width)],
+                                   ["Max. alignment search width (pixels)",
+                                    str(configuration.alignment_points_search_width)],
+                                   ["Minimum structure",
+                                    str(configuration.alignment_points_structure_threshold)],
+                                   ["Minimum brightness",
+                                    str(configuration.alignment_points_brightness_threshold)],
+                                   ["Percentage of best frames to be stacked",
+                                    str(configuration.alignment_points_frame_percent)]
+                                   ]
+
+        output_string = "\n           Stacking parameters:                                         | Value   |\n" \
+                        "           ------------------------------------------------------------------------" \
+                        "\n          "
+
+        # Extend the output string with a line for every parameter to be printed.
+        for line in parameters:
+            output_string += " {0:60s} | {1:8s}|\n          ".format(line[0], line[1])
+
+        # Write the complete table.
+        Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
+
+    @staticmethod
     def print_postproc_parameters(layers, logfile):
         """
         Print a table with postprocessing layer info for the selected postprocessing version.
 
+        :param layers: Object holding postprocessing parameters for all active layers.
+        :param logfile: logfile or None (no logging)
         :return: -
         """
 
@@ -935,12 +1110,12 @@ if __name__ == "__main__":
     search_width = 20
     sampling_stride = 1
 
-    dev_table = empty((2 * search_width, 2 * search_width), dtype=float32)
+    dev_table = empty((2 * search_width + 1, 2 * search_width + 1), dtype=float32)
 
     # First try the standard method "search_local_match". Compute the displacement vector, and
     # print a comparison of the true and computed values.
     start = time()
-    rep_count = 100
+    rep_count = 1
     for iter in range(rep_count):
         [dy, dx], dev_r = Miscellaneous.search_local_match(reference_box, frame, y_low, y_high,
                                                            x_low, x_high, search_width,

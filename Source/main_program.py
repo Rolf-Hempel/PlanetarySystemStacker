@@ -24,6 +24,9 @@ import ctypes
 import glob
 import sys
 import os
+import platform
+import traceback
+from ctypes import CDLL
 
 import matplotlib.pyplot as plt
 from skimage import img_as_ubyte
@@ -33,7 +36,7 @@ from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from alignment_point_editor import AlignmentPointEditorWidget
 from configuration import Configuration
-from exceptions import NotSupportedError, InternalError
+from exceptions import NotSupportedError, InternalError, Error
 from frames import Frames
 from rank_frames import RankFrames
 from stack_frames import StackFrames
@@ -42,10 +45,10 @@ from timer import timer
 def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=False,
              automatic_ap_creation=True):
     """
-    Execute the whole stacking workflow for a test case. This can either use a video file (.avi)
+    Execute the whole stacking workflow for a test case. This can either use a video file (.avi .ser)
     or still images stored in a single directory.
 
-    :param input_name: Video file (.avi) or name of a directory containing still images
+    :param input_name: Video file (.avi .ser) or name of a directory containing still images
     :param input_type: Either "video" or "image" (see "input_name")
     :param roi: If specified, tuple (y_low, y_high, x_low, x_high) with pixel bounds for "region
                 of interest"
@@ -68,8 +71,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
         names = input_name
     # For single image input, the Frames constructor expects a list of image file names for "names".
     else:
-        names = os.listdir(input_name)
-        names = [os.path.join(input_name, name) for name in names]
+        names = [os.path.join(input_name, name) for name in os.listdir(input_name)]
     stacked_image_name = input_name + '.stacked.tiff'
 
     # The name of the alignment point visualization file is derived from the input video name or
@@ -90,10 +92,12 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
     my_timer.create('Read all frames')
     try:
         frames = Frames(configuration, names, type=input_type,
-                        convert_to_grayscale=convert_to_grayscale)
+                        convert_to_grayscale=convert_to_grayscale,
+                        buffer_original=False, buffer_monochrome=False,
+                        buffer_gaussian=True, buffer_laplacian=True)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + str(e))
         exit()
     my_timer.stop('Read all frames')
@@ -186,7 +190,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
             if ap['reference_box'] is not None:
                 continue
             count_updates += 1
-            AlignmentPoints.set_reference_box(ap, align_frames.mean_frame)
+            AlignmentPoints.set_reference_box(ap, alignment_points.mean_frame)
         print("Buffers allocated for " + str(count_updates) + " alignment points.")
 
     # Produce an overview image showing all alignment points.
@@ -233,7 +237,7 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
 
 if __name__ == "__main__":
     """
-    This File contains a test main program. It goes through the whole process without using a 
+    This File contains a test main program. It goes through the whole process without using a
     graphical unser interface. It is not intended to be used in production runs.
     """
 
@@ -241,7 +245,8 @@ if __name__ == "__main__":
     redirect_stdout = False
     show_results = True
     input_type = 'video'
-    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
+    # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
+    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
     # input_type = 'image'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
     convert_to_grayscale = False
@@ -251,12 +256,19 @@ if __name__ == "__main__":
     ####################################### Specify test case end ##################################
 
     # Redirect standard output to a file if requested.
+    protocol_file = None
     if redirect_stdout:
+        print("Redirecting stdout, please check Protocol.txt file in input directory.",
+              file=sys.stderr)
         stdout_saved = sys.stdout
         protocol_file = open(os.path.join(input_directory, 'Protocol.txt'), 'a')
         sys.stdout = protocol_file
 
-    mkl_rt = ctypes.CDLL('mkl_rt.dll')
+    if platform.system() == 'Windows':
+        mkl_rt = CDLL('mkl_rt.dll')
+    else:
+        mkl_rt = CDLL('libmkl_rt.so')
+
     mkl_get_max_threads = mkl_rt.mkl_get_max_threads
 
     def mkl_set_num_threads(cores):
@@ -272,6 +284,8 @@ if __name__ == "__main__":
     # For images, it is assumed that the input directory contains one or several directories with
     # image files.
     else:
+        if input_type != 'image':
+            print("WARNING: Wrong input spec, assuming 'image'")
         input_directory_content = os.listdir(input_directory)
         # input_names = [dir for dir in input_directory_content if os.path.isdir(dir)]
         input_names = []
@@ -280,36 +294,51 @@ if __name__ == "__main__":
             if os.path.isdir(dir_abs):
                 input_names.append(dir_abs)
 
+    # Feedback on number of files found to process
+    if len(input_names) > 0:
+        print("+++ Start processing", len(input_names), input_type)
+    else:
+        print("+++ No files found to process")
+
     # Start the processing workflow in batch mode for all AVIs / file directories.
-    for input_name in input_names:
-        if roi:
-            average, average_roi, color_image_with_aps, stacked_image = workflow(input_name,
-                input_type=input_type, roi=roi, convert_to_grayscale=convert_to_grayscale,
-                automatic_ap_creation=automatic_ap_creation)
-        else:
-            average, color_image_with_aps, stacked_image = workflow(input_name,
-                input_type=input_type, convert_to_grayscale=convert_to_grayscale,
-                automatic_ap_creation=automatic_ap_creation)
-
-        # Interrupt the workflow to display resulting images only if requested.
-        if show_results:
-            # Show the full average frame.
-            plt.imshow(average, cmap='Greys_r')
-            plt.show()
-
+    try:
+        for input_name in input_names:
             if roi:
-                # Show the ROI average frame.
-                plt.imshow(average_roi, cmap='Greys_r')
+                average, average_roi, color_image_with_aps, stacked_image = workflow(input_name,
+                    input_type=input_type, roi=roi, convert_to_grayscale=convert_to_grayscale,
+                    automatic_ap_creation=automatic_ap_creation)
+            else:
+                average, color_image_with_aps, stacked_image = workflow(input_name,
+                    input_type=input_type, convert_to_grayscale=convert_to_grayscale,
+                    automatic_ap_creation=automatic_ap_creation)
+
+            # Interrupt the workflow to display resulting images only if requested.
+            if show_results:
+                # Show the full average frame.
+                plt.imshow(average, cmap='Greys_r')
                 plt.show()
 
-            # Show alignment points and patches
-            plt.imshow(color_image_with_aps)
-            plt.show()
+                if roi:
+                    # Show the ROI average frame.
+                    plt.imshow(average_roi, cmap='Greys_r')
+                    plt.show()
 
-            # Convert the stacked image to 8bit and show in Window.
-            plt.imshow(img_as_ubyte(stacked_image))
-            plt.show()
+                # Show alignment points and patches
+                plt.imshow(color_image_with_aps)
+                plt.show()
+
+                # Convert the stacked image to 8bit and show in Window.
+                plt.imshow(img_as_ubyte(stacked_image))
+                plt.show()
+    except:
+        exec_info = sys.exc_info()
+        if protocol_file is None:
+            traceback.print_tb(exec_info[2])
+        else:
+            traceback.print_tb(exec_info[2], file=protocol_file)
+        print(exec_info[1])
 
     # Redirect stdout back to normal.
     if redirect_stdout:
         sys.stdout = stdout_saved
+        protocol_file.close()

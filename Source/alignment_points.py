@@ -25,13 +25,14 @@ from time import time
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, uint32
+from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, int32, uint16
 from scipy import ndimage
 from skimage.feature import register_translation
+from cv2 import meanStdDev, GaussianBlur
 
 from align_frames import AlignFrames
 from configuration import Configuration
-from exceptions import NotSupportedError
+from exceptions import NotSupportedError, Error
 from frames import Frames
 from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
@@ -65,7 +66,11 @@ class AlignmentPoints(object):
         self.rank_frames = rank_frames
         self.align_frames = align_frames
         self.progress_signal = progress_signal
-        self.mean_frame = align_frames.mean_frame
+
+        # Apply a low-pass filter on the mean frame as a preparation for shift detection.
+        self.mean_frame = GaussianBlur(align_frames.mean_frame.astype(uint16),
+                                        (self.configuration.frames_gauss_width,
+                                        self.configuration.frames_gauss_width), 0).astype(int32)
         self.num_pixels_y = self.mean_frame.shape[0]
         self.num_pixels_x = self.mean_frame.shape[1]
         self.alignment_points_dropped_dim = None
@@ -80,8 +85,8 @@ class AlignmentPoints(object):
         # Initialize the number of frames to be stacked at each AP.
         self.stack_size = None
 
-        self.dev_table = empty((2 * self.configuration.alignment_points_search_width,
-                               2 * self.configuration.alignment_points_search_width), dtype=float32)
+        self.dev_table = empty((2 * self.configuration.alignment_points_search_width + 1,
+                               2 * self.configuration.alignment_points_search_width + 1), dtype=float32)
 
     @staticmethod
     def ap_locations(num_pixels, min_boundary_distance, step_size, even):
@@ -98,28 +103,21 @@ class AlignmentPoints(object):
 
         # The number of interior alignment boxes in general is not an integer. Round to the next
         # higher number.
-        num_interior_odd = int(
-            ceil(float(num_pixels - 2 * min_boundary_distance) / float(step_size)))
+        num_interior_odd = int(ceil((num_pixels - 2 * min_boundary_distance) / step_size))
         # Because alignment points are arranged in a staggered grid, in even rows there is one point
         # more.
         num_interior_even = num_interior_odd + 1
 
         # The precise distance between alignment points will differ slightly from the specified
         # step_size. Compute the exact distance. Integer locations will be rounded later.
-        distance_corrected = float(num_pixels - 2 * min_boundary_distance) / float(
-            num_interior_odd)
+        distance_corrected = (num_pixels - 2 * min_boundary_distance) / num_interior_odd
 
         # Compute the AP locations, separately for even and odd rows.
         if even:
-            locations = []
-            for i in range(num_interior_even):
-                locations.append(int(min_boundary_distance + i * distance_corrected))
+            locations = [int(min_boundary_distance + i * distance_corrected) for i in range(num_interior_even)]
         else:
-            locations = []
-            for i in range(num_interior_odd):
-                locations.append(int(
-                    min_boundary_distance + 0.5 * distance_corrected +
-                    i * distance_corrected))
+            locations = [int(min_boundary_distance + 0.5 * distance_corrected +
+                             i * distance_corrected) for i in range(num_interior_odd)]
         return locations
 
     def create_ap_grid(self):
@@ -205,8 +203,7 @@ class AlignmentPoints(object):
 
                     # Check if the fraction of dark pixels exceeds a threshold.
                     box = alignment_point['reference_box']
-                    fraction = (box < brightness_threshold).sum() / float(
-                        box.shape[0] * box.shape[1])
+                    fraction = (box < brightness_threshold).sum() / (box.shape[0] * box.shape[1])
                     if fraction > self.configuration.alignment_points_dim_fraction_threshold:
 
                         # Compute the center of mass of the brightness distribution within the box,
@@ -336,19 +333,12 @@ class AlignmentPoints(object):
         :return: -
         """
 
-        # Initialize the reduced AP list.
-        new_alignment_point_list = []
-
         # Create list with unique identifiers of all items on the list.
         ap_list_ids = [id(ap_list_item) for ap_list_item in ap_list]
 
-        # If the identifier of an alignment point does not match any list item, keep it.
-        for ap in self.alignment_points:
-            if id(ap) not in ap_list_ids:
-                new_alignment_point_list.append(ap)
-
         # Replace the original AP list with the reduced one.
-        self.alignment_points = new_alignment_point_list
+        # If the identifier of an alignment point does not match any list item, keep it.
+        self.alignment_points = [ap for ap in self.alignment_points if id(ap) not in ap_list_ids]
 
     def replace_alignment_point(self, ap_old, ap_new):
         """
@@ -409,10 +399,10 @@ class AlignmentPoints(object):
             return None
 
         # Compute new values for patch and box sizes.
-        half_patch_width_new_int = int(round(half_box_width *
+        half_patch_width_new_int = round(half_box_width *
                                              self.configuration.alignment_points_half_patch_width /
-                                             self.configuration.alignment_points_half_box_width))
-        half_box_width_new_int = int(round(half_box_width))
+                                             self.configuration.alignment_points_half_box_width)
+        half_box_width_new_int = round(half_box_width)
 
         # Compute resized patch bounds. If resizing hits the image boundary on at least one side,
         # the operation is aborted.
@@ -515,11 +505,8 @@ class AlignmentPoints(object):
                  If no AP satisfies the condition, return an empty list.
         """
 
-        ap_list = []
-        for ap in self.alignment_points:
-            if y_low <= ap['y'] <= y_high and x_low <= ap['x'] <= x_high:
-                ap_list.append(ap)
-        return ap_list
+        return [ap for ap in self.alignment_points if y_low <= ap['y'] <= y_high and
+                x_low <= ap['x'] <= x_high]
 
     @staticmethod
     def find_neighbor(ap_y, ap_x, alignment_points):
@@ -582,7 +569,7 @@ class AlignmentPoints(object):
         # Compute the frequency of progress signals in the computational loop.
         if self.progress_signal is not None:
             self.signal_loop_length = max(self.frames.number, 1)
-            self.signal_step_size = max(int(round(self.frames.number / 10)), 1)
+            self.signal_step_size = max(round(self.frames.number / 10), 1)
 
         # Initialize a list which for each AP contains the qualities of all frames at this point.
         for alignment_point in self.alignment_points:
@@ -596,7 +583,7 @@ class AlignmentPoints(object):
                 frame = self.frames.frames_mono_blurred(frame_index)
 
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank frames at APs",
                                               int((frame_index / self.signal_loop_length) * 100.))
 
@@ -625,7 +612,7 @@ class AlignmentPoints(object):
                 frame = self.frames.frames_mono_blurred_laplacian(frame_index)
 
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                if self.progress_signal is not None and frame_index % self.signal_step_size == 0:
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank frames at APs",
                                               int((frame_index / self.signal_loop_length) * 100.))
 
@@ -642,8 +629,7 @@ class AlignmentPoints(object):
                                      alignment_point['patch_x_high'] + self.align_frames.dx[
                                          frame_index]) / self.configuration.align_frames_sampling_stride)
                     # Compute the frame quality and append it to the list for this alignment point.
-                    alignment_point['frame_qualities'].append(
-                        frame[y_low:y_high, x_low:x_high].var())
+                    alignment_point['frame_qualities'].append(meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0])
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank frames at APs", 100)
@@ -652,12 +638,9 @@ class AlignmentPoints(object):
         self.frames.reset_alignment_point_lists()
         # For each alignment point sort the computed quality ranks in descending order.
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):
-            alignment_point['best_frame_indices'] = [b[0] for b in sorted(
-                enumerate(alignment_point['frame_qualities']), key=lambda i: i[1],
-                reverse=True)]
             # Truncate the list to the number of frames to be stacked for each alignmeent point.
-            alignment_point['best_frame_indices'] = alignment_point['best_frame_indices'][
-                                                    :self.stack_size]
+            alignment_point['best_frame_indices'] = sorted(range(len(alignment_point['frame_qualities'])),
+                                                    key=alignment_point['frame_qualities'].__getitem__, reverse=True)[:self.stack_size]
             # Add this alignment point to the AP lists of those frames where the AP is to be used.
             for frame_index in alignment_point['best_frame_indices']:
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)
@@ -820,7 +803,7 @@ if __name__ == "__main__":
         frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
-    except Exception as e:
+    except Error as e:
         print("Error: " + e.message)
         exit()
 

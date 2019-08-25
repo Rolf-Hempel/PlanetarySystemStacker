@@ -20,21 +20,820 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
+import datetime
+import struct
 from glob import glob
-from os import path, remove
+from os import path, remove, listdir, stat
+from os.path import splitext
 from pathlib import Path
 from time import time
 
-import numpy as np
+from PyQt5 import QtCore
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
-    COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs, \
-    CAP_PROP_POS_FRAMES
+    COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
+    convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED, \
+    COLOR_BayerRG2RGB, COLOR_BayerGR2RGB, COLOR_BayerGB2RGB, COLOR_BayerBG2RGB, flip
+from cv2 import mean as cv_mean
 from math import ceil
-from scipy import misc
+from numpy import max as np_max
+from numpy import min as np_min
+from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, \
+    frombuffer, dtype, moveaxis
 
 from configuration import Configuration
-from exceptions import TypeError, ShapeError, ArgumentError
+from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error, \
+    InternalError
 from frames_old import FramesOld
+from astropy.io import fits
+
+
+class VideoReader(object):
+    """
+    The VideoReader deals with the import of frames from a video file. Frames can be read either
+    consecutively, or at an arbitrary frame index. Eventually, all common video types (such as .avi,
+    .ser, .mov) should be supported.
+    """
+
+    def __init__(self):
+        """
+        Create the VideoReader object and initialize instance variables.
+        """
+
+        self.opened = False
+        self.just_opened = False
+        self.last_read = None
+        self.last_frame_read = None
+        self.frame_count = None
+        self.shape = None
+        self.color = None
+        self.convert_to_grayscale = False
+        self.dtype = None
+        self.SERFile = False
+
+    def sanity_check(self, file_path):
+        """
+        Performs a sanity check of input file.
+
+        :return: -
+        """
+
+        if not path.isfile(file_path):
+            raise IOError("File does not exist")
+        elif stat(file_path).st_size == 0:
+            raise IOError("File is empty")
+        else:
+            if path.splitext(file_path)[1].lower() == '.ser':
+                with open(file_path, 'rb') as fid:
+                    HEADER = fid.read(14).decode()
+                if HEADER == 'LUCAM-RECORDER':
+                    self.SERFile = True
+                else:
+                    raise IOError("File has structure not conform with SER file format")
+
+    def open(self, file_path, convert_to_grayscale=False):
+        """
+        Initialize the VideoReader object and return parameters with video metadata.
+         Throws an IOError if the video file format is not supported.
+
+        :param file_path: Full name of the video file.
+        :param convert_to_grayscale: If True, convert color frames to grayscale;
+                                     otherwise return RGB color frames.
+        :return: (frame_count, color, dtype, shape) with
+                 frame_count: Total number of frames in video.
+                 color: True, if frames are in color; False otherwise.
+                 dtype: Numpy type, either uint8 or uint16
+                 shape: Tuple with the shape of a single frame; (num_px_y, num_px_x, 3) for color,
+                        (num_px_y, num_px_x) for B/W.
+        """
+
+        # Do sanity check
+        self.sanity_check(file_path)
+
+        # Check if input file is SER file
+        if self.SERFile:
+            SER_header = self.read_ser_header(file_path)
+
+            self.frame_count = SER_header['FrameCount']
+            self.color = 0 < SER_header['ColorID'] < 100 and \
+                         SER_header['DebayerPattern'] is not None
+
+            if SER_header['PixelDepthPerPlane'] <= 8:
+                self.dtype = dtype(uint8)
+            else:
+                self.dtype = dtype(uint16)
+
+            # Debayer raw RGB data
+            if self.color:
+                self.SER_data = [cvtColor(frame, SER_header['DebayerPattern']) for frame in self.read_ser_image_data(file_path, SER_header)]
+            else:
+                self.SER_data = self.read_ser_image_data(file_path, SER_header)
+
+            self.last_read = 0
+            self.last_frame_read = self.SER_data[self.last_read]
+            self.shape = self.last_frame_read.shape
+
+        else:
+            try:
+                # Create the VideoCapture object.
+                self.cap = VideoCapture(file_path)
+
+                # Read the first frame.
+                ret, self.last_frame_read = self.cap.read()
+                if not ret:
+                    raise IOError("Error in reading first video frame")
+
+                # Look up video metadata.
+                self.last_read = 0
+                self.frame_count = int(self.cap.get(CAP_PROP_FRAME_COUNT))
+                self.shape = self.last_frame_read.shape
+                self.color = (len(self.shape) == 3)
+                self.dtype = self.last_frame_read.dtype
+            except:
+                raise IOError("Error in reading first video frame")
+
+        # If file is in color mode and grayscale output is requested, do the conversion and change
+        # metadata.
+        if self.color:
+            if convert_to_grayscale:
+                # Remember to do the conversion when reading frames later on.
+                self.convert_to_grayscale = True
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
+                self.color = False
+                self.shape = self.last_frame_read.shape
+            else:
+                # If color mode should stay, change image read by OpenCV into RGB.
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
+
+        self.opened = True
+        self.just_opened = True
+
+        # Return the metadata.
+        return self.frame_count, self.color, self.dtype, self.shape
+
+    def read_frame(self, index=None):
+        """
+        Read a single frame from the video.
+
+        :param index: Frame index (optional). If no index is specified, the next frame is read.
+                      At the first invocation, this is frame number 0.
+        :return: Numpy array containing the frame. For B/W, the shape is (num_px_y, num_px_x).
+                 For a color video, it is (num_px_y, num_px_x, 3). The type is uint8 or uint16 for
+                 8 or 16 bit resolution.
+        """
+
+        if not self.opened:
+            raise WrongOrderingError(
+                "Error: Attempt to read video frame before opening VideoReader")
+
+        # Special case: first call after initialization.
+        if self.just_opened:
+            self.just_opened = False
+
+            # Frame 0 has been read during initialization. Not necessary to read it again.
+            if index is None or index == 0:
+                return self.last_frame_read
+            # Otherwise set the frame pointer to the specified position.
+            else:
+                if not self.SERFile:
+                    self.cap.set(CAP_PROP_POS_FRAMES, index)
+                self.last_read = index
+
+        # General case: not the first call.
+        else:
+
+            # Consecutive reading. Just increment the frame pointer.
+            if index is None:
+                self.last_read += 1
+
+            # An index is specified explicitly. If it is the same as at last call, just return the
+            # last frame.
+            elif index == self.last_read:
+                return self.last_frame_read
+
+            # Some other frame was specified explicitly. If it is the next frame after the one read
+            # last time, the frame pointer does not have to be set.
+            else:
+                if index != self.last_read + 1 and not self.SERFile:
+                    self.cap.set(CAP_PROP_POS_FRAMES, index)
+                self.last_read = index
+
+        # A new frame has to be read. First check if the index is not out of bounds.
+        if 0 <= self.last_read < self.frame_count:
+            try:
+                # Read the next frame.
+                if self.SERFile:
+                    ret = True
+                    self.last_frame_read = self.SER_data[self.last_read]
+                else:
+                    ret, self.last_frame_read = self.cap.read()
+                if not ret:
+                    raise IOError("Error in reading video frame, index: " + str(index))
+            except:
+                raise IOError("Error in reading video frame, index: " + str(index))
+
+            # Do the conversion to grayscale or into RGB color if necessary.
+            if self.convert_to_grayscale:
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
+            elif self.color:
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
+        else:
+            raise ArgumentError("Error in reading video frame, index " + str(index) +
+                                " is out of bounds")
+
+        return self.last_frame_read
+
+    def close(self):
+        """
+        Close the VideoReader object.
+
+        :return:
+        """
+
+        if not self.SERFile:
+            self.cap.release()
+        self.opened = False
+
+    def read_ser_header(self, file_path):
+        """
+        Read the "Header" of SER file with fixed size of 178 Byte.
+
+        :param      file_path           Absolute file path of the SER file
+        :return:    header              Dictionary containing the both "raw"
+                                        and "decoded" values of "header"
+        """
+
+        KEYS = ('FileId', 'LuID', 'ColorID', 'LittleEndian', 'ImageWidth',
+                'ImageHeight', 'PixelDepthPerPlane', 'FrameCount', 'Observer',
+                'Instrument', 'Telescope', 'DateTime', 'DateTime_UTC')
+
+        ColorID = {0:   'MONO',
+                   8:   'BAYER_RGGB',
+                   9:   'BAYER_GRBG',
+                   10:  'BAYER_GBRG',
+                   11:  'BAYER_BGGR',
+                   16:  'BAYER_CYYM',
+                   17:  'BAYER_YCMY',
+                   18:  'BAYER_YMCY',
+                   19:  'BAYER_MYYC',
+                   100: 'RGB',
+                   101: 'BGR'}
+
+        with open(file_path, 'rb') as fid:
+            content = fid.read(178)
+
+        header = {key: value.decode('latin1') if isinstance(value, bytes) else
+                  value for (key, value) in zip(KEYS, struct.unpack(
+                          '<14s 7i 40s 40s 40s 2q', content))}
+
+        if header['ColorID'] == 8:
+            header['DebayerPattern'] = COLOR_BayerRG2RGB
+        elif header['ColorID'] == 9:
+            header['DebayerPattern'] = COLOR_BayerGR2RGB
+        elif header['ColorID'] == 10:
+            header['DebayerPattern'] = COLOR_BayerGB2RGB
+        elif header['ColorID'] == 11:
+            header['DebayerPattern'] = COLOR_BayerBG2RGB
+        else:
+            header['DebayerPattern'] = None
+
+        header['ColorIDDecoded'] = ColorID[header['ColorID']]
+
+        if header['ColorID'] < 100:
+            header['NumberOfPlanes'] = 1
+        else:
+            header['NumberOfPlanes'] = 3
+
+        if header['PixelDepthPerPlane'] <= 8:
+            header['BytesPerPixel'] = header['NumberOfPlanes']
+            if header['ColorID'] < 100:
+                header['PixelDataOrganization'] = 'M'
+            elif header['ColorID'] == 100:
+                header['PixelDataOrganization'] = 'R G B'
+            else:
+                header['PixelDataOrganization'] = 'B G R'
+        else:
+            header['BytesPerPixel'] = 2 * header['NumberOfPlanes']
+            if header['ColorID'] < 100:
+                header['PixelDataOrganization'] = 'MM'
+            elif header['ColorID'] == 100:
+                header['PixelDataOrganization'] = 'RR GG BB'
+            else:
+                header['PixelDataOrganization'] = 'BB GG RR'
+
+        try:
+            header['DateTime_Decoded'] = datetime.datetime(1, 1, 1) + \
+                datetime.timedelta(microseconds=header['DateTime'] // 10)
+        except Exception:
+            header['DateTime_Decoded'] = None
+
+        try:
+            header['DateTime_UTC_Decoded'] = datetime.datetime(1, 1, 1) + \
+                datetime.timedelta(microseconds=header['DateTime_UTC'] // 10)
+        except Exception:
+            header['DateTime_UTC_Decoded'] = None
+
+        # Check, if FireCature metadata is available
+        if 'fps=' in header['Telescope']:
+            header['FPS'] = float(header['Telescope'].split('fps=')[1].split('gain')[0])
+            header['Gain'] = int(header['Telescope'].split('gain=')[1].split('exp')[0])
+            header['Exposure [ms]'] = float(header['Telescope'].split('exp=')[1].split('\x00')[0])
+
+        return header
+
+    def read_ser_image_data(self, file_path, header=None):
+        """
+        Read the "Image Data" of SER file.
+
+        :param      file_path           Absolute file path of the SER file
+        :param      header (optional)   Ser file header, if already available
+        :return:    image_data          Multi dimmensional Numpy array
+                                        containig image frame data
+        """
+
+        if header is None:
+            header = self.read_ser_header(file_path)
+
+        if header['PixelDepthPerPlane'] <= 8:
+            PixelDepthPerPlane = dtype(uint8)
+        else:
+            # FireCapture uses "LittleEndian".
+            # Until FireCatpure 2.7 this flag was not set properly.
+            PixelDepthPerPlane = dtype(uint16).newbyteorder('<')
+
+        AMOUNT = header['FrameCount'] * header['ImageWidth'] * \
+            header['ImageHeight'] * header['BytesPerPixel']
+
+        with open(file_path, 'rb') as fid:
+            fid.seek(178)
+            content = fid.read(AMOUNT)
+
+        return frombuffer(content, dtype=PixelDepthPerPlane).reshape(
+                header['FrameCount'], header['ImageHeight'],
+                header['ImageWidth'])
+
+    def read_ser_trailer(self, file_path, header=None):
+        """
+        Read the "Trailer" of SER file with time stamps in UTC for every image
+        frame. Those values are "optional".
+
+        :param      file_path           Absolute file path of the SER file
+        :param      header (optional)   Ser file header, if already available
+        :return:    trailer             List containing "datetime" objects for
+                                        time stamps in UTC. Otherwise "None"
+        """
+
+        if header is None:
+            header = self.read_ser_header(file_path)
+
+        OFFSET = 178 + header['FrameCount'] * header['ImageWidth'] * \
+            header['ImageHeight'] * header['BytesPerPixel']
+
+        with open(file_path, 'rb') as fid:
+            fid.seek(OFFSET)
+            content = fid.read()
+
+        if content:
+            return [datetime.datetime(1, 1, 1) + datetime.timedelta(
+                microseconds=value // 10) for value in struct.unpack(
+                        '<{0}Q'.format(header['FrameCount']), content)]
+        else:
+            return None
+
+
+class ImageReader(object):
+    """
+    The ImageReader deals with the import of frames from a list of single images. Frames can
+    be read either consecutively, or at an arbitrary frame index. It is assumed that the
+    lexicographic order of file names corresponds to their chronological order.
+    """
+
+    def __init__(self):
+        """
+        Create the ImageReader object and initialize instance variables.
+        """
+
+        self.opened = False
+        self.just_opened = False
+        self.last_read = None
+        self.last_frame_read = None
+        self.frame_count = None
+        self.shape = None
+        self.color = None
+        self.convert_to_grayscale = False
+        self.dtype = None
+
+    def open(self, file_path_list, convert_to_grayscale=False):
+        """
+        Initialize the ImageReader object and return parameters with image metadata.
+
+        :param file_path_list: List with path names to the image files.
+        :param convert_to_grayscale: If True, convert color frames to grayscale;
+                                     otherwise return RGB color frames.
+        :return: (frame_count, color, dtype, shape) with
+                 frame_count: Total number of frames.
+                 color: True, if frames are in color; False otherwise.
+                 dtype: Numpy type, either uint8 or uint16
+                 shape: Tuple with the shape of a single frame; (num_px_y, num_px_x, 3) for color,
+                        (num_px_y, num_px_x) for B/W.
+        """
+
+        self.file_path_list = file_path_list
+
+        try:
+            self.frame_count = len(self.file_path_list)
+
+            self.last_frame_read = Frames.read_image(self.file_path_list[0])
+
+            if convert_to_grayscale:
+                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
+                # Remember to do the conversion when reading frames later on.
+                self.convert_to_grayscale = True
+
+            # Look up metadata.
+            self.last_read = 0
+            self.shape = self.last_frame_read.shape
+            self.color = (len(self.shape) == 3)
+            self.dtype = self.last_frame_read.dtype
+        except Exception as ex:
+            raise IOError("Reading first frame: " + str(ex))
+
+        self.opened = True
+        self.just_opened = True
+
+        # Return the metadata.
+        return self.frame_count, self.color, self.dtype, self.shape
+
+    def read_frame(self, index=None):
+        """
+        Read a single frame.
+
+        :param index: Frame index (optional). If no index is specified, the next frame is read.
+                      At the first invocation, this is frame number 0.
+        :return: Numpy array containing the frame. For B/W, the shape is (num_px_y, num_px_x).
+                 For a color video, it is (num_px_y, num_px_x, 3). The type is uint8 or uint16 for
+                 8 or 16 bit resolution.
+        """
+
+        if not self.opened:
+            raise WrongOrderingError(
+                "Error: Attempt to read image file frame before opening ImageReader")
+
+        # Special case: first call after initialization.
+        if self.just_opened:
+            self.just_opened = False
+
+            # Frame 0 has been read during initialization. Not necessary to read it again.
+            if index is None or index == 0:
+                return self.last_frame_read
+
+        # General case: not the first call.
+        else:
+
+            # Consecutive reading. Just increment the frame index.
+            if index is None:
+                self.last_read += 1
+
+            # An index is specified explicitly. If it is the same as at last call, just return the
+            # last frame.
+            elif index == self.last_read:
+                return self.last_frame_read
+
+            # Some other frame was specified explicitly.
+            else:
+                self.last_read = index
+
+        # A new frame has to be read. First check if the index is not out of bounds.
+        if 0 <= self.last_read < self.frame_count:
+            try:
+                self.last_frame_read = Frames.read_image(self.file_path_list[self.last_read])
+                if self.convert_to_grayscale:
+                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
+            except Exception as ex:
+                raise IOError("Reading image with index: " + str(index) + ", " + str(ex))
+        else:
+            raise ArgumentError("Reading image with index: " + str(index) +
+                                ", index is out of bounds")
+
+        # Check if the metadata match.
+        shape = self.last_frame_read.shape
+        color = (len(shape) == 3)
+
+        # Check if all images have matching metadata.
+        if color != self.color:
+            raise ShapeError(
+                "Mixing grayscale and color images not supported, index: " + str(index))
+        elif shape != self.shape:
+            raise ShapeError("Images have different size, index: " + str(index))
+        elif self.last_frame_read.dtype != self.dtype:
+            raise TypeError("Images have different type, index: " + str(index))
+
+        return self.last_frame_read
+
+    def close(self):
+        """
+        Close the ImageReader object.
+
+        :return:
+        """
+
+        self.opened = False
+
+
+class Calibration(QtCore.QObject):
+    """
+    This class performs the dark / flat calibration of frames. Master frames are created from
+    video files or image directories. Flats, darks and the stacking input must match in terms of
+    types, shapes and color modes.
+
+    """
+
+    report_calibration_error_signal = QtCore.pyqtSignal(str)
+
+    def __init__(self, configuration):
+        """
+        Initialize the  object for dark / flat calibration.
+
+        :param configuration: Configuration object with parameters
+        """
+
+        super(Calibration, self).__init__()
+        self.configuration = configuration
+        self.reset_masters()
+
+    def reset_masters(self):
+        """
+        De-activate master dark and flat frames.
+
+        :return: -
+        """
+
+        self.reset_master_dark()
+        self.reset_master_flat()
+
+        self.color = None
+        self.shape = None
+        self.dtype = None
+
+    def reset_master_dark(self):
+        """
+        De-activate a master dark frame.
+
+        :return: -
+        """
+
+        self.master_dark_frame = None
+        self.master_dark_frame_adapted = None
+        self.high_value = None
+        self.dark_color = None
+        self.dark_dtype = None
+        self.dark_shape = None
+
+    def reset_master_flat(self):
+        """
+        De-activate a master flat frame.
+
+        :return: -
+        """
+
+        self.master_flat_frame = None
+        self.inverse_master_flat_frame = None
+        self.flat_color = None
+        self.flat_dtype = None
+        self.flat_shape = None
+
+    def create_master(self, master_name, output_dtype=uint16):
+        """
+        Create a master frame by averaging a number of video frames or still images.
+
+        :param master_name: Path name of video file or image directory.
+        :param output_dtype: Data type of resulting master frame, one of:
+                             - uint8 (high value = 255)
+                             - uint16 (high value = 65535)
+                             default: uint16
+        :return: Master frame
+        """
+
+        # Case video file:
+        if Path(master_name).is_file():
+            extension = Path(master_name).suffix
+            if extension in ('.avi', '.ser'):
+                reader = VideoReader()
+                frame_count, input_color, input_dtype, input_shape = reader.open(master_name)
+                self.configuration.hidden_parameters_current_dir = str(Path(master_name).parent)
+            else:
+                raise InternalError(
+                    "Unsupported file type '" + extension + "' specified for master frame "
+                                                            "construction")
+        # Case image directory:
+        elif Path(master_name).is_dir():
+            names = [path.join(master_name, name) for name in listdir(master_name)]
+            reader = ImageReader()
+            frame_count, input_color, input_dtype, input_shape = reader.open(names)
+            self.configuration.hidden_parameters_current_dir = str(master_name)
+        else:
+            raise InternalError("Cannot decide if input file is video or image directory")
+
+        # Sum all frames in a 64bit buffer.
+        master_frame_64 = zeros(input_shape, float64)
+        for index in range(frame_count):
+            master_frame_64 += reader.read_frame()
+
+        # Return the average frame in the format specified.
+        if output_dtype == input_dtype:
+            return (master_frame_64 / frame_count).astype(output_dtype)
+        elif output_dtype == uint8 and input_dtype == uint16:
+            factor = 1. / (frame_count * 256)
+            return (master_frame_64 * factor).astype(output_dtype)
+        elif output_dtype == uint16 and input_dtype == uint8:
+            factor = 256. / frame_count
+            return (master_frame_64 * factor).astype(output_dtype)
+        else:
+            raise ArgumentError("Cannot convert dtype from " + str(input_dtype) + " to " +
+                                str(output_dtype))
+
+    def create_master_dark(self, dark_name, load_from_file=False):
+        """
+        Create a master dark image, or read it from a file.
+
+        :param dark_name: If a new master frame is to be created, path name of video file or image
+                          directory. Otherwise the file name (Tiff or Fits) of the master frame.
+        :param load_from_file: True, if to be loaded from file. False, if to be created anew.
+        :return: -
+        """
+
+        # Reset a master dark frame if previously allocated.
+        self.reset_master_dark()
+
+        # Create the master frame or read it from a file.
+        if load_from_file:
+            try:
+                self.master_dark_frame = Frames.read_image(dark_name)
+            except Exception as e:
+                self.report_calibration_error_signal.emit("Error: " + str(e))
+                return
+
+            if self.master_dark_frame.dtype == uint8:
+                self.master_dark_frame = (self.master_dark_frame * 256).astype(uint16)
+        else:
+            self.master_dark_frame = self.create_master(dark_name, output_dtype=uint16)
+
+        self.shape = self.dark_shape = self.master_dark_frame.shape
+        self.color = self.dark_color = (len(self.dark_shape) == 3)
+        self.dark_dtype = self.master_dark_frame.dtype
+
+        # If a flat frame has been processed already, check for consistency. If master frames do not
+        # match, remove the master flat.
+        if self.inverse_master_flat_frame is not None:
+            if self.dark_color != self.flat_color or self.dark_shape != self.flat_shape:
+                self.reset_master_flat()
+                # Send a message to the main GUI indicating that a non-matching master flat is
+                # removed.
+                self.report_calibration_error_signal.emit(
+                    "A non-matching master flat was de-activated")
+
+    def load_master_dark(self, dark_name):
+        """
+        Read a master dark frame from disk and initialize its metadata.
+
+        :param dark_name: Path name of master dark frame (type TIFF)
+        :return: -
+        """
+
+        self.create_master_dark(dark_name, load_from_file=True)
+
+    def create_master_flat(self, flat_name, load_from_file=False):
+        """
+        Create a master flat image, or read it from a file.
+
+        :param flat_name: If a new master frame is to be created, path name of video file or image
+                          directory. Otherwise the file name (Tiff or Fits) of the master frame.
+        :param load_from_file: True, if to be loaded from file. False, if to be created anew.
+        :return: -
+        """
+
+        # Reset a master flat frame if previously allocated.
+        self.reset_master_flat()
+
+        # Create the master frame or read it from a file.
+        if load_from_file:
+            try:
+                self.master_flat_frame = Frames.read_image(flat_name)
+            except Exception as e:
+                self.report_calibration_error_signal.emit("Error: " + str(e))
+                return
+
+            if self.master_flat_frame.dtype == uint8:
+                self.master_flat_frame = (self.master_flat_frame * 256).astype(uint16)
+        else:
+            self.master_flat_frame = self.create_master(flat_name, output_dtype=uint16)
+
+        self.shape = self.flat_shape = self.master_flat_frame.shape
+        self.color = self.flat_color = (len(self.flat_shape) == 3)
+        self.flat_dtype = self.master_flat_frame.dtype
+
+        # If a dark frame has been processed already, check for consistency. If master frames do not
+        # match, remove the master dark.
+        if self.master_dark_frame is not None:
+            if self.dark_color != self.flat_color or self.dark_shape != self.flat_shape:
+                self.reset_master_dark()
+                # Send a message to the main GUI indicating that a non-matching master dark is
+                # removed.
+                self.report_calibration_error_signal.emit(
+                    "A non-matching master dark was de-activated")
+
+        average_flat_frame = average(self.master_flat_frame).astype(uint16)
+
+        # If a new flat frame is to be constructed, apply a dark frame (if available).
+        if not load_from_file:
+            if self.master_dark_frame is not None:
+                # If there is a matching dark frame, use it to correct the flat frame. Avoid zeros
+                # in places where darks and flats are the same (hot pixels??).
+                self.master_flat_frame = where(self.master_flat_frame > self.master_dark_frame,
+                                               self.master_flat_frame - self.master_dark_frame,
+                                               average_flat_frame)
+
+        # Compute the inverse master flat (float32) so that its entries are close to one.
+        if average_flat_frame > 0:
+            self.inverse_master_flat_frame = (average_flat_frame / self.master_flat_frame).astype(
+                float32)
+        else:
+            self.reset_master_flat()
+            raise InternalError("Invalid input for flat frame computation")
+
+    def load_master_flat(self, flat_name):
+        """
+        Read a master flat frame from disk and initialize its metadata.
+
+        :param flat_name: Path name of master flat frame (type TIFF)
+        :return: -
+        """
+
+        try:
+            self.create_master_flat(flat_name, load_from_file=True)
+
+        # Send a signal to the main GUI and trigger error message printing there.
+        except Error as e:
+            self.report_calibration_error_signal.emit(
+                "Error in loading master flat: " + str(e) + ", flat correction de-activated")
+
+    def flats_darks_match(self, color, shape):
+        """
+        Check if the master flat / master dark match frame attributes.
+
+        :param color: True, if frames are in color; False otherwise.
+        :param shape: Tuple with the shape of a single frame; (num_px_y, num_px_x, 3) for color,
+                      (num_px_y, num_px_x) for B/W.
+        :return: True, if attributes match; False otherwise.
+        """
+
+        return color == self.color and shape == self.shape
+
+    def adapt_frame_type(self, frame_dtype):
+        """
+        Adapt the type of the master frames to the type of frames to be corrected.
+
+        :param frame_dtype: Dtype of frames to be corrected. Either uint8 or uint16.
+        :return: -
+        """
+
+        self.dtype = frame_dtype
+
+        if self.master_dark_frame is None:
+            self.high_value = None
+            self.master_dark_frame_adapted = None
+        elif frame_dtype == uint8:
+            self.high_value = 255
+            self.master_dark_frame_adapted = (self.master_dark_frame / 256.).astype(uint8)
+        elif frame_dtype == uint16:
+            self.high_value = 65535
+            self.master_dark_frame_adapted = self.master_dark_frame
+
+    def correct(self, frame):
+        """
+        Correct a stacking frame using a master dark and / or a master flat.
+
+        :param frame: Frame to be stacked.
+        :return: Frame corrected for dark/flat, same type as input frame.
+        """
+
+        # Case neither darks nor flats are available:
+        if self.master_dark_frame_adapted is None and self.inverse_master_flat_frame is None:
+            return frame
+
+        # Case only flats are available:
+        elif self.master_dark_frame_adapted is None:
+            return (frame * self.inverse_master_flat_frame).astype(self.dtype)
+
+        # Case only darks are available:
+        elif self.inverse_master_flat_frame is None:
+            return where(frame > self.master_dark_frame_adapted,
+                         frame - self.master_dark_frame_adapted, 0)
+
+        # Case both darks and flats are available:
+        else:
+            return clip(
+                (frame - self.master_dark_frame_adapted) * self.inverse_master_flat_frame,
+                0., self.high_value).astype(self.dtype)
 
 
 class Frames(object):
@@ -70,9 +869,41 @@ class Frames(object):
 
     """
 
-    def __init__(self, configuration, names, type='video', convert_to_grayscale=False,
-                 progress_signal=None, buffer_original=True, buffer_monochrome=False,
-                 buffer_gaussian=True, buffer_laplacian=True):
+    @staticmethod
+    def set_buffering(buffering_level):
+        """
+        Decide on the objects to be buffered, depending on "buffering_level" configuration
+        parameter.
+
+        :param buffering_level: Buffering level parameter as set in configuration.
+        :return: Tuple of four booleans:
+                 buffer_original: Keep all original frames in buffer.
+                 buffer_monochrome: Keep the monochrome version of  all original frames in buffer.
+                 buffer_gaussian: Keep the monochrome version with Gaussian blur added of  all
+                                  frames in buffer.
+                 buffer_laplacian: Keep the Laplacian of Gaussian (LoG) of the monochrome version of
+                                   all frames in buffer.
+        """
+
+        buffer_original = False
+        buffer_monochrome = False
+        buffer_gaussian = False
+        buffer_laplacian = False
+
+        if buffering_level > 0:
+            buffer_laplacian = True
+        if buffering_level > 1:
+            buffer_gaussian = True
+        if buffering_level > 2:
+            buffer_original = True
+        if buffering_level > 3:
+            buffer_monochrome = True
+
+        return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
+
+    def __init__(self, configuration, names, type='video', calibration=None,
+                 convert_to_grayscale=False, progress_signal=None, buffer_original=True,
+                 buffer_monochrome=False, buffer_gaussian=True, buffer_laplacian=True):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
@@ -81,6 +912,7 @@ class Frames(object):
         :param names: In case "video": name of the video file. In case "image": list of names for
                       all images.
         :param type: Either "video" or "image".
+        :param calibration: (Optional) calibration object for darks/flats correction.
         :param convert_to_grayscale: If "True", convert frames to grayscale if they are RGB.
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
                                 (str, int) with the current activity (str) and the progress in
@@ -100,6 +932,7 @@ class Frames(object):
 
         self.configuration = configuration
         self.names = names
+        self.calibration = calibration
         self.progress_signal = progress_signal
         self.type = type
         self.convert_to_grayscale = convert_to_grayscale
@@ -119,102 +952,43 @@ class Frames(object):
         self.laplacian_available = None
         self.laplacian_available_index = None
 
+        # Set a flag that no monochrome image has been computed before.
+        self.first_monochrome = True
+        self.average_brightness_first_frame = None
+
+        # Initialize the list of original frames.
+        self.frames_original = None
+
         # Compute the scaling value for Laplacian computation.
-        self.alpha = 1./256.
+        self.alpha = 1. / 256.
 
-        # If the original frames are to be buffered, read them in one go. In this case, a progress
-        # bar is displayed in the main GUI.
-        if self.buffer_original:
-            if self.type == 'image':
-                # Use scipy.misc to read in image files. If "convert_to_grayscale" is True, convert
-                # pixel values to 32bit floats.
-                self.number = len(self.names)
-                self.signal_step_size = max(int(self.number / 10), 1)
-                if self.convert_to_grayscale:
-                    self.frames_original = [misc.imread(path, mode='F') for path in self.names]
-                else:
-                    self.frames_original = []
-                    for frame_index, path in enumerate(self.names):
-                        # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                        if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
-                            self.progress_signal.emit("Read all frames",
-                                                 int((frame_index / self.number) * 100.))
-                        # Read the next frame.
-                        frame = cvtColor(imread(path, -1), COLOR_BGR2RGB)
-                        self.frames_original.append(frame)
-
-                    if self.progress_signal is not None:
-                        self.progress_signal.emit("Read all frames", 100)
-                self.shape = self.frames_original[0].shape
-                self.dt0 = self.frames_original[0].dtype
-
-                # Test if all images have the same shape, color type and depth.
-                # If not, raise an exception.
-                for image in self.frames_original:
-                    if image.shape != self.shape:
-                        raise ShapeError("Images have different size")
-                    elif len(self.shape) != len(image.shape):
-                        raise ShapeError("Mixing grayscale and color images not supported")
-                    if image.dtype != self.dt0:
-                        raise TypeError("Images have different type")
-
-            elif self.type == 'video':
-                # In case "video", use OpenCV to capture frames from video file. Revert the implicit
-                # conversion from RGB to BGR in OpenCV input.
-                self.cap = VideoCapture(self.names)
-                self.number = int(self.cap.get(CAP_PROP_FRAME_COUNT))
-                self.frames_original = []
-                self.signal_step_size = max(int(self.number / 10), 1)
-                for frame_index in range(self.number):
-                    # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                    if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
-                        self.progress_signal.emit("Read all frames", int((frame_index/self.number)*100.))
-                    # Read the next frame.
-                    ret, frame = self.cap.read()
-                    if ret:
-                        if self.convert_to_grayscale:
-                            self.frames_original.append(cvtColor(frame, COLOR_BGR2GRAY))
-                        else:
-                            self.frames_original.append(cvtColor(frame, COLOR_BGR2RGB))
-                    else:
-                        raise IOError("Error in reading video frame")
-                self.cap.release()
-                if self.progress_signal is not None:
-                    self.progress_signal.emit("Read all frames", 100)
-                self.shape = self.frames_original[0].shape
-                self.dt0 = self.frames_original[0].dtype
-            else:
-                raise TypeError("Image type " + self.type + " not supported")
-
-            # Monochrome images are stored as 2D arrays, color images as 3D.
-            if len(self.shape) == 2:
-                self.color = False
-            elif len(self.shape) == 3:
-                self.color = True
-            else:
-                raise ShapeError("Image shape not supported")
-
-            # Set the depth value of all images to either 16 or 8 bits.
-            if self.dt0 == 'uint16':
-                self.depth = 16
-            elif self.dt0 == 'uint8':
-                self.depth = 8
-            else:
-                raise TypeError("Frame type " + str(self.dt0) + " not supported")
-
+        # Initialize and open the reader object.
+        if self.type == 'image':
+            self.reader = ImageReader()
+        elif self.type == 'video':
+            self.reader = VideoReader()
         else:
-            if self.type == 'image':
-                self.number = len(names)
-            elif self.type == 'video':
-                self.cap = VideoCapture(names)
-                self.number = int(self.cap.get(CAP_PROP_FRAME_COUNT))
+            raise TypeError("Image type " + self.type + " not supported")
 
-            # Initialize metadata
-            self.shape = None
-            self.depth = None
-            self.dt0 = None
-            self.color = None
-            self.frames_original = [None for index in range(self.number)]
+        self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
+            convert_to_grayscale=self.convert_to_grayscale)
+
+        # Set the depth value of all images to either 16 or 8 bits.
+        if self.dt0 == 'uint16':
+            self.depth = 16
+        elif self.dt0 == 'uint8':
+            self.depth = 8
+        else:
+            raise TypeError("Frame type " + str(self.dt0) + " not supported")
+
+        # Check if the darks / flats of the calibration object match the current reader.
+        if self.calibration:
+            self.calibration_matches = self.calibration.flats_darks_match(self.color, self.shape)
+            # If there are matching darks or flats, adapt their type to the current frame type.
+            if self.calibration_matches:
+                self.calibration.adapt_frame_type(self.dt0)
+        else:
+            self.calibration_matches = False
 
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
         # Laplacians.
@@ -223,10 +997,79 @@ class Frames(object):
             self.color_index = colors.index(self.configuration.frames_mono_channel)
         else:
             raise ArgumentError("Invalid color selected for channel extraction")
-        self.frames_monochrome = [None for index in range(self.number)]
-        self.frames_monochrome_blurred = [None for index in range(self.number)]
-        self.frames_monochrome_blurred_laplacian = [None for index in range(self.number)]
+        self.frames_monochrome = [None] * self.number
+        self.frames_monochrome_blurred = [None] *self.number
+        self.frames_monochrome_blurred_laplacian = [None] *self.number
         self.used_alignment_points = None
+
+    def compute_required_buffer_size(self, buffering_level):
+        """
+        Compute the RAM required to store original images and their derivatives, and other objects
+        which scale with the image size.
+
+        Additional to the original images and their derivatives, the following large objects are
+        allocated during the workflow:
+            calibration.master_dark_frame: pixels * colors (float32)
+            calibration.master_dark_frame_uint8: pixels * colors (uint8)
+            calibration.master_dark_frame_uint16: pixels * colors (uint16)
+            calibration.master_flat_frame: pixels * colors (float32)
+            align_frames.mean_frame: image pixels (int32)
+            align_frames.mean_frame_original: image pixels (int32)
+            alignment_points, reference boxes: < 2 * image pixels (int32)
+            alignment_points, stacking buffers: < 2 * image pixels * colors (float32)
+            stack_frames.stacked_image_buffer: image pixels * colors (float32)
+            stack_frames.number_single_frame_contributions: image pixels (int32)
+            stack_frames.sum_single_frame_weights: image pixels (float32)
+            stack_frames.mask: image pixels (float32)
+            stack_frames.averaged_background: image pixels * colors (float32)
+            stack_frames.stacked_image: image pixels * colors (uint16)
+
+        :param buffering_level: Buffering level parameter.
+        :return: Number of required buffer space in bytes.
+        """
+
+        # Compute the number of image pixels.
+        number_pixel = self.shape[0] * self.shape[1]
+
+        # Compute the size of a monochrome image in bytes.
+        image_size_monochrome_bytes = number_pixel * self.depth / 8
+
+        # Compute the size of an original image in bytes.
+        if self.color:
+            image_size_bytes = 3 * image_size_monochrome_bytes
+        else:
+            image_size_bytes = image_size_monochrome_bytes
+
+        # Compute the size of the monochrome images with Gaussian blur added in bytes.
+        image_size_gaussian_bytes = number_pixel * 2
+
+        # Compute the size of a "Laplacian of Gaussian" in bytes. Remember that it is down-sampled.
+        image_size_laplacian_bytes = number_pixel / \
+                                     self.configuration.align_frames_sampling_stride ** 2
+
+        # Compute the buffer space per image, based on the buffering level.
+        buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian = \
+            Frames.set_buffering(buffering_level)
+        buffer_per_image = 0
+        if buffer_original:
+            buffer_per_image += image_size_bytes
+        if buffer_monochrome:
+            buffer_per_image += image_size_monochrome_bytes
+        if buffer_gaussian:
+            buffer_per_image += image_size_gaussian_bytes
+        if buffer_laplacian:
+            buffer_per_image += image_size_laplacian_bytes
+
+        # Multiply with the total number of frames.
+        buffer_for_all_images = buffer_per_image * self.number
+
+        # Compute the size of additional workspace objects allocated during the workflow.
+        buffer_additional_workspace = number_pixel * 57
+        if self.color:
+            buffer_additional_workspace += number_pixel * 58
+
+        # Return the total buffer space required.
+        return (buffer_for_all_images + buffer_additional_workspace) / 1e9
 
     def frames(self, index):
         """
@@ -236,9 +1079,34 @@ class Frames(object):
         :return: Frame with index "index".
         """
 
-        if not 0<=index<self.number:
+        if not 0 <= index < self.number:
             raise ArgumentError("Frame index " + str(index) + " is out of bounds")
         # print ("Accessing frame " + str(index))
+
+        # If the original frames are to be buffered, read them in one go at the first call to this
+        # method. In this case, a progress bar is displayed in the main GUI.
+        if self.frames_original is None:
+            if self.buffer_original:
+                self.frames_original = []
+                self.signal_step_size = max(int(self.number / 10), 1)
+                for frame_index in range(self.number):
+                    # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                    if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
+                        self.progress_signal.emit("Read all frames",
+                                                  int((frame_index / self.number) * 100.))
+                    # Read the next frame. If dark/flat correction is active, do the corrections.
+                    if self.calibration_matches:
+                        self.frames_original.append(self.calibration.correct(
+                            self.reader.read_frame()))
+                    else:
+                        self.frames_original.append(self.reader.read_frame())
+
+                self.reader.close()
+
+            # If original frames are not buffered, initialize an empty frame list, so frames can be
+            # read later in non-consecutive order.
+            else:
+                self.frames_original = [None] *self.number
 
         # The original frames are buffered. Just return the frame.
         if self.buffer_original:
@@ -248,58 +1116,17 @@ class Frames(object):
         if self.original_available_index == index:
             return self.original_available
 
-        # The frame has not been stored for re-use, read it.
+        # The frame has not been stored for re-use, read it. If dark/flat correction is active, do
+        # the corrections.
         else:
-            if self.type == 'image':
-                if self.convert_to_grayscale:
-                    frame = misc.imread(self.names[index], mode='F')
-                else:
-                    frame = cvtColor(imread(self.names[index], -1), COLOR_BGR2RGB)
+            if self.calibration_matches:
+                frame = self.calibration.correct(self.reader.read_frame(index))
             else:
-                # Set the read position in the file to frame "index", and read the frame.
-                if index != self.original_available_index + 1:
-                    self.cap.set(CAP_PROP_POS_FRAMES, index)
-                ret, frame = self.cap.read()
-                if ret:
-                    if self.convert_to_grayscale:
-                        frame = cvtColor(frame, COLOR_BGR2GRAY)
-                    else:
-                        frame = cvtColor(frame, COLOR_BGR2RGB)
-                else:
-                    raise IOError("Error in reading video frame")
+                frame = self.reader.read_frame(index)
 
             # Cache the frame just read.
             self.original_available = frame
             self.original_available_index = index
-
-            # For the first frame read, set image metadata.
-            if self.shape is None:
-                self.shape = frame.shape
-                # Monochrome images are stored as 2D arrays, color images as 3D.
-                if len(self.shape) == 2:
-                    self.color = False
-                elif len(self.shape) == 3:
-                    self.color = True
-                else:
-                    raise ShapeError("Image shape not supported")
-
-                self.dt0 = frame.dtype
-                # Set the depth value of all images to either 16 or 8 bits.
-                if self.dt0 == 'uint16':
-                    self.depth = 16
-                elif self.dt0 == 'uint8':
-                    self.depth = 8
-                else:
-                    raise TypeError("Frame type " + str(self.dt0) + " not supported")
-
-            # For every other frame, check for consistency.
-            else:
-                if len(frame.shape) != len(self.shape):
-                    raise ShapeError("Mixing grayscale and color images not supported")
-                elif frame.shape != self.shape:
-                    raise ShapeError("Images have different size")
-                if frame.dtype != self.dt0:
-                    raise TypeError("Images have different type")
 
             return frame
 
@@ -333,12 +1160,29 @@ class Frames(object):
             # If frames are in color mode produce a B/W version.
             if self.color:
                 if self.color_index == 3:
-                    frame_mono = cvtColor(frame_original, COLOR_BGR2GRAY)
+                    frame_mono = cvtColor(frame_original, COLOR_RGB2GRAY)
                 else:
                     frame_mono = frame_original[:, :, self.color_index]
             # Frames are in B/W mode already
             else:
                 frame_mono = frame_original
+
+            # Normalize the overall frame brightness.
+            frame_type = frame_mono.dtype
+            if self.first_monochrome:
+                self.average_brightness_first_frame = cv_mean(frame_mono)[0]
+                frame_mono = frame_mono.astype(frame_type)
+                self.first_monochrome = False
+            else:
+                average_brightness_current_frame = cv_mean(frame_mono)[0]
+                frame_mono = frame_mono * self.average_brightness_first_frame / \
+                                average_brightness_current_frame
+                # Clip the pixel values to the range allowed.
+                if frame_type == uint8:
+                    clip(frame_mono, 0, 255, out=frame_mono)
+                else:
+                    clip(frame_mono, 0, 65535, out=frame_mono)
+                frame_mono = frame_mono.astype(frame_type)
 
             # If the monochrome frames are buffered, store it at the current index.
             if self.buffer_monochrome:
@@ -379,12 +1223,13 @@ class Frames(object):
             frame_mono = self.frames_mono(index)
 
             # If the mono image is 8bit, interpolate it to 16bit.
-            if frame_mono.dtype == np.uint8:
-                frame_mono = frame_mono.astype(np.uint16) * 256
+            if frame_mono.dtype == uint8:
+                frame_mono = frame_mono.astype(uint16) * 256
 
             # Compute a version of the frame with Gaussian blur added.
             frame_monochrome_blurred = GaussianBlur(frame_mono,
-                (self.configuration.frames_gauss_width, self.configuration.frames_gauss_width), 0)
+                                                    (self.configuration.frames_gauss_width,
+                                                     self.configuration.frames_gauss_width), 0)
 
             # If the blurred frames are buffered, store the current frame at the current index.
             if self.buffer_gaussian:
@@ -425,9 +1270,9 @@ class Frames(object):
 
             # Compute a version of the frame with Gaussian blur added.
             frame_monochrome_laplacian = convertScaleAbs(Laplacian(
-                    frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
-                    ::self.configuration.align_frames_sampling_stride], CV_32F),
-                    alpha=self.alpha)
+                frame_monochrome_blurred[::self.configuration.align_frames_sampling_stride,
+                ::self.configuration.align_frames_sampling_stride], CV_32F),
+                alpha=self.alpha)
 
             # If the blurred frames are buffered, store the current frame at the current index.
             if self.buffer_laplacian:
@@ -454,11 +1299,13 @@ class Frames(object):
     @staticmethod
     def save_image(filename, image, color=False, avoid_overwriting=True):
         """
-        Save an image to a file.
+        Save an image to a file. If "avoid_overwriting" is set to False, images can have either
+        ".tiff" or ".fits" format.
 
         :param filename: Name of the file where the image is to be written
         :param image: ndarray object containing the image data
-        :param color: If True, a three channel RGB image is to be saved. Otherwise, monochrome.
+        :param color: If True, a three channel RGB image is to be saved. Otherwise, it is assumed
+                      that the image is monochrome.
         :param avoid_overwriting: If True, append a string to the input name if necessary so that
                                   it does not match any existing file. If False, overwrite
                                   an existing file.
@@ -487,17 +1334,78 @@ class Frames(object):
                 if not suffix:
                     filename += '.tiff'
 
-        # Don't care if a file with the given name exists. Overwrite it if necessary.
-        elif path.exists(filename):
-            remove(filename)
+        elif Path(filename).suffix == '.tiff':
+            # Don't care if a file with the given name exists. Overwrite it if necessary.
+            if path.exists(filename):
+                remove(filename)
+            # Write the image to the file. Before writing, convert the internal RGB representation into
+            # the BGR representation assumed by OpenCV.
+            if color:
+                imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
+            else:
+                imwrite(str(filename), image)
 
-        # Write the image to the file. Before writing, convert the internal RGB representation into
-        # the BGR representation assumed by OpenCV.
-        if color:
-            imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
+        elif Path(filename).suffix == '.fits':
+            # Flip image horizontally to preserve orientation
+            image = flip(image, 0)
+            if color:
+                image = moveaxis(image, -1, 0)
+            hdu = fits.PrimaryHDU(image)
+            hdu.header['CREATOR'] = 'PlanetarySystemStacker'
+            hdu.writeto(filename, overwrite=True)
+
         else:
-            imwrite(str(filename), image)
+            raise TypeError("Attempt to write image format other than 'tiff' or 'fits'")
 
+    @staticmethod
+    def read_image(filename):
+        """
+        Read an image (either in Tiff or Fits format) from a file.
+
+        :param filename: Path name of the input image.
+        :return: RGB or monochrome image.
+        """
+
+        name, suffix = splitext(filename)
+
+        # Make sure files with extensions written in large print can be read as well.
+        suffix = suffix.lower()
+
+        # Case FITS format:
+        if suffix in ('.fit', '.fits'):
+            image = fits.getdata(filename)
+
+            # FITS output file from AS3 is 16bit depth file, even though BITPIX
+            # has been set to "-32", which would suggest "numpy.float32"
+            # https://docs.astropy.org/en/stable/io/fits/usage/image.html
+            # To process this data in PSS, do "round()" and convert numpy array to "np.uint16"
+            if image.dtype == '>f4':
+                image = image.round().astype(uint16)
+
+            # If color image, move axis to be able to process the content
+            if len(image.shape) == 3:
+                image = moveaxis(image, 0, -1).copy()
+
+            # Flip image horizontally to recover orignal orientation
+            image = flip(image, 0)
+
+        # Case other supported image formats:
+        elif suffix in ('.tiff', '.tif', '.png', '.jpg'):
+            input_image = imread(filename, IMREAD_UNCHANGED)
+            if input_image is None:
+                raise IOError("Cannot read image file. Possible cause: Path contains non-ascii characters")
+
+            # If color image, convert to RGB mode.
+            if len(input_image.shape) == 3:
+                image = cvtColor(input_image, COLOR_BGR2RGB)
+            else:
+                image = input_image
+
+        else:
+            raise TypeError("Attempt to read image format other than 'tiff', 'tif',"
+                            " '.png', '.jpg' or 'fit', 'fits'")
+
+        return image
 
 def access_pattern(frames_object, average_frame_percent):
     """
@@ -509,8 +1417,7 @@ def access_pattern(frames_object, average_frame_percent):
     :return: Total time in seconds.
     """
 
-
-    number = frames.number
+    number = frames_object.number
     average_frame_number = max(
         ceil(number * average_frame_percent / 100.), 1)
     start = time()
@@ -518,8 +1425,8 @@ def access_pattern(frames_object, average_frame_percent):
     for index in range(number):
         frames_object.frames_mono_blurred_laplacian(index)
 
-    frames_object.frames_mono_blurred(number-1)
-    frames_object.frames_mono_blurred(number-1)
+    frames_object.frames_mono_blurred(number - 1)
+    frames_object.frames_mono_blurred(number - 1)
 
     for index in range(number):
         frames_object.frames_mono_blurred(index)
@@ -536,24 +1443,72 @@ def access_pattern(frames_object, average_frame_percent):
 
     return time() - start
 
+
+def access_pattern_simple(frames_object, average_frame_percent):
+    """
+    Simulate the access pattern of PSS to frame data, without any other activity in between. Return
+    the overall time.
+
+    :param frames_object: Frames object to access frames.
+    :param average_frame_percent: Percentage of frames for average image computation.
+    :return: Total time in seconds.
+    """
+
+    number = frames.number
+    start = time()
+
+    for rep_cnt in range(5):
+        for index in range(number):
+            frames_object.frames_mono_blurred(index)
+
+    return time() - start
+
+
 if __name__ == "__main__":
 
     # Images can either be extracted from a video file or a batch of single photographs. Select
     # the example for the test run.
-    type = 'image'
+    type = 'video'
     version = 'frames'
-    buffering_level = 2
+    buffering_level = 4
 
+    name_flats = None
+    name_darks = None
     if type == 'image':
         # names = glob('Images/2012_*.tif')
         # names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
-        names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
+        names = glob(
+            'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
     else:
         names = 'Videos/another_short_video.avi'
         # names = 'Videos/Moon_Tile-024_043939.avi'
+        name_flats = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Flat.avi'
+        name_darks = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Dark.avi'
 
     # Get configuration parameters.
     configuration = Configuration()
+
+    # Initialize the Dark / Flat correction.
+    if name_darks or name_flats:
+        calibration = Calibration(configuration)
+    else:
+        calibration = None
+
+    # Create the master dark if requested.
+    if name_darks:
+        calibration.create_master_dark(name_darks)
+        print("Master dark created, shape: " + str(calibration.master_dark_frame.shape))
+        dark_min = np_min(calibration.master_dark_frame)
+        dark_max = np_max(calibration.master_dark_frame)
+        print("Dark min: " + str(dark_min) + ", Dark max: " + str(dark_max))
+
+    # Create the master flat if requested.
+    if name_flats:
+        calibration.create_master_flat(name_flats)
+        print("Master flat created, shape: " + str(calibration.inverse_master_flat_frame.shape))
+        flat_min = np_min(calibration.inverse_master_flat_frame)
+        flat_max = np_max(calibration.inverse_master_flat_frame)
+        print("Flat min: " + str(flat_min) + ", Flat max: " + str(flat_max))
 
     # Decide on the objects to be buffered, depending on configuration parameter.
     buffer_original = False
@@ -573,20 +1528,18 @@ if __name__ == "__main__":
     start = time()
     if version == 'frames':
         try:
-            frames = Frames(configuration, names, type=type, convert_to_grayscale=False,
-                   buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
-                   buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
-        except Exception as e:
+            frames = Frames(configuration, names, type=type, calibration=calibration,
+                            convert_to_grayscale=False,
+                            buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
+                            buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
+        except Error as e:
             print("Error: " + e.message)
             exit()
-        frames_mono_3 = frames.frames_mono(3)
-        frames_mono_blurred_4 = frames.frames_mono_blurred(4)
-        frames_mono_blurred_laplacian_1 = frames.frames_mono_blurred_laplacian(1)
     else:
         try:
             frames = FramesOld(configuration, names, type=type, convert_to_grayscale=False)
             frames.add_monochrome(configuration.frames_mono_channel)
-        except Exception as e:
+        except Error as e:
             print("Error: " + e.message)
             exit()
     initialization_time = time() - start
@@ -594,8 +1547,10 @@ if __name__ == "__main__":
     print("Number of images read: " + str(frames.number))
     print("Image shape: " + str(frames.shape))
 
+    # total_access_time = access_pattern_simple(frames,
+    #                                       configuration.align_frames_average_frame_percent)
     total_access_time = access_pattern(frames, configuration.align_frames_average_frame_percent)
 
     print("\nInitialization time: {0:7.3f}, frame accesses and variant computations: {1:7.3f},"
           " total: {2:7.3f} (seconds)".format(initialization_time, total_access_time,
-                                              initialization_time+total_access_time))
+                                              initialization_time + total_access_time))

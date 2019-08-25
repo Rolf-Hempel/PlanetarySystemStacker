@@ -52,18 +52,15 @@ class FileDialog(QtWidgets.QFileDialog):
         :return: -
         """
 
-        inds = self.tree.selectionModel().selectedIndexes()
-        files = []
-        for i in inds:
-            if i.column() == 0:
-                files.append(self.directory().filePath(str(i.data())))
+        files = [self.directory().filePath(str(i.data())) for i in
+                 self.tree.selectionModel().selectedIndexes() if i.column() == 0]
         self.signal_dialog_ready.emit(files)
         self.close()
 
 
 class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
     """
-    Manage the list of jobs. Each item is either the name of a video file (.avi) or a directory
+    Manage the list of jobs. Each item is either the name of a video file (.avi .ser) or a directory
     containing image files of the same shape. Ask the user to add jobs to the list, or to remove
     existing entries. The interaction with the user is through the JobDialog class.
     """
@@ -84,7 +81,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.setFrameShadow(QtWidgets.QFrame.Sunken)
         self.setObjectName("configuration_editor")
 
-        self.setFixedSize(900, 600)
+        # The following line was deactivated. Otherwise the instructions under the joblist
+        # would not show completely on full HD monitors.
+        # self.setFixedSize(900, 600)
 
         self.parent_gui = parent_gui
         self.configuration = self.parent_gui.configuration
@@ -139,10 +138,10 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         self.file_dialog = FileDialog(self, message,
                                       self.configuration.hidden_parameters_current_dir,
-                                      "Videos (*.avi)", options=options)
-        self.file_dialog.setNameFilters(["Still image folders / video files for stacking (*.avi)",
-                                         "Images for postprocessing (*.tiff *.tif *.png *.jpg)"])
-        self.file_dialog.selectNameFilter("Still image folders / video files for stacking (*.avi)")
+                                      "Videos (*.avi *.ser)", options=options)
+        self.file_dialog.setNameFilters(["Still image folders / video files for stacking (*.avi *.ser)",
+                                         "Images for postprocessing (*.tiff *.tif *.fit *.fits *.png *.jpg)"])
+        self.file_dialog.selectNameFilter("Still image folders / video files for stacking (*.avi *.ser)")
 
         # The list of strings with the new job names is sent by the FileDialog via the signal.
         self.file_dialog.signal_dialog_ready.connect(self.get_input_names)
@@ -172,17 +171,10 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         """
 
         # Get the selected items from the central job list widget.
-        items = self.job_list_widget.selectedItems()
-        remove_list = []
-        for item in items:
-            remove_list.append(str(item.text()))
-        input_names = []
-        for item in self.job_names:
-            if item not in remove_list:
-                input_names.append(item)
+        remove_list = [str(item.text()) for item in self.job_list_widget.selectedItems()]
 
         # Update the current job name list, and re-draw the job list widget.
-        self.job_names = input_names
+        self.job_names = [item for item in self.job_names if item not in remove_list]
         self.populate_job_list()
 
     def accept(self):
@@ -193,16 +185,16 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         :return: -
         """
 
-        image_extensions = ['.tif', '.tiff', '.jpg', '.png']
-        video_extensions = ['.avi']
+        image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
+        video_extensions = ['.avi', '.ser']
         # Set the job types of all current jobs on the list.
         self.job_types = []
         for job in self.job_names:
             if Path(job).is_file():
-                extension = Path(job).suffix
+                extension = Path(job).suffix.lower()
                 if extension in video_extensions:
                     self.job_types.append('video')
-                elif Path(job).suffix in image_extensions:
+                elif extension in image_extensions:
                     self.job_types.append('postproc')
                 else:
                     raise InternalError("Unsupported file type '" + extension + "' specified for job")
