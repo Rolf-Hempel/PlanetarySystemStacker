@@ -30,7 +30,7 @@ exe = EXE(pyz,
           bootloader_ignore_signals=False,
           strip=False,
           upx=True,
-          console=True )    # To get rid of the console window, change value to False.
+          console=False )    # To display a console window, change value to True.
 coll = COLLECT(exe,
                a.binaries,
                a.zipfiles,

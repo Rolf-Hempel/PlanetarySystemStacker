@@ -58,6 +58,24 @@ class FileDialog(QtWidgets.QFileDialog):
         self.close()
 
 
+class Job(object):
+    """
+    Objects of this class encapsulate all information describing a PSS job.
+    """
+
+    def __init__(self, job_name, parent=None):
+        """
+        Initialize a Job object, given its name.
+
+        :param job_name: Name of the job (str)
+        :param parent: Parent object
+        """
+
+        self.name = job_name
+        self.type = None
+        self.bayer_pattern = None
+
+
 class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
     """
     Manage the list of jobs. Each item is either the name of a video file (.avi .ser) or a directory
@@ -91,13 +109,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         # Set the window icon to the PSS icon.
         self.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
 
-        # Get a copy of the job names constructed so far. The editor only works on the copy, so
+        # Get a copy of the jobs constructed so far. The editor only works on the copy, so
         # that in the case of "cancel" the original list is not changed.
-        self.job_names = self.parent_gui.job_names.copy()
-
-        # Initialize the job types. When the editor exits (close() method), the types are set
-        # according to the entries in "job_names" (either "video" or "image").
-        self.job_types = None
+        self.jobs = self.parent_gui.jobs.copy()
 
         self.messageLabel.setStyleSheet('color: red')
 
@@ -110,7 +124,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.populate_job_list()
 
         # If the job list is empty, open the input file dialog.
-        if not self.job_names:
+        if not self.jobs:
             self.add_jobs()
 
     def populate_job_list(self):
@@ -120,8 +134,8 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         :return: -
         """
         self.job_list_widget.clear()
-        for job in self.job_names:
-            item = QtWidgets.QListWidgetItem(job)
+        for job in self.jobs:
+            item = QtWidgets.QListWidgetItem(job.name)
             self.job_list_widget.addItem(item)
 
     def add_jobs(self):
@@ -155,9 +169,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         :return: -
         """
         if input_names:
-            for entry in input_names:
-                if entry not in self.job_names:
-                    self.job_names.append(entry)
+            for input_name in input_names:
+                if input_name not in [job.name for job in self.jobs]:
+                    self.jobs.append(Job(input_name))
 
             # Save the current directory location. The next dialog will open at this position.
             self.configuration.hidden_parameters_current_dir = str(Path(input_names[0]).parents[0])
@@ -173,8 +187,8 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         # Get the selected items from the central job list widget.
         remove_list = [str(item.text()) for item in self.job_list_widget.selectedItems()]
 
-        # Update the current job name list, and re-draw the job list widget.
-        self.job_names = [item for item in self.job_names if item not in remove_list]
+        # Update the current job list, and re-draw the job list widget.
+        self.jobs = [job for job in self.jobs if job.name not in remove_list]
         self.populate_job_list()
 
     def accept(self):
@@ -188,25 +202,23 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
         video_extensions = ['.avi', '.ser']
         # Set the job types of all current jobs on the list.
-        self.job_types = []
-        for job in self.job_names:
-            if Path(job).is_file():
-                extension = Path(job).suffix.lower()
+        for job in self.jobs:
+            if Path(job.name).is_file():
+                extension = Path(job.name).suffix.lower()
                 if extension in video_extensions:
-                    self.job_types.append('video')
+                    job.type = 'video'
                 elif extension in image_extensions:
-                    self.job_types.append('postproc')
+                    job.type = 'postproc'
                 else:
                     raise InternalError("Unsupported file type '" + extension + "' specified for job")
-            elif Path(job).is_dir():
-                self.job_types.append('image')
+            elif Path(job.name).is_dir():
+                job.type = 'image'
             else:
                 raise InternalError("Cannot decide if input file is video or image directory")
 
         # Update the job list and reset the current job index to the first entry.
-        self.parent_gui.job_names = self.job_names
-        self.parent_gui.job_types = self.job_types
-        self.parent_gui.job_number = len(self.job_names)
+        self.parent_gui.jobs = self.jobs
+        self.parent_gui.job_number = len(self.jobs)
         self.parent_gui.job_index = 0
         self.parent_gui.activity = "Read frames"
         self.parent_gui.activate_gui_elements([self.parent_gui.ui.box_automatic], True)

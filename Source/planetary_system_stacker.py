@@ -23,7 +23,6 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 
 """
 
-import os
 import getpass
 import platform
 from os import remove
@@ -139,7 +138,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     signal_reset_masters = QtCore.pyqtSignal()
     signal_load_master_dark = QtCore.pyqtSignal(str)
     signal_load_master_flat = QtCore.pyqtSignal(str)
-    signal_frames = QtCore.pyqtSignal(str, str, bool)
+    signal_frames = QtCore.pyqtSignal(object, bool)
     signal_rank_frames = QtCore.pyqtSignal()
     signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
     signal_set_roi = QtCore.pyqtSignal(int, int, int, int)
@@ -224,6 +223,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.workflow.calibration.report_calibration_error_signal.connect(
             self.report_calibration_error)
         self.workflow.work_next_task_signal.connect(self.work_next_task)
+        self.workflow.abort_job_signal.connect(self.next_job_after_error)
         self.workflow.work_current_progress_signal.connect(self.set_current_progress)
         self.workflow.set_main_gui_busy_signal.connect(self.gui_set_busy)
         self.workflow.set_status_bar_signal.connect(self.write_status_bar)
@@ -256,8 +256,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.pause = False
         self.job_number = 0
         self.job_index = 0
-        self.job_names = []
-        self.job_types = []
+        self.jobs = []
         self.activity = 'Read frames'
 
         # Initialize the "backwards" combobox: The user can only go back to those program steps
@@ -679,7 +678,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         """
 
         # Make sure not to process an empty job list, or a job index out of range.
-        if not self.job_names or self.job_index >= self.job_number:
+        if not self.jobs or self.job_index >= self.job_number:
             return
 
         self.activity = next_activity
@@ -698,15 +697,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         elif self.activity == "Read frames":
             # For the first activity (reading all frames from the file system) there is no
             # GUI interaction. Start the workflow action immediately.
-            self.signal_frames.emit(self.job_names[self.job_index],
-                                    self.job_types[self.job_index], False)
+            self.signal_frames.emit(self.jobs[self.job_index], False)
             self.busy = True
 
         elif self.activity == "Rank frames":
 
             # If batch mode is deselected, start GUI activity.
             # if not self.automatic:
-            #     self.write_status_bar("Processing " + self.job_names[self.job_index] + ".", "black")
+            #     self.write_status_bar("Processing " + self.jobs[self.job_index].name + ".", "black")
             #     self.place_holder_manual_activity('Rank frames')
 
             # Now start the corresponding action on the workflow thread.
@@ -874,14 +872,40 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 self.activity = "Read frames"
                 if not self.automatic:
                     pass
-                self.signal_frames.emit(self.job_names[self.job_index],
-                                        self.job_types[self.job_index], False)
+                self.signal_frames.emit(self.jobs[self.job_index], False)
             else:
                 # End of queue reached, give control back to the user.
                 self.busy = False
 
         # Activate / Deactivate GUI elements depending on the current situation.
         self.update_status()
+
+    @QtCore.pyqtSlot(str)
+    def next_job_after_error(self, message):
+        """
+        This method is triggered by the workflow thread via a signal when an error causes a job to
+        be aborted. In interactive mode a message window shows the error message and asks the user
+        for confirmation. Depending on the protocol level, the error message is also written to the
+        protocol (file).
+
+        :param message: Error message to be displayed
+        :return: -
+        """
+
+        # In iShow a message box and wait for acknowledgement by the user.
+        if not self.automatic:
+
+            msg = QtWidgets.QMessageBox()
+            msg.setText(message)
+            msg.setIcon(QtWidgets.QMessageBox.Critical)
+            msg.setWindowTitle(self.configuration.global_parameters_version)
+            msg.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
+            msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
+            msg.exec_()
+
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol(message + "\n", self.workflow.attached_log_file)
+        self.work_next_task("Next job")
 
     def save_result(self):
         """
@@ -1007,7 +1031,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                             'Compute frame qualities', 'Stack frames',
                                             'Save stacked image'])
         elif self.activity == "Postprocessing":
-            if self.workflow.job_type == 'stacking':
+            if self.workflow.activity == 'stacking':
                 self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
                                                 'Select stack size', 'Set ROI',
                                                 'Set alignment points',
@@ -1016,7 +1040,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             # This is to be added for both job types.
             self.ui.comboBox_back.addItems(['Postprocessing'])
         elif self.activity == "Save postprocessed image":
-            if self.workflow.job_type == 'stacking':
+            if self.workflow.activity == 'stacking':
                 self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
                                                 'Select stack size', 'Set ROI',
                                                 'Set alignment points',
@@ -1026,7 +1050,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             # This is to be added for both job types.
             self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
         elif self.activity == "Next job":
-            if self.workflow.job_type == 'stacking':
+            if self.workflow.activity == 'stacking':
                 self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
                                                 'Select stack size', 'Set ROI',
                                                 'Set alignment points',
@@ -1077,7 +1101,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                         self.ui.menuEdit, self.ui.menuCalibrate], False)
             self.activate_gui_elements([self.ui.pushButton_pause], True)
             if self.job_index < self.job_number:
-                self.write_status_bar("Busy processing " + self.job_names[self.job_index], "black")
+                self.write_status_bar("Busy processing " + self.jobs[self.job_index].name, "black")
 
         # In manual mode, activate buttons and menu entries. Update the status bar.
         else:
@@ -1218,7 +1242,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Ask the user for confirmation.
         quit_msg = "Are you sure you want to exit?"
-        reply = QtWidgets.QMessageBox.question(self, 'Message', quit_msg,
+        reply = QtWidgets.QMessageBox.question(self, self.configuration.global_parameters_version,
+                                               quit_msg,
                                                QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
                                                QtWidgets.QMessageBox.No)
         # Positive reply: Do it.

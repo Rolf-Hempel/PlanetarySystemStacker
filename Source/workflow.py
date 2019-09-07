@@ -25,6 +25,7 @@ from ctypes import CDLL, byref, c_int
 from os import listdir
 import platform
 from os.path import splitext, join
+from time import sleep
 
 import gc
 import psutil
@@ -46,6 +47,7 @@ class Workflow(QtCore.QObject):
     master_dark_created_signal = QtCore.pyqtSignal(bool)
     master_flat_created_signal = QtCore.pyqtSignal(bool)
     work_next_task_signal = QtCore.pyqtSignal(str)
+    abort_job_signal = QtCore.pyqtSignal(str)
     work_current_progress_signal = QtCore.pyqtSignal(str, int)
     set_main_gui_busy_signal = QtCore.pyqtSignal(bool)
     set_status_bar_signal = QtCore.pyqtSignal(str, str)
@@ -70,7 +72,7 @@ class Workflow(QtCore.QObject):
         self.postprocessed_image = None
         self.postproc_input_image = None
         self.postproc_input_name = None
-        self.job_type = None
+        self.activity = None
         self.attached_log_name = None
         self.attached_log_file = None
         self.stdout_saved = None
@@ -100,8 +102,8 @@ class Workflow(QtCore.QObject):
         except Exception as e:
             Miscellaneous.protocol(
                 "Warning: mkl_rt.dll / libmkl_rt.so does not work (not a Windows or Linux system, "
-                "or Intel Math Kernel Library not installed?). "
-                + str(e), self.attached_log_file, precede_with_timestamp=True)
+                "or Intel Math Kernel Library not installed?). " + str(e), self.attached_log_file,
+                precede_with_timestamp=True)
 
         # Create the calibration object, used for potential flat / dark corrections.
         self.calibration = Calibration(self.configuration)
@@ -119,16 +121,12 @@ class Workflow(QtCore.QObject):
         try:
             self.set_main_gui_busy_signal.emit(True)
             self.calibration.create_master_dark(dark_names[0])
-            # if self.configuration.global_parameters_protocol_level > 0 and \
-            #         self.calibration.master_flat_removed:
-            #     Miscellaneous.protocol("           A non-matching master flat was de-activated",
-            #         self.attached_log_file, precede_with_timestamp=False)
             self.master_dark_created_signal.emit(True)
         except Exception as e:
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("           Error in creating master dark frame: " + str(e),
                                        self.attached_log_file, precede_with_timestamp=False)
-                self.master_dark_created_signal.emit(False)
+            self.master_dark_created_signal.emit(False)
 
     @QtCore.pyqtSlot(list)
     def execute_create_master_flat(self, flat_names):
@@ -144,29 +142,26 @@ class Workflow(QtCore.QObject):
         try:
             self.set_main_gui_busy_signal.emit(True)
             self.calibration.create_master_flat(flat_names[0])
-            # if self.configuration.global_parameters_protocol_level > 0 and \
-            #         self.calibration.master_dark_removed:
-            #     Miscellaneous.protocol("           A non-matching master dark was de-activated",
-            #         self.attached_log_file, precede_with_timestamp=False)
             self.master_flat_created_signal.emit(True)
         except Error as e:
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("           Error in creating master flat frame: " + str(
-                    e) + ", flat frame calibration de-activated",
-                                       self.attached_log_file, precede_with_timestamp=False)
-                self.master_flat_created_signal.emit(False)
+                    e) + ", flat frame calibration de-activated", self.attached_log_file,
+                                       precede_with_timestamp=False)
+            self.master_flat_created_signal.emit(False)
 
     @QtCore.pyqtSlot()
     def execute_reset_masters(self):
 
         # De-activate master frames.
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ De-activating master frames +++",
-                                   self.attached_log_file, precede_with_timestamp=True)
+            Miscellaneous.protocol("+++ De-activating master frames +++", self.attached_log_file,
+                                   precede_with_timestamp=True)
         self.calibration.reset_masters()
 
-    @QtCore.pyqtSlot(str, str, bool)
-    def execute_frames(self, input_name, input_type, convert_to_grayscale):
+    @QtCore.pyqtSlot(object, bool)
+    def execute_frames(self, job, convert_to_grayscale):
+        # self.work_next_task_signal.emit("Next job")
 
         # If objects are left over from previous run, delete them.
         for obj in [self.frames, self.rank_frames, self.align_frames, self.alignment_points,
@@ -178,7 +173,7 @@ class Workflow(QtCore.QObject):
         gc.collect()
 
         # Update the status bar in the main GUI.
-        self.input_name = input_name
+        self.input_name = job.name
         self.set_status_bar_processing_phase("reading frames")
 
         # A jobs can either "stack" images or "postprocess" a single image. In the latter case,
@@ -188,35 +183,35 @@ class Workflow(QtCore.QObject):
         # photographs. In the first case, input_type is set to 'video', in the second case to
         # 'image'.
 
-        if input_type == 'postproc':
-            self.job_type = 'postproc'
-            self.postproc_input_name = input_name
+        if job.name == 'postproc':
+            self.activity = 'postproc'
+            self.postproc_input_name = job.name
 
             # Reset the postprocessed image to None. This way, in saving the postprocessing result,
             # it can be checked if an image was computed in the workflow thread.
             self.postprocessed_image = None
             self.postprocessed_image_name = PostprocDataObject.set_file_name_processed(
-                input_name, self.configuration.postproc_suffix,
+                job.name, self.configuration.postproc_suffix,
                 self.configuration.global_parameters_image_format)
-            self.attached_log_name = splitext(input_name)[0] + '_postproc-log.txt'
+            self.attached_log_name = splitext(job.name)[0] + '_postproc-log.txt'
 
         # For video file input, the Frames constructor expects the video file name for "names".
-        elif input_type == 'video':
-            self.job_type = 'stacking'
-            names = input_name
-            self.stacked_image_name = splitext(input_name)[0] + \
+        elif job.type == 'video':
+            self.activity = 'stacking'
+            names = job.name
+            self.stacked_image_name = splitext(job.name)[0] + \
                                       self.configuration.stack_frames_suffix + '.' + \
                                       self.configuration.global_parameters_image_format
-            self.attached_log_name = splitext(input_name)[0] + '_stacking-log.txt'
+            self.attached_log_name = splitext(job.name)[0] + '_stacking-log.txt'
 
         # For single image input, the Frames constructor expects a list of image file names for
         # "names".
         else:  # input_type = 'image'
-            self.job_type = 'stacking'
-            names = [join(input_name, name) for name in listdir(input_name)]
-            self.stacked_image_name = input_name + self.configuration.stack_frames_suffix + '.' + \
+            self.activity = 'stacking'
+            names = [join(job.name, name) for name in listdir(job.name)]
+            self.stacked_image_name = job.name + self.configuration.stack_frames_suffix + '.' + \
                                       self.configuration.global_parameters_image_format
-            self.attached_log_name = input_name + '_stacking-log.txt'
+            self.attached_log_name = job.name + '_stacking-log.txt'
 
         # Redirect stdout to a file if requested.
         if self.configuration.global_parameters_write_protocol_to_file != self.output_redirected:
@@ -243,10 +238,10 @@ class Workflow(QtCore.QObject):
 
         # Write a header to stdout and optionally to the logfile.
         if self.configuration.global_parameters_protocol_level > 0:
-            decorator_line = (len(input_name) + 28) * "*"
+            decorator_line = (len(job.name) + 28) * "*"
             Miscellaneous.protocol(decorator_line, self.attached_log_file,
                                    precede_with_timestamp=False)
-            Miscellaneous.protocol("Start processing " + input_name, self.attached_log_file)
+            Miscellaneous.protocol("Start processing " + job.name, self.attached_log_file)
             Miscellaneous.protocol(decorator_line, self.attached_log_file,
                                    precede_with_timestamp=False)
 
@@ -254,7 +249,7 @@ class Workflow(QtCore.QObject):
         self.my_timer = timer()
         self.my_timer.create('Execution over all')
 
-        if self.job_type == 'stacking':
+        if self.activity == 'stacking':
             # Write parameters to the protocol.
             if self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.print_stacking_parameters(self.configuration, self.attached_log_file)
@@ -270,7 +265,7 @@ class Workflow(QtCore.QObject):
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
             try:
-                self.frames = Frames(self.configuration, names, type=input_type,
+                self.frames = Frames(self.configuration, names, type=job.type,
                                      calibration=self.calibration,
                                      convert_to_grayscale=convert_to_grayscale,
                                      progress_signal=self.work_current_progress_signal,
@@ -303,16 +298,12 @@ class Workflow(QtCore.QObject):
                             "calibration de-activated",
                             self.attached_log_file, precede_with_timestamp=False)
             except Error as e:
-                if self.configuration.global_parameters_protocol_level > 0:
-                    Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
-                                           self.attached_log_file)
-                self.work_next_task_signal.emit("Next job")
+                print ("Position Error 1")
+                self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
                 return
             except Exception as e:
-                if self.configuration.global_parameters_protocol_level > 0:
-                    Miscellaneous.protocol("Error: " + str(e) + ", continue with next job\n",
-                                           self.attached_log_file)
-                self.work_next_task_signal.emit("Next job")
+                print("Position Error 2" + str(e))
+                self.abort_job_signal.emit("Error: " + str(e) + ", continue with next job")
                 return
 
             # Look up the available RAM (without paging)
@@ -338,19 +329,15 @@ class Workflow(QtCore.QObject):
                         break
 
                 # If an appropriate level was found, write it as a recommendation to the protocol.
-                if self.configuration.global_parameters_protocol_level > 0:
-                    if recommended_level is not None:
-                        Miscellaneous.protocol("Error: Too little RAM for chosen buffering level,"
-                                               " recommended level: " + str(recommended_level) +
-                                               ", continuing with next job\n",
-                                               self.attached_log_file)
-                    else:
-                        Miscellaneous.protocol("Error: Too little RAM for this job, "
-                                               "continuing with the next one\n",
-                                               self.attached_log_file)
+                if recommended_level is not None:
+                    message = "Error: Too little RAM for chosen buffering level, recommended " \
+                              "level: " + str(
+                        recommended_level) + ", continuing with next job"
+                else:
+                    message = "Error: Too little RAM for this job, continuing with the next one"
 
                 # Continue with the next job.
-                self.work_next_task_signal.emit("Next job")
+                self.abort_job_signal.emit(message)
                 return
 
             # The RAM seems to be sufficient, continue with ranking frames.
@@ -361,16 +348,10 @@ class Workflow(QtCore.QObject):
             try:
                 self.postproc_input_image = Frames.read_image(self.postproc_input_name)
             except Error as e:
-                if self.configuration.global_parameters_protocol_level > 0:
-                    Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
-                                           self.attached_log_file)
-                self.work_next_task_signal.emit("Next job")
+                self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
                 return
             except Exception as e:
-                if self.configuration.global_parameters_protocol_level > 0:
-                    Miscellaneous.protocol("Error: " + str(e) + ", continue with next job\n",
-                                           self.attached_log_file)
-                self.work_next_task_signal.emit("Next job")
+                self.abort_job_signal.emit("Error: " + str(e) + ", continue with next job")
                 return
 
             # Convert 8 bit to 16 bit.
@@ -393,18 +374,12 @@ class Workflow(QtCore.QObject):
             self.rank_frames.frame_score()
             self.my_timer.stop('Ranking images')
         except Error as e:
-            if self.configuration.global_parameters_protocol_level > 0:
-                Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
-                                       self.attached_log_file)
+            self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
             self.my_timer.stop('Ranking images')
-            self.work_next_task_signal.emit("Next job")
             return
         except Exception as e:
-            if self.configuration.global_parameters_protocol_level > 0:
-                Miscellaneous.protocol("Error: " + str(e) + ", continue with next job\n",
-                                       self.attached_log_file)
+            self.abort_job_signal.emit("Error: " + str(e) + ", continue with next job")
             self.my_timer.stop('Ranking images')
-            self.work_next_task_signal.emit("Next job")
             return
 
         if self.configuration.global_parameters_protocol_level > 1:
@@ -420,8 +395,7 @@ class Workflow(QtCore.QObject):
         self.set_status_bar_processing_phase("aligning frames")
         # Initialize the frame alignment object.
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Initializing frame alignment +++",
-                                   self.attached_log_file)
+            Miscellaneous.protocol("+++ Initializing frame alignment +++", self.attached_log_file)
         self.align_frames = AlignFrames(self.frames, self.rank_frames, self.configuration,
                                         progress_signal=self.work_current_progress_signal)
 
@@ -430,19 +404,19 @@ class Workflow(QtCore.QObject):
             auto_execution = False
             if y_low_opt == 0 and y_high_opt == 0 and x_low_opt == 0 and x_high_opt == 0:
                 auto_execution = True
-            elif (y_high_opt - y_low_opt) / self.frames.shape[0] > \
-                    self.configuration.align_frames_max_stabilization_patch_fraction or \
-                    (x_high_opt - x_low_opt) / self.frames.shape[1] > \
-                    self.configuration.align_frames_max_stabilization_patch_fraction and \
+            elif (y_high_opt - y_low_opt) / self.frames.shape[
+                0] > self.configuration.align_frames_max_stabilization_patch_fraction or (
+                    x_high_opt - x_low_opt) / self.frames.shape[
+                1] > self.configuration.align_frames_max_stabilization_patch_fraction and \
                     self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("           Stabilization patch selected manually is "
                                        "too large, switch to automatic mode",
                                        self.attached_log_file, precede_with_timestamp=False)
                 auto_execution = True
-            elif (y_high_opt - y_low_opt) / self.frames.shape[0] < \
-                    self.configuration.align_frames_min_stabilization_patch_fraction or \
-                    (x_high_opt - x_low_opt) / self.frames.shape[1] < \
-                    self.configuration.align_frames_min_stabilization_patch_fraction and \
+            elif (y_high_opt - y_low_opt) / self.frames.shape[
+                0] < self.configuration.align_frames_min_stabilization_patch_fraction or (
+                    x_high_opt - x_low_opt) / self.frames.shape[
+                1] < self.configuration.align_frames_min_stabilization_patch_fraction and \
                     self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("           Stabilization patch selected manually is "
                                        "too small, switch to automatic mode",
@@ -456,16 +430,15 @@ class Workflow(QtCore.QObject):
             if auto_execution or self.configuration.align_frames_automation:
 
                 self.my_timer.create_no_check('Select optimal alignment patch')
-                (y_low_opt, y_high_opt, x_low_opt, x_high_opt) = \
-                    self.align_frames.compute_alignment_rect(
-                        self.configuration.align_frames_rectangle_scale_factor)
+                (y_low_opt, y_high_opt, x_low_opt,
+                 x_high_opt) = self.align_frames.compute_alignment_rect(
+                    self.configuration.align_frames_rectangle_scale_factor)
                 self.my_timer.stop('Select optimal alignment patch')
                 if self.configuration.global_parameters_protocol_level > 1:
                     Miscellaneous.protocol(
-                        "           Alignment rectangle, computed automatically: " +
-                        str(y_low_opt) + "<y<" + str(y_high_opt) +
-                        ", " + str(x_low_opt) + "<x<" +
-                        str(x_high_opt), self.attached_log_file,
+                        "           Alignment rectangle, computed automatically: " + str(
+                            y_low_opt) + "<y<" + str(y_high_opt) + ", " + str(
+                            x_low_opt) + "<x<" + str(x_high_opt), self.attached_log_file,
                         precede_with_timestamp=False)
 
             # As an alternative, set the coordinates of the rectangular patch explicitly.
@@ -481,11 +454,11 @@ class Workflow(QtCore.QObject):
 
                 self.align_frames.set_alignment_rect(y_low_opt, y_high_opt, x_low_opt, x_high_opt)
                 if self.configuration.global_parameters_protocol_level > 1:
-                    Miscellaneous.protocol("           Alignment rectangle, set by the user: " +
-                                           str(y_low_opt) + "<y<" + str(y_high_opt) +
-                                           ", " + str(x_low_opt) + "<x<" +
-                                           str(x_high_opt), self.attached_log_file,
-                                           precede_with_timestamp=False)
+                    Miscellaneous.protocol(
+                        "           Alignment rectangle, set by the user: " + str(
+                            y_low_opt) + "<y<" + str(y_high_opt) + ", " + str(
+                            x_low_opt) + "<x<" + str(x_high_opt), self.attached_log_file,
+                        precede_with_timestamp=False)
 
         # Align all frames globally relative to the frame with the highest score.
         if self.configuration.global_parameters_protocol_level > 0:
@@ -507,11 +480,8 @@ class Workflow(QtCore.QObject):
                     # Everything is fine, no need to try another stabilization patch.
                     break
                 except (NotSupportedError, ArgumentError) as e:
-                    if self.configuration.global_parameters_protocol_level > 0:
-                        Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
-                                               self.attached_log_file)
+                    self.abort_job_signal("Error: " + e.message + ", continue with next job")
                     self.my_timer.stop('Global frame alignment')
-                    self.work_next_task_signal.emit("Next job")
                     return
                 # For some frames no valid shift could be computed. This would create problems later
                 # in the workflow. Therefore, try again with another stabilization patch.
@@ -522,41 +492,33 @@ class Workflow(QtCore.QObject):
                                                self.attached_log_file)
                     # If there is no more patch available, skip this job.
                     if patch_index == number_patches - 1:
-                        if self.configuration.global_parameters_protocol_level > 0:
-                            Miscellaneous.protocol("Error: No alternative stabilization patch"
-                                                   " available, continue with next job\n",
-                                                   self.attached_log_file)
+                        self.abort_job_signal(
+                            "Error: No alternative stabilization patch available, continue with "
+                            "next job")
                         self.my_timer.stop('Global frame alignment')
-                        self.work_next_task_signal.emit("Next job")
                         return
                     # Continue with the next best stabilization patch.
                     else:
                         y_low_opt, y_high_opt, x_low_opt, x_high_opt = \
                             self.align_frames.alignment_rect_bounds[patch_index + 1]
                         if self.configuration.global_parameters_protocol_level > 0:
-                            Miscellaneous.protocol("           Next alignment rectangle tried: " +
-                                                   str(y_low_opt) + "<y<" + str(y_high_opt) +
-                                                   ", " + str(x_low_opt) + "<x<" +
-                                                   str(x_high_opt), self.attached_log_file,
-                                                   precede_with_timestamp=False)
+                            Miscellaneous.protocol(
+                                "           Next alignment rectangle tried: " + str(
+                                    y_low_opt) + "<y<" + str(y_high_opt) + ", " + str(
+                                    x_low_opt) + "<x<" + str(x_high_opt), self.attached_log_file,
+                                precede_with_timestamp=False)
 
         # Align all frames in "Planet" mode.
         else:
             try:
                 self.align_frames.align_frames()
             except Error as e:
-                if self.configuration.global_parameters_protocol_level > 0:
-                    Miscellaneous.protocol("Error: " + e.message + ", continue with next job\n",
-                                           self.attached_log_file)
+                self.abort_job_signal("Error: " + e.message + ", continue with next job")
                 self.my_timer.stop('Global frame alignment')
-                self.work_next_task_signal.emit("Next job")
                 return
             except Exception as e:
-                if self.configuration.global_parameters_protocol_level > 0:
-                    Miscellaneous.protocol("Error: " + str(e) + ", continue with next job\n",
-                                           self.attached_log_file)
+                self.abort_job_signal("Error: " + str(e) + ", continue with next job")
                 self.my_timer.stop('Global frame alignment')
-                self.work_next_task_signal.emit("Next job")
                 return
 
         self.my_timer.stop('Global frame alignment')
@@ -596,11 +558,10 @@ class Workflow(QtCore.QObject):
         self.my_timer.stop('Setting ROI and new reference')
 
         if self.configuration.global_parameters_protocol_level > 1 and y_min != 0 or y_max != 0:
-            Miscellaneous.protocol("           ROI, set by the user: " +
-                                   str(y_min) + "<y<" + str(y_max) +
-                                   ", " + str(x_min) + "<x<" +
-                                   str(x_max), self.attached_log_file,
-                                   precede_with_timestamp=False)
+            Miscellaneous.protocol(
+                "           ROI, set by the user: " + str(y_min) + "<y<" + str(y_max) + ", " + str(
+                    x_min) + "<x<" + str(x_max), self.attached_log_file,
+                precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Set alignment points")
 
@@ -613,12 +574,12 @@ class Workflow(QtCore.QObject):
             # Initialize the AlignmentPoints object.
             self.my_timer.create_no_check('Initialize alignment point object')
             self.alignment_points = AlignmentPoints(self.configuration, self.frames,
-                                                    self.rank_frames,
-                                                    self.align_frames,
+                                                    self.rank_frames, self.align_frames,
                                                     progress_signal=self.work_current_progress_signal)
             self.my_timer.stop('Initialize alignment point object')
 
-            # Create alignment points, and create an image with wll alignment point boxes and patches.
+            # Create alignment points, and create an image with wll alignment point boxes and
+            # patches.
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("+++ Start creating alignment points +++",
                                        self.attached_log_file)
@@ -635,13 +596,12 @@ class Workflow(QtCore.QObject):
     def execute_compute_frame_qualities(self):
 
         if self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol("           Number of alignment points selected: " + str(
-                len(self.alignment_points.alignment_points)) +
-                                   ", aps dropped because too dim: " + str(
-                self.alignment_points.alignment_points_dropped_dim) +
-                                   ", aps dropped because too little structure: " + str(
-                self.alignment_points.alignment_points_dropped_structure),
-                                   self.attached_log_file, precede_with_timestamp=False)
+            Miscellaneous.protocol("           Number of alignment points selected: " + str(len(
+                self.alignment_points.alignment_points)) + ", aps dropped because too dim: " + str(
+                self.alignment_points.alignment_points_dropped_dim) + ", aps dropped because too "
+                                                                      "little structure: " + str(
+                self.alignment_points.alignment_points_dropped_structure), self.attached_log_file,
+                                   precede_with_timestamp=False)
 
         self.set_status_bar_processing_phase("ranking all frames at all alignment points")
         # For each alignment point rank frames by their quality.
@@ -669,12 +629,13 @@ class Workflow(QtCore.QObject):
 
         # Stack all frames.
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start stacking " + str(self.alignment_points.stack_size) +
-                                   " frames +++", self.attached_log_file)
+            Miscellaneous.protocol(
+                "+++ Start stacking " + str(self.alignment_points.stack_size) + " frames +++",
+                self.attached_log_file)
         self.stack_frames.stack_frames()
 
-        if self.configuration.global_parameters_protocol_level > 1 and \
-                len(self.alignment_points.alignment_points) > 0:
+        if self.configuration.global_parameters_protocol_level > 1 and len(
+            self.alignment_points.alignment_points) > 0:
             Miscellaneous.protocol("\n           Distribution of shifts at alignment points:",
                                    self.attached_log_file, precede_with_timestamp=False)
             Miscellaneous.protocol(self.stack_frames.print_shift_table() + "\n",
@@ -695,16 +656,15 @@ class Workflow(QtCore.QObject):
         self.set_status_bar_processing_phase("saving result")
         # Save the image as 16bit int (color or mono).
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start saving the stacked image +++",
-                                   self.attached_log_file)
+            Miscellaneous.protocol("+++ Start saving the stacked image +++", self.attached_log_file)
         self.my_timer.create_no_check('Saving the stacked image')
         self.frames.save_image(self.stacked_image_name, self.stack_frames.stacked_image,
                                color=self.frames.color, avoid_overwriting=False)
         self.my_timer.stop('Saving the stacked image')
         if self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol("           The stacked image was written to: " +
-                                   self.stacked_image_name,
-                                   self.attached_log_file, precede_with_timestamp=False)
+            Miscellaneous.protocol(
+                "           The stacked image was written to: " + self.stacked_image_name,
+                self.attached_log_file, precede_with_timestamp=False)
 
         # If postprocessing is included after stacking, set the stacked image as input.
         if self.configuration.global_parameters_include_postprocessing:
@@ -726,8 +686,7 @@ class Workflow(QtCore.QObject):
     def execute_postprocess_image(self):
 
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start postprocessing +++",
-                                   self.attached_log_file)
+            Miscellaneous.protocol("+++ Start postprocessing +++", self.attached_log_file)
         self.my_timer.create_no_check('Conputing image postprocessing')
 
         # Initialize the new image with the original image.
@@ -757,8 +716,7 @@ class Workflow(QtCore.QObject):
                                        self.attached_log_file)
             self.my_timer.create_no_check('Saving the postprocessed image')
             Frames.save_image(self.postprocessed_image_name, postprocessed_image,
-                              color=(len(postprocessed_image.shape) == 3),
-                              avoid_overwriting=False)
+                              color=(len(postprocessed_image.shape) == 3), avoid_overwriting=False)
             self.my_timer.stop('Saving the postprocessed image')
             if self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.protocol(
