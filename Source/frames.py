@@ -69,6 +69,7 @@ class VideoReader(object):
         self.convert_to_grayscale = False
         self.dtype = None
         self.SERFile = False
+        self.bayer_pattern = None
 
     def sanity_check(self, file_path):
         """
@@ -90,12 +91,15 @@ class VideoReader(object):
                 else:
                     raise IOError("File has structure not conform with SER file format")
 
-    def open(self, file_path, convert_to_grayscale=False):
+    def open(self, file_path, bayer_pattern='Auto detect', convert_to_grayscale=False):
         """
         Initialize the VideoReader object and return parameters with video metadata.
          Throws an IOError if the video file format is not supported.
 
         :param file_path: Full name of the video file.
+        :param bayer_pattern: Bayer pattern, one out of: "Auto detect", "Grayscale", "RGB",
+                              "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
+                              "Force Bayer BGGR".
         :param convert_to_grayscale: If True, convert color frames to grayscale;
                                      otherwise return RGB color frames.
         :return: (frame_count, color, dtype, shape) with
@@ -105,6 +109,9 @@ class VideoReader(object):
                  shape: Tuple with the shape of a single frame; (num_px_y, num_px_x, 3) for color,
                         (num_px_y, num_px_x) for B/W.
         """
+
+        # Set the bayer pattern.
+        self.bayer_pattern = bayer_pattern
 
         # Do sanity check
         self.sanity_check(file_path)
@@ -421,12 +428,16 @@ class ImageReader(object):
         self.color = None
         self.convert_to_grayscale = False
         self.dtype = None
+        self.bayer_pattern = None
 
-    def open(self, file_path_list, convert_to_grayscale=False):
+    def open(self, file_path_list, bayer_pattern='Auto detect', convert_to_grayscale=False):
         """
         Initialize the ImageReader object and return parameters with image metadata.
 
         :param file_path_list: List with path names to the image files.
+        :param bayer_pattern: Bayer pattern, one out of: "Auto detect", "Grayscale", "RGB",
+                              "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
+                              "Force Bayer BGGR".
         :param convert_to_grayscale: If True, convert color frames to grayscale;
                                      otherwise return RGB color frames.
         :return: (frame_count, color, dtype, shape) with
@@ -438,6 +449,7 @@ class ImageReader(object):
         """
 
         self.file_path_list = file_path_list
+        self.bayer_pattern = bayer_pattern
 
         try:
             self.frame_count = len(self.file_path_list)
@@ -901,9 +913,10 @@ class Frames(object):
 
         return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
 
-    def __init__(self, configuration, names, type='video', calibration=None,
-                 convert_to_grayscale=False, progress_signal=None, buffer_original=True,
-                 buffer_monochrome=False, buffer_gaussian=True, buffer_laplacian=True):
+    def __init__(self, configuration, names, type='video', bayer_pattern="Auto detect",
+                 calibration=None, convert_to_grayscale=False, progress_signal=None,
+                 buffer_original=True, buffer_monochrome=False, buffer_gaussian=True,
+                 buffer_laplacian=True):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
@@ -912,6 +925,9 @@ class Frames(object):
         :param names: In case "video": name of the video file. In case "image": list of names for
                       all images.
         :param type: Either "video" or "image".
+        :param bayer_pattern: Bayer pattern, one out of: "Auto detect", "Grayscale", "RGB",
+                              "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
+                               "Force Bayer BGGR".
         :param calibration: (Optional) calibration object for darks/flats correction.
         :param convert_to_grayscale: If "True", convert frames to grayscale if they are RGB.
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
@@ -935,6 +951,7 @@ class Frames(object):
         self.calibration = calibration
         self.progress_signal = progress_signal
         self.type = type
+        self.bayer_pattern = bayer_pattern
         self.convert_to_grayscale = convert_to_grayscale
 
         self.buffer_original = buffer_original
@@ -971,6 +988,7 @@ class Frames(object):
             raise TypeError("Image type " + self.type + " not supported")
 
         self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
+            bayer_pattern=self.bayer_pattern,
             convert_to_grayscale=self.convert_to_grayscale)
 
         # Set the depth value of all images to either 16 or 8 bits.

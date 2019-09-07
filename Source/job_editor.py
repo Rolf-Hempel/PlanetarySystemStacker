@@ -73,7 +73,7 @@ class Job(object):
 
         self.name = job_name
         self.type = None
-        self.bayer_pattern = None
+        self.bayer_pattern = 'Auto detect'
 
 
 class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
@@ -119,6 +119,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.buttonBox.rejected.connect(self.reject)
         self.button_remove_jobs.clicked.connect(self.remove_job_list)
         self.button_add_jobs.clicked.connect(self.add_jobs)
+
+        # Install an event filter on the job list to enable the context menu.
+        self.job_list_widget.installEventFilter(self)
 
         # Populate the job list widget with the current job list.
         self.populate_job_list()
@@ -191,6 +194,83 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.jobs = [job for job in self.jobs if job.name not in remove_list]
         self.populate_job_list()
 
+    def eventFilter(self, source, event):
+        """
+        The event filter intercepts context menu events on job list items. It is used to specify
+        Bayer patterns explicitly.
+
+        :param source: The widget for which the filter is activated
+                       (in this case "self.job_list_widget")
+        :param event: The event type for this filter ("QtCore.QEvent.ContextMenu")
+        :return: True
+        """
+
+        # If a context menu item is pressed, remember the pattern.
+        def action1_triggered(state):
+            if state:
+                self.pattern = 'Auto detect'
+
+        def action2_triggered(state):
+            if state:
+                self.pattern = 'Grayscale'
+
+        def action3_triggered(state):
+            if state:
+                self.pattern = 'RGB'
+
+        def action4_triggered(state):
+            if state:
+                self.pattern = 'Force Bayer RGGB'
+
+        def action5_triggered(state):
+            if state:
+                self.pattern = 'Force Bayer GRBG'
+
+        def action6_triggered(state):
+            if state:
+                self.pattern = 'Force Bayer GBRG'
+
+        def action7_triggered(state):
+            if state:
+                self.pattern = 'Force Bayer BGGR'
+
+        # The context menu is opened on a job list entry.
+        if (event.type() == QtCore.QEvent.ContextMenu and
+                source is self.job_list_widget):
+            menu = QtWidgets.QMenu()
+            action1 = QtWidgets.QAction('Auto detect', menu, checkable=True)
+            action1.triggered.connect(action1_triggered)
+            menu.addAction(action1)
+            menu.addSeparator()
+            action2 = QtWidgets.QAction('Grayscale', menu, checkable=True)
+            action2.triggered.connect(action2_triggered)
+            menu.addAction(action2)
+            action3 = QtWidgets.QAction('RGB', menu, checkable=True)
+            action3.triggered.connect(action3_triggered)
+            menu.addAction(action3)
+            action4 = QtWidgets.QAction('Force Bayer RGGB', menu, checkable=True)
+            action4.triggered.connect(action4_triggered)
+            menu.addAction(action4)
+            action5 = QtWidgets.QAction('Force Bayer GRBG', menu, checkable=True)
+            action5.triggered.connect(action5_triggered)
+            menu.addAction(action5)
+            action6 = QtWidgets.QAction('Force Bayer GBRG', menu, checkable=True)
+            action6.triggered.connect(action6_triggered)
+            menu.addAction(action6)
+            action7 = QtWidgets.QAction('Force Bayer BGGR', menu, checkable=True)
+            action7.triggered.connect(action7_triggered)
+            menu.addAction(action7)
+
+            # Identify the item and its location in the job list. Set the selected Bayer pattern
+            # in the job object.
+            if menu.exec_(event.globalPos()):
+                item = source.itemAt(event.pos())
+                row = source.row(item)
+                # print(item.text() + ", row: " + str(row) + ", pattern: " + str(self.pattern))
+                self.jobs[row].bayer_pattern = self.pattern
+            return True
+        return super(JobEditor, self).eventFilter(source, event)
+
     def accept(self):
         """
         If the OK button is clicked and the job list has been changed update the job list in the
@@ -215,6 +295,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
                 job.type = 'image'
             else:
                 raise InternalError("Cannot decide if input file is video or image directory")
+            # print ("name: " + job.name + ", type: " + job.type + ", pattern: " + job.bayer_pattern)
 
         # Update the job list and reset the current job index to the first entry.
         self.parent_gui.jobs = self.jobs

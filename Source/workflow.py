@@ -266,6 +266,7 @@ class Workflow(QtCore.QObject):
                     Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
             try:
                 self.frames = Frames(self.configuration, names, type=job.type,
+                                     bayer_pattern=job.bayer_pattern,
                                      calibration=self.calibration,
                                      convert_to_grayscale=convert_to_grayscale,
                                      progress_signal=self.work_current_progress_signal,
