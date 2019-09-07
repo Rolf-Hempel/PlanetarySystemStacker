@@ -186,6 +186,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         width = self.configuration.hidden_parameters_main_window_width
         height = self.configuration.hidden_parameters_main_window_height
         self.setGeometry(x0, y0, width, height)
+        if self.configuration.hidden_parameters_main_window_maximized:
+            self.showMaximized()
 
         # Initialize variables.
         self.widget_saved = None
@@ -1256,12 +1258,15 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 self.workflow.attached_log_file.close()
 
             # Store the geometry of main window, so it is placed the same at next program start.
-            if self.windowState() != QtCore.Qt.WindowMaximized:
+            if self.windowState() == QtCore.Qt.WindowMaximized:
+                self.configuration.hidden_parameters_main_window_maximized = True
+            else:
                 (x0, y0, width, height) = self.geometry().getRect()
                 self.configuration.hidden_parameters_main_window_x0 = x0
                 self.configuration.hidden_parameters_main_window_y0 = y0
                 self.configuration.hidden_parameters_main_window_width = width
                 self.configuration.hidden_parameters_main_window_height = height
+                self.configuration.hidden_parameters_main_window_maximized = False
 
             # Write the current configuration to the ".ini" file in the user's home directory.
             self.configuration.write_config()

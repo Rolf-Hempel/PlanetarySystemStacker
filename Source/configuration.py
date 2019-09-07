@@ -34,6 +34,7 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_y0 = None
         self.hidden_parameters_main_window_width = None
         self.hidden_parameters_main_window_height = None
+        self.hidden_parameters_main_window_maximized = None
         self.global_parameters_version = None
         self.global_parameters_protocol_level = None
         self.global_parameters_write_protocol_to_file = None
@@ -59,6 +60,7 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_y0 = 100
         self.hidden_parameters_main_window_width = 1200
         self.hidden_parameters_main_window_height = 800
+        self.hidden_parameters_main_window_maximized = False
         self.global_parameters_version = "Planetary System Stacker 0.6.0"
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = False
@@ -91,6 +93,8 @@ class ConfigurationParameters(object):
             configuration_object.hidden_parameters_main_window_width
         self.hidden_parameters_main_window_height = \
             configuration_object.hidden_parameters_main_window_height
+        self.hidden_parameters_main_window_maximized = \
+            configuration_object.hidden_parameters_main_window_maximized
         self.global_parameters_version = configuration_object.global_parameters_version
         self.global_parameters_protocol_level = \
             configuration_object.global_parameters_protocol_level
@@ -220,6 +224,8 @@ class Configuration(object):
             configuration_parameters.hidden_parameters_main_window_width
         self.hidden_parameters_main_window_height = \
             configuration_parameters.hidden_parameters_main_window_height
+        self.hidden_parameters_main_window_maximized = \
+            configuration_parameters.hidden_parameters_main_window_maximized
         self.global_parameters_version = configuration_parameters.global_parameters_version
         self.global_parameters_protocol_level = \
             configuration_parameters.global_parameters_protocol_level
@@ -268,6 +274,8 @@ class Configuration(object):
             self.hidden_parameters_main_window_width
         configuration_parameters.hidden_parameters_main_window_height = \
             self.hidden_parameters_main_window_height
+        configuration_parameters.hidden_parameters_main_window_maximized = \
+            self.hidden_parameters_main_window_maximized
         configuration_parameters.global_parameters_version = self.global_parameters_version
         configuration_parameters.global_parameters_protocol_level = \
             self.global_parameters_protocol_level
@@ -322,6 +330,8 @@ class Configuration(object):
             conf.getint('Hidden parameters', 'main window width')
         self.hidden_parameters_main_window_height = conf.getint('Hidden parameters',
                                                                 'main window height')
+        self.hidden_parameters_main_window_maximized = conf.getboolean('Hidden parameters',
+                                                                       'main window maximized')
         self.global_parameters_protocol_level = conf.getint('Global parameters',
                                                             'protocol level')
         self.global_parameters_write_protocol_to_file = conf.getboolean('Global parameters',
@@ -374,6 +384,8 @@ class Configuration(object):
                            str(self.hidden_parameters_main_window_width))
         self.set_parameter('Hidden parameters', 'main window height',
                            str(self.hidden_parameters_main_window_height))
+        self.set_parameter('Hidden parameters', 'main window maximized',
+                           str(self.hidden_parameters_main_window_maximized))
         self.config_parser_object.add_section('Global parameters')
         self.set_parameter('Global parameters', 'version', self.global_parameters_version)
         self.set_parameter('Global parameters', 'protocol level',
