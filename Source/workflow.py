@@ -279,6 +279,10 @@ class Workflow(QtCore.QObject):
                         "           Number of images: " + str(self.frames.number) +
                         ", image shape: " + str(self.frames.shape), self.attached_log_file,
                         precede_with_timestamp=False)
+                    if job.bayer_pattern != 'Auto detect color':
+                        Miscellaneous.protocol(
+                            "           Debayer pattern selected manually: " + job.bayer_pattern,
+                            self.attached_log_file, precede_with_timestamp=False)
                     if self.frames.calibration_matches:
                         if self.calibration.master_dark_frame_adapted is not None and \
                                 self.calibration.inverse_master_flat_frame is not None:
