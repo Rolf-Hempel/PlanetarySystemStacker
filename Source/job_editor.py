@@ -205,69 +205,86 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         :return: True
         """
 
+        self.pattern = None
+
         # If a context menu item is pressed, remember the pattern.
         def action1_triggered(state):
-            if state:
-                self.pattern = 'Auto detect'
+            self.pattern = 'Auto detect'
 
         def action2_triggered(state):
-            if state:
-                self.pattern = 'Grayscale'
+            self.pattern = 'Grayscale'
 
         def action3_triggered(state):
-            if state:
-                self.pattern = 'RGB'
+            self.pattern = 'RGB'
 
         def action4_triggered(state):
-            if state:
-                self.pattern = 'Force Bayer RGGB'
+            self.pattern = 'Force Bayer RGGB'
 
         def action5_triggered(state):
-            if state:
-                self.pattern = 'Force Bayer GRBG'
+            self.pattern = 'Force Bayer GRBG'
 
         def action6_triggered(state):
-            if state:
-                self.pattern = 'Force Bayer GBRG'
+            self.pattern = 'Force Bayer GBRG'
 
         def action7_triggered(state):
-            if state:
-                self.pattern = 'Force Bayer BGGR'
+            self.pattern = 'Force Bayer BGGR'
 
         # The context menu is opened on a job list entry.
         if (event.type() == QtCore.QEvent.ContextMenu and
                 source is self.job_list_widget):
+
+            # Create a list of patterns which are checked by the selected items initially.
+            checked_patterns = []
+            for item in self.job_list_widget.selectedItems():
+                checked_patterns.append(self.jobs[source.row(item)].bayer_pattern)
+
+            # Create the context menu. Mark those patterns checked which have been set for at least
+            # one selected job list entry.
             menu = QtWidgets.QMenu()
             action1 = QtWidgets.QAction('Auto detect', menu, checkable=True)
             action1.triggered.connect(action1_triggered)
+            if 'Auto detect' in checked_patterns:
+                action1.setChecked(True)
             menu.addAction(action1)
             menu.addSeparator()
             action2 = QtWidgets.QAction('Grayscale', menu, checkable=True)
             action2.triggered.connect(action2_triggered)
+            if 'Grayscale' in checked_patterns:
+                action2.setChecked(True)
             menu.addAction(action2)
             action3 = QtWidgets.QAction('RGB', menu, checkable=True)
             action3.triggered.connect(action3_triggered)
+            if 'RGB' in checked_patterns:
+                action3.setChecked(True)
             menu.addAction(action3)
             action4 = QtWidgets.QAction('Force Bayer RGGB', menu, checkable=True)
             action4.triggered.connect(action4_triggered)
+            if 'Force Bayer RGGB' in checked_patterns:
+                action4.setChecked(True)
             menu.addAction(action4)
             action5 = QtWidgets.QAction('Force Bayer GRBG', menu, checkable=True)
             action5.triggered.connect(action5_triggered)
+            if 'Force Bayer GRBG' in checked_patterns:
+                action5.setChecked(True)
             menu.addAction(action5)
             action6 = QtWidgets.QAction('Force Bayer GBRG', menu, checkable=True)
             action6.triggered.connect(action6_triggered)
+            if 'Force Bayer GBRG' in checked_patterns:
+                action6.setChecked(True)
             menu.addAction(action6)
             action7 = QtWidgets.QAction('Force Bayer BGGR', menu, checkable=True)
             action7.triggered.connect(action7_triggered)
+            if 'Force Bayer BGGR' in checked_patterns:
+                action7.setChecked(True)
             menu.addAction(action7)
 
-            # Identify the item and its location in the job list. Set the selected Bayer pattern
-            # in the job object.
-            if menu.exec_(event.globalPos()):
-                item = source.itemAt(event.pos())
-                row = source.row(item)
-                # print(item.text() + ", row: " + str(row) + ", pattern: " + str(self.pattern))
-                self.jobs[row].bayer_pattern = self.pattern
+            # Identify the selected items and their locations in the job list. Set the selected
+            # Bayer pattern in the corresponding job objects.
+            if menu.exec_(event.globalPos()) and self.pattern is not None:
+                for item in self.job_list_widget.selectedItems():
+                    row = source.row(item)
+                    self.jobs[row].bayer_pattern = self.pattern
+                    # print(item.text() + ", row: " + str(row) + ", pattern: " + str(self.pattern))
             return True
         return super(JobEditor, self).eventFilter(source, event)
 
