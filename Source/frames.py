@@ -91,13 +91,13 @@ class VideoReader(object):
                 else:
                     raise IOError("File has structure not conform with SER file format")
 
-    def open(self, file_path, bayer_pattern='Auto detect', convert_to_grayscale=False):
+    def open(self, file_path, bayer_pattern='Auto detect color', convert_to_grayscale=False):
         """
         Initialize the VideoReader object and return parameters with video metadata.
          Throws an IOError if the video file format is not supported.
 
         :param file_path: Full name of the video file.
-        :param bayer_pattern: Bayer pattern, one out of: "Auto detect", "Grayscale", "RGB",
+        :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
                               "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
                               "Force Bayer BGGR".
         :param convert_to_grayscale: If True, convert color frames to grayscale;
@@ -430,12 +430,12 @@ class ImageReader(object):
         self.dtype = None
         self.bayer_pattern = None
 
-    def open(self, file_path_list, bayer_pattern='Auto detect', convert_to_grayscale=False):
+    def open(self, file_path_list, bayer_pattern='Auto detect color', convert_to_grayscale=False):
         """
         Initialize the ImageReader object and return parameters with image metadata.
 
         :param file_path_list: List with path names to the image files.
-        :param bayer_pattern: Bayer pattern, one out of: "Auto detect", "Grayscale", "RGB",
+        :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
                               "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
                               "Force Bayer BGGR".
         :param convert_to_grayscale: If True, convert color frames to grayscale;
@@ -913,7 +913,7 @@ class Frames(object):
 
         return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
 
-    def __init__(self, configuration, names, type='video', bayer_pattern="Auto detect",
+    def __init__(self, configuration, names, type='video', bayer_pattern="Auto detect color",
                  calibration=None, convert_to_grayscale=False, progress_signal=None,
                  buffer_original=True, buffer_monochrome=False, buffer_gaussian=True,
                  buffer_laplacian=True):
@@ -925,7 +925,7 @@ class Frames(object):
         :param names: In case "video": name of the video file. In case "image": list of names for
                       all images.
         :param type: Either "video" or "image".
-        :param bayer_pattern: Bayer pattern, one out of: "Auto detect", "Grayscale", "RGB",
+        :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
                               "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
                                "Force Bayer BGGR".
         :param calibration: (Optional) calibration object for darks/flats correction.

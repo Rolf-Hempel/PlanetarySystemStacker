@@ -73,7 +73,7 @@ class Job(object):
 
         self.name = job_name
         self.type = None
-        self.bayer_pattern = 'Auto detect'
+        self.bayer_pattern = 'Auto detect color'
 
 
 class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
@@ -209,7 +209,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         # If a context menu item is pressed, remember the pattern.
         def action1_triggered(state):
-            self.pattern = 'Auto detect'
+            self.pattern = 'Auto detect color'
 
         def action2_triggered(state):
             self.pattern = 'Grayscale'
@@ -241,9 +241,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
             # Create the context menu. Mark those patterns checked which have been set for at least
             # one selected job list entry.
             menu = QtWidgets.QMenu()
-            action1 = QtWidgets.QAction('Auto detect', menu, checkable=True)
+            action1 = QtWidgets.QAction('Auto detect color', menu, checkable=True)
             action1.triggered.connect(action1_triggered)
-            if 'Auto detect' in checked_patterns:
+            if 'Auto detect color' in checked_patterns:
                 action1.setChecked(True)
             menu.addAction(action1)
             menu.addSeparator()
