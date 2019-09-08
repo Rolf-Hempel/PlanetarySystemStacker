@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from pathlib import Path
+from copy import deepcopy
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 
@@ -111,7 +112,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         # Get a copy of the jobs constructed so far. The editor only works on the copy, so
         # that in the case of "cancel" the original list is not changed.
-        self.jobs = self.parent_gui.jobs.copy()
+        self.jobs = deepcopy(self.parent_gui.jobs)
 
         self.messageLabel.setStyleSheet('color: red')
 
