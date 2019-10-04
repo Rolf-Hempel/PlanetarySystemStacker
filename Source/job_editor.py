@@ -175,7 +175,9 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         if input_names:
             for input_name in input_names:
                 if input_name not in [job.name for job in self.jobs]:
-                    self.jobs.append(Job(input_name))
+                    new_job = Job(input_name)
+                    new_job.bayer_pattern = self.configuration.frames_debayering_default
+                    self.jobs.append(new_job)
 
             # Save the current directory location. The next dialog will open at this position.
             self.configuration.hidden_parameters_current_dir = str(Path(input_names[0]).parents[0])

@@ -43,6 +43,7 @@ class ConfigurationParameters(object):
         self.global_parameters_include_postprocessing = None
         self.global_parameters_image_format = None
         self.frames_gauss_width = None
+        self.frames_debayering_default = None
         self.align_frames_mode = None
         self.align_frames_automation = None
         self.align_frames_rectangle_scale_factor = None
@@ -69,6 +70,7 @@ class ConfigurationParameters(object):
         self.global_parameters_include_postprocessing = False
         self.global_parameters_image_format = "tiff"
         self.frames_gauss_width = 7
+        self.frames_debayering_default = 'Auto detect color'
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
         self.align_frames_rectangle_scale_factor = 3.
@@ -109,6 +111,7 @@ class ConfigurationParameters(object):
         self.global_parameters_image_format = \
             configuration_object.global_parameters_image_format
         self.frames_gauss_width = configuration_object.frames_gauss_width
+        self.frames_debayering_default = configuration_object.frames_debayering_default
         self.align_frames_mode = configuration_object.align_frames_mode
         self.align_frames_automation = configuration_object.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -240,6 +243,7 @@ class Configuration(object):
         self.global_parameters_image_format = \
             configuration_parameters.global_parameters_image_format
         self.frames_gauss_width = configuration_parameters.frames_gauss_width
+        self.frames_debayering_default = configuration_parameters.frames_debayering_default
         self.align_frames_mode = configuration_parameters.align_frames_mode
         self.align_frames_automation = configuration_parameters.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -289,6 +293,7 @@ class Configuration(object):
             self.global_parameters_image_format
 
         configuration_parameters.frames_gauss_width = self.frames_gauss_width
+        configuration_parameters.frames_debayering_default = self.frames_debayering_default
 
         configuration_parameters.align_frames_mode = self.align_frames_mode
         configuration_parameters.align_frames_automation = self.align_frames_automation
@@ -344,6 +349,7 @@ class Configuration(object):
         self.global_parameters_image_format = conf.get(
             'Global parameters', 'image format')
         self.frames_gauss_width = conf.getint('Frames', 'gauss width')
+        self.frames_debayering_default = conf.get('Frames', 'debayering default')
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
         self.align_frames_rectangle_scale_factor = conf.getfloat('Align frames',
@@ -403,6 +409,7 @@ class Configuration(object):
 
         self.config_parser_object.add_section('Frames')
         self.set_parameter('Frames', 'gauss width', str(self.frames_gauss_width))
+        self.set_parameter('Frames', 'debayering default', self.frames_debayering_default)
 
         self.config_parser_object.add_section('Align frames')
         self.set_parameter('Align frames', 'mode', self.align_frames_mode)

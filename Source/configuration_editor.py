@@ -59,6 +59,14 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
         # Connect local methods with GUI change events.
         self.fgw_slider_value.valueChanged['int'].connect(self.fgw_changed)
+        self.fdb_comboBox.addItem('Auto detect color')
+        self.fdb_comboBox.addItem('Grayscale')
+        self.fdb_comboBox.addItem('RGB')
+        self.fdb_comboBox.addItem('Force Bayer RGGB')
+        self.fdb_comboBox.addItem('Force Bayer GRBG')
+        self.fdb_comboBox.addItem('Force Bayer GBRG')
+        self.fdb_comboBox.addItem('Force Bayer BGGR')
+        self.fdb_comboBox.activated[str].connect(self.fdb_changed)
         self.afm_comboBox.addItem('Surface')
         self.afm_comboBox.addItem('Planet')
         self.afm_comboBox.activated[str].connect(self.afm_changed)
@@ -93,6 +101,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
         self.fgw_slider_value.setValue(int((self.config_copy.frames_gauss_width + 1) / 2))
         self.fgw_label_display.setText(str(self.config_copy.frames_gauss_width))
+        index = self.fdb_comboBox.findText(self.config_copy.frames_debayering_default,
+                                           QtCore.Qt.MatchFixedString)
+        if index >= 0:
+            self.fdb_comboBox.setCurrentIndex(index)
         index = self.afm_comboBox.findText(self.config_copy.align_frames_mode,
                                            QtCore.Qt.MatchFixedString)
         if index >= 0:
@@ -142,6 +154,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
         self.config_copy.frames_gauss_width = 2 * value - 1
         self.fgw_label_display.setText(str(self.config_copy.frames_gauss_width))
+
+    def fdb_changed(self, value):
+        self.config_copy.frames_debayering_default = value
 
     def afm_changed(self, value):
         self.config_copy.align_frames_mode = value
@@ -312,6 +327,11 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
         if self.config_copy.frames_gauss_width != self.configuration.frames_gauss_width:
             self.configuration.frames_gauss_width = self.config_copy.frames_gauss_width
+            self.configuration.configuration_changed = True
+            self.configuration.go_back_to_activity = 'Read frames'
+
+        if self.config_copy.frames_debayering_default != self.configuration.frames_debayering_default:
+            self.configuration.frames_debayering_default = self.config_copy.frames_debayering_default
             self.configuration.configuration_changed = True
             self.configuration.go_back_to_activity = 'Read frames'
 

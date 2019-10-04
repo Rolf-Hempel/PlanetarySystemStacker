@@ -630,7 +630,8 @@ class Calibration(QtCore.QObject):
             extension = Path(master_name).suffix
             if extension in ('.avi', '.ser'):
                 reader = VideoReader()
-                frame_count, input_color, input_dtype, input_shape = reader.open(master_name)
+                frame_count, input_color, input_dtype, input_shape = reader.open(master_name,
+                                        bayer_pattern=self.configuration.frames_debayering_default)
                 self.configuration.hidden_parameters_current_dir = str(Path(master_name).parent)
             else:
                 raise InternalError(
@@ -640,7 +641,8 @@ class Calibration(QtCore.QObject):
         elif Path(master_name).is_dir():
             names = [path.join(master_name, name) for name in listdir(master_name)]
             reader = ImageReader()
-            frame_count, input_color, input_dtype, input_shape = reader.open(names)
+            frame_count, input_color, input_dtype, input_shape = reader.open(names,
+                                        bayer_pattern=self.configuration.frames_debayering_default)
             self.configuration.hidden_parameters_current_dir = str(master_name)
         else:
             raise InternalError("Cannot decide if input file is video or image directory")
