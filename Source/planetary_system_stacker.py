@@ -894,7 +894,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
-        # In iShow a message box and wait for acknowledgement by the user.
+        # Show a message box and wait for acknowledgement by the user.
         if not self.automatic:
 
             msg = QtWidgets.QMessageBox()

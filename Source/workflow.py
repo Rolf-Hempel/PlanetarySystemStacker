@@ -303,11 +303,9 @@ class Workflow(QtCore.QObject):
                             "calibration de-activated",
                             self.attached_log_file, precede_with_timestamp=False)
             except Error as e:
-                print ("Position Error 1")
                 self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
                 return
             except Exception as e:
-                print("Position Error 2" + str(e))
                 self.abort_job_signal.emit("Error: " + str(e) + ", continue with next job")
                 return
 
