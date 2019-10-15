@@ -28,7 +28,7 @@ from cv2 import GaussianBlur, FONT_HERSHEY_SIMPLEX, putText, resize
 import matplotlib.pyplot as plt
 from numpy import int as np_int
 from numpy import zeros, full, empty, float32, int32, newaxis, arange, count_nonzero, \
-    where, sqrt, logical_or, uint16
+    where, sqrt, logical_or, uint16, clip
 from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
@@ -107,12 +107,10 @@ class StackFrames(object):
         self.background_patches = None
         self.stacked_background_buffer = None
 
-        # Allocate a buffer which for each pixel of the image buffer counts the number of
-        # contributing alignment patch images. Also, allocate a second buffer of same type and size
-        # to accumulate the weights at each pixel. This buffer is used to normalize the image
-        # buffer. The second buffer is initialized with a small value to avoid divide by zero.
-        self.number_single_frame_contributions = full([self.dim_y, self.dim_x], 0, dtype=int32)
-        self.sum_single_frame_weights = full([self.dim_y, self.dim_x], 0.0001, dtype=float32)
+        # Allocate a buffer which for each pixel of the image accumulates the weights at each pixel.
+        # This buffer is used to normalize the image buffer. It is initialized with a small value to
+        # avoid divide by zero.
+        self.sum_single_frame_weights = full([self.dim_y, self.dim_x], 1.e-30, dtype=float32)
 
         # Prepare for debugging the local de-warping: In each frame a shifted AP patch can be
         # compared to the corresponding section of the reference frame. This is visualized in a
@@ -140,36 +138,6 @@ class StackFrames(object):
         """
 
         self.my_timer.start('Stacking: Initialize background blending')
-        # Loop over all APs and add the number of image contributions to all pixels covered by them.
-        for alignment_point in self.alignment_points.alignment_points:
-            patch_y_low = alignment_point['patch_y_low']
-            patch_y_high = alignment_point['patch_y_high']
-            patch_x_low = alignment_point['patch_x_low']
-            patch_x_high = alignment_point['patch_x_high']
-
-            # For each image buffer pixel count the number of image contributions.
-            self.number_single_frame_contributions[patch_y_low:patch_y_high,
-            patch_x_low: patch_x_high] += self.alignment_points.stack_size
-
-            # For AP patches on the frame border, avoid blending with a non-existing background
-            # image patch. This is done by adding "virtual" frame contributions between the frame
-            # border and the AP box. Since in those areas it looks like two APs were contributing,
-            # the background is assigned a zero weight. Therefore, the background does not have to
-            # be computed in those locations. Quite tricky, isn't it?
-            y_low = alignment_point['box_y_low']
-            y_high = alignment_point['box_y_high']
-            x_low = alignment_point['box_x_low']
-            x_high = alignment_point['box_x_high']
-            if patch_y_low == 0:
-                y_low = 0
-            if patch_y_high == self.dim_y:
-                y_high = self.dim_y
-            if patch_x_low == 0:
-                x_low = 0
-            if patch_x_high == self.dim_x:
-                x_high = self.dim_x
-            self.number_single_frame_contributions[y_low:y_high, x_low:x_high] += \
-                self.alignment_points.stack_size
 
         # The stack size is the number of frames which contribute to each AP stack.
         single_stack_size_float = float(self.alignment_points.stack_size)
@@ -181,19 +149,28 @@ class StackFrames(object):
             patch_x_low = alignment_point['patch_x_low']
             patch_x_high = alignment_point['patch_x_high']
 
+            # If the patch is on the image boundary, do not ramp down the weight from the patch
+            # center towards that boundary. This way it is avoided that the background image is
+            # computed there and blended in with the patch.
+            extend_low_y = patch_y_low == 0
+            extend_high_y = patch_y_high == self.dim_y
+            extend_low_x = patch_x_low == 0
+            extend_high_x = patch_x_high == self.dim_x
+
             # Compute the weights used in AP blending and store them with the AP.
             alignment_point['weights_yx'] = self.one_dim_weight(patch_y_low, patch_y_high,
-                    alignment_point['box_y_low'], alignment_point['box_y_high'])[:, newaxis] * \
-                    self.one_dim_weight(patch_x_low, patch_x_high, alignment_point['box_x_low'],
-                    alignment_point['box_x_high'])
+                                                alignment_point['y'], extend_low=extend_low_y,
+                                                extend_high=extend_high_y)[:, newaxis] * \
+                                            self.one_dim_weight(patch_x_low, patch_x_high,
+                                                alignment_point['x'], extend_low=extend_low_x,
+                                                extend_high=extend_high_x)
 
             # For each image buffer pixel add the weights. This is used for normalization later.
             self.sum_single_frame_weights[patch_y_low:patch_y_high,
             patch_x_low: patch_x_high] += single_stack_size_float * alignment_point['weights_yx']
 
         # Compute the fraction of pixels where no AP patch contributes.
-        self.number_stacking_holes = count_nonzero(
-            self.number_single_frame_contributions == 0)
+        self.number_stacking_holes = count_nonzero(self.sum_single_frame_weights < 1.e-10)
         self.fraction_stacking_holes = self.number_stacking_holes / self.number_pixels
 
         # If all pixels are covered by AP patches, no background image is required.
@@ -205,33 +182,8 @@ class StackFrames(object):
         # a background computed as the average of globally shifted best frames. The background
         # should only shine through outside AP patches.
         #
-        # The "real" alignment point contributions are already in the
-        # "stacked_image_buffer".
+        # The "real" alignment point contributions are collected in the "stacked_image_buffer".
         # Only the "holes" in the buffer have to be filled with the "averaged_background".
-        # Initialize a mask for blending both buffers with each other. Set values to:
-        #   0.  at points not covered by a single AP patch.
-        #   1.  at points covered by more than one AP, and at points within the interior
-        #       (AP box) of a single AP.
-        #   0.5 between those areas. After blurring the mask, values in these transition
-        #       regions will show a smooth transition between APs and background.
-        self.mask = where((self.number_single_frame_contributions == 0), float32(0.), float32(0.5))
-        self.mask = where((
-        logical_or(self.number_single_frame_contributions > self.alignment_points.stack_size,
-                      self.sum_single_frame_weights > single_stack_size_float)), 1.,
-                      self.mask)
-
-        # Apply a Gaussian blur to the mask to make transitions smoother.
-        blur_width = self.configuration.stack_frames_gauss_width
-        self.mask = GaussianBlur(self.mask, (blur_width, blur_width), 0)
-
-        # The Gaussian blur might have created nonzero mask entries outside AP patches. Reset
-        # them to zero to avoid artifacts.
-        self.mask = where((self.number_single_frame_contributions == 0), 0., self.mask)
-
-        # Re-use the array "number_single_frame_contributions". It is set to 0 at all pixels
-        # where a background is required. At all other locations it is set to 1.
-        self.number_single_frame_contributions = where((self.mask >= 1.), 1, 0)
-
         # Allocate a buffer for the background image.
         if self.frames.color:
             self.averaged_background = zeros([self.dim_y, self.dim_x, 3], dtype=float32)
@@ -268,9 +220,9 @@ class StackFrames(object):
                         continue
 
                     # If the patch contains pixels where the background is used, add it to the list.
-                    if count_nonzero(
-                            self.number_single_frame_contributions[patch_y_low:patch_y_high,
-                            patch_x_low:patch_x_high] == 0) > 0:
+                    if count_nonzero(self.sum_single_frame_weights[patch_y_low:patch_y_high,
+                                                                   patch_x_low:patch_x_high] <
+                                    self.configuration.stack_frames_background_blend_threshold) > 0:
                         background_patch = {}
                         background_patch['patch_y_low'] = patch_y_low
                         background_patch['patch_y_high'] = patch_y_high
@@ -544,13 +496,20 @@ class StackFrames(object):
         if self.fraction_stacking_holes > 0:
             self.my_timer.create_no_check('Stacking: blending APs with background')
 
+            # The background image has been computed where self.sum_single_frame_weights is below the
+            # threshold. Compute for every pixel the weight (between 0. and 1.) with which the
+            # stacked patches are to be blended with the background image.
+            self.foreground_weight = self.sum_single_frame_weights / \
+                                     self.configuration.stack_frames_background_blend_threshold
+            clip(self.foreground_weight, 0., 1., out=self.foreground_weight)
+
             # blend the AP buffer with the background.
             if self.frames.color:
                 self.stacked_image_buffer = (self.stacked_image_buffer-self.averaged_background) * \
-                                            self.mask[:, :, newaxis] + self.averaged_background
+                                            self.foreground_weight[:, :, newaxis] + self.averaged_background
             else:
                 self.stacked_image_buffer = (self.stacked_image_buffer-self.averaged_background) * \
-                                            self.mask + self.averaged_background
+                                            self.foreground_weight + self.averaged_background
 
             self.my_timer.stop('Stacking: blending APs with background')
 
@@ -564,37 +523,48 @@ class StackFrames(object):
         return self.stacked_image
 
     @staticmethod
-    def one_dim_weight(patch_low, patch_high, box_low, box_high):
+    def one_dim_weight(patch_low, patch_high, box_center, extend_low=False, extend_high=False):
         """
-        Compute one-dimensional weighting ramps between box and patch borders. This function is
-        called for y and x dimensions separately.
+        Compute one-dimensional weighting ramps between box center and patch borders. This function
+        is called for y and x dimensions separately.
 
         :param patch_low: Lower index of AP patch in the given coordinate direction
         :param patch_high: Upper index of AP patch in the given coordinate direction
-        :param box_low: Lower index of AP box in the given coordinate direction
-        :param box_high: Upper index of AP box in the given coordinate direction
-        :return: Vector with weights, starting with 1./(border_width+1) at patch_low, ramping up to
-                 1. at box_low, staying at 1. up to box_high-1, and than ramping down to
-                 1./(border_width+1) at patch_high-1.
+        :param box_center: AP coordinate index in the given direction (center of box)
+        :param extend_low: If true, set all weights from patch_low to box_center to 1.
+                           (and thus replace the ramp in that index range)
+        :param extend_high: If true, set all weights from box_center to patch_high-1 to 1.
+                            (and thus replace the ramp in that index range)
+        :return: Vector with weights, starting with 1./(box_center - patch_low +1) at patch_low,
+                 ramping up to 1. at box_center, and than ramping down to
+                 1./(patch_high - box_center) at patch_high-1.
         """
 
         # Compute offsets relative to patch_low.
         patch_high_offset = patch_high - patch_low
-        box_low_offset = box_low - patch_low
-        box_high_offset = box_high - patch_low
+        center_offset = box_center - patch_low
 
         # Allocate weights array, length given by patch size.
         weights = empty((patch_high_offset,), dtype=float32)
 
-        # Ramping up between lower patch and box borders.
-        if box_low_offset > 0:
-            weights[0:box_low_offset] = arange(1 ,box_low_offset+1 , 1) / float32(box_low_offset+1)
-        # Box interior
-        weights[box_low_offset:box_high_offset] = 1.
-        # Ramping down between upper box and patch borders.
-        if patch_high_offset > box_high_offset:
-            weights[box_high_offset:patch_high_offset] = arange(patch_high - box_high, 0, -1) /\
-                                                         float32(patch_high - box_high + 1)
+        # If extend_low: Replace lower ramp with constant value 1.
+        if extend_low:
+            weights[0:center_offset] = 1.
+        # Ramp up from a small value to 1. at the center coordinate.
+        else:
+            weights[0:center_offset] = arange(1, center_offset + 1, 1) / float32(
+                center_offset + 1)
+
+        # Now set the weights for indices starting with the center coordinate (weight 1.) and
+        # ending at the upper patch boundary with a small value. Again, if "extend_high" is set
+        # to True, the ramp is replaced with a constant value 1.
+        if extend_high:
+            weights[center_offset:patch_high_offset] = 1.
+        else:
+            weights[center_offset:patch_high_offset] = arange(patch_high - box_center, 0,
+                                                                 -1) / float32(
+                patch_high - box_center)
+
         return weights
 
     def print_shift_table(self):
