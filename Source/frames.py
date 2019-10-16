@@ -121,17 +121,23 @@ class VideoReader(object):
             SER_header = self.read_ser_header(file_path)
 
             self.frame_count = SER_header['FrameCount']
-            self.color = 0 < SER_header['ColorID'] < 100 and \
-                         SER_header['DebayerPattern'] is not None
+            self.color = 0 < SER_header['ColorID'] <= 19 and \
+                         SER_header['DebayerPattern'] is not None \
+                         or 100 <= SER_header['ColorID'] <= 101
 
             if SER_header['PixelDepthPerPlane'] <= 8:
                 self.dtype = dtype(uint8)
             else:
                 self.dtype = dtype(uint16)
 
-            # Debayer raw RGB data
+            # Process color data if necessary
             if self.color:
-                self.SER_data = [cvtColor(frame, SER_header['DebayerPattern']) for frame in self.read_ser_image_data(file_path, SER_header)]
+                if 0 < SER_header['ColorID'] <= 19:
+                    self.SER_data = [cvtColor(frame, SER_header['DebayerPattern']) for frame in self.read_ser_image_data(file_path, SER_header)]
+                elif SER_header['ColorID'] == 100:
+                    self.SER_data = [cvtColor(frame, COLOR_RGB2BGR) for frame in self.read_ser_image_data(file_path, SER_header)]
+                else:
+                    self.SER_data = self.read_ser_image_data(file_path, SER_header)
             else:
                 self.SER_data = self.read_ser_image_data(file_path, SER_header)
 
@@ -374,9 +380,14 @@ class VideoReader(object):
             fid.seek(178)
             content = fid.read(AMOUNT)
 
-        return frombuffer(content, dtype=PixelDepthPerPlane).reshape(
-                header['FrameCount'], header['ImageHeight'],
-                header['ImageWidth'])
+        if header['NumberOfPlanes'] == 1:
+            return frombuffer(content, dtype=PixelDepthPerPlane).reshape(
+                    header['FrameCount'], header['ImageHeight'],
+                    header['ImageWidth'])
+        else:
+            return frombuffer(content, dtype=PixelDepthPerPlane).reshape(
+                    header['FrameCount'], header['ImageHeight'],
+                    header['ImageWidth'], header['NumberOfPlanes'])
 
     def read_ser_trailer(self, file_path, header=None):
         """
