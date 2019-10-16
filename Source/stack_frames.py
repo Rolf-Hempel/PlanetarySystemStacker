@@ -477,8 +477,7 @@ class StackFrames(object):
                 patch_x_low: patch_x_high, :] += alignment_point['stacking_buffer'] * \
                                                  alignment_point['weights_yx'][:, :, newaxis]
             else:
-                self.stacked_image_buffer[
-                patch_y_low:patch_y_high,
+                self.stacked_image_buffer[patch_y_low:patch_y_high,
                 patch_x_low: patch_x_high] += alignment_point['stacking_buffer'] * \
                                               alignment_point['weights_yx']
 

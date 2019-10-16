@@ -144,7 +144,7 @@ class Configuration(object):
 
         self.frames_mono_channel = 'green'
 
-        self.rank_frames_pixel_stride = 1
+        self.rank_frames_pixel_stride = 2
         self.rank_frames_method = "Laplace"
 
         self.align_frames_method = "SteepestDescent"
