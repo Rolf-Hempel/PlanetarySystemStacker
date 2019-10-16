@@ -171,7 +171,6 @@ class StackFrames(object):
 
         # Compute the fraction of pixels where no AP patch contributes.
         self.number_stacking_holes = count_nonzero(self.sum_single_frame_weights < 1.e-10)
-        self.fraction_stacking_holes = self.number_stacking_holes / self.number_pixels
 
         # If all pixels are covered by AP patches, no background image is required.
         if self.number_stacking_holes == 0:
@@ -497,7 +496,7 @@ class StackFrames(object):
         # If the alignment points do not cover the full frame, blend the AP contributions with
         # a background computed as the average of globally shifted best frames. The background
         # should only shine through outside AP patches.
-        if self.fraction_stacking_holes > 0:
+        if self.number_stacking_holes > 0:
             self.my_timer.create_no_check('Stacking: blending APs with background')
 
             # The background image has been computed where self.sum_single_frame_weights is below the
