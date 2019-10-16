@@ -190,13 +190,19 @@ class StackFrames(object):
         else:
             self.averaged_background = zeros([self.dim_y, self.dim_x], dtype=float32)
 
+        # Compute the number of points where the background image will be used in patch blending.
+        points_where_background_used = count_nonzero(self.sum_single_frame_weights <
+                                     self.configuration.stack_frames_background_blend_threshold *
+                                     single_stack_size_float)
+
         # If the fraction is below a certain limit, it is worthwhile to compute the background
         # image only where it is needed. Construct a list with patches where the background is
         # needed. The mask blurring has slightly changed the number of pixels where the background
         # is needed, so the value of "fraction_stacking_holes" is not exact. The difference will be
         # very small, though. Since the fraction is only used to decide if a complete background
         # image should be computed, the approximate value is more than sufficient.
-        if self.fraction_stacking_holes < self.configuration.stack_frames_background_fraction:
+        if points_where_background_used/self.number_pixels < \
+                self.configuration.stack_frames_background_fraction:
 
             # Initialize a list of background patches.
             self.background_patches = []
@@ -221,8 +227,9 @@ class StackFrames(object):
 
                     # If the patch contains pixels where the background is used, add it to the list.
                     if count_nonzero(self.sum_single_frame_weights[patch_y_low:patch_y_high,
-                                                                   patch_x_low:patch_x_high] <
-                                    self.configuration.stack_frames_background_blend_threshold) > 0:
+                                     patch_x_low:patch_x_high] <
+                                     self.configuration.stack_frames_background_blend_threshold *
+                                     single_stack_size_float) > 0:
                         background_patch = {}
                         background_patch['patch_y_low'] = patch_y_low
                         background_patch['patch_y_high'] = patch_y_high
@@ -497,9 +504,12 @@ class StackFrames(object):
 
             # The background image has been computed where self.sum_single_frame_weights is below the
             # threshold. Compute for every pixel the weight (between 0. and 1.) with which the
-            # stacked patches are to be blended with the background image.
+            # stacked patches are to be blended with the background image. Please note that the
+            # weights have to be divided by the stack size first, to normalize them to 1. at patch
+            # centers.
             self.foreground_weight = self.sum_single_frame_weights / \
-                                     self.configuration.stack_frames_background_blend_threshold
+                                     (self.configuration.stack_frames_background_blend_threshold *
+                                      self.alignment_points.stack_size)
             clip(self.foreground_weight, 0., 1., out=self.foreground_weight)
 
             # blend the AP buffer with the background.
