@@ -21,22 +21,22 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from glob import glob
-from warnings import filterwarnings
 from time import sleep
+from warnings import filterwarnings
 
-from cv2 import GaussianBlur, FONT_HERSHEY_SIMPLEX, putText, resize
 import matplotlib.pyplot as plt
+from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize
 from numpy import int as np_int
-from numpy import zeros, full, empty, float32, int32, newaxis, arange, count_nonzero, \
-    where, sqrt, logical_or, uint16, clip
+from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
+    sqrt, uint16, clip, minimum
 from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
-from miscellaneous import Miscellaneous
 from exceptions import InternalError, NotSupportedError, Error
 from frames import Frames
+from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
 from timer import timer
 
@@ -158,12 +158,20 @@ class StackFrames(object):
             extend_high_x = patch_x_high == self.dim_x
 
             # Compute the weights used in AP blending and store them with the AP.
-            alignment_point['weights_yx'] = self.one_dim_weight(patch_y_low, patch_y_high,
+            alignment_point['weights_yx'] = minimum(self.one_dim_weight(patch_y_low, patch_y_high,
                                                 alignment_point['y'], extend_low=extend_low_y,
-                                                extend_high=extend_high_y)[:, newaxis] * \
-                                            self.one_dim_weight(patch_x_low, patch_x_high,
+                                                extend_high=extend_high_y)[:, newaxis],
+                                                    self.one_dim_weight(patch_x_low, patch_x_high,
                                                 alignment_point['x'], extend_low=extend_low_x,
-                                                extend_high=extend_high_x)
+                                                extend_high=extend_high_x)[newaxis, :])
+
+            # This is an alternative where the weights decrease more rapidly towards the corners.
+            # alignment_point['weights_yx'] = self.one_dim_weight(patch_y_low, patch_y_high,
+            #                                     alignment_point['y'], extend_low=extend_low_y,
+            #                                     extend_high=extend_high_y)[:, newaxis] * \
+            #                                 self.one_dim_weight(patch_x_low, patch_x_high,
+            #                                     alignment_point['x'], extend_low=extend_low_x,
+            #                                     extend_high=extend_high_x)
 
             # For each image buffer pixel add the weights. This is used for normalization later.
             self.sum_single_frame_weights[patch_y_low:patch_y_high,
