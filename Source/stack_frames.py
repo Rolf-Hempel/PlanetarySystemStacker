@@ -467,8 +467,6 @@ class StackFrames(object):
         """
 
         self.my_timer.start('Stacking: merging AP buffers')
-        # For each image buffer pixel count the number of image contributions.
-        single_stack_size_int = self.alignment_points.stack_size
 
         # Add the contributions of all alignment points into a single buffer.
         for alignment_point in self.alignment_points.alignment_points:
@@ -507,18 +505,19 @@ class StackFrames(object):
             # stacked patches are to be blended with the background image. Please note that the
             # weights have to be divided by the stack size first, to normalize them to 1. at patch
             # centers.
-            self.foreground_weight = self.sum_single_frame_weights / \
+            foreground_weight = self.sum_single_frame_weights / \
                                      (self.configuration.stack_frames_background_blend_threshold *
                                       self.alignment_points.stack_size)
-            clip(self.foreground_weight, 0., 1., out=self.foreground_weight)
+            clip(foreground_weight, 0., 1., out=foreground_weight)
 
-            # blend the AP buffer with the background.
+            # Blend the AP buffer with the background.
             if self.frames.color:
                 self.stacked_image_buffer = (self.stacked_image_buffer-self.averaged_background) * \
-                                            self.foreground_weight[:, :, newaxis] + self.averaged_background
+                                            foreground_weight[:, :, newaxis] + \
+                                            self.averaged_background
             else:
                 self.stacked_image_buffer = (self.stacked_image_buffer-self.averaged_background) * \
-                                            self.foreground_weight + self.averaged_background
+                                            foreground_weight + self.averaged_background
 
             self.my_timer.stop('Stacking: blending APs with background')
 
