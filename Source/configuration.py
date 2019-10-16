@@ -167,6 +167,7 @@ class Configuration(object):
         self.alignment_points_local_search_subpixel = False
 
         self.stack_frames_suffix = "_pss"
+        self.stack_frames_background_blend_threshold = 0.1
         self.stack_frames_background_fraction = 0.3
         self.stack_frames_background_patch_size = 100
         self.stack_frames_gauss_width = 5
