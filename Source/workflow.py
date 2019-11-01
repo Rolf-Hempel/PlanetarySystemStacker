@@ -306,7 +306,8 @@ class Workflow(QtCore.QObject):
                 self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
                 return
             except Exception as e:
-                self.abort_job_signal.emit("Error: " + str(e) + ", continue with next job")
+                self.abort_job_signal.emit(
+                    "Error in opening/reading frames: " + str(e) + ", continue with next job")
                 return
 
             # Look up the available RAM (without paging)
@@ -354,7 +355,8 @@ class Workflow(QtCore.QObject):
                 self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
                 return
             except Exception as e:
-                self.abort_job_signal.emit("Error: " + str(e) + ", continue with next job")
+                self.abort_job_signal.emit(
+                    "Error in reading image file: " + str(e) + ", continue with next job")
                 return
 
             # Convert 8 bit to 16 bit.
@@ -381,7 +383,8 @@ class Workflow(QtCore.QObject):
             self.my_timer.stop('Ranking images')
             return
         except Exception as e:
-            self.abort_job_signal.emit("Error: " + str(e) + ", continue with next job")
+            self.abort_job_signal.emit(
+                "Error (probably out of RAM): " + str(e) + ", continue with next job")
             self.my_timer.stop('Ranking images')
             return
 
@@ -520,7 +523,8 @@ class Workflow(QtCore.QObject):
                 self.my_timer.stop('Global frame alignment')
                 return
             except Exception as e:
-                self.abort_job_signal("Error: " + str(e) + ", continue with next job")
+                self.abort_job_signal(
+                    "Error in aligning frames: " + str(e) + ", continue with next job")
                 self.my_timer.stop('Global frame alignment')
                 return
 
