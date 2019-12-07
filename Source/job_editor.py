@@ -60,7 +60,7 @@ class FileDialog(QtWidgets.QFileDialog):
 
 class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
     """
-    Manage the list of jobs. Each item is either the name of a video file (.avi .ser) or a directory
+    Manage the list of jobs. Each item is either the name of a video file (.avi .mov .ser) or a directory
     containing image files of the same shape. Ask the user to add jobs to the list, or to remove
     existing entries. The interaction with the user is through the JobDialog class.
     """
@@ -138,10 +138,10 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         self.file_dialog = FileDialog(self, message,
                                       self.configuration.hidden_parameters_current_dir,
-                                      "Videos (*.avi *.ser)", options=options)
-        self.file_dialog.setNameFilters(["Still image folders / video files for stacking (*.avi *.ser)",
+                                      "Videos (*.avi *.mov *.ser)", options=options)
+        self.file_dialog.setNameFilters(["Still image folders / video files for stacking (*.avi *.mov *.ser)",
                                          "Images for postprocessing (*.tiff *.tif *.fit *.fits *.png *.jpg)"])
-        self.file_dialog.selectNameFilter("Still image folders / video files for stacking (*.avi *.ser)")
+        self.file_dialog.selectNameFilter("Still image folders / video files for stacking (*.avi *.mov *.ser)")
 
         # The list of strings with the new job names is sent by the FileDialog via the signal.
         self.file_dialog.signal_dialog_ready.connect(self.get_input_names)
@@ -186,7 +186,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         """
 
         image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
-        video_extensions = ['.avi', '.ser']
+        video_extensions = ['.avi', '.mov', '.ser']
         # Set the job types of all current jobs on the list.
         self.job_types = []
         for job in self.job_names:
