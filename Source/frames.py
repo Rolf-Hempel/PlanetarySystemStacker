@@ -20,8 +20,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import datetime
-import struct
+import ser_parser
 from glob import glob
 from os import path, remove, listdir, stat
 from os.path import splitext
@@ -31,14 +30,14 @@ from time import time
 from PyQt5 import QtCore
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
-    convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_GRAYSCALE, IMREAD_UNCHANGED, \
-    COLOR_BayerRG2RGB, COLOR_BayerGR2RGB, COLOR_BayerGB2RGB, COLOR_BayerBG2RGB, flip
+    convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_UNCHANGED, \
+    flip
 from cv2 import mean as cv_mean
 from math import ceil
 from numpy import max as np_max
 from numpy import min as np_min
 from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, \
-    frombuffer, dtype, moveaxis
+    moveaxis
 
 from configuration import Configuration
 from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error, \
@@ -51,7 +50,7 @@ class VideoReader(object):
     """
     The VideoReader deals with the import of frames from a video file. Frames can be read either
     consecutively, or at an arbitrary frame index. Eventually, all common video types (such as .avi,
-    .mov, .ser) should be supported.
+    .ser, .mov) should be supported.
     """
 
     def __init__(self):
@@ -69,6 +68,7 @@ class VideoReader(object):
         self.convert_to_grayscale = False
         self.dtype = None
         self.SERFile = False
+        self.bayer_pattern = None
 
     def sanity_check(self, file_path):
         """
@@ -81,21 +81,16 @@ class VideoReader(object):
             raise IOError("File does not exist")
         elif stat(file_path).st_size == 0:
             raise IOError("File is empty")
-        else:
-            if path.splitext(file_path)[1].lower() == '.ser':
-                with open(file_path, 'rb') as fid:
-                    HEADER = fid.read(14).decode()
-                if HEADER == 'LUCAM-RECORDER':
-                    self.SERFile = True
-                else:
-                    raise IOError("File has structure not conform with SER file format")
 
-    def open(self, file_path, convert_to_grayscale=False):
+    def open(self, file_path, bayer_pattern='Auto detect color', convert_to_grayscale=False):
         """
         Initialize the VideoReader object and return parameters with video metadata.
          Throws an IOError if the video file format is not supported.
 
         :param file_path: Full name of the video file.
+        :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
+                              "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
+                              "Force Bayer BGGR".
         :param convert_to_grayscale: If True, convert color frames to grayscale;
                                      otherwise return RGB color frames.
         :return: (frame_count, color, dtype, shape) with
@@ -106,31 +101,24 @@ class VideoReader(object):
                         (num_px_y, num_px_x) for B/W.
         """
 
+        # Set the bayer pattern.
+        self.bayer_pattern = bayer_pattern
+
         # Do sanity check
         self.sanity_check(file_path)
 
+        self.SERFile = path.splitext(file_path)[1].lower() == '.ser'
+
         # Check if input file is SER file
         if self.SERFile:
-            SER_header = self.read_ser_header(file_path)
 
-            self.frame_count = SER_header['FrameCount']
-            self.color = 0 < SER_header['ColorID'] < 100 and \
-                         SER_header['DebayerPattern'] is not None
-
-            if SER_header['PixelDepthPerPlane'] <= 8:
-                self.dtype = dtype(uint8)
-            else:
-                self.dtype = dtype(uint16)
-
-            # Debayer raw RGB data
-            if self.color:
-                self.SER_data = [cvtColor(frame, SER_header['DebayerPattern']) for frame in self.read_ser_image_data(file_path, SER_header)]
-            else:
-                self.SER_data = self.read_ser_image_data(file_path, SER_header)
-
+            self.cap = ser_parser.SERParser(file_path)
+            self.last_frame_read = self.cap.read_frame()
             self.last_read = 0
-            self.last_frame_read = self.SER_data[self.last_read]
+            self.frame_count = self.cap.frame_count
             self.shape = self.last_frame_read.shape
+            self.color = self.cap.color
+            self.dtype = self.cap.PixelDepthPerPlane
 
         else:
             try:
@@ -157,11 +145,13 @@ class VideoReader(object):
             if convert_to_grayscale:
                 # Remember to do the conversion when reading frames later on.
                 self.convert_to_grayscale = True
-                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
+                if self.SERFile:
+                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
+                else:
+                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
                 self.color = False
                 self.shape = self.last_frame_read.shape
-            else:
-                # If color mode should stay, change image read by OpenCV into RGB.
+            elif not self.SERFile:
                 self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
 
         self.opened = True
@@ -194,7 +184,9 @@ class VideoReader(object):
                 return self.last_frame_read
             # Otherwise set the frame pointer to the specified position.
             else:
-                if not self.SERFile:
+                if self.SERFile:
+                    self.cap.frame_number = index
+                else:
                     self.cap.set(CAP_PROP_POS_FRAMES, index)
                 self.last_read = index
 
@@ -213,8 +205,11 @@ class VideoReader(object):
             # Some other frame was specified explicitly. If it is the next frame after the one read
             # last time, the frame pointer does not have to be set.
             else:
-                if index != self.last_read + 1 and not self.SERFile:
-                    self.cap.set(CAP_PROP_POS_FRAMES, index)
+                if index != self.last_read + 1:
+                    if self.SERFile:
+                        self.cap.frame_number = index
+                    else:
+                        self.cap.set(CAP_PROP_POS_FRAMES, index)
                 self.last_read = index
 
         # A new frame has to be read. First check if the index is not out of bounds.
@@ -223,7 +218,7 @@ class VideoReader(object):
                 # Read the next frame.
                 if self.SERFile:
                     ret = True
-                    self.last_frame_read = self.SER_data[self.last_read]
+                    self.last_frame_read = self.cap.read_frame()
                 else:
                     ret, self.last_frame_read = self.cap.read()
                 if not ret:
@@ -233,8 +228,11 @@ class VideoReader(object):
 
             # Do the conversion to grayscale or into RGB color if necessary.
             if self.convert_to_grayscale:
-                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
-            elif self.color:
+                if self.SERFile:
+                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
+                else:
+                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
+            elif self.color and not self.SERFile:
                 self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
         else:
             raise ArgumentError("Error in reading video frame, index " + str(index) +
@@ -249,156 +247,8 @@ class VideoReader(object):
         :return:
         """
 
-        if not self.SERFile:
-            self.cap.release()
+        self.cap.release()
         self.opened = False
-
-    def read_ser_header(self, file_path):
-        """
-        Read the "Header" of SER file with fixed size of 178 Byte.
-
-        :param      file_path           Absolute file path of the SER file
-        :return:    header              Dictionary containing the both "raw"
-                                        and "decoded" values of "header"
-        """
-
-        KEYS = ('FileId', 'LuID', 'ColorID', 'LittleEndian', 'ImageWidth',
-                'ImageHeight', 'PixelDepthPerPlane', 'FrameCount', 'Observer',
-                'Instrument', 'Telescope', 'DateTime', 'DateTime_UTC')
-
-        ColorID = {0:   'MONO',
-                   8:   'BAYER_RGGB',
-                   9:   'BAYER_GRBG',
-                   10:  'BAYER_GBRG',
-                   11:  'BAYER_BGGR',
-                   16:  'BAYER_CYYM',
-                   17:  'BAYER_YCMY',
-                   18:  'BAYER_YMCY',
-                   19:  'BAYER_MYYC',
-                   100: 'RGB',
-                   101: 'BGR'}
-
-        with open(file_path, 'rb') as fid:
-            content = fid.read(178)
-
-        header = {key: value.decode('latin1') if isinstance(value, bytes) else
-                  value for (key, value) in zip(KEYS, struct.unpack(
-                          '<14s 7i 40s 40s 40s 2q', content))}
-
-        if header['ColorID'] == 8:
-            header['DebayerPattern'] = COLOR_BayerRG2RGB
-        elif header['ColorID'] == 9:
-            header['DebayerPattern'] = COLOR_BayerGR2RGB
-        elif header['ColorID'] == 10:
-            header['DebayerPattern'] = COLOR_BayerGB2RGB
-        elif header['ColorID'] == 11:
-            header['DebayerPattern'] = COLOR_BayerBG2RGB
-        else:
-            header['DebayerPattern'] = None
-
-        header['ColorIDDecoded'] = ColorID[header['ColorID']]
-
-        if header['ColorID'] < 100:
-            header['NumberOfPlanes'] = 1
-        else:
-            header['NumberOfPlanes'] = 3
-
-        if header['PixelDepthPerPlane'] <= 8:
-            header['BytesPerPixel'] = header['NumberOfPlanes']
-            if header['ColorID'] < 100:
-                header['PixelDataOrganization'] = 'M'
-            elif header['ColorID'] == 100:
-                header['PixelDataOrganization'] = 'R G B'
-            else:
-                header['PixelDataOrganization'] = 'B G R'
-        else:
-            header['BytesPerPixel'] = 2 * header['NumberOfPlanes']
-            if header['ColorID'] < 100:
-                header['PixelDataOrganization'] = 'MM'
-            elif header['ColorID'] == 100:
-                header['PixelDataOrganization'] = 'RR GG BB'
-            else:
-                header['PixelDataOrganization'] = 'BB GG RR'
-
-        try:
-            header['DateTime_Decoded'] = datetime.datetime(1, 1, 1) + \
-                datetime.timedelta(microseconds=header['DateTime'] // 10)
-        except Exception:
-            header['DateTime_Decoded'] = None
-
-        try:
-            header['DateTime_UTC_Decoded'] = datetime.datetime(1, 1, 1) + \
-                datetime.timedelta(microseconds=header['DateTime_UTC'] // 10)
-        except Exception:
-            header['DateTime_UTC_Decoded'] = None
-
-        # Check, if FireCature metadata is available
-        if 'fps=' in header['Telescope']:
-            header['FPS'] = float(header['Telescope'].split('fps=')[1].split('gain')[0])
-            header['Gain'] = int(header['Telescope'].split('gain=')[1].split('exp')[0])
-            header['Exposure [ms]'] = float(header['Telescope'].split('exp=')[1].split('\x00')[0])
-
-        return header
-
-    def read_ser_image_data(self, file_path, header=None):
-        """
-        Read the "Image Data" of SER file.
-
-        :param      file_path           Absolute file path of the SER file
-        :param      header (optional)   Ser file header, if already available
-        :return:    image_data          Multi dimmensional Numpy array
-                                        containig image frame data
-        """
-
-        if header is None:
-            header = self.read_ser_header(file_path)
-
-        if header['PixelDepthPerPlane'] <= 8:
-            PixelDepthPerPlane = dtype(uint8)
-        else:
-            # FireCapture uses "LittleEndian".
-            # Until FireCatpure 2.7 this flag was not set properly.
-            PixelDepthPerPlane = dtype(uint16).newbyteorder('<')
-
-        AMOUNT = header['FrameCount'] * header['ImageWidth'] * \
-            header['ImageHeight'] * header['BytesPerPixel']
-
-        with open(file_path, 'rb') as fid:
-            fid.seek(178)
-            content = fid.read(AMOUNT)
-
-        return frombuffer(content, dtype=PixelDepthPerPlane).reshape(
-                header['FrameCount'], header['ImageHeight'],
-                header['ImageWidth'])
-
-    def read_ser_trailer(self, file_path, header=None):
-        """
-        Read the "Trailer" of SER file with time stamps in UTC for every image
-        frame. Those values are "optional".
-
-        :param      file_path           Absolute file path of the SER file
-        :param      header (optional)   Ser file header, if already available
-        :return:    trailer             List containing "datetime" objects for
-                                        time stamps in UTC. Otherwise "None"
-        """
-
-        if header is None:
-            header = self.read_ser_header(file_path)
-
-        OFFSET = 178 + header['FrameCount'] * header['ImageWidth'] * \
-            header['ImageHeight'] * header['BytesPerPixel']
-
-        with open(file_path, 'rb') as fid:
-            fid.seek(OFFSET)
-            content = fid.read()
-
-        if content:
-            return [datetime.datetime(1, 1, 1) + datetime.timedelta(
-                microseconds=value // 10) for value in struct.unpack(
-                        '<{0}Q'.format(header['FrameCount']), content)]
-        else:
-            return None
-
 
 class ImageReader(object):
     """
@@ -421,12 +271,16 @@ class ImageReader(object):
         self.color = None
         self.convert_to_grayscale = False
         self.dtype = None
+        self.bayer_pattern = None
 
-    def open(self, file_path_list, convert_to_grayscale=False):
+    def open(self, file_path_list, bayer_pattern='Auto detect color', convert_to_grayscale=False):
         """
         Initialize the ImageReader object and return parameters with image metadata.
 
         :param file_path_list: List with path names to the image files.
+        :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
+                              "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
+                              "Force Bayer BGGR".
         :param convert_to_grayscale: If True, convert color frames to grayscale;
                                      otherwise return RGB color frames.
         :return: (frame_count, color, dtype, shape) with
@@ -438,6 +292,7 @@ class ImageReader(object):
         """
 
         self.file_path_list = file_path_list
+        self.bayer_pattern = bayer_pattern
 
         try:
             self.frame_count = len(self.file_path_list)
@@ -616,9 +471,10 @@ class Calibration(QtCore.QObject):
         # Case video file:
         if Path(master_name).is_file():
             extension = Path(master_name).suffix
-            if extension in ('.avi', '.mov', '.ser'):
+            if extension in ('.avi', '.ser'):
                 reader = VideoReader()
-                frame_count, input_color, input_dtype, input_shape = reader.open(master_name)
+                frame_count, input_color, input_dtype, input_shape = reader.open(master_name,
+                                        bayer_pattern=self.configuration.frames_debayering_default)
                 self.configuration.hidden_parameters_current_dir = str(Path(master_name).parent)
             else:
                 raise InternalError(
@@ -628,7 +484,8 @@ class Calibration(QtCore.QObject):
         elif Path(master_name).is_dir():
             names = [path.join(master_name, name) for name in listdir(master_name)]
             reader = ImageReader()
-            frame_count, input_color, input_dtype, input_shape = reader.open(names)
+            frame_count, input_color, input_dtype, input_shape = reader.open(names,
+                                        bayer_pattern=self.configuration.frames_debayering_default)
             self.configuration.hidden_parameters_current_dir = str(master_name)
         else:
             raise InternalError("Cannot decide if input file is video or image directory")
@@ -901,9 +758,10 @@ class Frames(object):
 
         return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
 
-    def __init__(self, configuration, names, type='video', calibration=None,
-                 convert_to_grayscale=False, progress_signal=None, buffer_original=True,
-                 buffer_monochrome=False, buffer_gaussian=True, buffer_laplacian=True):
+    def __init__(self, configuration, names, type='video', bayer_pattern="Auto detect color",
+                 calibration=None, convert_to_grayscale=False, progress_signal=None,
+                 buffer_original=True, buffer_monochrome=False, buffer_gaussian=True,
+                 buffer_laplacian=True):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
@@ -912,6 +770,9 @@ class Frames(object):
         :param names: In case "video": name of the video file. In case "image": list of names for
                       all images.
         :param type: Either "video" or "image".
+        :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
+                              "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
+                               "Force Bayer BGGR".
         :param calibration: (Optional) calibration object for darks/flats correction.
         :param convert_to_grayscale: If "True", convert frames to grayscale if they are RGB.
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
@@ -935,6 +796,7 @@ class Frames(object):
         self.calibration = calibration
         self.progress_signal = progress_signal
         self.type = type
+        self.bayer_pattern = bayer_pattern
         self.convert_to_grayscale = convert_to_grayscale
 
         self.buffer_original = buffer_original
@@ -971,6 +833,7 @@ class Frames(object):
             raise TypeError("Image type " + self.type + " not supported")
 
         self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
+            bayer_pattern=self.bayer_pattern,
             convert_to_grayscale=self.convert_to_grayscale)
 
         # Set the depth value of all images to either 16 or 8 bits.
