@@ -45,10 +45,10 @@ from timer import timer
 def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=False,
              automatic_ap_creation=True):
     """
-    Execute the whole stacking workflow for a test case. This can either use a video file (.avi .ser)
+    Execute the whole stacking workflow for a test case. This can either use a video file (.avi .mov .mp4 .ser)
     or still images stored in a single directory.
 
-    :param input_name: Video file (.avi .ser) or name of a directory containing still images
+    :param input_name: Video file (.avi .mov .mp4 .ser) or name of a directory containing still images
     :param input_type: Either "video" or "image" (see "input_name")
     :param roi: If specified, tuple (y_low, y_high, x_low, x_high) with pixel bounds for "region
                 of interest"

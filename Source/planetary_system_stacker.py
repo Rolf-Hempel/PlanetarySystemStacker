@@ -451,8 +451,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         file_dialog = FileDialog(self, message,
                                  self.configuration.hidden_parameters_current_dir,
-                                 "Videos (*.avi *.ser)", options=options)
-        file_dialog.setNameFilters(["Still image folder / video file (*.avi *.ser)"])
+                                 "Videos (*.avi *.mov *.mp4 *.ser)", options=options)
+        file_dialog.setNameFilters(["Still image folder / video file (*.avi *.mov *.mp4 *.ser)"])
 
         # The list of strings (length 1) with the path name to the dark frames is sent by the
         # FileDialog via the signal "signal_dialog_ready".
@@ -533,8 +533,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         file_dialog = FileDialog(self, message,
                                  self.configuration.hidden_parameters_current_dir,
-                                 "Videos (*.avi *.ser)", options=options)
-        file_dialog.setNameFilters(["Still image folder / video file (*.avi *.ser)"])
+                                 "Videos (*.avi *.mov *.mp4 *.ser)", options=options)
+        file_dialog.setNameFilters(["Still image folder / video file (*.avi *.mov *.mp4 *.ser)"])
 
         # The list of strings (length 1) with the path name to the flat frames is sent by the
         # FileDialog via the signal "signal_dialog_ready".

@@ -51,7 +51,7 @@ class VideoReader(object):
     """
     The VideoReader deals with the import of frames from a video file. Frames can be read either
     consecutively, or at an arbitrary frame index. Eventually, all common video types (such as .avi,
-    .ser, .mov) should be supported.
+    .mov, .mp4, .ser) should be supported.
     """
 
     def __init__(self):
@@ -639,7 +639,7 @@ class Calibration(QtCore.QObject):
         # Case video file:
         if Path(master_name).is_file():
             extension = Path(master_name).suffix
-            if extension in ('.avi', '.ser'):
+            if extension in ('.avi', '.mov', '.mp4', '.ser'):
                 reader = VideoReader()
                 frame_count, input_color, input_dtype, input_shape = reader.open(master_name,
                                         bayer_pattern=self.configuration.frames_debayering_default)
