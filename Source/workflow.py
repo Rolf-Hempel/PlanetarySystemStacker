@@ -80,7 +80,7 @@ class Workflow(QtCore.QObject):
         self.protocol_file = None
 
         # Switch alignment point debugging on / off.
-        self.debug_AP = False
+        self.debug_AP = True
 
         # The following code works on Windows and Linux systems only. It is not necessary, though.
         try:

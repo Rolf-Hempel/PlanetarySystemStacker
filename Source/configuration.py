@@ -155,7 +155,7 @@ class Configuration(object):
         self.alignment_points_rank_method = "Laplace"
         self.alignment_points_rank_pixel_stride = 2
         self.alignment_points_de_warp = True
-        self.alignment_points_method = 'MultiLevel'
+        self.alignment_points_method = 'SteepestDescent'
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
 

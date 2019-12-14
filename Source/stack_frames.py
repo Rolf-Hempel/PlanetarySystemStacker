@@ -287,6 +287,8 @@ class StackFrames(object):
             alignment_point['shifts_x'] = []
             alignment_point['deviations'] = []
             alignment_point['frame_indices'] = []
+            alignment_point['warp_y'] = 0
+            alignment_point['warp_x'] = 0
 
         # Go through the list of all frames.
         for frame_index in range(self.frames.number):
@@ -303,6 +305,8 @@ class StackFrames(object):
                 alignment_point['shifts_x'].append(shift_x)
                 alignment_point['deviations'].append(deviation)
                 alignment_point['frame_indices'].append(frame_index)
+                alignment_point['warp_y'] += shift_y
+                alignment_point['warp_x'] += shift_x
 
                 # Increment the counter corresponding to the 2D warp shift.
                 try:
@@ -310,6 +314,12 @@ class StackFrames(object):
                 except:
                     print ("Error: shift dy: " + str(shift_y) + ", dx: " + str(shift_x) +
                            " too large for statistics vector.")
+
+        for alignment_point in self.alignment_points.alignment_points:
+            alignment_point['warp_y'] /= self.alignment_points.stack_size
+            alignment_point['warp_x'] /= self.alignment_points.stack_size
+
+            print ("Warp_y: " + str(alignment_point['warp_y']) + ", Warp_x: " + str(alignment_point['warp_x']))
 
         # Shorten the list of frames to be used at each alignment point.
         factor = 0.5

@@ -69,11 +69,6 @@ class AlignmentPoints(object):
         self.align_frames = align_frames
         self.progress_signal = progress_signal
 
-        # Apply a low-pass filter on the mean frame as a preparation for shift detection.
-        self.mean_frame = GaussianBlur(align_frames.mean_frame.astype(uint16),
-                                        (self.configuration.frames_gauss_width,
-                                        self.configuration.frames_gauss_width), 0).astype(int32)
-
         if self.configuration.alignment_points_method == 'MultiLevel':
             self.mean_frames = []
 
@@ -719,6 +714,25 @@ class AlignmentPoints(object):
             for frame_index in alignment_point['best_frame_indices']:
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)
 
+            # Cut the referenced patch for this alignment point from the sharpest frame at this
+            # location.
+            best_index = alignment_point['best_frame_indices'][0]
+            offset_y = self.align_frames.intersection_shape[0][0] - \
+                       self.align_frames.frame_shifts[best_index][0]
+            offset_x = self.align_frames.intersection_shape[1][0] - \
+                       self.align_frames.frame_shifts[best_index][1]
+            alignment_point['reference_box'] = self.frames.frames_mono_blurred(best_index)[
+                                               offset_y + alignment_point['box_y_low']:
+                                               offset_y + alignment_point['box_y_high'],
+                                               offset_x + alignment_point['box_x_low']:
+                                               offset_x + alignment_point['box_x_high']]
+
+            alignment_point['reference_patch'] = self.frames.frames_mono_blurred(best_index)[
+                                               offset_y + alignment_point['patch_y_low']:
+                                               offset_y + alignment_point['patch_y_high'],
+                                               offset_x + alignment_point['patch_x_low']:
+                                               offset_x + alignment_point['patch_x_high']]
+
     def prepare_for_debugging(self, update_image_window_signal):
         """
         The effect of de-warping is to be visualized in the GUI. To this end, method
@@ -733,7 +747,7 @@ class AlignmentPoints(object):
         self.update_image_window_signal = update_image_window_signal
         self.scale_factor = 3
         self.border = 2
-        self.image_delay = 3.
+        self.image_delay = 0.1
 
     def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
                                       de_warp=True):
@@ -926,8 +940,7 @@ class AlignmentPoints(object):
                     y_high = alignment_point['patch_y_high']
                     x_low = alignment_point['patch_x_low']
                     x_high = alignment_point['patch_x_high']
-                    reference_patch = (self.mean_frame[y_low:y_high, x_low:x_high]).astype(uint16)
-                    reference_patch = resize(reference_patch, None,
+                    reference_patch = resize(alignment_point['reference_patch'].astype(uint16), None,
                                              fx=float(self.scale_factor),
                                              fy=float(self.scale_factor))
 
