@@ -31,13 +31,11 @@ class SERParser(object):
 
     __author__ = 'Michal Powalko'
     __author_email__ = 'm.powalko@gmail.com'
-    __version__ = '1.0'
+    __version__ = '1.1'
     __name__ = 'SER parser for PlanetarySystemStacker tool (PSS)'
 
     def __init__(self, ser_file):
         super().__init__()
-
-        self.frame_number = -1
 
         self.sanity_check(ser_file)
 
@@ -156,6 +154,8 @@ class SERParser(object):
             header['Gain'] = int(header['Telescope'].split('gain=')[1].split('exp')[0])
             header['Exposure [ms]'] = float(header['Telescope'].split('exp=')[1].split('\x00')[0])
 
+        self.frame_number = -1
+
         return header
 
     def read_frame(self, frame_number=None):
@@ -167,14 +167,18 @@ class SERParser(object):
         """
 
         if frame_number is None:
-            self.frame_number += 1
-        else:
-            self.frame_number = frame_number
+            frame_number = self.frame_number + 1
 
-        if self.frame_number == 0:
-            self.fid.seek(178)
+        if 0 <= frame_number < self.frame_count:
+            if frame_number != self.frame_number + 1:
+                if frame_number == 0:
+                    self.fid.seek(178)
+                else:
+                    self.fid.seek(178 + frame_number * self.frame_size)
         else:
-            self.fid.seek(178 + self.frame_number * self.frame_size)
+            raise IOError('Error in reading video frame, index: {0} is out of bounds'.format(frame_number))
+
+        self.frame_number = frame_number
 
         if self.header['NumberOfPlanes'] == 1:
             if self.color:
@@ -221,6 +225,8 @@ class SERParser(object):
 
         content = self.fid.read()
 
+        self.frame_number = self.frame_count
+
         if content:
             return [datetime.datetime(1, 1, 1) + datetime.timedelta(
                 microseconds=value // 10) for value in struct.unpack(
@@ -240,8 +246,7 @@ if __name__ == "__main__":
     file_path = r'C:\Temp\SER\Mars_GRBG.ser'
 
     cap = ser_parser.SERParser(file_path)
-    last_frame_read = cap.read_frame()
-    last_read = 0
+    last_frame_read = cap.read_frame(25)
     frame_count = cap.frame_count
     shape = last_frame_read.shape
     color = cap.color
