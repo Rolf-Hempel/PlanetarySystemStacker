@@ -58,8 +58,6 @@ class VideoReader(object):
         Create the VideoReader object and initialize instance variables.
         """
 
-        self.opened = False
-        self.just_opened = False
         self.last_read = None
         self.last_frame_read = None
         self.frame_count = None
@@ -107,19 +105,22 @@ class VideoReader(object):
         # Do sanity check
         self.sanity_check(file_path)
 
+        # Check, if file has SER extension
         self.SERFile = path.splitext(file_path)[1].lower() == '.ser'
 
         # Check if input file is SER file
         if self.SERFile:
-
+            # Create the VideoCapture object.
             self.cap = ser_parser.SERParser(file_path)
+
+            # Read the first frame.
             self.last_frame_read = self.cap.read_frame(0)
-            self.last_read = 0
+
+            # Look up video metadata.
             self.frame_count = self.cap.frame_count
             self.shape = self.last_frame_read.shape
             self.color = self.cap.color
             self.dtype = self.cap.PixelDepthPerPlane
-
         else:
             try:
                 # Create the VideoCapture object.
@@ -131,13 +132,15 @@ class VideoReader(object):
                     raise IOError("Error in reading first video frame")
 
                 # Look up video metadata.
-                self.last_read = 0
                 self.frame_count = int(self.cap.get(CAP_PROP_FRAME_COUNT))
                 self.shape = self.last_frame_read.shape
                 self.color = (len(self.shape) == 3)
                 self.dtype = self.last_frame_read.dtype
             except:
                 raise IOError("Error in reading first video frame")
+
+        # Assign "last_read"
+        self.last_read = 0
 
         # If file is in color mode and grayscale output is requested, do the conversion and change
         # metadata.
@@ -154,9 +157,6 @@ class VideoReader(object):
             elif not self.SERFile:
                 self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
 
-        self.opened = True
-        self.just_opened = True
-
         # Return the metadata.
         return self.frame_count, self.color, self.dtype, self.shape
 
@@ -165,48 +165,23 @@ class VideoReader(object):
         Read a single frame from the video.
 
         :param index: Frame index (optional). If no index is specified, the next frame is read.
-                      At the first invocation, this is frame number 0.
         :return: Numpy array containing the frame. For B/W, the shape is (num_px_y, num_px_x).
                  For a color video, it is (num_px_y, num_px_x, 3). The type is uint8 or uint16 for
                  8 or 16 bit resolution.
         """
 
-        if not self.opened:
-            raise WrongOrderingError(
-                "Error: Attempt to read video frame before opening VideoReader")
-
-        # Special case: first call after initialization.
-        if self.just_opened:
-            self.just_opened = False
-
-            # Frame 0 has been read during initialization. Not necessary to read it again.
-            if index is None or index == 0:
-                return self.last_frame_read
-            # Otherwise set the frame pointer to the specified position.
-            else:
-                if not self.SERFile:
-                    self.cap.set(CAP_PROP_POS_FRAMES, index)
-                self.last_read = index
-
-        # General case: not the first call.
-        else:
-
+        # Check the index.
+        if index is None:
             # Consecutive reading. Just increment the frame pointer.
-            if index is None:
-                self.last_read += 1
-
-            # An index is specified explicitly. If it is the same as at last call, just return the
-            # last frame.
-            elif index == self.last_read:
-                return self.last_frame_read
-
-            # Some other frame was specified explicitly. If it is the next frame after the one read
-            # last time, the frame pointer does not have to be set.
-            else:
-                if index != self.last_read + 1:
-                    if not self.SERFile:
-                        self.cap.set(CAP_PROP_POS_FRAMES, index)
-                self.last_read = index
+            self.last_read += 1
+        elif index == self.last_read:
+            # An index is the same as at last call, just return the last frame.
+            return self.last_frame_read
+        else:
+            # If it is the next frame after the one read last time, the frame pointer does not have to be set.
+            if not self.SERFile and index != self.last_read + 1:
+                self.cap.set(CAP_PROP_POS_FRAMES, index)
+            self.last_read = index
 
         # A new frame has to be read. First check if the index is not out of bounds.
         if 0 <= self.last_read < self.frame_count:
@@ -218,9 +193,9 @@ class VideoReader(object):
                 else:
                     ret, self.last_frame_read = self.cap.read()
                 if not ret:
-                    raise IOError("Error in reading video frame, index: " + str(index))
+                    raise IOError("Error in reading video frame, index: {0}".format(index))
             except:
-                raise IOError("Error in reading video frame, index: " + str(index))
+                raise IOError("Error in reading video frame, index: {0}".format(index))
 
             # Do the conversion to grayscale or into RGB color if necessary.
             if self.convert_to_grayscale:
@@ -231,8 +206,7 @@ class VideoReader(object):
             elif self.color and not self.SERFile:
                 self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
         else:
-            raise ArgumentError("Error in reading video frame, index " + str(index) +
-                                " is out of bounds")
+            raise ArgumentError("Error in reading video frame, index {0} is out of bounds".format(index))
 
         return self.last_frame_read
 
@@ -244,7 +218,6 @@ class VideoReader(object):
         """
 
         self.cap.release()
-        self.opened = False
 
 class ImageReader(object):
     """
