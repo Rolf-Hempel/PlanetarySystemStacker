@@ -67,6 +67,7 @@ class VideoReader(object):
         self.dtype = None
         self.SERFile = False
         self.bayer_pattern = None
+        self.opencv_color_space = COLOR_BGR2RGB
 
     def sanity_check(self, file_path):
         """
@@ -151,11 +152,12 @@ class VideoReader(object):
                 if self.SERFile:
                     self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
                 else:
-                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
+                    self.opencv_color_space = COLOR_BGR2GRAY
+                    self.last_frame_read = cvtColor(self.last_frame_read, self.opencv_color_space)
                 self.color = False
                 self.shape = self.last_frame_read.shape
             elif not self.SERFile:
-                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
+                self.last_frame_read = cvtColor(self.last_frame_read, self.opencv_color_space)
 
         # Return the metadata.
         return self.frame_count, self.color, self.dtype, self.shape
@@ -188,23 +190,14 @@ class VideoReader(object):
             try:
                 # Read the next frame.
                 if self.SERFile:
-                    ret = True
-                    self.last_frame_read = self.cap.read_frame(self.last_read)
+                    if self.convert_to_grayscale:
+                        self.last_frame_read = cvtColor(self.cap.read_frame(self.last_read), COLOR_RGB2GRAY)
+                    else:
+                        self.last_frame_read = self.cap.read_frame(self.last_read)
                 else:
-                    ret, self.last_frame_read = self.cap.read()
-                if not ret:
-                    raise IOError("Error in reading video frame, index: {0}".format(index))
+                    self.last_frame_read = cvtColor(self.cap.read()[1], self.opencv_color_space)
             except:
                 raise IOError("Error in reading video frame, index: {0}".format(index))
-
-            # Do the conversion to grayscale or into RGB color if necessary.
-            if self.convert_to_grayscale:
-                if self.SERFile:
-                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
-                else:
-                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2GRAY)
-            elif self.color and not self.SERFile:
-                self.last_frame_read = cvtColor(self.last_frame_read, COLOR_BGR2RGB)
         else:
             raise ArgumentError("Error in reading video frame, index {0} is out of bounds".format(index))
 
