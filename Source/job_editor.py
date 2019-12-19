@@ -237,9 +237,8 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
                 source is self.job_list_widget):
 
             # Create a list of patterns which are checked by the selected items initially.
-            checked_patterns = []
-            for item in self.job_list_widget.selectedItems():
-                checked_patterns.append(self.jobs[source.row(item)].bayer_pattern)
+            checked_patterns = [self.jobs[source.row(item)].bayer_pattern
+                                for item in self.job_list_widget.selectedItems()]
 
             # Create the context menu. Mark those patterns checked which have been set for at least
             # one selected job list entry.
