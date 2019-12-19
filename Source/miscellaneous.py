@@ -30,7 +30,7 @@ from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY
     resize
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin, uint8, float32, uint16, full
+    empty, argmin, stack, sin, uint8, float32, uint16, full, mean
 from math import exp
 from numpy import min as np_min
 from numpy.fft import fft2, ifft2
@@ -781,7 +781,7 @@ class Miscellaneous(object):
         composite_dim_x = sum_shape_x + border * (len(image_list) + 1)
 
         # Allocate the composite image.
-        composite = full((composite_dim_y, composite_dim_x), 0, dtype=type)
+        composite = full((composite_dim_y, composite_dim_x), int(mean(image_list[0])), dtype=type)
 
         # Copy the images into the composite image.
         x_pos = border
