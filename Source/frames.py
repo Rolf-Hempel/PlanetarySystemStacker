@@ -1121,8 +1121,7 @@ class Frames(object):
         # For every frame initialize the list with used alignment points.
         self.used_alignment_points = [[] for index in range(self.number)]
 
-    @staticmethod
-    def save_image(filename, image, color=False, avoid_overwriting=True):
+    def save_image(self, filename, image, color=False, avoid_overwriting=True):
         """
         Save an image to a file. If "avoid_overwriting" is set to False, images can have either
         ".tiff" or ".fits" format.
@@ -1176,7 +1175,7 @@ class Frames(object):
             if color:
                 image = moveaxis(image, -1, 0)
             hdu = fits.PrimaryHDU(image)
-            hdu.header['CREATOR'] = 'PlanetarySystemStacker'
+            hdu.header['CREATOR'] = self.configuration.global_parameters_version
             hdu.writeto(filename, overwrite=True)
 
         else:
