@@ -1206,20 +1206,31 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         OPENCV_VERSION = cv2.__version__
         NUMPY_VERSION = np.__version__
 
-        CONTENT = ('''       {0}
-        \n
-        System overview:
-        PC: {2}
-        CPU Cores: {9}
-        Memory: {10:.1f} [GB]
-        OS: {3}
-        User: {1}
-        \n
-        Software versions used:
-        Python: {4}
-        Qt: {5}
-        Matplotlib: {6}
-        OpenCV: {7}
+        CONTENT = ('''        <b>{0}</b><br><br>
+        Produce a sharp image of a planetary system object (moon, sun, planets)
+        from many seeing-affected frames using the "lucky imaging" technique.
+        <br><br>
+        The program is mainly targeted at extended objects (moon, sun),
+        but it should work as well for the (easier) planet case.
+        A full working prototype written in Python has been finished.
+        Results obtained in first tests show the same image quality as
+        the established software AutoStakkert!3.
+        <br><br>
+        Homepage: <a href='https://github.com/Rolf-Hempel/PlanetarySystemStacker'>
+        https://github.com/Rolf-Hempel/PlanetarySystemStacker</a>
+        <br><br>
+        System overview:<br>
+        PC: {2}<br>
+        CPU Cores: {9}<br>
+        Memory: {10:.1f} [GB]<br>
+        OS: {3}<br>
+        User: {1}<br>
+        <br>
+        Software versions used:<br>
+        Python: {4}<br>
+        Qt: {5}<br>
+        Matplotlib: {6}<br>
+        OpenCV: {7}<br>
         Numpy: {8}'''.format(self.configuration.global_parameters_version, USER, PC, OS,
                              PYTHON_VERSION, QT_VERSION,
                              MATPLOTLIB_VERSION, OPENCV_VERSION, NUMPY_VERSION, CPU,
