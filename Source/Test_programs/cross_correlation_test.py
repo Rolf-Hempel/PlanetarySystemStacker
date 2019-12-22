@@ -64,6 +64,7 @@ def display_image(image, delay=0.1):
 def blurr_image(image, strength):
     return GaussianBlur(image, (strength, strength), 0)
 
+
 def search_local_match_gradient_correlation(reference_box, frame, y_low, y_high, x_low, x_high,
                                             search_width, sampling_stride, cor_table):
     """
@@ -99,8 +100,8 @@ def search_local_match_gradient_correlation(reference_box, frame, y_low, y_high,
     # Initialize the global optimum with the value at dy=dx=0.
     if sampling_stride != 1:
         correlation_max = (reference_box[::sampling_stride, ::sampling_stride] * frame[
-                                      y_low:y_high:sampling_stride,
-                                      x_low:x_high:sampling_stride]).sum()
+                                                                                 y_low:y_high:sampling_stride,
+                                                                                 x_low:x_high:sampling_stride]).sum()
     else:
         correlation_max = (reference_box * frame[y_low:y_high, x_low:x_high]).sum()
     cor_table[0, 0] = correlation_max
@@ -115,7 +116,7 @@ def search_local_match_gradient_correlation(reference_box, frame, y_low, y_high,
 
     # Start with shift [0, 0]. Stop when a circle with radius 1 around the current optimum
     # reaches beyond the search area.
-    while max(abs(dy_max), abs(dx_max)) <= search_width-1:
+    while max(abs(dy_max), abs(dx_max)) <= search_width - 1:
 
         # Create an enumerator which produces shift values [dy, dx] in a circular pattern
         # with radius 1 around the current optimum [dy_min, dx_min].
@@ -134,8 +135,8 @@ def search_local_match_gradient_correlation(reference_box, frame, y_low, y_high,
                 if correlation < -0.5:
                     counter_new += 1
                     correlation = (reference_box[::sampling_stride, ::sampling_stride] * frame[
-                                      y_low - dy:y_high - dy:sampling_stride,
-                                      x_low - dx:x_high - dx:sampling_stride]).sum()
+                                                                                         y_low - dy:y_high - dy:sampling_stride,
+                                                                                         x_low - dx:x_high - dx:sampling_stride]).sum()
                     cor_table[dy, dx] = correlation
                 else:
                     counter_reused += 1
@@ -147,7 +148,7 @@ def search_local_match_gradient_correlation(reference_box, frame, y_low, y_high,
                 correlation = cor_table[dy, dx]
                 if correlation < -0.5:
                     correlation = (reference_box * frame[y_low - dy:y_high - dy,
-                                        x_low - dx:x_high - dx]).sum()
+                                                   x_low - dx:x_high - dx]).sum()
                     cor_table[dy, dx] = correlation
                 if correlation > correlation_max_1:
                     correlation_max_1, dy_max_1, dx_max_1 = correlation, dy, dx
@@ -280,11 +281,11 @@ if __name__ == "__main__":
 
     ap_size = 40
     blurr_strength_first_phase = 5
-    stride_first_phase = 4
-    search_width_first_phase = 8
+    stride_first_phase = 2
+    search_width_first_phase = 6
 
-    blurr_strength_second_phase = 11
-    stride_second_phase = 1
+    blurr_strength_second_phase = 13
+    stride_second_phase = 2
     search_width_second_phase = stride_first_phase + 2
 
     y_low = ap_position_y - int(ap_size / 2)
@@ -323,6 +324,9 @@ if __name__ == "__main__":
     shift_y_local_total_sum = 0
     shift_x_local_total_sum = 0
 
+    shift_y_corrected = []
+    shift_x_corrected = []
+
     for idx in range(frames.number):
         shift_y_global = align_frames.frame_shifts[idx][0]
         shift_x_global = align_frames.frame_shifts[idx][1]
@@ -349,16 +353,20 @@ if __name__ == "__main__":
         x_lo = x_low - shift_x_global + shift_x_local_first_phase
         x_hi = x_high - shift_x_global + shift_x_local_first_phase
 
+        frame_blurred_second_phase = blurr_image(frames.frames_mono_blurred(idx), blurr_strength_second_phase)
         [shift_y_local_second_phase, shift_x_local_second_phase], dev_r \
             = search_local_match_gradient_correlation(reference_window_second_phase,
-                                                        frames.frames_mono_blurred(idx), y_lo, y_hi,
-                                                        x_lo, x_hi, search_width_second_phase,
-                                                        stride_second_phase, dev_table)
+                                                      frame_blurred_second_phase, y_lo, y_hi,
+                                                      x_lo, x_hi, search_width_second_phase,
+                                                      stride_second_phase, dev_table)
 
         shift_y_local_total = shift_y_local_first_phase + shift_y_local_second_phase
         shift_x_local_total = shift_x_local_first_phase + shift_x_local_second_phase
         shift_y_local_total_sum += shift_y_local_total
         shift_x_local_total_sum += shift_x_local_total
+
+        shift_y_corrected.append(shift_y_local_total)
+        shift_x_corrected.append(shift_x_local_total)
 
         frame_window_shifted_second_phase = blurr_image(
             frames.frames_mono_blurred(idx)[
@@ -372,15 +380,27 @@ if __name__ == "__main__":
             scale_factor=1)
         display_image(composite_image, delay=0.1)
 
-        print ("frame index: " + str(idx) + ", shift first phase: [" + str(shift_y_local_first_phase) + ", " + str(shift_x_local_first_phase) +
-               "], shift second phase: [" + str(shift_y_local_second_phase) + ", " + str(shift_x_local_second_phase) +
-               "], total shift: [" + str(shift_y_local_total) + ", " + str(shift_x_local_total) + "]")
+        print("frame index: " + str(idx) + ", shift first phase: [" + str(
+            shift_y_local_first_phase) + ", " + str(shift_x_local_first_phase) +
+              "], shift second phase: [" + str(shift_y_local_second_phase) + ", " + str(
+            shift_x_local_second_phase) +
+              "], total shift: [" + str(shift_y_local_total) + ", " + str(
+            shift_x_local_total) + "]")
 
     shift_y_reference = shift_y_local_total_sum / frames.number
     shift_x_reference = shift_x_local_total_sum / frames.number
 
-    print ("")
-    print ("reference patch shift, y: " + str(shift_y_reference) + ", x: " + str(shift_x_reference))
+    for idx in range(frames.number):
+        shift_y_corrected[idx] -= shift_y_reference
+        shift_x_corrected[idx] -= shift_x_reference
+
+    print("")
+    print("reference patch shift, y: " + str(shift_y_reference) + ", x: " + str(shift_x_reference))
+
+    print("")
+    for idx in range(frames.number):
+        print("frame index: " + str(idx) + ", local AP shift: [" + str(
+            shift_y_corrected[idx]) + ", " + str(shift_x_corrected[idx]) + "]")
 
     display_image(None)
 
