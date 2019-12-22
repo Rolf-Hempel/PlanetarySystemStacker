@@ -506,7 +506,7 @@ class Miscellaneous(object):
 
         # Start with shift [0, 0]. Stop when a circle with radius 1 around the current optimum
         # reaches beyond the search area.
-        while max(abs(dy_min), abs(dx_min)) < search_width-1:
+        while max(abs(dy_min), abs(dx_min)) <= search_width-1:
 
             # Create an enumerator which produces shift values [dy, dx] in a circular pattern
             # with radius 1 around the current optimum [dy_min, dx_min].
