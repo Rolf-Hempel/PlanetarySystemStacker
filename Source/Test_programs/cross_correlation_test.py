@@ -70,7 +70,7 @@ def search_local_match_gradient_correlation(reference_box, frame, y_low, y_high,
     Try shifts in y, x between the box around the alignment point in the mean frame and the
     corresponding box in the given frame. Start with shifts [0, 0] and move out in steps until
     a local optimum is reached. In each step try all positions with distance 1 in y and/or x
-    from the optimum found in the previous step (steepest descent). The global frame shift is
+    from the optimum found in the previous step (steepest ascent). The global frame shift is
     accounted for beforehand already.
 
     :param reference_box: Image box around alignment point in mean frame.
