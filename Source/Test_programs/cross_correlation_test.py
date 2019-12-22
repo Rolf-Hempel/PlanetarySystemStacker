@@ -27,7 +27,7 @@ from time import sleep
 
 import matplotlib.pyplot as plt
 import pylab as pl
-from cv2 import GaussianBlur, matchTemplate, TM_CCORR, TM_SQDIFF_NORMED, CV_32F, TM_SQDIFF, minMaxLoc
+from cv2 import GaussianBlur, matchTemplate, TM_CCORR, TM_SQDIFF_NORMED, CV_32F, TM_SQDIFF, minMaxLoc, meanStdDev
 from numpy import float32, unravel_index, argmin
 
 from align_frames import AlignFrames
@@ -86,7 +86,7 @@ if __name__ == "__main__":
     mkl_set_num_threads(2)
     print("Number of threads used by mkl: " + str(mkl_get_max_threads()))
 
-    input_name = 'E:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter/2019-05-26' \
+    input_name = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter/2019-05-26' \
                  '-0115_4-L-Jupiter_ZWO ASI290MM Mini_short.avi'
 
     # Initalize the timer object used to measure execution times of program sections.
@@ -175,14 +175,28 @@ if __name__ == "__main__":
 
     ap_size = 40
     blurr_strength = 5
-    stride = 1
+    stride = 4
 
     y_low = ap_position_y - int(ap_size / 2)
     y_high = y_low + ap_size
     x_low = ap_position_x - int(ap_size / 2)
     x_high = x_low + ap_size
 
-    reference_index = rank_frames.frame_ranks_max_index
+    frame_qualities = []
+    for idx in range(frames.number):
+        shift_y_global = align_frames.frame_shifts[idx][0]
+        shift_x_global = align_frames.frame_shifts[idx][1]
+        y_lo = int((y_low - shift_y_global) / configuration.align_frames_sampling_stride)
+        y_hi = int((y_high - shift_y_global) / configuration.align_frames_sampling_stride)
+        x_lo = int((x_low - shift_x_global) / configuration.align_frames_sampling_stride)
+        x_hi = int((x_high - shift_x_global) / configuration.align_frames_sampling_stride)
+        window = frames.frames_mono_blurred_laplacian(idx)[y_lo:y_hi, x_lo:x_hi]
+        frame_qualities.append(meanStdDev(window)[1][0][0])
+        pass
+
+    reference_index = frame_qualities.index(max(frame_qualities))
+    print("Index of best frame (local): " + str(reference_index))
+
     reference_window = blurr_image(
         frames.frames_mono_blurred(reference_index)[y_low:y_high:stride, x_low:x_high:stride],
         blurr_strength)
