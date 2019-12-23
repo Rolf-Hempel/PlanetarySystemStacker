@@ -29,9 +29,10 @@ import matplotlib.pyplot as plt
 import pylab as pl
 from cv2 import GaussianBlur, matchTemplate, TM_CCORR, TM_SQDIFF_NORMED, CV_32F, TM_SQDIFF, \
     minMaxLoc, meanStdDev
-from numpy import float32, unravel_index, argmin, zeros
+from numpy import float32, unravel_index, argmin, zeros, uint8, uint16
 
 from align_frames import AlignFrames
+from alignment_points import AlignmentPoints
 from configuration import Configuration
 from miscellaneous import Miscellaneous
 from exceptions import NotSupportedError, InternalError, Error
@@ -65,8 +66,8 @@ def blurr_image(image, strength):
     return GaussianBlur(image, (strength, strength), 0)
 
 
-def search_local_match_gradient_correlation(reference_box, frame, y_low, y_high, x_low, x_high,
-                                            search_width, sampling_stride, cor_table):
+def search_local_match_correlation(reference_box, frame, y_low, y_high, x_low, x_high,
+                                   search_width, sampling_stride, cor_table):
     """
     Try shifts in y, x between the box around the alignment point in the mean frame and the
     corresponding box in the given frame. Start with shifts [0, 0] and move out in steps until
@@ -276,50 +277,45 @@ if __name__ == "__main__":
     # plt.imshow(frames.frames_mono_blurred(rank_frames.frame_ranks_max_index), cmap='Greys_r')
     # plt.show()
 
+    # Create a single alignment point.
     ap_position_y = 350
     ap_position_x = 450
-
     ap_size = 40
+    configuration.alignment_points_half_box_width = int(round(ap_size / 2))
+    alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
+    alignment_points.add_alignment_point(alignment_points.new_alignment_point(ap_position_y, ap_position_x, False, False, False, False))
+
+    # Set a reference to the single alignment point.
+    alignment_point = alignment_points.alignment_points[0]
+
+    # Rank the frames at the alignment point.
+    alignment_points.compute_frame_qualities()
+
+    # Set parameters for noise reduction and search width for both correlation phases.
     blurr_strength_first_phase = 5
+    configuration.alignment_points_blurr_strength_first_phase = blurr_strength_first_phase
     stride_first_phase = 2
     search_width_first_phase = 6
 
     blurr_strength_second_phase = 13
-    stride_second_phase = 2
+    configuration.alignment_points_blurr_strength_second_phase = blurr_strength_second_phase
+    sampling_stride_second_phase = 2
     search_width_second_phase = stride_first_phase + 2
 
-    y_low = ap_position_y - int(ap_size / 2)
-    y_high = y_low + ap_size
-    x_low = ap_position_x - int(ap_size / 2)
-    x_high = x_low + ap_size
+    # Create reference boxes for both phases using the locally sharpest frame.
+    alignment_points.set_reference_boxes_correlation()
 
-    # Look for locally sharpest single frame
-    frame_qualities = []
-    for idx in range(frames.number):
-        shift_y_global = align_frames.frame_shifts[idx][0]
-        shift_x_global = align_frames.frame_shifts[idx][1]
-        y_lo = int((y_low - shift_y_global) / configuration.align_frames_sampling_stride)
-        y_hi = int((y_high - shift_y_global) / configuration.align_frames_sampling_stride)
-        x_lo = int((x_low - shift_x_global) / configuration.align_frames_sampling_stride)
-        x_hi = int((x_high - shift_x_global) / configuration.align_frames_sampling_stride)
-        window = frames.frames_mono_blurred_laplacian(idx)[y_lo:y_hi, x_lo:x_hi]
-        frame_qualities.append(meanStdDev(window)[1][0][0])
+    best_index = alignment_point['best_frame_indices'][0]
+    print("Index of best frame (local): " + str(best_index))
 
-    reference_index = frame_qualities.index(max(frame_qualities))
-    print("Index of best frame (local): " + str(reference_index))
-
-    reference_window_first_phase = blurr_image(
-        frames.frames_mono_blurred(reference_index)[y_low:y_high:stride_first_phase,
-        x_low:x_high:stride_first_phase],
-        blurr_strength_first_phase)
-
-    reference_window_second_phase = blurr_image(
-        frames.frames_mono_blurred(reference_index)[y_low:y_high, x_low:x_high],
-        blurr_strength_second_phase)
+    y_low = alignment_point['box_y_low']
+    y_high = alignment_point['box_y_high']
+    x_low = alignment_point['box_x_low']
+    x_high = alignment_point['box_x_high']
 
     index_extension = search_width_first_phase * stride_first_phase
 
-    dev_table = zeros((2 * search_width_second_phase, 2 * search_width_second_phase), dtype=float32)
+    cor_table = zeros((2 * search_width_second_phase, 2 * search_width_second_phase), dtype=float32)
 
     shift_y_local_total_sum = 0
     shift_x_local_total_sum = 0
@@ -328,37 +324,35 @@ if __name__ == "__main__":
     shift_x_corrected = []
 
     for idx in range(frames.number):
-        shift_y_global = align_frames.frame_shifts[idx][0]
-        shift_x_global = align_frames.frame_shifts[idx][1]
+        shift_y_global = align_frames.dy[idx]
+        shift_x_global = align_frames.dx[idx]
         frame_window = blurr_image(
             frames.frames_mono_blurred(idx)[
-            y_low - shift_y_global - index_extension:y_high - shift_y_global + index_extension:stride_first_phase,
-            x_low - shift_x_global - index_extension:x_high - shift_x_global + index_extension:stride_first_phase],
+            y_low + shift_y_global - index_extension:y_high + shift_y_global + index_extension:stride_first_phase,
+            x_low + shift_x_global - index_extension:x_high + shift_x_global + index_extension:stride_first_phase],
             blurr_strength_first_phase)
 
-        result = matchTemplate(frame_window.astype(float32),
-                               reference_window_first_phase.astype(float32), TM_SQDIFF_NORMED)
+        result = matchTemplate((frame_window / 256).astype(uint8),
+                               alignment_point['reference_box_first_phase'], TM_SQDIFF_NORMED)
+        # result = matchTemplate(frame_window.astype(float32),
+        #                        reference_window_first_phase.astype(float32), TM_SQDIFF_NORMED)
         minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
         shift_y_local_first_phase = (minLoc[1] - search_width_first_phase) * stride_first_phase
         shift_x_local_first_phase = (minLoc[0] - search_width_first_phase) * stride_first_phase
 
-        frame_window_shifted_first_phase = blurr_image(
-            frames.frames_mono_blurred(idx)[
-            y_low - shift_y_global + shift_y_local_first_phase:y_high - shift_y_global + shift_y_local_first_phase:stride_first_phase,
-            x_low - shift_x_global + shift_x_local_first_phase:x_high - shift_x_global + shift_x_local_first_phase:stride_first_phase],
-            blurr_strength_first_phase)
+        y_lo = y_low + shift_y_global + shift_y_local_first_phase
+        y_hi = y_high + shift_y_global + shift_y_local_first_phase
+        x_lo = x_low + shift_x_global + shift_x_local_first_phase
+        x_hi = x_high + shift_x_global + shift_x_local_first_phase
 
-        y_lo = y_low - shift_y_global + shift_y_local_first_phase
-        y_hi = y_high - shift_y_global + shift_y_local_first_phase
-        x_lo = x_low - shift_x_global + shift_x_local_first_phase
-        x_hi = x_high - shift_x_global + shift_x_local_first_phase
 
-        frame_blurred_second_phase = blurr_image(frames.frames_mono_blurred(idx), blurr_strength_second_phase)
+        frame_blurred_second_phase = blurr_image(frames.frames_mono_blurred(idx),
+                                                 blurr_strength_second_phase)
         [shift_y_local_second_phase, shift_x_local_second_phase], dev_r \
-            = search_local_match_gradient_correlation(reference_window_second_phase,
-                                                      frame_blurred_second_phase, y_lo, y_hi,
-                                                      x_lo, x_hi, search_width_second_phase,
-                                                      stride_second_phase, dev_table)
+            = search_local_match_correlation(alignment_point['reference_box_second_phase'],
+                                             frame_blurred_second_phase, y_lo, y_hi,
+                                             x_lo, x_hi, search_width_second_phase,
+                                             sampling_stride_second_phase, cor_table)
 
         shift_y_local_total = shift_y_local_first_phase + shift_y_local_second_phase
         shift_x_local_total = shift_x_local_first_phase + shift_x_local_second_phase
@@ -368,14 +362,19 @@ if __name__ == "__main__":
         shift_y_corrected.append(shift_y_local_total)
         shift_x_corrected.append(shift_x_local_total)
 
+        frame_window_shifted_first_phase = blurr_image(
+            frames.frames_mono_blurred(idx)[y_lo:y_hi:stride_first_phase,
+            x_lo:x_hi:stride_first_phase],
+            blurr_strength_first_phase)
+
         frame_window_shifted_second_phase = blurr_image(
             frames.frames_mono_blurred(idx)[
-            y_low - shift_y_global + shift_y_local_total:y_high - shift_y_global + shift_y_local_total,
-            x_low - shift_x_global + shift_x_local_total:x_high - shift_x_global + shift_x_local_total],
+            y_low + shift_y_global + shift_y_local_total:y_high + shift_y_global + shift_y_local_total,
+            x_low + shift_x_global + shift_x_local_total:x_high + shift_x_global + shift_x_local_total],
             blurr_strength_first_phase)
 
         composite_image = Miscellaneous.compose_image(
-            [reference_window_first_phase, frame_window, frame_window_shifted_first_phase,
+            [(alignment_point['reference_box_first_phase']*256).astype(uint16), frame_window, frame_window_shifted_first_phase,
              frame_window_shifted_second_phase],
             scale_factor=1)
         display_image(composite_image, delay=0.1)

@@ -539,6 +539,41 @@ class AlignmentPoints(object):
             #         waitKey(0)
             #         destroyAllWindows()
 
+    def set_reference_boxes_correlation(self):
+        """
+        This method is used if multi-level-correlation AP matching is selected. In this case two
+        reference boxes with different resolution are constructed. The box used in the first phase
+        contains only every second pixel of the original frame in each coordinate direction. The box
+        used in the second phase has the same resolution as the original frame.
+
+        This method is invoked when all APs are set, just before stacking.
+
+        :return: -
+        """
+
+        for ap_index, alignment_point in enumerate(self.alignment_points):
+
+            # Cut the reference box for this alignment point from the sharpest frame at this
+            # location.
+            best_index = alignment_point['best_frame_indices'][0]
+            offset_y = self.align_frames.dy[best_index]
+            offset_x = self.align_frames.dx[best_index]
+            window_second_phase = self.frames.frames_mono_blurred(best_index)[
+                                               offset_y + alignment_point['box_y_low']:
+                                               offset_y + alignment_point['box_y_high'],
+                                               offset_x + alignment_point['box_x_low']:
+                                               offset_x + alignment_point['box_x_high']]
+
+            # The reference box with the full resolution is used in the second phase.
+            alignment_point['reference_box_second_phase'] = (GaussianBlur(window_second_phase,
+                    (self.configuration.alignment_points_blurr_strength_second_phase,
+                     self.configuration.alignment_points_blurr_strength_second_phase), 0) / 256).astype(uint8)
+
+            # In the first phase a box with half the resolution is constructed.
+            alignment_point['reference_box_first_phase'] = (GaussianBlur(window_second_phase[::2, ::2],
+                    (self.configuration.alignment_points_blurr_strength_first_phase,
+                     self.configuration.alignment_points_blurr_strength_first_phase), 0) / 256).astype(uint8)
+
     @staticmethod
     def initialize_ap_stacking_buffer(alignment_point, color):
         """
