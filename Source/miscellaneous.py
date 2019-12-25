@@ -755,7 +755,7 @@ class Miscellaneous(object):
     def multilevel_correlation(reference_box_first_phase, frame_first_phase, blurr_strength_first_phase,
                                reference_box_second_phase, frame_blurred_second_phase, y_low,
                                y_high, x_low, x_high, shift_y_global, shift_x_global,
-                               search_width, sampling_stride):
+                               search_width):
         """
 
         :param reference_box_first_phase:
@@ -770,11 +770,17 @@ class Miscellaneous(object):
         :param shift_y_global:
         :param shift_x_global:
         :param search_width:
-        :param sampling_stride:
-        :return:
+        :return: (shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase,
+                  shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase)
+                  with:
+                  shift_y_local_first_phase:
+                  shift_x_local_first_phase:
+                  success_first_phase:
+                  shift_y_local_second_phase:
+                  shift_x_local_second_phase:
+                  success_second_phase:
         """
 
-        cor_table = zeros((8, 8), dtype=float32)
         search_width_second_phase = 4
         search_width_first_phase = int((search_width - search_width_second_phase) / 2)
         index_extension = search_width_first_phase * 2
@@ -787,26 +793,36 @@ class Miscellaneous(object):
         result = matchTemplate((frame_window_first_phase / 256).astype(uint8),
                                reference_box_first_phase, TM_CCORR_NORMED)
 
-        # result = matchTemplate(frame_window.astype(float32),
-        #                        reference_window_first_phase.astype(float32), TM_SQDIFF_NORMED)
         minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
         shift_y_local_first_phase = (maxLoc[1] - search_width_first_phase) * 2
         shift_x_local_first_phase = (maxLoc[0] - search_width_first_phase) * 2
 
-        y_lo = y_low + shift_y_global + shift_y_local_first_phase
-        y_hi = y_high + shift_y_global + shift_y_local_first_phase
-        x_lo = x_low + shift_x_global + shift_x_local_first_phase
-        x_hi = x_high + shift_x_global + shift_x_local_first_phase
+        success_first_phase = abs(shift_y_local_first_phase) != index_extension and abs(
+            shift_x_local_first_phase) != index_extension
+        if not success_first_phase:
+            shift_y_local_first_phase = shift_x_local_first_phase = 0
 
-        [shift_y_local_second_phase, shift_x_local_second_phase], cor_r \
-            = Miscellaneous.search_local_match_correlation(
-            reference_box_second_phase,
-            frame_blurred_second_phase, y_lo, y_hi,
-            x_lo, x_hi, search_width_second_phase,
-            sampling_stride, cor_table)
+        y_lo = y_low + shift_y_global + shift_y_local_first_phase - search_width_second_phase
+        y_hi = y_high + shift_y_global + shift_y_local_first_phase + search_width_second_phase
+        x_lo = x_low + shift_x_global + shift_x_local_first_phase - search_width_second_phase
+        x_hi = x_high + shift_x_global + shift_x_local_first_phase + search_width_second_phase
 
-        return shift_y_local_first_phase, shift_x_local_first_phase, shift_y_local_second_phase,\
-               shift_x_local_second_phase, cor_r
+        frame_window_second_phase = frame_blurred_second_phase[y_lo:y_hi, x_lo:x_hi]
+
+        result = matchTemplate((frame_window_second_phase / 256).astype(uint8),
+                               reference_box_second_phase, TM_CCORR_NORMED)
+
+        minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
+        shift_y_local_second_phase = maxLoc[1] - search_width_second_phase
+        shift_x_local_second_phase = maxLoc[0] - search_width_second_phase
+
+        success_second_phase = abs(shift_y_local_second_phase) != search_width_second_phase and abs(
+                shift_x_local_second_phase) != search_width_second_phase
+        if not success_second_phase:
+            shift_y_local_second_phase = shift_x_local_second_phase = 0
+
+        return shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase, \
+               shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase
 
     @staticmethod
     def search_local_match_correlation(reference_box, frame, y_low, y_high, x_low, x_high,
@@ -844,8 +860,8 @@ class Miscellaneous(object):
         # Initialize the global optimum with the value at dy=dx=0.
         if sampling_stride != 1:
             correlation_max = (reference_box[::sampling_stride, ::sampling_stride] * frame[
-                                                                                     y_low:y_high:sampling_stride,
-                                                                                     x_low:x_high:sampling_stride]).sum()
+                                                             y_low:y_high:sampling_stride,
+                                                             x_low:x_high:sampling_stride]).sum()
         else:
             correlation_max = (reference_box * frame[y_low:y_high, x_low:x_high]).sum()
         cor_table[0, 0] = correlation_max
@@ -879,8 +895,8 @@ class Miscellaneous(object):
                     if correlation < -0.5:
                         counter_new += 1
                         correlation = (reference_box[::sampling_stride, ::sampling_stride] * frame[
-                                                                                             y_low - dy:y_high - dy:sampling_stride,
-                                                                                             x_low - dx:x_high - dx:sampling_stride]).sum()
+                                                     y_low - dy:y_high - dy:sampling_stride,
+                                                     x_low - dx:x_high - dx:sampling_stride]).sum()
                         cor_table[dy, dx] = correlation
                     else:
                         counter_reused += 1

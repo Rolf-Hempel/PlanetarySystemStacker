@@ -178,7 +178,9 @@ if __name__ == "__main__":
     ap_size = 40
     configuration.alignment_points_half_box_width = int(round(ap_size / 2))
     alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
-    alignment_points.add_alignment_point(alignment_points.new_alignment_point(ap_position_y, ap_position_x, False, False, False, False))
+    alignment_points.add_alignment_point(
+        alignment_points.new_alignment_point(ap_position_y, ap_position_x, False, False, False,
+                                             False))
 
     # Set a reference to the single alignment point.
     alignment_point = alignment_points.alignment_points[0]
@@ -195,7 +197,6 @@ if __name__ == "__main__":
 
     blurr_strength_second_phase = 7
     configuration.alignment_points_blurr_strength_second_phase = blurr_strength_second_phase
-    sampling_stride = 2
 
     # Create reference boxes for both phases using the locally sharpest frame.
     alignment_points.set_reference_boxes_correlation()
@@ -221,13 +222,14 @@ if __name__ == "__main__":
         frame_blurred_second_phase = blurr_image(frames.frames_mono_blurred(idx),
                                                  blurr_strength_second_phase)
 
-        shift_y_local_first_phase, shift_x_local_first_phase, shift_y_local_second_phase, \
-        shift_x_local_second_phase, cor_r = Miscellaneous.multilevel_correlation(
-            alignment_point['reference_box_first_phase'], frames.frames_mono_blurred(idx),
-            blurr_strength_first_phase,
-            alignment_point['reference_box_second_phase'], frame_blurred_second_phase, y_low,
-            y_high, x_low, x_high, shift_y_global, shift_x_global,
-            search_width, sampling_stride)
+        shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase, \
+        shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase = \
+            Miscellaneous.multilevel_correlation(
+                alignment_point['reference_box_first_phase'], frames.frames_mono_blurred(idx),
+                blurr_strength_first_phase,
+                alignment_point['reference_box_second_phase'], frame_blurred_second_phase, y_low,
+                y_high, x_low, x_high, shift_y_global, shift_x_global,
+                search_width)
 
         # shift_y_local_second_phase = 0
         # shift_x_local_second_phase = 0
@@ -269,9 +271,12 @@ if __name__ == "__main__":
 
         print("frame index: " + str(idx) + ", shift first phase: [" + str(
             shift_y_local_first_phase) + ", " + str(shift_x_local_first_phase) +
-              "], shift second phase: [" + str(shift_y_local_second_phase) + ", " + str(
+              "], success first phase: " + str(
+            success_first_phase) + ", shift second phase: [" + str(
+            shift_y_local_second_phase) + ", " + str(
             shift_x_local_second_phase) +
-              "], total shift: [" + str(shift_y_local) + ", " + str(
+              "], success second phase: " + str(success_second_phase) + ", total shift: [" + str(
+            shift_y_local) + ", " + str(
             shift_x_local) + "]")
 
     shift_y_reference = shift_y_local_sum / frames.number
