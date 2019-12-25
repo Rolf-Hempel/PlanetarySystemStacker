@@ -66,111 +66,6 @@ def blurr_image(image, strength):
     return GaussianBlur(image, (strength, strength), 0)
 
 
-def search_local_match_correlation(reference_box, frame, y_low, y_high, x_low, x_high,
-                                   search_width, sampling_stride, cor_table):
-    """
-    Try shifts in y, x between the box around the alignment point in the mean frame and the
-    corresponding box in the given frame. Start with shifts [0, 0] and move out in steps until
-    a local optimum is reached. In each step try all positions with distance 1 in y and/or x
-    from the optimum found in the previous step (steepest ascent). The global frame shift is
-    accounted for beforehand already.
-
-    :param reference_box: Image box around alignment point in mean frame.
-    :param frame: Given frame for which the local shift at the alignment point is to be
-                  computed.
-    :param y_low: Lower y coordinate limit of box in given frame, taking into account the
-                  global shift and the different sizes of the mean frame and the original
-                  frames.
-    :param y_high: Upper y coordinate limit
-    :param x_low: Lower x coordinate limit
-    :param x_high: Upper x coordinate limit
-    :param search_width: Maximum distance in y and x from origin of the search area
-    :param sampling_stride: Stride in both coordinate directions used in computing deviations
-    :param cor_table: Scratch table to be used internally for storing intermediate results,
-                      size: [2*search_width, 2*search_width], dtype=float32.
-    :return: ([shift_y, shift_x], [dev_r]) with:
-               shift_y, shift_x: shift values of optimum or [0, 0] if no optimum could be found.
-               [dev_r]: list of optimum deviations for all steps until a local optimum is found.
-    """
-
-    # Set up a table which keeps correlation values from earlier iteration steps. This way,
-    # correlation evaluations can be avoided at coordinates which have been visited before.
-    # Initialize correlation with an impossibly low value.
-    cor_table[:, :] = -1.
-
-    # Initialize the global optimum with the value at dy=dx=0.
-    if sampling_stride != 1:
-        correlation_max = (reference_box[::sampling_stride, ::sampling_stride] * frame[
-                                                                                 y_low:y_high:sampling_stride,
-                                                                                 x_low:x_high:sampling_stride]).sum()
-    else:
-        correlation_max = (reference_box * frame[y_low:y_high, x_low:x_high]).sum()
-    cor_table[0, 0] = correlation_max
-    dy_max = 0
-    dx_max = 0
-
-    counter_new = 0
-    counter_reused = 0
-
-    # Initialize list of maximum correlations for each search radius.
-    cor_r = [correlation_max]
-
-    # Start with shift [0, 0]. Stop when a circle with radius 1 around the current optimum
-    # reaches beyond the search area.
-    while max(abs(dy_max), abs(dx_max)) <= search_width - 1:
-
-        # Create an enumerator which produces shift values [dy, dx] in a circular pattern
-        # with radius 1 around the current optimum [dy_min, dx_min].
-        circle_1 = Miscellaneous.circle_around(dy_max, dx_max, 1)
-
-        # Initialize the optimum for the new circle to an impossibly large value,
-        # and the corresponding shifts to None.
-        correlation_max_1, dy_max_1, dx_max_1 = -1., None, None
-
-        # Go through the circle with radius 1 and compute the correlation
-        # between the shifted frame and the corresponding box in the mean frame. Find the
-        # maximum "correlation_max_1".
-        if sampling_stride != 1:
-            for (dy, dx) in circle_1:
-                correlation = cor_table[dy, dx]
-                if correlation < -0.5:
-                    counter_new += 1
-                    correlation = (reference_box[::sampling_stride, ::sampling_stride] * frame[
-                                                                                         y_low - dy:y_high - dy:sampling_stride,
-                                                                                         x_low - dx:x_high - dx:sampling_stride]).sum()
-                    cor_table[dy, dx] = correlation
-                else:
-                    counter_reused += 1
-                if correlation > correlation_max_1:
-                    correlation_max_1, dy_max_1, dx_max_1 = correlation, dy, dx
-
-        else:
-            for (dy, dx) in circle_1:
-                correlation = cor_table[dy, dx]
-                if correlation < -0.5:
-                    correlation = (reference_box * frame[y_low - dy:y_high - dy,
-                                                   x_low - dx:x_high - dx]).sum()
-                    cor_table[dy, dx] = correlation
-                if correlation > correlation_max_1:
-                    correlation_max_1, dy_max_1, dx_max_1 = correlation, dy, dx
-
-        # Append the minimal deviation found in this step to list of minima.
-        cor_r.append(correlation_max_1)
-
-        # If for the current center the match is better than for all neighboring points, a
-        # local optimum is found.
-        if correlation_max_1 <= correlation_max:
-            # print ("new: " + str(counter_new) + ", reused: " + str(counter_reused))
-            return [dy_max, dx_max], cor_r
-
-        # Otherwise, update the current optimum and continue.
-        else:
-            correlation_max, dy_max, dx_max = correlation_max_1, dy_max_1, dx_max_1
-
-    # If within the maximum search radius no optimum could be found, return [0, 0].
-    return [0, 0], cor_r
-
-
 if __name__ == "__main__":
     """
     This File contains a test program for the measurement of local warp shifts. The idea is to use
@@ -278,8 +173,8 @@ if __name__ == "__main__":
     # plt.show()
 
     # Create a single alignment point.
-    ap_position_y = 350
-    ap_position_x = 450
+    ap_position_y = 341
+    ap_position_x = 459
     ap_size = 40
     configuration.alignment_points_half_box_width = int(round(ap_size / 2))
     alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
@@ -291,16 +186,16 @@ if __name__ == "__main__":
     # Rank the frames at the alignment point.
     alignment_points.compute_frame_qualities()
 
+    # Set the combined search width.
+    search_width = 16
+
     # Set parameters for noise reduction and search width for both correlation phases.
     blurr_strength_first_phase = 5
     configuration.alignment_points_blurr_strength_first_phase = blurr_strength_first_phase
-    stride_first_phase = 2
-    search_width_first_phase = 6
 
     blurr_strength_second_phase = 13
     configuration.alignment_points_blurr_strength_second_phase = blurr_strength_second_phase
-    sampling_stride_second_phase = 2
-    search_width_second_phase = stride_first_phase + 2
+    sampling_stride = 2
 
     # Create reference boxes for both phases using the locally sharpest frame.
     alignment_points.set_reference_boxes_correlation()
@@ -313,65 +208,59 @@ if __name__ == "__main__":
     x_low = alignment_point['box_x_low']
     x_high = alignment_point['box_x_high']
 
-    index_extension = search_width_first_phase * stride_first_phase
+    shift_y_local_sum = 0
+    shift_x_local_sum = 0
 
-    cor_table = zeros((2 * search_width_second_phase, 2 * search_width_second_phase), dtype=float32)
-
-    shift_y_local_total_sum = 0
-    shift_x_local_total_sum = 0
-
-    shift_y_corrected = []
-    shift_x_corrected = []
+    shift_y_local_corrected = []
+    shift_x_local_corrected = []
 
     for idx in range(frames.number):
         shift_y_global = align_frames.dy[idx]
         shift_x_global = align_frames.dx[idx]
-        frame_window = blurr_image(
-            frames.frames_mono_blurred(idx)[
-            y_low + shift_y_global - index_extension:y_high + shift_y_global + index_extension:stride_first_phase,
-            x_low + shift_x_global - index_extension:x_high + shift_x_global + index_extension:stride_first_phase],
-            blurr_strength_first_phase)
+        frame_blurred_first_phase = blurr_image(frames.frames_mono_blurred(idx),
+                                                blurr_strength_first_phase)
+        frame_blurred_second_phase = blurr_image(frames.frames_mono_blurred(idx),
+                                                 blurr_strength_second_phase)
 
-        result = matchTemplate((frame_window / 256).astype(uint8),
-                               alignment_point['reference_box_first_phase'], TM_SQDIFF_NORMED)
-        # result = matchTemplate(frame_window.astype(float32),
-        #                        reference_window_first_phase.astype(float32), TM_SQDIFF_NORMED)
-        minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
-        shift_y_local_first_phase = (minLoc[1] - search_width_first_phase) * stride_first_phase
-        shift_x_local_first_phase = (minLoc[0] - search_width_first_phase) * stride_first_phase
+        shift_y_local_first_phase, shift_x_local_first_phase, shift_y_local_second_phase, \
+        shift_x_local_second_phase, cor_r = Miscellaneous.multilevel_correlation(alignment_point['reference_box_first_phase'], frame_blurred_first_phase,
+                               alignment_point['reference_box_second_phase'], frame_blurred_second_phase, y_low,
+                               y_high, x_low, x_high, shift_y_global, shift_x_global,
+                               search_width, sampling_stride)
+
+        # shift_y_local_second_phase = 0
+        # shift_x_local_second_phase = 0
+        shift_y_local = shift_y_local_first_phase + shift_y_local_second_phase
+        shift_x_local = shift_x_local_first_phase + shift_x_local_second_phase
+        shift_y_local_sum += shift_y_local
+        shift_x_local_sum += shift_x_local
+
+        shift_y_local_corrected.append(shift_y_local)
+        shift_x_local_corrected.append(shift_x_local)
 
         y_lo = y_low + shift_y_global + shift_y_local_first_phase
         y_hi = y_high + shift_y_global + shift_y_local_first_phase
         x_lo = x_low + shift_x_global + shift_x_local_first_phase
         x_hi = x_high + shift_x_global + shift_x_local_first_phase
 
+        search_width_second_phase = 4
+        search_width_first_phase = int((search_width - search_width_second_phase) / 2)
+        index_extension = search_width_first_phase * 2
 
-        frame_blurred_second_phase = blurr_image(frames.frames_mono_blurred(idx),
-                                                 blurr_strength_second_phase)
-        [shift_y_local_second_phase, shift_x_local_second_phase], dev_r \
-            = search_local_match_correlation(alignment_point['reference_box_second_phase'],
-                                             frame_blurred_second_phase, y_lo, y_hi,
-                                             x_lo, x_hi, search_width_second_phase,
-                                             sampling_stride_second_phase, cor_table)
-
-        shift_y_local_total = shift_y_local_first_phase + shift_y_local_second_phase
-        shift_x_local_total = shift_x_local_first_phase + shift_x_local_second_phase
-        shift_y_local_total_sum += shift_y_local_total
-        shift_x_local_total_sum += shift_x_local_total
-
-        shift_y_corrected.append(shift_y_local_total)
-        shift_x_corrected.append(shift_x_local_total)
+        frame_window = frame_blurred_first_phase[
+                       y_low + shift_y_global - index_extension:y_high + shift_y_global + index_extension:2,
+                       x_low + shift_x_global - index_extension:x_high + shift_x_global + index_extension:2]
 
         frame_window_shifted_first_phase = blurr_image(
-            frames.frames_mono_blurred(idx)[y_lo:y_hi:stride_first_phase,
-            x_lo:x_hi:stride_first_phase],
+            frames.frames_mono_blurred(idx)[y_lo:y_hi:2,
+            x_lo:x_hi:2],
             blurr_strength_first_phase)
 
         frame_window_shifted_second_phase = blurr_image(
             frames.frames_mono_blurred(idx)[
-            y_low + shift_y_global + shift_y_local_total:y_high + shift_y_global + shift_y_local_total,
-            x_low + shift_x_global + shift_x_local_total:x_high + shift_x_global + shift_x_local_total],
-            blurr_strength_first_phase)
+            y_low + shift_y_global + shift_y_local:y_high + shift_y_global + shift_y_local,
+            x_low + shift_x_global + shift_x_local:x_high + shift_x_global + shift_x_local],
+            blurr_strength_second_phase)
 
         composite_image = Miscellaneous.compose_image(
             [(alignment_point['reference_box_first_phase']*256).astype(uint16), frame_window, frame_window_shifted_first_phase,
@@ -383,15 +272,15 @@ if __name__ == "__main__":
             shift_y_local_first_phase) + ", " + str(shift_x_local_first_phase) +
               "], shift second phase: [" + str(shift_y_local_second_phase) + ", " + str(
             shift_x_local_second_phase) +
-              "], total shift: [" + str(shift_y_local_total) + ", " + str(
-            shift_x_local_total) + "]")
+              "], total shift: [" + str(shift_y_local) + ", " + str(
+            shift_x_local) + "]")
 
-    shift_y_reference = shift_y_local_total_sum / frames.number
-    shift_x_reference = shift_x_local_total_sum / frames.number
+    shift_y_reference = shift_y_local_sum / frames.number
+    shift_x_reference = shift_x_local_sum / frames.number
 
     for idx in range(frames.number):
-        shift_y_corrected[idx] -= shift_y_reference
-        shift_x_corrected[idx] -= shift_x_reference
+        shift_y_local_corrected[idx] -= shift_y_reference
+        shift_x_local_corrected[idx] -= shift_x_reference
 
     print("")
     print("reference patch shift, y: " + str(shift_y_reference) + ", x: " + str(shift_x_reference))
@@ -399,7 +288,7 @@ if __name__ == "__main__":
     print("")
     for idx in range(frames.number):
         print("frame index: " + str(idx) + ", local AP shift: [" + str(
-            shift_y_corrected[idx]) + ", " + str(shift_x_corrected[idx]) + "]")
+            shift_y_local_corrected[idx]) + ", " + str(shift_x_local_corrected[idx]) + "]")
 
     display_image(None)
 

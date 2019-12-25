@@ -27,7 +27,7 @@ from time import time
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
     putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev,\
-    resize
+    resize, matchTemplate, TM_SQDIFF_NORMED, minMaxLoc, TM_CCORR_NORMED
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
     empty, argmin, stack, sin, uint8, float32, uint16, full, mean
@@ -750,6 +750,165 @@ class Miscellaneous(object):
             for x in range(x_center - cross_half_len, x_center + cross_half_len + 1):
                 if 0 <= x < shape_x:
                     frame[y_center, x] = rgb
+
+    @staticmethod
+    def multilevel_correlation(reference_box_first_phase, frame_blurred_first_phase,
+                               reference_box_second_phase, frame_blurred_second_phase, y_low,
+                               y_high, x_low, x_high, shift_y_global, shift_x_global,
+                               search_width, sampling_stride):
+        """
+
+        :param reference_box_first_phase:
+        :param frame_blurred_first_phase:
+        :param reference_box_second_phase:
+        :param frame_blurred_second_phase:
+        :param y_low:
+        :param y_high:
+        :param x_low:
+        :param x_high:
+        :param shift_y_global:
+        :param shift_x_global:
+        :param search_width:
+        :param sampling_stride:
+        :return:
+        """
+
+        cor_table = zeros((8, 8), dtype=float32)
+        search_width_second_phase = 4
+        search_width_first_phase = int((search_width - search_width_second_phase) / 2)
+        index_extension = search_width_first_phase * 2
+
+        frame_window = frame_blurred_first_phase[
+               y_low + shift_y_global - index_extension:y_high + shift_y_global + index_extension:2,
+               x_low + shift_x_global - index_extension:x_high + shift_x_global + index_extension:2]
+
+        result = matchTemplate((frame_window / 256).astype(uint8),
+                               reference_box_first_phase, TM_CCORR_NORMED)
+        # result = matchTemplate(frame_window.astype(float32),
+        #                        reference_window_first_phase.astype(float32), TM_SQDIFF_NORMED)
+        minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
+        shift_y_local_first_phase = (maxLoc[1] - search_width_first_phase) * 2
+        shift_x_local_first_phase = (maxLoc[0] - search_width_first_phase) * 2
+
+        y_lo = y_low + shift_y_global + shift_y_local_first_phase
+        y_hi = y_high + shift_y_global + shift_y_local_first_phase
+        x_lo = x_low + shift_x_global + shift_x_local_first_phase
+        x_hi = x_high + shift_x_global + shift_x_local_first_phase
+
+        [shift_y_local_second_phase, shift_x_local_second_phase], cor_r \
+            = Miscellaneous.search_local_match_correlation(
+            reference_box_second_phase,
+            frame_blurred_second_phase, y_lo, y_hi,
+            x_lo, x_hi, search_width_second_phase,
+            sampling_stride, cor_table)
+
+        return shift_y_local_first_phase, shift_x_local_first_phase, shift_y_local_second_phase,\
+               shift_x_local_second_phase, cor_r
+
+    @staticmethod
+    def search_local_match_correlation(reference_box, frame, y_low, y_high, x_low, x_high,
+                                       search_width, sampling_stride, cor_table):
+        """
+        Try shifts in y, x between the box around the alignment point in the mean frame and the
+        corresponding box in the given frame. Start with shifts [0, 0] and move out in steps until
+        a local optimum is reached. In each step try all positions with distance 1 in y and/or x
+        from the optimum found in the previous step (steepest ascent). The global frame shift is
+        accounted for beforehand already.
+
+        :param reference_box: Image box around alignment point in mean frame.
+        :param frame: Given frame for which the local shift at the alignment point is to be
+                      computed.
+        :param y_low: Lower y coordinate limit of box in given frame, taking into account the
+                      global shift and the different sizes of the mean frame and the original
+                      frames.
+        :param y_high: Upper y coordinate limit
+        :param x_low: Lower x coordinate limit
+        :param x_high: Upper x coordinate limit
+        :param search_width: Maximum distance in y and x from origin of the search area
+        :param sampling_stride: Stride in both coordinate directions used in computing deviations
+        :param cor_table: Scratch table to be used internally for storing intermediate results,
+                          size: [2*search_width, 2*search_width], dtype=float32.
+        :return: ([shift_y, shift_x], [dev_r]) with:
+                   shift_y, shift_x: shift values of optimum or [0, 0] if no optimum could be found.
+                   [dev_r]: list of optimum correlations for all steps until a local optimum is found.
+        """
+
+        # Set up a table which keeps correlation values from earlier iteration steps. This way,
+        # correlation evaluations can be avoided at coordinates which have been visited before.
+        # Initialize correlation with an impossibly low value.
+        cor_table[:, :] = -1.
+
+        # Initialize the global optimum with the value at dy=dx=0.
+        if sampling_stride != 1:
+            correlation_max = (reference_box[::sampling_stride, ::sampling_stride] * frame[
+                                                                                     y_low:y_high:sampling_stride,
+                                                                                     x_low:x_high:sampling_stride]).sum()
+        else:
+            correlation_max = (reference_box * frame[y_low:y_high, x_low:x_high]).sum()
+        cor_table[0, 0] = correlation_max
+        dy_max = 0
+        dx_max = 0
+
+        counter_new = 0
+        counter_reused = 0
+
+        # Initialize list of maximum correlations for each search radius.
+        cor_r = [correlation_max]
+
+        # Start with shift [0, 0]. Stop when a circle with radius 1 around the current optimum
+        # reaches beyond the search area.
+        while max(abs(dy_max), abs(dx_max)) <= search_width - 1:
+
+            # Create an enumerator which produces shift values [dy, dx] in a circular pattern
+            # with radius 1 around the current optimum [dy_min, dx_min].
+            circle_1 = Miscellaneous.circle_around(dy_max, dx_max, 1)
+
+            # Initialize the optimum for the new circle to an impossibly large value,
+            # and the corresponding shifts to None.
+            correlation_max_1, dy_max_1, dx_max_1 = -1., None, None
+
+            # Go through the circle with radius 1 and compute the correlation
+            # between the shifted frame and the corresponding box in the mean frame. Find the
+            # maximum "correlation_max_1".
+            if sampling_stride != 1:
+                for (dy, dx) in circle_1:
+                    correlation = cor_table[dy, dx]
+                    if correlation < -0.5:
+                        counter_new += 1
+                        correlation = (reference_box[::sampling_stride, ::sampling_stride] * frame[
+                                                                                             y_low - dy:y_high - dy:sampling_stride,
+                                                                                             x_low - dx:x_high - dx:sampling_stride]).sum()
+                        cor_table[dy, dx] = correlation
+                    else:
+                        counter_reused += 1
+                    if correlation > correlation_max_1:
+                        correlation_max_1, dy_max_1, dx_max_1 = correlation, dy, dx
+
+            else:
+                for (dy, dx) in circle_1:
+                    correlation = cor_table[dy, dx]
+                    if correlation < -0.5:
+                        correlation = (reference_box * frame[y_low - dy:y_high - dy,
+                                                       x_low - dx:x_high - dx]).sum()
+                        cor_table[dy, dx] = correlation
+                    if correlation > correlation_max_1:
+                        correlation_max_1, dy_max_1, dx_max_1 = correlation, dy, dx
+
+            # Append the minimal deviation found in this step to list of minima.
+            cor_r.append(correlation_max_1)
+
+            # If for the current center the match is better than for all neighboring points, a
+            # local optimum is found.
+            if correlation_max_1 <= correlation_max:
+                # print ("new: " + str(counter_new) + ", reused: " + str(counter_reused))
+                return [dy_max, dx_max], cor_r
+
+            # Otherwise, update the current optimum and continue.
+            else:
+                correlation_max, dy_max, dx_max = correlation_max_1, dy_max_1, dx_max_1
+
+        # If within the maximum search radius no optimum could be found, return [0, 0].
+        return [0, 0], cor_r
 
     @staticmethod
     def compose_image(image_list, scale_factor=1, border=5):
