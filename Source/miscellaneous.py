@@ -752,14 +752,15 @@ class Miscellaneous(object):
                     frame[y_center, x] = rgb
 
     @staticmethod
-    def multilevel_correlation(reference_box_first_phase, frame_blurred_first_phase,
+    def multilevel_correlation(reference_box_first_phase, frame_first_phase, blurr_strength_first_phase,
                                reference_box_second_phase, frame_blurred_second_phase, y_low,
                                y_high, x_low, x_high, shift_y_global, shift_x_global,
                                search_width, sampling_stride):
         """
 
         :param reference_box_first_phase:
-        :param frame_blurred_first_phase:
+        :param frame_first_phase:
+        :param blurr_strength_first_phase:
         :param reference_box_second_phase:
         :param frame_blurred_second_phase:
         :param y_low:
@@ -778,12 +779,14 @@ class Miscellaneous(object):
         search_width_first_phase = int((search_width - search_width_second_phase) / 2)
         index_extension = search_width_first_phase * 2
 
-        frame_window = frame_blurred_first_phase[
-               y_low + shift_y_global - index_extension:y_high + shift_y_global + index_extension:2,
-               x_low + shift_x_global - index_extension:x_high + shift_x_global + index_extension:2]
+        frame_window_first_phase = GaussianBlur(frame_first_phase[
+            y_low + shift_y_global - index_extension:y_high + shift_y_global + index_extension:2,
+            x_low + shift_x_global - index_extension:x_high + shift_x_global + index_extension:2],
+            (blurr_strength_first_phase, blurr_strength_first_phase), 0)
 
-        result = matchTemplate((frame_window / 256).astype(uint8),
+        result = matchTemplate((frame_window_first_phase / 256).astype(uint8),
                                reference_box_first_phase, TM_CCORR_NORMED)
+
         # result = matchTemplate(frame_window.astype(float32),
         #                        reference_window_first_phase.astype(float32), TM_SQDIFF_NORMED)
         minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)

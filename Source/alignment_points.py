@@ -541,7 +541,7 @@ class AlignmentPoints(object):
 
     def set_reference_boxes_correlation(self):
         """
-        This method is used if multi-level-correlation AP matching is selected. In this case two
+        This method is used if multilevel-correlation AP matching is selected. In this case two
         reference boxes with different resolution are constructed. The box used in the first phase
         contains only every second pixel of the original frame in each coordinate direction. The box
         used in the second phase has the same resolution as the original frame.
