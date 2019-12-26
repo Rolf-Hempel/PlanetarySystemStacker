@@ -204,33 +204,36 @@ if __name__ == "__main__":
     best_index = alignment_point['best_frame_indices'][0]
     print("Index of best frame (local): " + str(best_index))
 
-    y_low = alignment_point['box_y_low']
-    y_high = alignment_point['box_y_high']
-    x_low = alignment_point['box_x_low']
-    x_high = alignment_point['box_x_high']
-
+    # Initialize variables for the computation of the mean shifts.
     shift_y_local_sum = 0
     shift_x_local_sum = 0
 
+    # Intialize lists to store the warp shifts. They will be corrected later by the bias caused by
+    # the shift of the reference patch.
     shift_y_local_corrected = []
     shift_x_local_corrected = []
 
     for idx in range(frames.number):
-        shift_y_global = align_frames.dy[idx]
-        shift_x_global = align_frames.dx[idx]
+        y_low = alignment_point['box_y_low'] + align_frames.dy[idx]
+        y_high = alignment_point['box_y_high'] + align_frames.dy[idx]
+        x_low = alignment_point['box_x_low'] + align_frames.dx[idx]
+        x_high = alignment_point['box_x_high'] + align_frames.dx[idx]
 
+        # Apply a Gaussian filter to the original frame for the second correlation phase.
         frame_blurred_second_phase = blurr_image(frames.frames_mono_blurred(idx),
                                                  blurr_strength_second_phase)
 
+        # Compute the warp shift using multi-level normalized cross correlation.
         shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase, \
         shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase = \
             Miscellaneous.multilevel_correlation(
                 alignment_point['reference_box_first_phase'], frames.frames_mono_blurred(idx),
                 blurr_strength_first_phase,
                 alignment_point['reference_box_second_phase'], frame_blurred_second_phase, y_low,
-                y_high, x_low, x_high, shift_y_global, shift_x_global,
-                search_width)
+                y_high, x_low, x_high, search_width)
 
+        # Combine the shifts of both phases and update the summation variables (to determine the
+        # mean warp shift).
         # shift_y_local_second_phase = 0
         # shift_x_local_second_phase = 0
         shift_y_local = shift_y_local_first_phase + shift_y_local_second_phase
@@ -238,28 +241,30 @@ if __name__ == "__main__":
         shift_y_local_sum += shift_y_local
         shift_x_local_sum += shift_x_local
 
+        # Store the warps measured for this frame.
         shift_y_local_corrected.append(shift_y_local)
         shift_x_local_corrected.append(shift_x_local)
 
+        # The following is code for visualizing the effect of warp correction (of both phases).
         search_width_second_phase = 4
         search_width_first_phase = int((search_width - search_width_second_phase) / 2)
         index_extension = search_width_first_phase * 2
 
         frame_window_first_phase = blurr_image(frames.frames_mono_blurred(idx)[
-           y_low + shift_y_global - index_extension:y_high + shift_y_global + index_extension:2,
-           x_low + shift_x_global - index_extension:x_high + shift_x_global + index_extension:2],
+           y_low - index_extension:y_high + index_extension:2,
+           x_low - index_extension:x_high + index_extension:2],
            blurr_strength_first_phase)
 
         frame_window_shifted_first_phase = blurr_image(
             frames.frames_mono_blurred(idx)[
-            y_low + shift_y_global + shift_y_local_first_phase:y_high + shift_y_global + shift_y_local_first_phase:2,
-            x_low + shift_x_global + shift_x_local_first_phase:x_high + shift_x_global + shift_x_local_first_phase:2],
+            y_low - shift_y_local_first_phase:y_high - shift_y_local_first_phase:2,
+            x_low - shift_x_local_first_phase:x_high - shift_x_local_first_phase:2],
             blurr_strength_first_phase)
 
         frame_window_shifted_second_phase = blurr_image(
             frames.frames_mono_blurred(idx)[
-            y_low + shift_y_global + shift_y_local:y_high + shift_y_global + shift_y_local,
-            x_low + shift_x_global + shift_x_local:x_high + shift_x_global + shift_x_local],
+            y_low - shift_y_local:y_high - shift_y_local,
+            x_low - shift_x_local:x_high - shift_x_local],
             blurr_strength_second_phase)
 
         composite_image = Miscellaneous.compose_image(
@@ -279,9 +284,12 @@ if __name__ == "__main__":
             shift_y_local) + ", " + str(
             shift_x_local) + "]")
 
+    # The warp of the reference patch is computed as the mean value of all shifts.
     shift_y_reference = shift_y_local_sum / frames.number
     shift_x_reference = shift_x_local_sum / frames.number
 
+    # For all frames correct the measured shift values for the bias caused by the shift of the
+    # reference patch.
     for idx in range(frames.number):
         shift_y_local_corrected[idx] -= shift_y_reference
         shift_x_local_corrected[idx] -= shift_x_reference
