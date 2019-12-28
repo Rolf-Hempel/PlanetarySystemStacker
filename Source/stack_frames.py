@@ -285,7 +285,7 @@ class StackFrames(object):
         elif self.configuration.alignment_points_method == 'MultiLevelCorrelation':
             self.alignment_points.set_reference_boxes_correlation()
 
-        # Go through the list of all frames.
+        # Begin the computation of local warp shifts at every alignment point.
         self.my_timer.start('Stacking: compute AP shifts')
 
         # MultiLevelCorrelation  is not supported by method "compute_shift_alignment_point" in

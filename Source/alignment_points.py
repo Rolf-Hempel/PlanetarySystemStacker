@@ -751,6 +751,19 @@ class AlignmentPoints(object):
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank frames at APs", 100)
 
+        # Initialize the alignment point lists for all frames.
+        self.frames.reset_alignment_point_lists()
+        # For each alignment point sort the computed quality ranks in descending order.
+        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
+            # Truncate the list to the number of frames to be stacked for each alignmeent point.
+            alignment_point['best_frame_indices'] = sorted(
+                range(len(alignment_point['frame_qualities'])),
+                key=alignment_point['frame_qualities'].__getitem__, reverse=True)[
+                                                    :self.stack_size]
+            # Add this alignment point to the AP lists of those frames where the AP is to be used.
+            for frame_index in alignment_point['best_frame_indices']:
+                self.frames.used_alignment_points[frame_index].append(alignment_point_index)
+
     def prepare_for_debugging(self, update_image_window_signal):
         """
         The effect of de-warping is to be visualized in the GUI. To this end, method
