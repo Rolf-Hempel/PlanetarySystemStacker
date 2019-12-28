@@ -967,11 +967,11 @@ class AlignmentPoints(object):
                     total_shift_y = int(round(dy_global - shift_pixel[0]))
                     total_shift_x = int(round(dx_global - shift_pixel[1]))
 
-                    y_low = alignment_point['patch_y_low']
-                    y_high = alignment_point['patch_y_high']
-                    x_low = alignment_point['patch_x_low']
-                    x_high = alignment_point['patch_x_high']
-                    reference_patch = resize(alignment_point['reference_patch'].astype(uint16), None,
+                    y_low = alignment_point['box_y_low']
+                    y_high = alignment_point['box_y_high']
+                    x_low = alignment_point['box_x_low']
+                    x_high = alignment_point['box_x_high']
+                    reference_patch = resize(alignment_point['reference_box'].astype(uint16), None,
                                              fx=float(self.scale_factor),
                                              fy=float(self.scale_factor))
 

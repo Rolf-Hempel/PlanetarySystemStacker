@@ -381,6 +381,10 @@ class StackFrames(object):
         # First find out if there are holes between AP patches.
         self.prepare_for_stack_blending()
 
+        # Initialize counters which for each AP point to the next index in lists with frame-related
+        # data.
+        frame_counters = zeros(len(self.alignment_points.alignment_points), dtype=int)
+
         # Go through the list of all frames.
         for frame_index in range(self.frames.number):
             frame = self.frames.frames(frame_index)
@@ -397,9 +401,10 @@ class StackFrames(object):
             # Go through all alignment points for which this frame was found to be among the best.
             for alignment_point_index in self.frames.used_alignment_points[frame_index]:
                 alignment_point = self.alignment_points.alignment_points[alignment_point_index]
-                frame_index_at_ap = alignment_point['best_frame_indices'].index(frame_index)
+                frame_index_at_ap = frame_counters[alignment_point_index]
                 shift_y = alignment_point['shifts_y_local'][frame_index_at_ap]
                 shift_x = alignment_point['shifts_x_local'][frame_index_at_ap]
+                frame_counters[alignment_point_index] += 1
 
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
