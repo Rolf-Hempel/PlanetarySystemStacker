@@ -33,6 +33,7 @@ from skimage import img_as_uint, img_as_ubyte
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
+from miscellaneous import Miscellaneous
 from exceptions import InternalError, NotSupportedError, Error
 from frames import Frames
 from rank_frames import RankFrames
@@ -281,66 +282,101 @@ class StackFrames(object):
         # alignment point.
         if self.configuration.alignment_points_method == 'MultiLevel':
             self.alignment_points.set_reference_boxes()
-
-        for alignment_point in self.alignment_points.alignment_points:
-            alignment_point['shifts_y'] = []
-            alignment_point['shifts_x'] = []
-            alignment_point['deviations'] = []
-            alignment_point['frame_indices'] = []
-            alignment_point['warp_y'] = 0
-            alignment_point['warp_x'] = 0
+        elif self.configuration.alignment_points_method == 'MultiLevelCorrelation':
+            self.alignment_points.set_reference_boxes_correlation()
 
         # Go through the list of all frames.
-        for frame_index in range(self.frames.number):
-            frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
-            for alignment_point_index in self.frames.used_alignment_points[frame_index]:
-                alignment_point = self.alignment_points.alignment_points[alignment_point_index]
+        self.my_timer.start('Stacking: compute AP shifts')
 
-                # Compute the local warp shift for this frame.
-                self.my_timer.start('Stacking: compute AP shifts')
-                [shift_y, shift_x], deviation = self.alignment_points.compute_shift_alignment_point(
-                    frame_mono_blurred, frame_index, alignment_point_index,
-                    de_warp=self.configuration.alignment_points_de_warp)
-                alignment_point['shifts_y'].append(shift_y)
-                alignment_point['shifts_x'].append(shift_x)
-                alignment_point['deviations'].append(deviation)
-                alignment_point['frame_indices'].append(frame_index)
-                alignment_point['warp_y'] += shift_y
-                alignment_point['warp_x'] += shift_x
+        # MultiLevelCorrelation  is not supported by method "compute_shift_alignment_point" in
+        # class "AlignmentPoints". Therefore, the code to compute the local shifts is inserted
+        # here, using the shift detection routine in class Miscellaneous directly.
+        if self.configuration.alignment_points_method == 'MultiLevelCorrelation':
+            blurr_strength_first_phase = self.configuration.alignment_points_blurr_strength_first_phase
+            blurr_strength_second_phase = self.configuration.alignment_points_blurr_strength_second_phase
 
-                # Increment the counter corresponding to the 2D warp shift.
-                try:
-                    self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
-                except:
-                    print ("Error: shift dy: " + str(shift_y) + ", dx: " + str(shift_x) +
-                           " too large for statistics vector.")
+            for frame_index in range(self.frames.number):
+                # Apply a Gaussian filter to the original frame for the second correlation phase.
+                frame_blurred_second_phase = GaussianBlur(frames.frames_mono_blurred(frame_index),
+                                                          (blurr_strength_second_phase,
+                                                           blurr_strength_second_phase), 0)
+                frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
 
-        for alignment_point in self.alignment_points.alignment_points:
-            alignment_point['warp_y'] /= self.alignment_points.stack_size
-            alignment_point['warp_x'] /= self.alignment_points.stack_size
+                for alignment_point_index in self.frames.used_alignment_points[frame_index]:
+                    alignment_point = self.alignment_points.alignment_points[alignment_point_index]
+                    y_low = alignment_point['box_y_low'] + self.align_frames.dy[frame_index]
+                    y_high = alignment_point['box_y_high'] + self.align_frames.dy[frame_index]
+                    x_low = alignment_point['box_x_low'] + self.align_frames.dx[frame_index]
+                    x_high = alignment_point['box_x_high'] + self.align_frames.dx[frame_index]
 
-            print ("Warp_y: " + str(alignment_point['warp_y']) + ", Warp_x: " + str(alignment_point['warp_x']))
+                    # Compute the local warp shift for this frame.
+                    shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase, \
+                    shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase = \
+                        Miscellaneous.multilevel_correlation(
+                            alignment_point['reference_box_first_phase'],
+                            frame_mono_blurred,
+                            blurr_strength_first_phase,
+                            alignment_point['reference_box_second_phase'],
+                            frame_blurred_second_phase,
+                            y_low, y_high, x_low, x_high,
+                            self.configuration.alignment_points_search_width)
 
-        # Shorten the list of frames to be used at each alignment point.
-        factor = 0.5
-        self.alignment_points.stack_size = max(1, int(round(self.alignment_points.stack_size * factor)))
+                    # Compute the combined warp shifts from both phases and append them to the
+                    # lists of the alignment point object.
+                    shift_y_local = shift_y_local_first_phase + shift_y_local_second_phase
+                    shift_x_local = shift_x_local_first_phase + shift_x_local_second_phase
+                    alignment_point['shifts_y_local'].append(shift_y_local)
+                    alignment_point['shifts_x_local'].append(shift_x_local)
 
-        self.frames.reset_alignment_point_lists()
-        for alignment_point_index, alignment_point in enumerate(self.alignment_points.alignment_points):
+                    # The following two lines are for the computation of mean warp shifts.
+                    alignment_point['shift_y_local_sum'] += shift_y_local
+                    alignment_point['shift_x_local_sum'] += shift_x_local
 
-            # del alignment_point['best_frame_indices'][self.alignment_points.stack_size:]
-            index_list = sorted(
-                range(len(alignment_point['deviations'])),
-                key=alignment_point['deviations'].__getitem__, reverse=False)[:self.alignment_points.stack_size]
-            alignment_point['best_frame_indices'] = [alignment_point['frame_indices'][i] for i in index_list]
-            alignment_point['shifts_y'] = [alignment_point['shifts_y'][i] for i in index_list]
-            alignment_point['shifts_x'] = [alignment_point['shifts_x'][i] for i in index_list]
+            # After computing all local warp shifts, the mean shifts are computed. They are
+            # interpreted as the warp shifts at the reference patch. To compensate for those
+            # shifts, the mean values are subtracted from all individual shifts.
+            for alignment_point in self.alignment_points.alignment_points:
+                # Compute mean shifts and round them to the nearest integer value.
+                mean_shift_y = int(
+                    round(alignment_point['shift_y_local_sum'] / self.alignment_points.stack_size))
+                mean_shift_x = int(
+                    round(alignment_point['shift_x_local_sum'] / self.alignment_points.stack_size))
+                # Correct all warp shifts by subtracting the mean shift values.
+                for index in range(self.alignment_points.stack_size):
+                    alignment_point['shifts_y_local'][index] -= mean_shift_y
+                    alignment_point['shifts_x_local'][index] -= mean_shift_x
+                    # Increment the counter corresponding to the 2D warp shift.
+                    try:
+                        self.shift_distribution[int(round(sqrt(
+                            alignment_point['shifts_y_local'][index] ** 2 +
+                            alignment_point['shifts_x_local'][index] ** 2)))] += 1
+                    except:
+                        print("Error: shift dy: " + str(
+                            alignment_point['shifts_y_local'][index]) + ", dx: " + str(
+                            alignment_point['shifts_x_local'][index]) +
+                              " too large for statistics vector.")
 
-            alignment_point['best_frame_indices_consecutive'] = sorted(
-                alignment_point['best_frame_indices'])
-            # Add this alignment point to the AP lists of those frames where the AP is to be used.
-            for frame_index in alignment_point['best_frame_indices']:
-                self.frames.used_alignment_points[frame_index].append(alignment_point_index)
+        else:
+            for frame_index in range(self.frames.number):
+                frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
+                for alignment_point_index in self.frames.used_alignment_points[frame_index]:
+                    alignment_point = self.alignment_points.alignment_points[alignment_point_index]
+
+                    # Compute the local warp shift for this frame.
+                    [shift_y, shift_x], deviation = self.alignment_points.compute_shift_alignment_point(
+                        frame_mono_blurred, frame_index, alignment_point_index,
+                        de_warp=self.configuration.alignment_points_de_warp)
+                    alignment_point['shifts_y_local'].append(shift_y)
+                    alignment_point['shifts_x_local'].append(shift_x)
+
+                    # Increment the counter corresponding to the 2D warp shift.
+                    try:
+                        self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
+                    except:
+                        print ("Error: shift dy: " + str(shift_y) + ", dx: " + str(shift_x) +
+                               " too large for statistics vector.")
+
+        self.my_timer.stop('Stacking: compute AP shifts')
 
         # First find out if there are holes between AP patches.
         self.prepare_for_stack_blending()
@@ -362,9 +398,8 @@ class StackFrames(object):
             for alignment_point_index in self.frames.used_alignment_points[frame_index]:
                 alignment_point = self.alignment_points.alignment_points[alignment_point_index]
                 frame_index_at_ap = alignment_point['best_frame_indices'].index(frame_index)
-                shift_y = alignment_point['shifts_y'][frame_index_at_ap]
-                shift_x = alignment_point['shifts_x'][frame_index_at_ap]
-                deviation = alignment_point['deviations'][frame_index_at_ap]
+                shift_y = alignment_point['shifts_y_local'][frame_index_at_ap]
+                shift_x = alignment_point['shifts_x_local'][frame_index_at_ap]
 
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
@@ -372,7 +407,6 @@ class StackFrames(object):
                 # dx.
                 total_shift_y = int(round(dy - shift_y))
                 total_shift_x = int(round(dx - shift_x))
-                self.my_timer.stop('Stacking: compute AP shifts')
 
                 # Add the shifted alignment point patch to the AP's stacking buffer.
                 self.my_timer.start('Stacking: remapping and adding')

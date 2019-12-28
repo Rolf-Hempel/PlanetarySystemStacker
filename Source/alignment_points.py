@@ -493,6 +493,10 @@ class AlignmentPoints(object):
               alignment_point['box_x_low']:alignment_point['box_x_high']]
         alignment_point['reference_box'] = box
 
+        # Initialize data structures to store local warp shifts.
+        alignment_point['shifts_y_local'] = []
+        alignment_point['shifts_x_local'] = []
+
     def set_reference_boxes(self):
         """
         This method is used if multi-level AP matching is selected. In this case a hierarchy of
@@ -528,6 +532,10 @@ class AlignmentPoints(object):
                 alignment_point['reference_boxes'].append(
                     self.mean_frames[level][y_level - half_box_width:y_level + half_box_width,
                     x_level - half_box_width:x_level + half_box_width])
+
+            # Initialize data structures to store local warp shifts.
+            alignment_point['shifts_y_local'] = []
+            alignment_point['shifts_x_local'] = []
 
             # if self.debug_AP and not ap_index:
             #     print('half_box_width_finest: ' + str(half_box_width_finest))
@@ -573,6 +581,12 @@ class AlignmentPoints(object):
             alignment_point['reference_box_first_phase'] = (GaussianBlur(window_second_phase[::2, ::2],
                     (self.configuration.alignment_points_blurr_strength_first_phase,
                      self.configuration.alignment_points_blurr_strength_first_phase), 0) / 256).astype(uint8)
+
+            # Initialize data structures to store local warp shifts and to compute mean values.
+            alignment_point['shift_y_local_sum'] = 0
+            alignment_point['shift_x_local_sum'] = 0
+            alignment_point['shifts_y_local'] = []
+            alignment_point['shifts_x_local'] = []
 
     @staticmethod
     def initialize_ap_stacking_buffer(alignment_point, color):
@@ -736,37 +750,6 @@ class AlignmentPoints(object):
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank frames at APs", 100)
-
-        # Initialize the alignment point lists for all frames.
-        self.frames.reset_alignment_point_lists()
-        # For each alignment point sort the computed quality ranks in descending order.
-        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
-            # Truncate the list to the number of frames to be stacked for each alignmeent point.
-            alignment_point['best_frame_indices'] = sorted(range(len(alignment_point['frame_qualities'])),
-                                                    key=alignment_point['frame_qualities'].__getitem__, reverse=True)[:self.stack_size]
-            alignment_point['best_frame_indices_consecutive'] = sorted(alignment_point['best_frame_indices'])
-            # Add this alignment point to the AP lists of those frames where the AP is to be used.
-            for frame_index in alignment_point['best_frame_indices']:
-                self.frames.used_alignment_points[frame_index].append(alignment_point_index)
-
-            # Cut the referenced patch for this alignment point from the sharpest frame at this
-            # location.
-            best_index = alignment_point['best_frame_indices'][0]
-            offset_y = self.align_frames.intersection_shape[0][0] - \
-                       self.align_frames.frame_shifts[best_index][0]
-            offset_x = self.align_frames.intersection_shape[1][0] - \
-                       self.align_frames.frame_shifts[best_index][1]
-            alignment_point['reference_box'] = self.frames.frames_mono_blurred(best_index)[
-                                               offset_y + alignment_point['box_y_low']:
-                                               offset_y + alignment_point['box_y_high'],
-                                               offset_x + alignment_point['box_x_low']:
-                                               offset_x + alignment_point['box_x_high']]
-
-            alignment_point['reference_patch'] = self.frames.frames_mono_blurred(best_index)[
-                                               offset_y + alignment_point['patch_y_low']:
-                                               offset_y + alignment_point['patch_y_high'],
-                                               offset_x + alignment_point['patch_x_low']:
-                                               offset_x + alignment_point['patch_x_high']]
 
     def prepare_for_debugging(self, update_image_window_signal):
         """
