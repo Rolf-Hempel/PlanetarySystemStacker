@@ -23,11 +23,11 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from glob import glob
 from warnings import filterwarnings
 
-from cv2 import GaussianBlur
+from cv2 import GaussianBlur, resize
 import matplotlib.pyplot as plt
 from numpy import int as np_int
 from numpy import zeros, full, empty, float32, int32, newaxis, arange, count_nonzero, \
-    where, sqrt, logical_or
+    where, sqrt, logical_or, uint16
 from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
@@ -327,19 +327,22 @@ class StackFrames(object):
 
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
-                    self.progress_signal.emit("AP shift comp.", int((frame_index / self.frames.number)
-                                                                  * 100.))
+                    self.progress_signal.emit("AP shift comp.",
+                                              int((frame_index / self.frames.number) * 100.))
 
                 if self.frames.used_alignment_points[frame_index]:
                     # If this frame is used at any AP, apply a Gaussian filter to the original frame
                     # in preparation for the second correlation phase.
-                    frame_blurred_second_phase = GaussianBlur(frames.frames_mono_blurred(frame_index),
-                                                              (blurr_strength_second_phase,
-                                                               blurr_strength_second_phase), 0)
+                    frame_blurred_second_phase = GaussianBlur(
+                        frames.frames_mono_blurred(frame_index),
+                        (blurr_strength_second_phase,
+                         blurr_strength_second_phase), 0)
                     frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
 
                 for alignment_point_index in self.frames.used_alignment_points[frame_index]:
                     alignment_point = self.alignment_points.alignment_points[alignment_point_index]
+
+                    # Compute AP box index ranges in current frame after global alignment.
                     y_low = alignment_point['box_y_low'] + self.align_frames.dy[frame_index]
                     y_high = alignment_point['box_y_high'] + self.align_frames.dy[frame_index]
                     x_low = alignment_point['box_x_low'] + self.align_frames.dx[frame_index]
@@ -368,7 +371,46 @@ class StackFrames(object):
                     alignment_point['shift_y_local_sum'] += shift_y_local
                     alignment_point['shift_x_local_sum'] += shift_x_local
 
-                # Insert the AP shift visualization here.
+                    # If debugging mode is on, visualize the shifts for the first AP.
+                    if not alignment_point_index:
+                        search_width_second_phase = 4
+                        search_width_first_phase = int(
+                            (self.configuration.alignment_points_search_width -
+                             search_width_second_phase) / 2)
+                        index_extension = search_width_first_phase * 2
+
+                        # Globally stabilized search window for first phase.
+                        frame_window_first_phase = GaussianBlur(frame_mono_blurred[
+                                            y_low - index_extension:y_high + index_extension:2,
+                                            x_low - index_extension:x_high + index_extension:2],
+                                            (blurr_strength_first_phase,
+                                             blurr_strength_first_phase), 0)
+
+                        # AP box with first phase shift applied.
+                        frame_window_shifted_first_phase = GaussianBlur(frame_mono_blurred[
+                            y_low - shift_y_local_first_phase:y_high - shift_y_local_first_phase:2,
+                            x_low - shift_x_local_first_phase:x_high - shift_x_local_first_phase:2],
+                            (blurr_strength_first_phase,
+                             blurr_strength_first_phase),
+                            0)
+
+                        # AP box with first and second phase shifts applied.
+                        frame_window_shifted_second_phase = GaussianBlur(frame_mono_blurred[
+                                                     y_low - shift_y_local:y_high - shift_y_local,
+                                                     x_low - shift_x_local:x_high - shift_x_local],
+                                                     (blurr_strength_second_phase,
+                                                      blurr_strength_second_phase),
+                                                     0)
+
+                        # Compose images and send them to the GUI thread for display.
+                        composed_image = Miscellaneous.compose_image(
+                            [frame_window_first_phase,
+                             (alignment_point['reference_box_first_phase'] * 256).astype(uint16),
+                             frame_window_shifted_first_phase,
+                             frame_window_shifted_second_phase], scale_factor=self.scale_factor,
+                            border=self.border)
+                        self.update_image_window_signal.emit(composed_image)
+
 
             # After computing all local warp shifts, the mean shifts are computed. They are
             # interpreted as the warp shifts at the reference patch. To compensate for those
@@ -395,6 +437,7 @@ class StackFrames(object):
                               " too large for statistics vector.")
 
         else:
+            # Treat all cases except for MultiLevelCorrelation.
             for frame_index in range(self.frames.number):
 
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
