@@ -112,6 +112,13 @@ class StackFrames(object):
         self.number_single_frame_contributions = full([self.dim_y, self.dim_x], 0, dtype=int32)
         self.sum_single_frame_weights = full([self.dim_y, self.dim_x], 0.0001, dtype=float32)
 
+        # Initialize variables used to visualize the local de-warping at alignment points.
+        self.debug_AP = False
+        self.update_image_window_signal = None
+        self.scale_factor = None
+        self.border = None
+        self.image_delay = None
+
         self.my_timer.stop('Stacking: AP initialization')
 
     def prepare_for_stack_blending(self):
@@ -266,6 +273,22 @@ class StackFrames(object):
 
         self.my_timer.stop('Stacking: Initialize background blending')
 
+    def prepare_for_debugging(self, update_image_window_signal):
+        """
+        The effect of de-warping is to be visualized in the GUI. To this end, method
+         "compute_shift_alignment_point" for each frame sends an image to the GUI. The image
+         visualizes the effect of global frame stabilization and local de-warping at the given AP.
+
+        :param update_image_window_signal:
+        :return:
+        """
+
+        self.debug_AP = True
+        self.update_image_window_signal = update_image_window_signal
+        self.scale_factor = 3
+        self.border = 2
+        self.image_delay = 0.1
+
     def stack_frames(self):
         """
         Compute the shifted contributions of all frames to all alignment points and add them to the
@@ -344,6 +367,8 @@ class StackFrames(object):
                     # The following two lines are for the computation of mean warp shifts.
                     alignment_point['shift_y_local_sum'] += shift_y_local
                     alignment_point['shift_x_local_sum'] += shift_x_local
+
+                # Insert the AP shift visualization here.
 
             # After computing all local warp shifts, the mean shifts are computed. They are
             # interpreted as the warp shifts at the reference patch. To compensate for those

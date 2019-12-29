@@ -648,10 +648,15 @@ class Workflow(QtCore.QObject):
                                         self.alignment_points, self.my_timer,
                                         progress_signal=self.work_current_progress_signal)
 
-        # In debug mode: Prepare for de-warp visualization.
+        # In debug mode: Prepare for de-warp visualization. In the case of MultiLevelCorrelation,
+        # the warp measurement workflow is contained in class StackFrames, otherwise in
+        # AlignmentPoints.
         if self.debug_AP:
             self.create_image_window_signal.emit()
-            self.alignment_points.prepare_for_debugging(self.update_image_window_signal)
+            if self.configuration.alignment_points_method == 'MultiLevelCorrelation':
+                self.stack_frames.prepare_for_debugging(self.update_image_window_signal)
+            else:
+                self.alignment_points.prepare_for_debugging(self.update_image_window_signal)
 
         # Stack all frames.
         if self.configuration.global_parameters_protocol_level > 0:
