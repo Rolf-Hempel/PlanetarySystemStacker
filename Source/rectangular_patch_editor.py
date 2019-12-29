@@ -523,7 +523,7 @@ if __name__ == '__main__':
     window.showMaximized()
     app.exec_()
 
-    print ("Rectangle selected, y_low: " + str(border+window.y_low) + ", y_high: " +
+    print("Rectangle selected, y_low: " + str(border+window.y_low) + ", y_high: " +
            str(border+window.y_high) + ", x_low: " + str(border+window.x_low) + ", x_high: "
            + str(border+window.x_high))
 

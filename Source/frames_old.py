@@ -374,7 +374,7 @@ if __name__ == "__main__":
         print("Error: " + e.message)
         exit()
     end = time()
-    print ("Read " + str(frames_old.number) + " frames in " + str(end-start) + " seconds.")
+    print("Read " + str(frames_old.number) + " frames in " + str(end-start) + " seconds.")
 
     # Create monochrome versions of all frames. If the original frames are monochrome, just point
     # the monochrome frame list to the original images (no deep copy!).

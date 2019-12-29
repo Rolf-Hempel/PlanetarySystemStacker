@@ -340,7 +340,7 @@ class StackFrames(object):
                                             border=self.border)
                         self.update_image_window_signal.emit(composed_image)
                     except Exception as e:
-                        print (str(e))
+                        print(str(e))
 
                     # Insert a delay to keep the current frame long enough in the visualization
                     # window.

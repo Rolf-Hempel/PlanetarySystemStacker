@@ -212,6 +212,7 @@ class VideoReader(object):
 
         self.cap.release()
 
+
 class ImageReader(object):
     """
     The ImageReader deals with the import of frames from a list of single images. Frames can

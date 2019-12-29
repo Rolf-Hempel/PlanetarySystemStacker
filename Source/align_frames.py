@@ -489,7 +489,7 @@ class AlignFrames(object):
             self.mean_frame_original = self.mean_frame.copy()
             self.intersection_shape_original = self.intersection_shape.copy()
 
-        if y_min==0 and y_max==0 and x_min==0 and x_max==0:
+        if y_min == 0 and y_max == 0 and x_min == 0 and x_max == 0:
             y_min = 0
             y_max = self.intersection_shape_original[0][1] - \
                 self.intersection_shape_original[0][0]

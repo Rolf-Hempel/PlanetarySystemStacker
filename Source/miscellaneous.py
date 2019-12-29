@@ -485,7 +485,7 @@ class Miscellaneous(object):
         # Set up a table which keeps deviation values from earlier iteration steps. This way,
         # deviation evaluations can be avoided at coordinates which have been visited before.
         # Initialize deviations with an impossibly high value.
-        dev_table[:,:] = 1.e30
+        dev_table[:, :] = 1.e30
 
         # Initialize the global optimum with the value at dy=dx=0.
         if sampling_stride != 1:
@@ -991,7 +991,7 @@ class Miscellaneous(object):
             output_string = '{0} {1}'.format(datetime.now().strftime("%H-%M-%S.%f")[:-5], string)
         else:
             output_string = string
-        print (output_string)
+        print(output_string)
         stdout.flush()
 
         # If a logfile per stacked image was requested, write the string to that file as well.

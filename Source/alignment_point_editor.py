@@ -728,7 +728,7 @@ class AlignmentPointEditorWidget(QtWidgets.QFrame, Ui_alignment_point_editor):
         # Create the viewer frame and insert it into the window.
         self.viewer = AlignmentPointEditor(self.mean_frame, self.aps)
         self.horizontalLayout_2.insertWidget(0, self.viewer)
-        self.horizontalLayout_2.setStretch(1,0)
+        self.horizontalLayout_2.setStretch(1, 0)
 
         # Initialize sliders and their value labels.
         self.initialize_widgets_and_local_parameters(
@@ -934,6 +934,6 @@ if __name__ == '__main__':
             continue
         count_updates += 1
         AlignmentPoints.set_reference_box(ap, align_frames.mean_frame)
-    print ("Buffers allocated for " + str(count_updates) + " alignment points.")
+    print("Buffers allocated for " + str(count_updates) + " alignment points.")
     exit()
 
