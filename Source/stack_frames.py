@@ -278,15 +278,20 @@ class StackFrames(object):
         self.shift_distribution = full((self.configuration.alignment_points_search_width * 2,), 0,
                                        dtype=np_int)
 
+        # Begin the computation of local warp shifts at every alignment point.
+        self.my_timer.start('Stacking: compute AP shifts')
+
+        # Initialize lists to store local warp shifts.
+        for alignment_point in self.alignment_points.alignment_points:
+            alignment_point['shifts_y_local'] = []
+            alignment_point['shifts_x_local'] = []
+
         # If multi-level AP matching is selected, prepare the required level information for each
         # alignment point.
         if self.configuration.alignment_points_method == 'MultiLevel':
             self.alignment_points.set_reference_boxes()
         elif self.configuration.alignment_points_method == 'MultiLevelCorrelation':
             self.alignment_points.set_reference_boxes_correlation()
-
-        # Begin the computation of local warp shifts at every alignment point.
-        self.my_timer.start('Stacking: compute AP shifts')
 
         # MultiLevelCorrelation  is not supported by method "compute_shift_alignment_point" in
         # class "AlignmentPoints". Therefore, the code to compute the local shifts is inserted
@@ -296,11 +301,19 @@ class StackFrames(object):
             blurr_strength_second_phase = self.configuration.alignment_points_blurr_strength_second_phase
 
             for frame_index in range(self.frames.number):
-                # Apply a Gaussian filter to the original frame for the second correlation phase.
-                frame_blurred_second_phase = GaussianBlur(frames.frames_mono_blurred(frame_index),
-                                                          (blurr_strength_second_phase,
-                                                           blurr_strength_second_phase), 0)
-                frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
+
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
+                    self.progress_signal.emit("AP shift comp.", int((frame_index / self.frames.number)
+                                                                  * 100.))
+
+                if self.frames.used_alignment_points[frame_index]:
+                    # If this frame is used at any AP, apply a Gaussian filter to the original frame
+                    # in preparation for the second correlation phase.
+                    frame_blurred_second_phase = GaussianBlur(frames.frames_mono_blurred(frame_index),
+                                                              (blurr_strength_second_phase,
+                                                               blurr_strength_second_phase), 0)
+                    frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
 
                 for alignment_point_index in self.frames.used_alignment_points[frame_index]:
                     alignment_point = self.alignment_points.alignment_points[alignment_point_index]
@@ -358,6 +371,12 @@ class StackFrames(object):
 
         else:
             for frame_index in range(self.frames.number):
+
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
+                    self.progress_signal.emit("AP shift comp.", int((frame_index / self.frames.number)
+                                                                  * 100.))
+
                 frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
                 for alignment_point_index in self.frames.used_alignment_points[frame_index]:
                     alignment_point = self.alignment_points.alignment_points[alignment_point_index]
@@ -377,6 +396,9 @@ class StackFrames(object):
                                " too large for statistics vector.")
 
         self.my_timer.stop('Stacking: compute AP shifts')
+
+        if self.progress_signal is not None:
+            self.progress_signal.emit("AP shift comp.", 100)
 
         # First find out if there are holes between AP patches.
         self.prepare_for_stack_blending()

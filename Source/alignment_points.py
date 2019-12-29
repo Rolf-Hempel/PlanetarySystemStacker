@@ -493,10 +493,6 @@ class AlignmentPoints(object):
               alignment_point['box_x_low']:alignment_point['box_x_high']]
         alignment_point['reference_box'] = box
 
-        # Initialize data structures to store local warp shifts.
-        alignment_point['shifts_y_local'] = []
-        alignment_point['shifts_x_local'] = []
-
     def set_reference_boxes(self):
         """
         This method is used if multi-level AP matching is selected. In this case a hierarchy of
@@ -532,10 +528,6 @@ class AlignmentPoints(object):
                 alignment_point['reference_boxes'].append(
                     self.mean_frames[level][y_level - half_box_width:y_level + half_box_width,
                     x_level - half_box_width:x_level + half_box_width])
-
-            # Initialize data structures to store local warp shifts.
-            alignment_point['shifts_y_local'] = []
-            alignment_point['shifts_x_local'] = []
 
             # if self.debug_AP and not ap_index:
             #     print('half_box_width_finest: ' + str(half_box_width_finest))
@@ -582,11 +574,9 @@ class AlignmentPoints(object):
                     (self.configuration.alignment_points_blurr_strength_first_phase,
                      self.configuration.alignment_points_blurr_strength_first_phase), 0) / 256).astype(uint8)
 
-            # Initialize data structures to store local warp shifts and to compute mean values.
+            # Initialize summation variables for the computation of mean local shifts.
             alignment_point['shift_y_local_sum'] = 0
             alignment_point['shift_x_local_sum'] = 0
-            alignment_point['shifts_y_local'] = []
-            alignment_point['shifts_x_local'] = []
 
     @staticmethod
     def initialize_ap_stacking_buffer(alignment_point, color):
