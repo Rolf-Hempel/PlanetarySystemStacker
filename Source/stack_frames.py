@@ -21,10 +21,11 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from glob import glob
+from time import sleep
 from warnings import filterwarnings
 
-from cv2 import GaussianBlur, resize
 import matplotlib.pyplot as plt
+from cv2 import GaussianBlur
 from numpy import int as np_int
 from numpy import zeros, full, empty, float32, int32, newaxis, arange, count_nonzero, \
     where, sqrt, logical_or, uint16
@@ -33,9 +34,9 @@ from skimage import img_as_uint, img_as_ubyte
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
 from configuration import Configuration
-from miscellaneous import Miscellaneous
 from exceptions import InternalError, NotSupportedError, Error
 from frames import Frames
+from miscellaneous import Miscellaneous
 from rank_frames import RankFrames
 from timer import timer
 
@@ -334,7 +335,7 @@ class StackFrames(object):
                     # If this frame is used at any AP, apply a Gaussian filter to the original frame
                     # in preparation for the second correlation phase.
                     frame_blurred_second_phase = GaussianBlur(
-                        frames.frames_mono_blurred(frame_index),
+                        self.frames.frames_mono_blurred(frame_index),
                         (blurr_strength_second_phase,
                          blurr_strength_second_phase), 0)
                     frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
@@ -372,7 +373,7 @@ class StackFrames(object):
                     alignment_point['shift_x_local_sum'] += shift_x_local
 
                     # If debugging mode is on, visualize the shifts for the first AP.
-                    if not alignment_point_index:
+                    if self.debug_AP and not alignment_point_index:
                         search_width_second_phase = 4
                         search_width_first_phase = int(
                             (self.configuration.alignment_points_search_width -
@@ -410,6 +411,10 @@ class StackFrames(object):
                              frame_window_shifted_second_phase], scale_factor=self.scale_factor,
                             border=self.border)
                         self.update_image_window_signal.emit(composed_image)
+
+                        # Insert a delay to keep the current frame long enough in the visualization
+                        # window.
+                        sleep(self.image_delay)
 
 
             # After computing all local warp shifts, the mean shifts are computed. They are

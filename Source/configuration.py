@@ -155,11 +155,11 @@ class Configuration(object):
         self.alignment_points_rank_method = "Laplace"
         self.alignment_points_rank_pixel_stride = 2
         self.alignment_points_de_warp = True
-        self.alignment_points_method = 'SteepestDescent'
+        self.alignment_points_method = 'MultiLevelCorrelation'
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
         self.alignment_points_blurr_strength_first_phase = 11
-        self.alignment_points_blurr_strength_secoond_phase = 7
+        self.alignment_points_blurr_strength_second_phase = 7
 
         self.stack_frames_suffix = "_pss"
         self.stack_frames_background_fraction = 0.3
