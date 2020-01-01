@@ -324,6 +324,24 @@ class StackFrames(object):
             blurr_strength_first_phase = self.configuration.alignment_points_blurr_strength_first_phase
             blurr_strength_second_phase = self.configuration.alignment_points_blurr_strength_second_phase
 
+            search_width = self.configuration.alignment_points_search_width
+            search_width_second_phase = 4
+            max_search_width_first_phase = int((search_width - search_width_second_phase) / 2)
+            search_width_first_phase = max_search_width_first_phase
+
+            extent = 2 * search_width_first_phase + 1
+            weight_matrix_first_phase = empty((extent, extent), dtype=float32)
+            for y in range(extent):
+                for x in range(extent):
+                    weight_matrix_first_phase[
+                        y, x] = 1. - self.configuration.alignment_points_penalty_factor * (
+                                (y - search_width_first_phase) ** 2 + (
+                                    x - search_width_first_phase) ** 2)
+
+            # warp_counter = [0]*(max_search_width_first_phase+1)
+            # eval_counter = 0
+            # eval_period = max(int(self.alignment_points.stack_size*len(self.alignment_points.alignment_points) / 100), 100)
+
             for frame_index in range(self.frames.number):
 
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
@@ -359,7 +377,7 @@ class StackFrames(object):
                             alignment_point['reference_box_second_phase'],
                             frame_blurred_second_phase,
                             y_low, y_high, x_low, x_high,
-                            self.configuration.alignment_points_search_width)
+                            search_width, weight_matrix_first_phase)
 
                     # Compute the combined warp shifts from both phases and append them to the
                     # lists of the alignment point object.
@@ -372,13 +390,39 @@ class StackFrames(object):
                     alignment_point['shift_y_local_sum'] += shift_y_local
                     alignment_point['shift_x_local_sum'] += shift_x_local
 
+                    # if int(abs(shift_y_local_first_phase)/2) >= max_search_width_first_phase or int(abs(shift_x_local_first_phase)/2) >= max_search_width_first_phase:
+                    #     print ("shift y: " + str(shift_y_local_first_phase) + ", shift x: " + str(shift_x_local_first_phase) + ", max: " + str(max_search_width_first_phase))
+                    # warp_counter[int(abs(shift_y_local_first_phase)/2)] += 1
+                    # warp_counter[int(abs(shift_x_local_first_phase)/2)] += 1
+                    # eval_counter += 1
+                    #
+                    # if not eval_counter % eval_period:
+                    #     tail_counter = 0
+                    #     for index in reversed(range(max_search_width_first_phase)):
+                    #         tail_counter += warp_counter[index]
+                    #         if tail_counter/eval_counter > self.configuration.alignment_points_fraction_out_of_range_accespted*2:
+                    #             new_search_width_first_phase = min(index + 2, max_search_width_first_phase)
+                    #             if new_search_width_first_phase != search_width_first_phase:
+                    #                 print ("changing first phase search width to: " + str(index))
+                    #                 search_width_first_phase = new_search_width_first_phase
+                    #                 extent = 2 * search_width_first_phase + 1
+                    #                 weight_matrix_first_phase = empty((extent, extent),
+                    #                                                   dtype=float32)
+                    #                 for y in range(extent):
+                    #                     for x in range(extent):
+                    #                         weight_matrix_first_phase[
+                    #                             y, x] = 1. - self.configuration.alignment_points_penalty_factor * (
+                    #                                 (y - search_width_first_phase) ** 2 + (
+                    #                                 x - search_width_first_phase) ** 2)
+                    #             break
+
                     # If debugging mode is on, visualize the shifts for the first AP.
                     if self.debug_AP and not alignment_point_index:
                         search_width_second_phase = 4
-                        search_width_first_phase = int(
+                        max_search_width_first_phase = int(
                             (self.configuration.alignment_points_search_width -
                              search_width_second_phase) / 2)
-                        index_extension = search_width_first_phase * 2
+                        index_extension = max_search_width_first_phase * 2
 
                         # Globally stabilized search window for first phase.
                         frame_window_first_phase = GaussianBlur(frame_mono_blurred[
@@ -422,14 +466,14 @@ class StackFrames(object):
             # shifts, the mean values are subtracted from all individual shifts.
             for alignment_point in self.alignment_points.alignment_points:
                 # Compute mean shifts and round them to the nearest integer value.
-                mean_shift_y = int(
-                    round(alignment_point['shift_y_local_sum'] / self.alignment_points.stack_size))
-                mean_shift_x = int(
-                    round(alignment_point['shift_x_local_sum'] / self.alignment_points.stack_size))
+                # mean_shift_y = int(
+                #     round(alignment_point['shift_y_local_sum'] / self.alignment_points.stack_size))
+                # mean_shift_x = int(
+                #     round(alignment_point['shift_x_local_sum'] / self.alignment_points.stack_size))
                 # Correct all warp shifts by subtracting the mean shift values.
                 for index in range(self.alignment_points.stack_size):
-                    alignment_point['shifts_y_local'][index] -= mean_shift_y
-                    alignment_point['shifts_x_local'][index] -= mean_shift_x
+                    # alignment_point['shifts_y_local'][index] -= mean_shift_y
+                    # alignment_point['shifts_x_local'][index] -= mean_shift_x
                     # Increment the counter corresponding to the 2D warp shift.
                     try:
                         self.shift_distribution[int(round(sqrt(

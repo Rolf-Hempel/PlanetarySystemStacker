@@ -158,8 +158,10 @@ class Configuration(object):
         self.alignment_points_method = 'MultiLevelCorrelation'
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
-        self.alignment_points_blurr_strength_first_phase = 11
+        self.alignment_points_blurr_strength_first_phase = 1
         self.alignment_points_blurr_strength_second_phase = 7
+        self.alignment_points_penalty_factor = 0.00001
+        self.alignment_points_fraction_out_of_range_accespted = 0.01
 
         self.stack_frames_suffix = "_pss"
         self.stack_frames_background_fraction = 0.3
@@ -440,12 +442,9 @@ class Configuration(object):
         :return: -
         """
 
-        # Set the alignment patch size to 1.5 times the box size. Between the patch and box
-        # borders there must be at least as many pixels as the alignment search width. This way,
-        # alignment boxes close to the border never leave the frame.
-        self.alignment_points_half_patch_width = max(int(
-            round((self.alignment_points_half_box_width * 3) / 2)),
-            self.alignment_points_half_box_width + self.alignment_points_search_width)
+        # Set the alignment patch size to 1.5 times the box size.
+        self.alignment_points_half_patch_width = int(
+            round((self.alignment_points_half_box_width * 3) / 2))
 
         # Set the AP distance per coordinate direction such that adjacent patches overlap by 1/6
         # of their width.

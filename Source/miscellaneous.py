@@ -30,7 +30,7 @@ from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY
     resize, matchTemplate, TM_SQDIFF_NORMED, minMaxLoc, TM_CCORR_NORMED
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
-    empty, argmin, stack, sin, uint8, float32, uint16, full, mean
+    empty, argmin, stack, sin, uint8, float32, uint16, full, mean, std
 from math import exp
 from numpy import min as np_min
 from numpy.fft import fft2, ifft2
@@ -753,9 +753,10 @@ class Miscellaneous(object):
 
     @staticmethod
     def multilevel_correlation(reference_box_first_phase, frame_first_phase,
-                               blurr_strength_first_phase, reference_box_second_phase,
-                               frame_blurred_second_phase, y_low, y_high, x_low, x_high,
-                               search_width):
+                               blurr_strength_first_phase,
+                               reference_box_second_phase, frame_blurred_second_phase,
+                               y_low, y_high, x_low, x_high, search_width,
+                               weight_matrix_first_phase=None):
         """
         Determine the local warp shift at an alignment point using a multi-level approach based on
         normalized cross correlation. The first level uses a pixel grid which is coarser by a factor
@@ -794,6 +795,12 @@ class Miscellaneous(object):
         :param x_high: Upper x coordinate limit.
         :param search_width: Maximum distance in y and x from origin of the search area. (See the
                              comment in the explanatory text above.)
+        :param weight_matrix_first_phase: This parameter (if not None) may give a weighting array
+                                          by which the cross correlation results are multiplied
+                                          before the maximum value is determined. The size of this
+                                          2D array in each coordinate direction is that of the
+                                          reference_box_first_phase plus two times the first phase
+                                          search width (see below).
 
         :return: (shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase,
                   shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase)
@@ -826,12 +833,16 @@ class Miscellaneous(object):
             (blurr_strength_first_phase, blurr_strength_first_phase), 0)
 
         # Compute the normalized cross correlation.
-        result = matchTemplate((frame_window_first_phase / 256).astype(uint8),
-                               reference_box_first_phase, TM_CCORR_NORMED)
+        result = matchTemplate((frame_window_first_phase).astype(float32),
+                               reference_box_first_phase.astype(float32), TM_CCORR_NORMED)
 
         # Determine the position of the maximum correlation and compute the corresponding warp
-        # shift. The factor of 2 transforms the shift to the fine pixel grid.
-        minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
+        # shift. The factor of 2 transforms the shift to the fine pixel grid. If a non-trivial
+        # weight matrix is specified, multiply the results before looking for the maximum position.
+        if weight_matrix_first_phase is not None:
+            minVal, maxVal, minLoc, maxLoc = minMaxLoc(result*weight_matrix_first_phase)
+        else:
+            minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
         shift_y_local_first_phase = (search_width_first_phase - maxLoc[1]) * 2
         shift_x_local_first_phase = (search_width_first_phase - maxLoc[0]) * 2
 
@@ -854,7 +865,7 @@ class Miscellaneous(object):
 
             # Perform the template matching on the fine grid, again using normalized cross
             # correlation.
-            result = matchTemplate((frame_window_second_phase / 256).astype(uint8),
+            result = matchTemplate(frame_window_second_phase.astype(float32),
                                    reference_box_second_phase, TM_CCORR_NORMED)
 
             # Find the position of the local optimum and compute the corresponding shift values.

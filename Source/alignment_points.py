@@ -558,21 +558,32 @@ class AlignmentPoints(object):
             best_index = alignment_point['best_frame_indices'][0]
             offset_y = self.align_frames.dy[best_index]
             offset_x = self.align_frames.dx[best_index]
-            window_second_phase = self.frames.frames_mono_blurred(best_index)[
-                                               offset_y + alignment_point['box_y_low']:
-                                               offset_y + alignment_point['box_y_high'],
-                                               offset_x + alignment_point['box_x_low']:
-                                               offset_x + alignment_point['box_x_high']]
+            # window_second_phase = self.frames.frames_mono_blurred(best_index)[
+            #                                    offset_y + alignment_point['box_y_low']:
+            #                                    offset_y + alignment_point['box_y_high'],
+            #                                    offset_x + alignment_point['box_x_low']:
+            #                                    offset_x + alignment_point['box_x_high']]
+
+            window_second_phase = self.align_frames.mean_frame[
+                                  alignment_point['box_y_low']:
+                                  alignment_point['box_y_high'],
+                                  alignment_point['box_x_low']:
+                                  alignment_point['box_x_high']].astype(float32)
 
             # The reference box with the full resolution is used in the second phase.
-            alignment_point['reference_box_second_phase'] = (GaussianBlur(window_second_phase,
-                    (self.configuration.alignment_points_blurr_strength_second_phase,
-                     self.configuration.alignment_points_blurr_strength_second_phase), 0) / 256).astype(uint8)
+            # alignment_point['reference_box_second_phase'] = (GaussianBlur(window_second_phase,
+            #         (self.configuration.alignment_points_blurr_strength_second_phase,
+            #          self.configuration.alignment_points_blurr_strength_second_phase), 0) / 256).astype(uint8)
+
+            alignment_point['reference_box_second_phase'] = window_second_phase
 
             # In the first phase a box with half the resolution is constructed.
-            alignment_point['reference_box_first_phase'] = (GaussianBlur(window_second_phase[::2, ::2],
-                    (self.configuration.alignment_points_blurr_strength_first_phase,
-                     self.configuration.alignment_points_blurr_strength_first_phase), 0) / 256).astype(uint8)
+            # alignment_point['reference_box_first_phase'] = GaussianBlur(window_second_phase[::2, ::2],
+            #         (self.configuration.alignment_points_blurr_strength_first_phase,
+            #          self.configuration.alignment_points_blurr_strength_first_phase), 0)
+
+            alignment_point['reference_box_first_phase'] =  window_second_phase[::2, ::2]
+
 
             # Initialize summation variables for the computation of mean local shifts.
             alignment_point['shift_y_local_sum'] = 0

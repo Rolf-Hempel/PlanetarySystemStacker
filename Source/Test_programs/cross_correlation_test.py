@@ -269,7 +269,7 @@ if __name__ == "__main__":
 
         composite_image = Miscellaneous.compose_image(
             [frame_window_first_phase,
-             (alignment_point['reference_box_first_phase'] * 256).astype(uint16),
+             blurr_image(alignment_point['reference_box_first_phase'].astype(uint16), blurr_strength_first_phase),
              frame_window_shifted_first_phase,
              frame_window_shifted_second_phase], scale_factor=1)
         display_image(composite_image, delay=0.1)
