@@ -183,7 +183,7 @@ class Workflow(QtCore.QObject):
         # photographs. In the first case, input_type is set to 'video', in the second case to
         # 'image'.
 
-        if job.name == 'postproc':
+        if job.type == 'postproc':
             self.activity = 'postproc'
             self.postproc_input_name = job.name
 
