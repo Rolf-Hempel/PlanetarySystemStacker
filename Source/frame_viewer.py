@@ -372,11 +372,11 @@ class VideoFrameViewer(FrameViewer):
 
     resized = QtCore.pyqtSignal()
 
-    def __init__(self, frames, align_frames):
+    def __init__(self, frames, align_frames, frame_index=0):
         super(VideoFrameViewer, self).__init__()
         self.frames = frames
         self.align_frames = align_frames
-        self.frame_index = 0
+        self.frame_index = frame_index
 
         self.setPhoto(self.frame_index)
 
@@ -440,8 +440,13 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.rank_frames = rank_frames
         self.align_frames = align_frames
 
+        # Be careful: Indices are counted from 0, while widget contents are counted from 1 (to make
+        # it easier for the user.
+        self.quality_index = 0
+        self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index]
+
         # Set up the frame viewer and put it in the upper left corner.
-        self.frame_viewer = VideoFrameViewer(self.frames, self.align_frames)
+        self.frame_viewer = VideoFrameViewer(self.frames, self.align_frames, self.frame_index)
         self.frame_viewer.setObjectName("framewiever")
         self.grid_layout.addWidget(self.frame_viewer, 0, 0, 4, 3)
 
@@ -456,11 +461,6 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
                 round(self.frames.number * self.alignment_points_frame_percent / 100.)))
         self.frame_ranks = rank_frames.frame_ranks
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
-
-        # Be careful: Indices are counted from 0, while widget contents are counted from 1 (to make
-        # it easier for the user.
-        self.quality_index = 0
-        self.frame_index = self.rank_frames.quality_sorted_indices[self.quality_index]
 
         # Start with ordering frames by quality. This can be changed by the user using a radio
         # button.
