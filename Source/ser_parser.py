@@ -176,7 +176,7 @@ class SERParser(object):
                 else:
                     self.fid.seek(178 + frame_number * self.frame_size)
         else:
-            raise IOError('Error in reading video frame, index: {0} is out of bounds'.format(frame_number))
+            raise IOError('Error in reading SER frame, index: {0} is out of bounds'.format(frame_number))
 
         self.frame_number = frame_number
 

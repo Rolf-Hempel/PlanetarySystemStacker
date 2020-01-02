@@ -923,9 +923,9 @@ class Frames(object):
                     # Read the next frame. If dark/flat correction is active, do the corrections.
                     if self.calibration_matches:
                         self.frames_original.append(self.calibration.correct(
-                            self.reader.read_frame()))
+                            self.reader.read_frame(frame_index)))
                     else:
-                        self.frames_original.append(self.reader.read_frame())
+                        self.frames_original.append(self.reader.read_frame(frame_index))
 
                 self.reader.close()
 
