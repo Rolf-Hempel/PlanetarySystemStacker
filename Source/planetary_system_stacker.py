@@ -225,6 +225,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.workflow.calibration.report_calibration_error_signal.connect(
             self.report_calibration_error)
         self.workflow.work_next_task_signal.connect(self.work_next_task)
+        self.workflow.report_error_signal.connect(self.report_error)
         self.workflow.abort_job_signal.connect(self.next_job_after_error)
         self.workflow.work_current_progress_signal.connect(self.set_current_progress)
         self.workflow.set_main_gui_busy_signal.connect(self.gui_set_busy)
@@ -232,8 +233,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.workflow.create_image_window_signal.connect(self.create_image_window)
         self.workflow.update_image_window_signal.connect(self.update_image_window)
         self.workflow.terminate_image_window_signal.connect(self.terminate_image_window)
-        # self.workflow.set_status_signal.connect(self.set_status)
-        # self.workflow.set_error_signal.connect(self.show_error_message)
         self.thread.start()
 
         # Connect signals to start activities on the workflow thread (e.g. in method
@@ -482,7 +481,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 Frames.save_image(master_dark_file[0],
                                   self.workflow.calibration.master_dark_frame,
                                   color=self.workflow.calibration.dark_color,
-                                  avoid_overwriting=False)
+                                  avoid_overwriting=False,
+                                  header=self.configuration.global_parameters_version)
                 # Remember the current directory for next file dialog.
                 self.configuration.hidden_parameters_current_dir = \
                     str(Path(master_dark_file[0]).parents[0])
@@ -564,7 +564,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 Frames.save_image(master_flat_file[0],
                                   self.workflow.calibration.master_flat_frame,
                                   color=self.workflow.calibration.flat_color,
-                                  avoid_overwriting=False)
+                                  avoid_overwriting=False,
+                                  header=self.configuration.global_parameters_version)
                 # Remember the current directory for next file dialog.
                 self.configuration.hidden_parameters_current_dir = str(
                     Path(master_flat_file[0]).parents[0])
@@ -894,9 +895,26 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
+        # Report the error.
+        self.report_error(message)
+
+        # Abort the current job and go to the next one.
+        self.work_next_task("Next job")
+
+    @QtCore.pyqtSlot(str)
+    def report_error(self, message):
+        """
+        This method is triggered by the workflow thread via a signal when an error is to be
+        reported. In interactive mode a message window shows the error message and asks the user
+        for confirmation. Depending on the protocol level, the error message is also written to the
+        protocol (file).
+
+        :param message: Error message to be displayed
+        :return: -
+        """
+
         # Show a message box and wait for acknowledgement by the user.
         if not self.automatic:
-
             msg = QtWidgets.QMessageBox()
             msg.setText(message)
             msg.setIcon(QtWidgets.QMessageBox.Critical)
@@ -906,8 +924,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             msg.exec_()
 
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol(message + "\n", self.workflow.attached_log_file)
-        self.work_next_task("Next job")
+            Miscellaneous.protocol(message + "\n", self.workflow.attached_log_file,)
 
     def save_result(self):
         """
@@ -916,9 +933,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
-        self.workflow.frames.save_image(self.workflow.stacked_image_name,
-                                        self.workflow.stack_frames.stacked_image,
-                                        color=self.workflow.frames.color, avoid_overwriting=False)
+        Frames.save_image(self.workflow.stacked_image_name,
+                          self.workflow.stack_frames.stacked_image,
+                          color=self.workflow.frames.color, avoid_overwriting=False,
+                          header=self.configuration.global_parameters_version)
 
     def save_result_as(self):
         """
@@ -933,9 +951,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             "Image Files (*.tiff *.fits)", options=options)
 
         if filename and extension:
-            self.workflow.frames.save_image(filename, self.workflow.stack_frames.stacked_image,
-                                            color=self.workflow.frames.color,
-                                            avoid_overwriting=False)
+            Frames.save_image(filename, self.workflow.stack_frames.stacked_image,
+                              color=self.workflow.frames.color, avoid_overwriting=False,
+                              header=self.configuration.global_parameters_version)
 
     def place_holder_manual_activity(self, activity):
         # Ask the user for confirmation.
@@ -1103,7 +1121,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                         self.ui.menuEdit, self.ui.menuCalibrate], False)
             self.activate_gui_elements([self.ui.pushButton_pause], True)
             if self.job_index < self.job_number:
-                self.write_status_bar("Busy processing " + self.jobs[self.job_index].name, "black")
+                self.write_status_bar("Busy processing " + self.jobs[self.job_index].file_name,
+                                      "black")
 
         # In manual mode, activate buttons and menu entries. Update the status bar.
         else:

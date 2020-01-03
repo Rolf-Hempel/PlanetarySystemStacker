@@ -73,6 +73,7 @@ class Job(object):
         """
 
         self.name = job_name
+        self.file_name = Path(job_name).name
         self.type = None
         self.bayer_pattern = 'Auto detect color'
 

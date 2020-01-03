@@ -24,7 +24,7 @@ import sys
 from ctypes import CDLL, byref, c_int
 from os import listdir
 import platform
-from os.path import splitext, join
+from os.path import splitext, join, basename
 from time import sleep
 
 import gc
@@ -47,6 +47,7 @@ class Workflow(QtCore.QObject):
     master_dark_created_signal = QtCore.pyqtSignal(bool)
     master_flat_created_signal = QtCore.pyqtSignal(bool)
     work_next_task_signal = QtCore.pyqtSignal(str)
+    report_error_signal = QtCore.pyqtSignal(str)
     abort_job_signal = QtCore.pyqtSignal(str)
     work_current_progress_signal = QtCore.pyqtSignal(str, int)
     set_main_gui_busy_signal = QtCore.pyqtSignal(bool)
@@ -124,8 +125,7 @@ class Workflow(QtCore.QObject):
             self.master_dark_created_signal.emit(True)
         except Exception as e:
             if self.configuration.global_parameters_protocol_level > 0:
-                Miscellaneous.protocol("           Error in creating master dark frame: " + str(e),
-                                       self.attached_log_file, precede_with_timestamp=False)
+                self.report_error_signal.emit("Error in creating master dark frame: " + str(e))
             self.master_dark_created_signal.emit(False)
 
     @QtCore.pyqtSlot(list)
@@ -145,9 +145,8 @@ class Workflow(QtCore.QObject):
             self.master_flat_created_signal.emit(True)
         except Error as e:
             if self.configuration.global_parameters_protocol_level > 0:
-                Miscellaneous.protocol("           Error in creating master flat frame: " + str(
-                    e) + ", flat frame calibration de-activated", self.attached_log_file,
-                                       precede_with_timestamp=False)
+                self.report_error_signal.emit("Error in creating master flat frame: " +
+                                              str(e) + ", flat frame calibration de-activated")
             self.master_flat_created_signal.emit(False)
 
     @QtCore.pyqtSlot()
@@ -173,7 +172,7 @@ class Workflow(QtCore.QObject):
         gc.collect()
 
         # Update the status bar in the main GUI.
-        self.input_name = job.name
+        self.input_name = job.file_name
         self.set_status_bar_processing_phase("reading frames")
 
         # A jobs can either "stack" images or "postprocess" a single image. In the latter case,
@@ -486,7 +485,7 @@ class Workflow(QtCore.QObject):
                     # Everything is fine, no need to try another stabilization patch.
                     break
                 except (NotSupportedError, ArgumentError) as e:
-                    self.abort_job_signal("Error: " + e.message + ", continue with next job")
+                    self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
                     self.my_timer.stop('Global frame alignment')
                     return
                 # For some frames no valid shift could be computed. This would create problems later
@@ -498,7 +497,7 @@ class Workflow(QtCore.QObject):
                                                self.attached_log_file)
                     # If there is no more patch available, skip this job.
                     if patch_index == number_patches - 1:
-                        self.abort_job_signal(
+                        self.abort_job_signal.emit(
                             "Error: No alternative stabilization patch available, continue with "
                             "next job")
                         self.my_timer.stop('Global frame alignment')
@@ -519,11 +518,11 @@ class Workflow(QtCore.QObject):
             try:
                 self.align_frames.align_frames()
             except Error as e:
-                self.abort_job_signal("Error: " + e.message + ", continue with next job")
+                self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
                 self.my_timer.stop('Global frame alignment')
                 return
             except Exception as e:
-                self.abort_job_signal(
+                self.abort_job_signal.emit(
                     "Error in aligning frames: " + str(e) + ", continue with next job")
                 self.my_timer.stop('Global frame alignment')
                 return
@@ -665,8 +664,9 @@ class Workflow(QtCore.QObject):
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start saving the stacked image +++", self.attached_log_file)
         self.my_timer.create_no_check('Saving the stacked image')
-        self.frames.save_image(self.stacked_image_name, self.stack_frames.stacked_image,
-                               color=self.frames.color, avoid_overwriting=False)
+        Frames.save_image(self.stacked_image_name, self.stack_frames.stacked_image,
+                          color=self.frames.color, avoid_overwriting=False,
+                          header=self.configuration.global_parameters_version)
         self.my_timer.stop('Saving the stacked image')
         if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol(
@@ -723,7 +723,8 @@ class Workflow(QtCore.QObject):
                                        self.attached_log_file)
             self.my_timer.create_no_check('Saving the postprocessed image')
             Frames.save_image(self.postprocessed_image_name, postprocessed_image,
-                              color=(len(postprocessed_image.shape) == 3), avoid_overwriting=False)
+                              color=(len(postprocessed_image.shape) == 3), avoid_overwriting=False,
+                              header=self.configuration.global_parameters_version)
             self.my_timer.stop('Saving the postprocessed image')
             if self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.protocol(

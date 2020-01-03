@@ -739,7 +739,8 @@ if __name__ == "__main__":
     stacked_image = stack_frames.merge_alignment_point_buffers()
 
     # Save the stacked image as 16bit int (color or mono).
-    frames.save_image('Images/example_stacked.tiff', stacked_image, color=frames.color)
+    Frames.save_image('Images/example_stacked.tiff', stacked_image, color=frames.color,
+                      header=configuration.global_parameters_version)
 
     # Convert to 8bit and show in Window.
     plt.imshow(img_as_ubyte(stacked_image))

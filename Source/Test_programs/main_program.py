@@ -218,7 +218,8 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
 
     # Save the stacked image as 16bit int (color or mono).
     my_timer.create('Saving the final image')
-    frames.save_image(stacked_image_name, stacked_image, color=frames.color)
+    Frames.save_image(stacked_image_name, stacked_image, color=frames.color,
+                      header=configuration.global_parameters_version)
     my_timer.stop('Saving the final image')
 
     # Print out timer results.
@@ -226,7 +227,8 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
     my_timer.print()
 
     # Write the image with alignment points.
-    frames.save_image(ap_image_name, color_image_with_aps, color=True)
+    Frames.save_image(ap_image_name, color_image_with_aps, color=True,
+                      header=configuration.global_parameters_version)
 
     # If a ROI is selected, return both the original and the reduced-size average frame.
     if roi:
@@ -246,7 +248,7 @@ if __name__ == "__main__":
     show_results = True
     input_type = 'video'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
-    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
+    input_directory = 'E:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
     # input_type = 'image'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
     convert_to_grayscale = False

@@ -456,7 +456,7 @@ class Calibration(QtCore.QObject):
         # Sum all frames in a 64bit buffer.
         master_frame_64 = zeros(input_shape, float64)
         for index in range(frame_count):
-            master_frame_64 += reader.read_frame()
+            master_frame_64 += reader.read_frame(index)
 
         # Return the average frame in the format specified.
         if output_dtype == input_dtype:
@@ -1122,7 +1122,9 @@ class Frames(object):
         # For every frame initialize the list with used alignment points.
         self.used_alignment_points = [[] for index in range(self.number)]
 
-    def save_image(self, filename, image, color=False, avoid_overwriting=True):
+    @staticmethod
+    def save_image(filename, image, color=False, avoid_overwriting=True,
+                   header="PlanetarySystemStacker"):
         """
         Save an image to a file. If "avoid_overwriting" is set to False, images can have either
         ".tiff" or ".fits" format.
@@ -1134,6 +1136,7 @@ class Frames(object):
         :param avoid_overwriting: If True, append a string to the input name if necessary so that
                                   it does not match any existing file. If False, overwrite
                                   an existing file.
+        :param header: String with information on the PSS version being used (optional).
         :return: -
         """
 
@@ -1176,7 +1179,7 @@ class Frames(object):
             if color:
                 image = moveaxis(image, -1, 0)
             hdu = fits.PrimaryHDU(image)
-            hdu.header['CREATOR'] = self.configuration.global_parameters_version
+            hdu.header['CREATOR'] = header
             hdu.writeto(filename, overwrite=True)
 
         else:

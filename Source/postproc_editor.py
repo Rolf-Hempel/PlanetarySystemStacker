@@ -213,6 +213,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         QtWidgets.QWidget.__init__(self, parent)
         self.setupUi(self)
+        self.pss_version = configuration.global_parameters_version
         self.postproc_data_object = configuration.postproc_data_object
         self.postproc_blinking_period = configuration.postproc_blinking_period
         self.select_version_callback = select_version_callback
@@ -353,7 +354,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         Frames.save_image(self.postproc_data_object.file_name_processed,
                           self.postproc_data_object.versions[
                               self.postproc_data_object.version_selected].image,
-                          color=self.postproc_data_object.color, avoid_overwriting=False)
+                          color=self.postproc_data_object.color, avoid_overwriting=False,
+                          header=self.pss_version)
 
     def save_version_as(self):
         """
@@ -372,7 +374,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
             Frames.save_image(filename,
                               self.postproc_data_object.versions[
                                   self.postproc_data_object.version_selected].image,
-                              color=self.postproc_data_object.color, avoid_overwriting=False)
+                              color=self.postproc_data_object.color, avoid_overwriting=False,
+                              header=self.pss_version)
 
 
 class BlinkComparator(QtCore.QThread):
