@@ -27,7 +27,7 @@ from time import time
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
     putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev,\
-    resize
+    resize, matchTemplate, minMaxLoc, TM_CCORR_NORMED
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
     empty, argmin, stack, sin, uint8, float32, uint16, full
@@ -197,6 +197,156 @@ class Miscellaneous(object):
             tx -= shape[1]
 
         return [ty, tx]
+
+    @staticmethod
+    def multilevel_correlation(reference_box_first_phase, frame_first_phase,
+                               blurr_strength_first_phase, reference_box_second_phase,
+                               y_low, y_high, x_low, x_high, search_width,
+                               weight_matrix_first_phase=None,
+                               frame_blurred_second_phase=None):
+        """
+        Determine the local warp shift at an alignment point using a multi-level approach based on
+        normalized cross correlation. The first level uses a pixel grid which is coarser by a factor
+        of two in both coordinate directions. The second level uses the original pixel grid.
+        Noise is reduced on each level individually as chosen by the corresponding blurring
+        parameter.
+
+        The global search width is split between the two phases: A fixed search width of 4 is used
+        in the second phase (only for local corrections). Therefore, a width of (search_width-4)
+        in each coordinate direction remains for the first phase.
+
+        In both phases it is determined if the optimum is attained on the border of the search
+        area. If so, the correlation is regarded as unsuccessful (because the real optimum may be
+        outside of the search area).
+
+        :param reference_box_first_phase: Image box with stride 2 around alignment point in the
+                                          locally sharpest frame. A Gaussian filter with strength
+                                          "blurr_strength_first_phase" has been applied.
+        :param frame_first_phase: Given frame (stride 1) for which the local shift at the alignment
+                                  point is to be computed. This is the Gaussian blurred version of
+                                  the monochrome frame as computed in class "frames".
+        :param blurr_strength_first_phase: Additional Gaussian blur strength to be applied to
+                                           images in the first phase.
+        :param reference_box_second_phase: Image box with stride 1 around alignment point in the
+                                          locally sharpest frame. A Gaussian filter with strength
+                                          "blurr_strength_second_phase" has been applied.
+
+        :param y_low: Lower y coordinate limit of box in given frame, taking into account the
+                      global shift and the different sizes of the mean frame and the original
+                      frames.
+        :param y_high: Upper y coordinate limit.
+        :param x_low: Lower x coordinate limit.
+        :param x_high: Upper x coordinate limit.
+        :param search_width: Maximum distance in y and x from origin of the search area. (See the
+                             comment in the explanatory text above.)
+        :param weight_matrix_first_phase: This parameter (if not None) may give a weighting array
+                                          by which the cross correlation results are multiplied
+                                          before the maximum value is determined. The size of this
+                                          2D array in each coordinate direction is that of the
+                                          reference_box_first_phase plus two times the first phase
+                                          search width (see below).
+        :param frame_blurred_second_phase: If in the second phase an additional blur is to be
+                                           applied to the Gaussian blurred version of the monochrome
+                                           frame, this frame version can be passed via this optional
+                                           parameter. If "None" is selected, the original Gaussian
+                                           blurred version is used instead.
+
+        :return: (shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase,
+                  shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase)
+                  with:
+                  shift_y_local_first_phase: Local y warp shift determined in first phase
+                                             (expressed in terms of the original pixel grid).
+                  shift_x_local_first_phase: Local x warp shift determined in first phase.
+                  success_first_phase: "True" if the optimum was attained in the interior of the
+                                       search domain. "False" otherwise.
+                  shift_y_local_second_phase: Local y warp shift determined in second phase.
+                  shift_x_local_second_phase: Local x warp shift determined in second phase.
+                  success_second_phase: "True" if the optimum was attained in the interior of the
+                                       search domain. "False" otherwise.
+        """
+
+        # The optimization in the second phase is only meant for local fine grid adjustments.
+        search_width_second_phase = 4
+
+        # In the first phase the largest part of the local warp is detected. Divide the search
+        # width by two because the first phase uses a coarser pixel grid.
+        search_width_first_phase = int((search_width - search_width_second_phase) / 2)
+
+        # Define a window around the alignment point box. Extend the window in each coordinate
+        # direction. This defines the search space for the template matching. Coarsen the grid
+        # by a factor of two and apply an additional Gaussian blur.
+        index_extension = search_width_first_phase * 2
+        frame_window_first_phase = GaussianBlur(frame_first_phase[
+                                                y_low - index_extension:y_high + index_extension:2,
+                                                x_low - index_extension:x_high + index_extension:2],
+                                                (blurr_strength_first_phase,
+                                                 blurr_strength_first_phase), 0)
+
+        # Compute the normalized cross correlation.
+        result = matchTemplate((frame_window_first_phase).astype(float32),
+                               reference_box_first_phase.astype(float32), TM_CCORR_NORMED)
+
+        # Determine the position of the maximum correlation and compute the corresponding warp
+        # shift. The factor of 2 transforms the shift to the fine pixel grid. If a non-trivial
+        # weight matrix is specified, multiply the results before looking for the maximum position.
+        if weight_matrix_first_phase is not None:
+            minVal, maxVal, minLoc, maxLoc = minMaxLoc(result * weight_matrix_first_phase)
+        else:
+            minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
+        shift_y_local_first_phase = (search_width_first_phase - maxLoc[1]) * 2
+        shift_x_local_first_phase = (search_width_first_phase - maxLoc[0]) * 2
+
+        # The first phase is regarded as successful if the maximum correlation was attained in the
+        # interior of the search space.
+        success_first_phase = abs(shift_y_local_first_phase) != index_extension and abs(
+            shift_x_local_first_phase) != index_extension
+
+        # If the first phase was successful, add a second phase with a local search on the finest
+        # (original) pixel grid.
+        if success_first_phase:
+
+            # Define the search window for the second phase. Apply the shift found in the
+            # first phase.
+            y_lo = y_low - shift_y_local_first_phase - search_width_second_phase
+            y_hi = y_high - shift_y_local_first_phase + search_width_second_phase
+            x_lo = x_low - shift_x_local_first_phase - search_width_second_phase
+            x_hi = x_high - shift_x_local_first_phase + search_width_second_phase
+
+            # If a frame with an additional blur applied for the second phase is passed, use it.
+            # Otherwise use the original blurred monochrome frame instead.
+            if frame_blurred_second_phase is not None:
+                frame_window_second_phase = frame_blurred_second_phase[y_lo:y_hi, x_lo:x_hi]
+            else:
+                frame_window_second_phase = frame_first_phase[y_lo:y_hi, x_lo:x_hi]
+
+            # Perform the template matching on the fine grid, again using normalized cross
+            # correlation.
+            result = matchTemplate(frame_window_second_phase.astype(float32),
+                                   reference_box_second_phase, TM_CCORR_NORMED)
+
+            # Find the position of the local optimum and compute the corresponding shift values.
+            minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
+            shift_y_local_second_phase = search_width_second_phase - maxLoc[1]
+            shift_x_local_second_phase = search_width_second_phase - maxLoc[0]
+
+            # Again, the second phase is deemed successful only if the optimum was attained in the
+            # interior of the search space.
+            success_second_phase = abs(
+                shift_y_local_second_phase) != search_width_second_phase and abs(
+                shift_x_local_second_phase) != search_width_second_phase
+
+            # If the second phase was not successful, set the corresponding shifts to zero.
+            if not success_second_phase:
+                shift_y_local_second_phase = shift_x_local_second_phase = 0
+
+        # If the first phase was unsuccessful, drop the second phase and set all warp shifts to 0.
+        else:
+            success_second_phase = False
+            shift_y_local_first_phase = shift_x_local_first_phase = shift_y_local_second_phase = \
+                shift_x_local_second_phase = 0
+
+        return shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase, \
+               shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase
 
     @staticmethod
     def search_local_match(reference_box, frame, y_low, y_high, x_low, x_high, search_width,

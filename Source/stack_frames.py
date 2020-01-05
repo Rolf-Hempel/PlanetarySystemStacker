@@ -25,7 +25,7 @@ from time import sleep
 from warnings import filterwarnings
 
 import matplotlib.pyplot as plt
-from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize
+from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize, GaussianBlur
 from numpy import int as np_int
 from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
     sqrt, uint16, clip, minimum
@@ -261,6 +261,30 @@ class StackFrames(object):
         self.shift_distribution = full((self.configuration.alignment_points_search_width*2,), 0,
                                           dtype=np_int)
 
+        # If multi-level correlation AP matching is selected, prepare frame-independent data
+        # structures used by this particular search algorithm.
+        if self.configuration.alignment_points_method == 'MultiLevelCorrelation':
+            # Set the two-level reference boxes for all APs.
+            self.alignment_points.set_reference_boxes_correlation()
+
+            # Compute the "weight matrix" used in the first correlation phase. It penalizes search
+            # results far away from the center.
+            search_width_second_phase = 4
+            max_search_width_first_phase = int(
+                (self.configuration.alignment_points_search_width - search_width_second_phase) / 2)
+            search_width_first_phase = max_search_width_first_phase
+            extent = 2 * search_width_first_phase + 1
+            weight_matrix_first_phase = empty((extent, extent), dtype=float32)
+            for y in range(extent):
+                for x in range(extent):
+                    weight_matrix_first_phase[
+                        y, x] = 1. - self.configuration.alignment_points_penalty_factor * (
+                            (y - search_width_first_phase) ** 2 + (
+                            x - search_width_first_phase) ** 2)
+
+        else:
+            weight_matrix_first_phase = None
+
         # In debug mode: Prepare for de-warp visualization.
         if self.debug:
             self.create_image_window_signal.emit()
@@ -269,6 +293,18 @@ class StackFrames(object):
         for frame_index in range(self.frames.number):
             frame = self.frames.frames(frame_index)
             frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
+
+            # If this frame is used at any AP with the multi-level correlation method, apply an
+            # additional Gaussian filter to the Gaussian blurred version of the original frame
+            # in preparation for the second correlation phase.
+            if self.frames.used_alignment_points[
+                frame_index] and self.configuration.alignment_points_method == 'MultiLevelCorrelation':
+                frame_blurred_second_phase = GaussianBlur(
+                    self.frames.frames_mono_blurred(frame_index),
+                    (self.configuration.alignment_points_blurr_strength_second_phase,
+                     self.configuration.alignment_points_blurr_strength_second_phase), 0)
+            else:
+                frame_blurred_second_phase = None
 
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
             if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
@@ -287,7 +323,9 @@ class StackFrames(object):
                 self.my_timer.start('Stacking: compute AP shifts')
                 [shift_y, shift_x] = self.alignment_points.compute_shift_alignment_point(
                     frame_mono_blurred, frame_index, alignment_point_index,
-                    de_warp=self.configuration.alignment_points_de_warp)
+                    de_warp=self.configuration.alignment_points_de_warp,
+                    weight_matrix_first_phase=weight_matrix_first_phase,
+                    frame_blurred_second_phase=frame_blurred_second_phase)
 
                 # Increment the counter corresponding to the 2D warp shift.
                 self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1

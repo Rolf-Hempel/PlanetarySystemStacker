@@ -471,6 +471,33 @@ class AlignmentPoints(object):
               alignment_point['box_x_low']:alignment_point['box_x_high']]
         alignment_point['reference_box'] = box
 
+    def set_reference_boxes_correlation(self):
+        """
+        This method is used if multilevel-correlation AP matching is selected. In this case two
+        reference boxes with different resolution are constructed. The box used in the first phase
+        contains only every second pixel of the original frame in each coordinate direction. The box
+        used in the second phase has the same resolution as the original frame.
+
+        This method is invoked when all APs are set, just before stacking.
+
+        :return: -
+        """
+
+        for ap_index, alignment_point in enumerate(self.alignment_points):
+
+            # Cut the reference box for this alignment point from the mean frame.
+            window_second_phase = self.align_frames.mean_frame[
+                                  alignment_point['box_y_low']:
+                                  alignment_point['box_y_high'],
+                                  alignment_point['box_x_low']:
+                                  alignment_point['box_x_high']].astype(float32)
+
+            # The reference box with the full resolution is used in the second phase.
+            alignment_point['reference_box_second_phase'] = window_second_phase
+
+            # In the first phase a box with half the resolution is constructed.
+            alignment_point['reference_box_first_phase'] =  window_second_phase[::2, ::2]
+
     @staticmethod
     def initialize_ap_stacking_buffer(alignment_point, color):
         """
@@ -646,10 +673,14 @@ class AlignmentPoints(object):
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)
 
     def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
-                                      de_warp=True):
+                                      de_warp=True, weight_matrix_first_phase=None,
+                                      frame_blurred_second_phase=None):
         """
         Compute the [y, x] pixel shift vector at a given alignment point relative to the mean frame.
         Four different methods can be used to compute the shift values:
+        - a multilevel cross correlation algorithm (miscellaneous.multilevel_correlation). This
+          method was implemented after PSS had shown bad performance for planetary videos captured
+          with bad seeing.
         - a subpixel algorithm from "skimage.feature"
         - a phase correlation algorithm (miscellaneous.translation)
         - a local search algorithm (spiralling outwards), see method "search_local_match",
@@ -674,6 +705,21 @@ class AlignmentPoints(object):
         :param alignment_point_index: Index of the selected alignment point
         :param de_warp: If True, include local warp shift computation. If False, only apply
                         global frame shift.
+        :param weight_matrix_first_phase: This parameter is only used by the alignment method
+                                          "MultiLevelCorrelation". If not None it defines a
+                                          weighting array by which the cross correlation results are
+                                          multiplied before the maximum value is determined. The
+                                          size of this 2D array in each coordinate direction is that
+                                          of the reference_box_first_phase plus two times the first
+                                          phase search width.
+        :param frame_blurred_second_phase: This parameter is only used by the alignment method
+                                          "MultiLevelCorrelation". If in the second phase an
+                                           additional blur is to be applied to the Gaussian blurred
+                                           version of the monochrome frame, this frame version can
+                                           be passed via this optional parameter. If "None" is
+                                           selected, the original Gaussian blurred version is used
+                                           instead.
+
         :return: Local shift vector [dy, dx]
         """
 
@@ -682,7 +728,6 @@ class AlignmentPoints(object):
         y_high = alignment_point['box_y_high']
         x_low = alignment_point['box_x_low']
         x_high = alignment_point['box_x_high']
-        reference_box = alignment_point['reference_box']
 
         # The offsets dy and dx are caused by two effects: First, the mean frame is smaller
         # than the original frames. It only contains their intersection. And second, because the
@@ -691,14 +736,32 @@ class AlignmentPoints(object):
         dx = self.align_frames.dx[frame_index]
 
         if de_warp:
+            # Use a two-level algorithm based on (weighted) cross correlation.
+            if self.configuration.alignment_points_method == 'MultiLevelCorrelation':
+                shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase, \
+                shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase = \
+                    Miscellaneous.multilevel_correlation(
+                        alignment_point['reference_box_first_phase'],
+                        frame_mono_blurred,
+                        self.configuration.alignment_points_blurr_strength_first_phase,
+                        alignment_point['reference_box_second_phase'],
+                        y_low + dy, y_high + dy, x_low + dx, x_high + dx,
+                        self.configuration.alignment_points_search_width,
+                        weight_matrix_first_phase=weight_matrix_first_phase,
+                        frame_blurred_second_phase=frame_blurred_second_phase)
+
+                # Compute the combined warp shifts from both phases.
+                shift_pixel = [shift_y_local_first_phase + shift_y_local_second_phase,
+                               shift_x_local_first_phase + shift_x_local_second_phase]
+
             # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
-            if self.configuration.alignment_points_method == 'Subpixel':
+            elif self.configuration.alignment_points_method == 'Subpixel':
                 # Cut out the alignment box from the given frame. Take into account the offsets
                 # explained above.
                 box_in_frame = frame_mono_blurred[y_low + dy:y_high + dy,
                                x_low + dx:x_high + dx]
                 shift_pixel, error, diffphase = register_translation(
-                    reference_box, box_in_frame, 10, space='real')
+                    alignment_point['reference_box'], box_in_frame, 10, space='real')
 
             # Use a simple phase shift computation (contained in module "miscellaneous").
             elif self.configuration.alignment_points_method == 'CrossCorrelation':
@@ -706,12 +769,12 @@ class AlignmentPoints(object):
                 # explained above.
                 box_in_frame = frame_mono_blurred[y_low + dy:y_high + dy,
                                                   x_low + dx:x_high + dx]
-                shift_pixel = Miscellaneous.translation(reference_box,
+                shift_pixel = Miscellaneous.translation(alignment_point['reference_box'],
                                                         box_in_frame, box_in_frame.shape)
 
             # Use a local search (see method "search_local_match" below.
             elif self.configuration.alignment_points_method == 'RadialSearch':
-                shift_pixel, dev_r = Miscellaneous.search_local_match(reference_box,
+                shift_pixel, dev_r = Miscellaneous.search_local_match(alignment_point['reference_box'],
                     frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride,
@@ -719,7 +782,8 @@ class AlignmentPoints(object):
 
             # Use the steepest descent search method.
             elif self.configuration.alignment_points_method == 'SteepestDescent':
-                shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(reference_box,
+                shift_pixel, dev_r = Miscellaneous.search_local_match_gradient(
+                    alignment_point['reference_box'],
                     frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride, self.dev_table)
