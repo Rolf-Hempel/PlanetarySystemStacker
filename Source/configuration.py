@@ -462,16 +462,14 @@ class Configuration(object):
         :return: -
         """
 
-        # Set the alignment patch size to 1.5 times the box size. Between the patch and box
-        # borders there must be at least as many pixels as the alignment search width. This way,
-        # alignment boxes close to the border never leave the frame.
-        self.alignment_points_half_patch_width = max(int(
-            round((self.alignment_points_half_box_width * 3) / 2)),
-            self.alignment_points_half_box_width + self.alignment_points_search_width)
+        # Set the alignment patch size to 1.5 times the box size.
+        self.alignment_points_half_patch_width = int(
+            round((self.alignment_points_half_box_width * 3) / 2))
+
         # Set the AP distance per coordinate direction such that adjacent patches overlap by 1/6
         # of their width.
         self.alignment_points_step_size = int(
-            round((self.alignment_points_half_patch_width * 5) / 3))
+            round((self.alignment_points_half_patch_width * 4.5) / 3))
         # Initialze the number of frames to be stacked. It will be computed from the corresponding
         # percentage. The user, however, can override this value with a (more precise) figure
         # during the workflow.
