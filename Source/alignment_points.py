@@ -612,7 +612,7 @@ class AlignmentPoints(object):
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank frames at APs",
-                                              int((frame_index / self.signal_loop_length) * 100.))
+                                    int(round(10 * frame_index / self.signal_loop_length) * 10))
 
                 for ap_index, alignment_point in enumerate(self.alignment_points):
                     # Compute patch bounds within the current frame.
@@ -641,7 +641,7 @@ class AlignmentPoints(object):
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank frames at APs",
-                                              int((frame_index / self.signal_loop_length) * 100.))
+                                        int(round(10 * frame_index / self.signal_loop_length) * 10))
 
                 for ap_index, alignment_point in enumerate(self.alignment_points):
                     # Compute patch bounds within the current frame.
@@ -673,8 +673,7 @@ class AlignmentPoints(object):
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)
 
     def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
-                                      de_warp=True, weight_matrix_first_phase=None,
-                                      frame_blurred_second_phase=None):
+                                      de_warp=True, weight_matrix_first_phase=None):
         """
         Compute the [y, x] pixel shift vector at a given alignment point relative to the mean frame.
         Four different methods can be used to compute the shift values:
@@ -712,13 +711,6 @@ class AlignmentPoints(object):
                                           size of this 2D array in each coordinate direction is that
                                           of the reference_box_first_phase plus two times the first
                                           phase search width.
-        :param frame_blurred_second_phase: This parameter is only used by the alignment method
-                                          "MultiLevelCorrelation". If in the second phase an
-                                           additional blur is to be applied to the Gaussian blurred
-                                           version of the monochrome frame, this frame version can
-                                           be passed via this optional parameter. If "None" is
-                                           selected, the original Gaussian blurred version is used
-                                           instead.
 
         :return: Local shift vector [dy, dx]
         """
@@ -736,19 +728,18 @@ class AlignmentPoints(object):
         dx = self.align_frames.dx[frame_index]
 
         if de_warp:
-            # Use a two-level algorithm based on (weighted) cross correlation.
+            # Use a two-level algorithm based on (weighted) cross correlation. The user-supplied
+            # noise level parameter is used as the blurring factor for the first correlation phase.
             if self.configuration.alignment_points_method == 'MultiLevelCorrelation':
                 shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase, \
                 shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase = \
                     Miscellaneous.multilevel_correlation(
                         alignment_point['reference_box_first_phase'],
-                        frame_mono_blurred,
-                        self.configuration.alignment_points_blurr_strength_first_phase,
+                        frame_mono_blurred, self.configuration.frames_gauss_width,
                         alignment_point['reference_box_second_phase'],
                         y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                         self.configuration.alignment_points_search_width,
-                        weight_matrix_first_phase=weight_matrix_first_phase,
-                        frame_blurred_second_phase=frame_blurred_second_phase)
+                        weight_matrix_first_phase=weight_matrix_first_phase)
 
                 # Compute the combined warp shifts from both phases.
                 shift_pixel = [shift_y_local_first_phase + shift_y_local_second_phase,

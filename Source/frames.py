@@ -919,7 +919,7 @@ class Frames(object):
                     # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                     if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                         self.progress_signal.emit("Read all frames",
-                                                  int((frame_index / self.number) * 100.))
+                                                  int(round(10 * frame_index / self.number) * 10))
                     # Read the next frame. If dark/flat correction is active, do the corrections.
                     if self.calibration_matches:
                         self.frames_original.append(self.calibration.correct(

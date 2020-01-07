@@ -85,7 +85,7 @@ class RankFrames(object):
                 frame = self.frames.frames_mono_blurred(frame_index)
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
-                                              int((frame_index / self.number) * 100.))
+                                              int(round(10*frame_index / self.number) * 10))
                 self.frame_ranks.append(method(frame, self.configuration.rank_frames_pixel_stride))
         else:
             for frame_index in range(self.frames.number):
@@ -93,7 +93,7 @@ class RankFrames(object):
                 # self.frame_ranks.append(mean((frame - frame.mean())**2))
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
-                                              int((frame_index / self.number) * 100.))
+                                              int(round(10*frame_index / self.number) * 10))
                 self.frame_ranks.append(meanStdDev(frame)[1][0][0])
 
         if self.progress_signal is not None:

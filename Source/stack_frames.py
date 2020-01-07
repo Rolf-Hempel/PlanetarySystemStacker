@@ -279,8 +279,8 @@ class StackFrames(object):
                 for x in range(extent):
                     weight_matrix_first_phase[
                         y, x] = 1. - self.configuration.alignment_points_penalty_factor * (
-                            (y - search_width_first_phase) ** 2 + (
-                            x - search_width_first_phase) ** 2)
+                            (y / search_width_first_phase - 1) ** 2 + (
+                            x / search_width_first_phase - 1) ** 2)
 
         else:
             weight_matrix_first_phase = None
@@ -294,22 +294,10 @@ class StackFrames(object):
             frame = self.frames.frames(frame_index)
             frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
 
-            # If this frame is used at any AP with the multi-level correlation method, apply an
-            # additional Gaussian filter to the Gaussian blurred version of the original frame
-            # in preparation for the second correlation phase.
-            if self.frames.used_alignment_points[
-                frame_index] and self.configuration.alignment_points_method == 'MultiLevelCorrelation':
-                frame_blurred_second_phase = GaussianBlur(
-                    self.frames.frames_mono_blurred(frame_index),
-                    (self.configuration.alignment_points_blurr_strength_second_phase,
-                     self.configuration.alignment_points_blurr_strength_second_phase), 0)
-            else:
-                frame_blurred_second_phase = None
-
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
             if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
-                self.progress_signal.emit("Stack frames", int((frame_index / self.frames.number)
-                                                                  * 100.))
+                self.progress_signal.emit("Stack frames",
+                                          int(round(10 * frame_index / self.frames.number) * 10))
 
             # Look up the constant shifts of the given frame with respect to the mean frame.
             dy = self.align_frames.dy[frame_index]
@@ -324,8 +312,7 @@ class StackFrames(object):
                 [shift_y, shift_x] = self.alignment_points.compute_shift_alignment_point(
                     frame_mono_blurred, frame_index, alignment_point_index,
                     de_warp=self.configuration.alignment_points_de_warp,
-                    weight_matrix_first_phase=weight_matrix_first_phase,
-                    frame_blurred_second_phase=frame_blurred_second_phase)
+                    weight_matrix_first_phase=weight_matrix_first_phase)
 
                 # Increment the counter corresponding to the 2D warp shift.
                 self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1

@@ -81,8 +81,8 @@ class ConfigurationParameters(object):
         self.set_defaults_ap_editing()
 
     def set_defaults_ap_editing(self):
-        self.alignment_points_half_box_width = 20
-        self.alignment_points_structure_threshold = 0.05
+        self.alignment_points_half_box_width = 24
+        self.alignment_points_structure_threshold = 0.04
         self.alignment_points_brightness_threshold = 10
 
     def copy_from_config_object(self, configuration_object):
@@ -162,19 +162,15 @@ class Configuration(object):
         self.alignment_points_rank_method = "Laplace"
         self.alignment_points_rank_pixel_stride = 2
         self.alignment_points_de_warp = True
-        # self.alignment_points_method = 'SteepestDescent'
         self.alignment_points_method = 'MultiLevelCorrelation'
         self.alignment_points_sampling_stride = 2
         self.alignment_points_local_search_subpixel = False
-        self.alignment_points_blurr_strength_first_phase = 1
-        self.alignment_points_blurr_strength_second_phase = 7
-        self.alignment_points_penalty_factor = 0.00001
+        self.alignment_points_penalty_factor = 0.00025
 
         self.stack_frames_suffix = "_pss"
         self.stack_frames_background_blend_threshold = 0.2
         self.stack_frames_background_fraction = 0.3
         self.stack_frames_background_patch_size = 100
-        self.stack_frames_gauss_width = 5
 
         self.postproc_suffix = "_gpp"
         self.postproc_blinking_period = 1.

@@ -199,17 +199,16 @@ class Miscellaneous(object):
         return [ty, tx]
 
     @staticmethod
-    def multilevel_correlation(reference_box_first_phase, frame_first_phase,
+    def multilevel_correlation(reference_box_first_phase, frame_mono_blurred,
                                blurr_strength_first_phase, reference_box_second_phase,
                                y_low, y_high, x_low, x_high, search_width,
-                               weight_matrix_first_phase=None,
-                               frame_blurred_second_phase=None):
+                               weight_matrix_first_phase=None):
         """
         Determine the local warp shift at an alignment point using a multi-level approach based on
         normalized cross correlation. The first level uses a pixel grid which is coarser by a factor
         of two in both coordinate directions. The second level uses the original pixel grid.
-        Noise is reduced on each level individually as chosen by the corresponding blurring
-        parameter.
+        An additional noise reduction is applied on the first level as chosen by the corresponding
+        blurring parameter.
 
         The global search width is split between the two phases: A fixed search width of 4 is used
         in the second phase (only for local corrections). Therefore, a width of (search_width-4)
@@ -222,14 +221,13 @@ class Miscellaneous(object):
         :param reference_box_first_phase: Image box with stride 2 around alignment point in the
                                           locally sharpest frame. A Gaussian filter with strength
                                           "blurr_strength_first_phase" has been applied.
-        :param frame_first_phase: Given frame (stride 1) for which the local shift at the alignment
-                                  point is to be computed. This is the Gaussian blurred version of
-                                  the monochrome frame as computed in class "frames".
+        :param frame_mono_blurred: Given frame (stride 1) for which the local shift at the alignment
+                                   point is to be computed. This is the Gaussian blurred version of
+                                   the monochrome frame as computed in class "frames".
         :param blurr_strength_first_phase: Additional Gaussian blur strength to be applied to
                                            images in the first phase.
         :param reference_box_second_phase: Image box with stride 1 around alignment point in the
-                                          locally sharpest frame. A Gaussian filter with strength
-                                          "blurr_strength_second_phase" has been applied.
+                                           locally sharpest frame.
 
         :param y_low: Lower y coordinate limit of box in given frame, taking into account the
                       global shift and the different sizes of the mean frame and the original
@@ -245,11 +243,6 @@ class Miscellaneous(object):
                                           2D array in each coordinate direction is that of the
                                           reference_box_first_phase plus two times the first phase
                                           search width (see below).
-        :param frame_blurred_second_phase: If in the second phase an additional blur is to be
-                                           applied to the Gaussian blurred version of the monochrome
-                                           frame, this frame version can be passed via this optional
-                                           parameter. If "None" is selected, the original Gaussian
-                                           blurred version is used instead.
 
         :return: (shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase,
                   shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase)
@@ -276,7 +269,7 @@ class Miscellaneous(object):
         # direction. This defines the search space for the template matching. Coarsen the grid
         # by a factor of two and apply an additional Gaussian blur.
         index_extension = search_width_first_phase * 2
-        frame_window_first_phase = GaussianBlur(frame_first_phase[
+        frame_window_first_phase = GaussianBlur(frame_mono_blurred[
                                                 y_low - index_extension:y_high + index_extension:2,
                                                 x_low - index_extension:x_high + index_extension:2],
                                                 (blurr_strength_first_phase,
@@ -312,12 +305,8 @@ class Miscellaneous(object):
             x_lo = x_low - shift_x_local_first_phase - search_width_second_phase
             x_hi = x_high - shift_x_local_first_phase + search_width_second_phase
 
-            # If a frame with an additional blur applied for the second phase is passed, use it.
-            # Otherwise use the original blurred monochrome frame instead.
-            if frame_blurred_second_phase is not None:
-                frame_window_second_phase = frame_blurred_second_phase[y_lo:y_hi, x_lo:x_hi]
-            else:
-                frame_window_second_phase = frame_first_phase[y_lo:y_hi, x_lo:x_hi]
+            # Cut out the frame window for the second phase (fine grid) correlation.
+            frame_window_second_phase = frame_mono_blurred[y_lo:y_hi, x_lo:x_hi]
 
             # Perform the template matching on the fine grid, again using normalized cross
             # correlation.

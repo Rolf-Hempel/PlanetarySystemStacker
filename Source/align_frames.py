@@ -239,7 +239,7 @@ class AlignFrames(object):
                 # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                 if self.progress_signal is not None and number_processed % self.signal_step_size == 1:
                     self.progress_signal.emit("Align all frames",
-                                              int((number_processed / self.frames.number) * 100.))
+                                        int(round(10*number_processed / self.frames.number) * 10))
 
                 frame = self.frames.frames_mono_blurred(idx)
 
