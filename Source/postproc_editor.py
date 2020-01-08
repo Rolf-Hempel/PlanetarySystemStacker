@@ -492,6 +492,9 @@ class ImageProcessor(QtCore.QThread):
         self.version_selected = None
         self.layers_selected = None
 
+        # Remember that a new image must be computed because the ImageProcessor is just initialized.
+        self.initial_state = True
+
         self.start()
 
     def run(self):
@@ -540,7 +543,12 @@ class ImageProcessor(QtCore.QThread):
         :return: True, if the current version parameters have changed. False, otherwise.
         """
 
-        # First check if an additional version was created. Copy its layer info for later checks
+        # When the ImageProcessor is just initialized, a new image must be computed.
+        if self.initial_state:
+            self.initial_state = False
+            return True
+
+        # Check if an additional version was created. Copy its layer info for later checks
         # for changes.
         if self.version_selected >= len(self.last_version_layers):
             self.last_version_layers.append(deepcopy(self.postproc_data_object.versions[
