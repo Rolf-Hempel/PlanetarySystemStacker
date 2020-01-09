@@ -71,8 +71,6 @@ class AlignFrames(object):
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
         self.frame_ranks_max_index = rank_frames.frame_ranks_max_index
         self.x_low_opt = self.x_high_opt = self.y_low_opt = self.y_high_opt = None
-        self.dev_r_list = None
-        self.failed_index_list = None
         self.dy = self.dx = None
         self.y_low_opt = self.y_high_opt = self.x_low_opt = self.x_high_opt = None
         self.dy_original = self.dx_original = None
@@ -195,10 +193,24 @@ class AlignFrames(object):
                     "Method 'align_frames' is called before 'select_alignment_rect'")
 
             # From the sharpest frame cut out the alignment rectangle. The shifts of all other frames
-            #  will be computed relativ to this patch.
-            self.reference_window = self.frames.frames_mono_blurred(self.frame_ranks_max_index)[
-                                    self.y_low_opt:self.y_high_opt,
-                                    self.x_low_opt:self.x_high_opt].astype(int32)
+            # will be computed relativ to this patch.
+            if self.configuration.align_frames_method == "MultiLevelCorrelation":
+                # MultiLevelCorrelation uses two reference windows with different resolution. Also,
+                # please note that the data type is float32 in this case.
+                reference_frame = self.frames.frames_mono_blurred(
+                    self.frame_ranks_max_index).astype(float32)
+                self.reference_window = reference_frame[self.y_low_opt:self.y_high_opt,
+                                        self.x_low_opt:self.x_high_opt]
+                # For the first phase a box with half the resolution is constructed.
+                self.reference_window_first_phase = self.reference_window[::2, ::2]
+            else:
+                # For all other methods, the reference window is of type int32.
+                reference_frame = self.frames.frames_mono_blurred(
+                    self.frame_ranks_max_index).astype(int32)
+                self.reference_window = reference_frame[
+                                        self.y_low_opt:self.y_high_opt,
+                                        self.x_low_opt:self.x_high_opt]
+
             self.reference_window_shape = self.reference_window.shape
 
         elif self.configuration.align_frames_mode == "Planet":
@@ -213,10 +225,6 @@ class AlignFrames(object):
 
         # Initialize a list which for each frame contains the shifts in y and x directions.
         self.frame_shifts = [None] * self.frames.number
-
-        # Initialize lists with info on failed frames.
-        self.dev_r_list = []
-        self.failed_index_list = []
 
         # Initialize a counter of processed frames for progress bar signalling. It is set to one
         # because in the loop below the optimal frame is not counted.
@@ -243,115 +251,158 @@ class AlignFrames(object):
 
                 frame = self.frames.frames_mono_blurred(idx)
 
+                # In Planetary mode the shift of the "center of gravity" of the image is computed.
+                # This algorithm cannot fail.
                 if self.configuration.align_frames_mode == "Planet":
-                    # In Planetary mode the shift of the "center of gravity" of the image is
-                    # computed. This algorithm cannot fail.
+
                     cog_frame = AlignFrames.center_of_gravity(frame)
                     self.frame_shifts[idx] = [cog_reference_y - cog_frame[0],
                                               cog_reference_x - cog_frame[1]]
-                    number_processed += 1
-                    continue
 
-                # In "Surface" mode three alignment algorithms can be chosen from. In each case
-                # the result is the shift vector [dy_min, dx_min]. The second and third algorithm
-                # do a local search. It can fail if within the search radius no minimum is found.
-                # The first algorithm (cross-correlation) can fail as well, but in this case there
-                # is no indication that this happened.
+                # In Surface mode various methods can be used to measure the shift from one frame
+                # to the next. The method "Translation" is special: Using phase correlation it is
+                # the only method not based on a local search algorithm. It is treated differently
+                # here because it does not require a re-shifting of the alignment patch.
                 elif self.configuration.align_frames_method == "Translation":
                     # The shift is computed with cross-correlation. Cut out the alignment patch and
                     # compute its translation relative to the reference.
                     frame_window = self.frames.frames_mono_blurred(idx)[
                                    self.y_low_opt:self.y_high_opt, self.x_low_opt:self.x_high_opt]
-                    self.frame_shifts[idx] =  Miscellaneous.translation(self.reference_window,
-                                                    frame_window, self.reference_window_shape)
-                    continue
+                    self.frame_shifts[idx] = Miscellaneous.translation(self.reference_window,
+                                                                       frame_window,
+                                                                       self.reference_window_shape)
 
-                elif self.configuration.align_frames_method == "RadialSearch":
-                    # Spiral out from the shift position of the previous frame and search for the
-                    # local optimum.
-                    [dy_min, dx_min], dev_r = Miscellaneous.search_local_match(
-                        self.reference_window, frame, self.y_low_opt - dy_min_cum,
-                                                      self.y_high_opt - dy_min_cum,
-                                                      self.x_low_opt - dx_min_cum,
-                                                      self.x_high_opt - dx_min_cum,
-                        self.configuration.align_frames_search_width,
-                        self.configuration.align_frames_sampling_stride, sub_pixel=False)
-                elif self.configuration.align_frames_method == "SteepestDescent":
-                    # Spiral out from the shift position of the previous frame and search for the
-                    # local optimum.
-                    [dy_min, dx_min], dev_r = Miscellaneous.search_local_match_gradient(
-                        self.reference_window, frame, self.y_low_opt - dy_min_cum,
-                                                      self.y_high_opt - dy_min_cum,
-                                                      self.x_low_opt - dx_min_cum,
-                                                      self.x_high_opt - dx_min_cum,
-                        self.configuration.align_frames_search_width,
-                        self.configuration.align_frames_sampling_stride, self.dev_table)
+                # Now treat all "Surface" mode cases using local search algorithms. In each case
+                # the result is the shift vector [dy_min, dx_min]. The search can fail (if within
+                # the search radius no optimum is found). If that happens for at least one frame,
+                # an exception is raised. The workflow thread then tries again using another
+                # alignment patch.
                 else:
-                    raise NotSupportedError(
-                        "Frame alignment method " + configuration.align_frames_method +
-                        " not supported")
 
-                # Update the cumulative shift values to be used as starting point for the
-                # next frame.
-                dy_min_cum += dy_min
-                dx_min_cum += dx_min
-                self.frame_shifts[idx] = [dy_min_cum, dx_min_cum]
+                    if self.configuration.align_frames_method == "MultiLevelCorrelation":
+                        # The shift is computed in two phases: First on a coarse pixel grid,
+                        # and then on the original grid in a small neighborhood around the optimum
+                        # found in the first phase.
+                        shift_y_local_first_phase, shift_x_local_first_phase, \
+                        success_first_phase, shift_y_local_second_phase, \
+                        shift_x_local_second_phase, success_second_phase = \
+                            Miscellaneous.multilevel_correlation(
+                            self.reference_window_first_phase, frame,
+                            self.configuration.frames_gauss_width,
+                            self.reference_window, self.y_low_opt - dy_min_cum,
+                                                          self.y_high_opt - dy_min_cum,
+                                                          self.x_low_opt - dx_min_cum,
+                                                          self.x_high_opt - dx_min_cum,
+                            self.configuration.align_frames_search_width,
+                            weight_matrix_first_phase=None)
 
-                # In "Surface" mode shift computation can fail if no minimum is found within
-                # the pre-defined search radius.
-                if len(dev_r) > 2 and dy_min == 0 and dx_min == 0:
-                    self.failed_index_list.append(idx)
-                    self.dev_r_list.append(dev_r)
-                    continue
+                        success = success_first_phase and success_second_phase
+                        if success:
+                            [dy_min, dx_min] = [
+                                shift_y_local_first_phase + shift_y_local_second_phase,
+                                shift_x_local_first_phase + shift_x_local_second_phase]
 
-                # If the alignment window gets too close to a frame edge, move it away from
-                # that edge by half the border width. First check if the reference window still
-                # fits into the shifted frame.
-                if self.shape[0] - abs(
-                        dy_min_cum) - 2 * self.configuration.align_frames_search_width - \
-                        self.configuration.align_frames_border_width < \
-                        self.reference_window_shape[0] or self.shape[1] - abs(
-                        dx_min_cum) - 2 * self.configuration.align_frames_search_width - \
-                        self.configuration.align_frames_border_width < \
-                        self.reference_window_shape[1]:
-                    raise ArgumentError("Frame stabilization window does not fit into"
-                                        " intersection")
-                new_reference_window = False
-                # Start with the lower y edge.
-                while self.y_low_opt - dy_min_cum < \
-                        self.configuration.align_frames_search_width + \
-                        self.configuration.align_frames_border_width / 2:
-                    self.y_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
-                    self.y_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
-                    new_reference_window = True
-                # Now the upper y edge.
-                while self.y_high_opt - dy_min_cum > self.shape[
-                    0] - self.configuration.align_frames_search_width - \
-                        self.configuration.align_frames_border_width / 2:
-                    self.y_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
-                    self.y_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
-                    new_reference_window = True
-                # Now the lower x edge.
-                while self.x_low_opt - dx_min_cum < \
-                        self.configuration.align_frames_search_width + \
-                        self.configuration.align_frames_border_width / 2:
-                    self.x_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
-                    self.x_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
-                    new_reference_window = True
-                # Now the upper x edge.
-                while self.x_high_opt - dx_min_cum > self.shape[
-                    1] - self.configuration.align_frames_search_width - \
-                        self.configuration.align_frames_border_width / 2:
-                    self.x_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
-                    self.x_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
-                    new_reference_window = True
-                # If the window was moved, update the "reference_window".
-                if new_reference_window:
-                    self.reference_window = self.frames.frames_mono_blurred(
-                                                self.frame_ranks_max_index)[
-                                                self.y_low_opt:self.y_high_opt,
-                                                self.x_low_opt:self.x_high_opt].astype(int32)
 
+                    elif self.configuration.align_frames_method == "RadialSearch":
+                        # Spiral out from the shift position of the previous frame and search for the
+                        # local optimum.
+                        [dy_min, dx_min], dev_r = Miscellaneous.search_local_match(
+                            self.reference_window, frame, self.y_low_opt - dy_min_cum,
+                                                          self.y_high_opt - dy_min_cum,
+                                                          self.x_low_opt - dx_min_cum,
+                                                          self.x_high_opt - dx_min_cum,
+                            self.configuration.align_frames_search_width,
+                            self.configuration.align_frames_sampling_stride, sub_pixel=False)
+
+                        # The search was not successful if a zero shift was reported after more
+                        # than two search cycles.
+                        success = len(dev_r) <= 2 or dy_min != 0 or dx_min != 0
+
+                    elif self.configuration.align_frames_method == "SteepestDescent":
+                        # Spiral out from the shift position of the previous frame and search for the
+                        # local optimum.
+                        [dy_min, dx_min], dev_r = Miscellaneous.search_local_match_gradient(
+                            self.reference_window, frame, self.y_low_opt - dy_min_cum,
+                                                          self.y_high_opt - dy_min_cum,
+                                                          self.x_low_opt - dx_min_cum,
+                                                          self.x_high_opt - dx_min_cum,
+                            self.configuration.align_frames_search_width,
+                            self.configuration.align_frames_sampling_stride, self.dev_table)
+
+                        # The search was not successful if a zero shift was reported after more
+                        # than two search cycles.
+                        success = len(dev_r) <= 2 or dy_min != 0 or dx_min != 0
+
+                    else:
+                        raise NotSupportedError(
+                            "Frame alignment method " + configuration.align_frames_method +
+                            " not supported")
+
+                    # If the local search was unsuccessful, quit the frame loop with an error.
+                    if not success:
+                        raise InternalError("No valid shift computed for at least one frame")
+
+                    # Update the cumulative shift values to be used as starting point for the
+                    # next frame.
+                    dy_min_cum += dy_min
+                    dx_min_cum += dx_min
+                    self.frame_shifts[idx] = [dy_min_cum, dx_min_cum]
+
+                    # If the alignment window gets too close to a frame edge, move it away from
+                    # that edge by half the border width. First check if the reference window still
+                    # fits into the shifted frame.
+                    if self.shape[0] - abs(
+                            dy_min_cum) - 2 * self.configuration.align_frames_search_width - \
+                            self.configuration.align_frames_border_width < \
+                            self.reference_window_shape[0] or self.shape[1] - abs(
+                            dx_min_cum) - 2 * self.configuration.align_frames_search_width - \
+                            self.configuration.align_frames_border_width < \
+                            self.reference_window_shape[1]:
+                        raise ArgumentError("Frame stabilization window does not fit into"
+                                            " intersection")
+
+                    new_reference_window = False
+                    # Start with the lower y edge.
+                    while self.y_low_opt - dy_min_cum < \
+                            self.configuration.align_frames_search_width + \
+                            self.configuration.align_frames_border_width / 2:
+                        self.y_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
+                        self.y_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
+                        new_reference_window = True
+                    # Now the upper y edge.
+                    while self.y_high_opt - dy_min_cum > self.shape[
+                        0] - self.configuration.align_frames_search_width - \
+                            self.configuration.align_frames_border_width / 2:
+                        self.y_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
+                        self.y_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
+                        new_reference_window = True
+                    # Now the lower x edge.
+                    while self.x_low_opt - dx_min_cum < \
+                            self.configuration.align_frames_search_width + \
+                            self.configuration.align_frames_border_width / 2:
+                        self.x_low_opt += ceil(self.configuration.align_frames_border_width / 2.)
+                        self.x_high_opt += ceil(self.configuration.align_frames_border_width / 2.)
+                        new_reference_window = True
+                    # Now the upper x edge.
+                    while self.x_high_opt - dx_min_cum > self.shape[
+                        1] - self.configuration.align_frames_search_width - \
+                            self.configuration.align_frames_border_width / 2:
+                        self.x_low_opt -= ceil(self.configuration.align_frames_border_width / 2.)
+                        self.x_high_opt -= ceil(self.configuration.align_frames_border_width / 2.)
+                        new_reference_window = True
+
+                    # If the window was moved, update the "reference window(s)".
+                    if new_reference_window:
+                        if self.configuration.align_frames_method == "MultiLevelCorrelation":
+                            self.reference_window = reference_frame[self.y_low_opt:self.y_high_opt,
+                                                    self.x_low_opt:self.x_high_opt]
+                            # For the first phase a box with half the resolution is constructed.
+                            self.reference_window_first_phase = self.reference_window[::2, ::2]
+                        else:
+                            self.reference_window = reference_frame[self.y_low_opt:self.y_high_opt,
+                                                    self.x_low_opt:self.x_high_opt]
+
+                # This frame is processed, go to next one.
                 number_processed += 1
 
         if self.progress_signal is not None:
@@ -363,11 +414,6 @@ class AlignFrames(object):
                                     min(b[0] for b in self.frame_shifts) + self.shape[0]],
                                    [max(b[1] for b in self.frame_shifts),
                                     min(b[1] for b in self.frame_shifts) + self.shape[1]]]
-
-
-        if len(self.failed_index_list) > 0:
-            raise InternalError("No valid shift computed for " + str(len(self.failed_index_list)) +
-                                " frames: " + str(self.failed_index_list))
 
     @staticmethod
     def center_of_gravity(frame):
@@ -581,8 +627,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        file = 'Moon_Tile-013_205538_short'
-        # file = 'another_short_video'
+        # file = 'Moon_Tile-013_205538_short'
+        file = 'another_short_video'
         # file = 'Moon_Tile-024_043939'
         # file = 'Moon_Tile-013_205538'
         names = 'Videos/' + file + '.avi'
@@ -638,10 +684,6 @@ if __name__ == "__main__":
         exit()
     except InternalError as e:
         print("Warning: " + e.message)
-        for index, frame_number in enumerate(align_frames.failed_index_list):
-            print("Shift computation failed for frame " +
-                  str(align_frames.failed_index_list[index]) + ", minima list: " +
-                  str(align_frames.dev_r_list[index]))
 
     print("Frame shifts: " + str(align_frames.frame_shifts))
     print("Intersection: " + str(align_frames.intersection_shape))

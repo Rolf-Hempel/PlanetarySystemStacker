@@ -147,7 +147,7 @@ class Configuration(object):
         self.rank_frames_pixel_stride = 2
         self.rank_frames_method = "Laplace"
 
-        self.align_frames_method = "SteepestDescent"
+        self.align_frames_method = "MultiLevelCorrelation"
         self.align_frames_rectangle_black_threshold = 10240
         self.align_frames_rectangle_min_fraction = 0.7
         self.align_frames_rectangle_stride = 2
