@@ -1230,10 +1230,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         from many seeing-affected frames using the "lucky imaging" technique.
         <br><br>
         The program is mainly targeted at extended objects (moon, sun),
-        but it should work as well for the (easier) planet case.
-        A full working prototype written in Python has been finished.
-        Results obtained in first tests show the same image quality as
-        the established software AutoStakkert!3.
+        but it has been applied successfully to the imaging of planets as well.
         <br><br>
         Homepage: <a href='https://github.com/Rolf-Hempel/PlanetarySystemStacker'>
         https://github.com/Rolf-Hempel/PlanetarySystemStacker</a>
