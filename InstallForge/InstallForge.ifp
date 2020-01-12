@@ -2,7 +2,7 @@
 ProjectFileVersion = "1.1"
 [General]
 Program name = PlanetarySystemStacker
-Program version = 0.6.0
+Program version = 0.7.0 beta
 Windows 2000 = 0
 Windows XP = 0
 Windows Server 2003 = 0
@@ -57,7 +57,7 @@ Time = 2
 PlaySound = 0
 Allow = 0
 [Build]
-File = D:\SW-Development\Python\PlanetarySystemStacker\Windows_Installer\PlanetarySystemStacker_V0.6.0_Windows-Installer.exe
+File = D:\SW-Development\Python\PlanetarySystemStacker\Windows_Installer\PlanetarySystemStacker_V0.7.0-beta_Windows-Installer.exe
 [Updater]
 Allow = 0
 1 = <appname>
