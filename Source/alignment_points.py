@@ -712,8 +712,12 @@ class AlignmentPoints(object):
                                           of the reference_box_first_phase plus two times the first
                                           phase search width.
 
-        :return: Local shift vector [dy, dx]
+        :return: [shift_y, shift_x], success with: [shift_y, shift_x]: Local shift vector
+                                         success: True, if computation successful; False, otherwise.
         """
+
+        # Initialize the "success" return value.
+        success = True
 
         alignment_point = self.alignment_points[alignment_point_index]
         y_low = alignment_point['box_y_low']
@@ -744,6 +748,7 @@ class AlignmentPoints(object):
                 # Compute the combined warp shifts from both phases.
                 shift_pixel = [shift_y_local_first_phase + shift_y_local_second_phase,
                                shift_x_local_first_phase + shift_x_local_second_phase]
+                success = success_second_phase
 
             # Use subpixel registration from skimage.feature, with accuracy 1/10 pixels.
             elif self.configuration.alignment_points_method == 'Subpixel':
@@ -770,6 +775,8 @@ class AlignmentPoints(object):
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride,
                     sub_pixel=self.configuration.alignment_points_local_search_subpixel)
+                if len(dev_r)>2 and shift_pixel==[0, 0]:
+                    success = False
 
             # Use the steepest descent search method.
             elif self.configuration.alignment_points_method == 'SteepestDescent':
@@ -778,16 +785,18 @@ class AlignmentPoints(object):
                     frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride, self.dev_table)
+                if len(dev_r)>2 and shift_pixel==[0, 0]:
+                    success = False
             else:
                 raise NotSupportedError("The point shift computation method " +
                                         self.configuration.alignment_points_method +
                                         " is not implemented")
 
             # Return the computed shift vector.
-            return shift_pixel
+            return shift_pixel, success
         else:
             # If no de-warping is computed, just return the zero vector.
-            return [0, 0]
+            return [0, 0], success
 
     def show_alignment_points(self, image):
         """

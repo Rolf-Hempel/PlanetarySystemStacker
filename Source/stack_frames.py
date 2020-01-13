@@ -25,7 +25,7 @@ from time import sleep
 from warnings import filterwarnings
 
 import matplotlib.pyplot as plt
-from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize, GaussianBlur
+from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize
 from numpy import int as np_int
 from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
     sqrt, uint16, clip, minimum
@@ -260,6 +260,7 @@ class StackFrames(object):
         # Initialize the array for shift distribution statistics.
         self.shift_distribution = full((self.configuration.alignment_points_search_width*2,), 0,
                                           dtype=np_int)
+        self.failure_counter = 0
 
         # If multi-level correlation AP matching is selected, prepare frame-independent data
         # structures used by this particular search algorithm.
@@ -309,13 +310,16 @@ class StackFrames(object):
 
                 # Compute the local warp shift for this frame.
                 self.my_timer.start('Stacking: compute AP shifts')
-                [shift_y, shift_x] = self.alignment_points.compute_shift_alignment_point(
+                [shift_y, shift_x], success = self.alignment_points.compute_shift_alignment_point(
                     frame_mono_blurred, frame_index, alignment_point_index,
                     de_warp=self.configuration.alignment_points_de_warp,
                     weight_matrix_first_phase=weight_matrix_first_phase)
 
                 # Increment the counter corresponding to the 2D warp shift.
-                self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
+                if success:
+                    self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
+                else:
+                    self.failure_counter += 1
 
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
@@ -556,9 +560,11 @@ class StackFrames(object):
         # Scale the image buffer such that entries are in the interval [0., 1.]. Then convert the
         # float image buffer to 16bit int (or 48bit in color mode).
         if self.frames.depth == 8:
-            self.stacked_image = img_as_uint(self.stacked_image_buffer / 255)
+            self.stacked_image = img_as_uint(
+                clip(self.stacked_image_buffer / 255, 0., 1., out=self.stacked_image_buffer))
         else:
-            self.stacked_image = img_as_uint(self.stacked_image_buffer / 65535)
+            self.stacked_image = img_as_uint(
+                clip(self.stacked_image_buffer / 65535, 0., 1., out=self.stacked_image_buffer))
 
         return self.stacked_image
 
@@ -615,6 +621,11 @@ class StackFrames(object):
         :return: String with three lines to be printed to the protocol file(s)
         """
 
+        # Compute the total number of shift measurements.
+        shift_counter = sum(self.shift_distribution)
+        entries_total = shift_counter + self.failure_counter
+
+
         # Find the last non-zero entry in the array.
         if max(self.shift_distribution) > 0:
             max_index = [index for index, item in enumerate(self.shift_distribution) if item != 0][-1] \
@@ -623,21 +634,23 @@ class StackFrames(object):
             # Initialize the three table lines.
             s =    "           Shift (pixels):"
             line = "           ---------------"
-            t =    "           Count:         "
+            t =    "           Percent:       "
 
             # Extend the three table lines up to the max index.
             for index in range(max_index):
-                s += "|{:6d} ".format(index)
-                line += "--------"
-                t += "|{:6d} ".format(self.shift_distribution[index])
+                s += "|{:7d} ".format(index)
+                line += "---------"
+                t += "|{:7.3f} ".format(100.*self.shift_distribution[index]/entries_total)
 
             # Finish the three table lines.
             s += "|"
             line += "-"
             t += "|"
 
-            # Return the three lines to be printed to the protocol.
-            return s + "\n" + line + "\n" + t
+            # Return the lines to be printed to the protocol.
+            return s + "\n" + line + "\n" + t + "\n\n" + \
+                   "           Failed shift measurements: {:7.3f} %".format(
+                                                            100.*self.failure_counter/entries_total)
         else:
             return ""
 

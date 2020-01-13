@@ -638,7 +638,15 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol(
                 "+++ Start stacking " + str(self.alignment_points.stack_size) + " frames +++",
                 self.attached_log_file)
-        self.stack_frames.stack_frames()
+        try:
+            self.stack_frames.stack_frames()
+        except Error as e:
+            self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
+            return
+        except Exception as e:
+            self.abort_job_signal.emit(
+                "Error in stacking frames: " + str(e) + ", continue with next job")
+            return
 
         if self.configuration.global_parameters_protocol_level > 1 and len(
             self.alignment_points.alignment_points) > 0:
@@ -652,7 +660,16 @@ class Workflow(QtCore.QObject):
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start merging all alignment patches and the background +++",
                                    self.attached_log_file)
-        self.stack_frames.merge_alignment_point_buffers()
+
+        try:
+            self.stack_frames.merge_alignment_point_buffers()
+        except Error as e:
+            self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
+            return
+        except Exception as e:
+            self.abort_job_signal.emit(
+                "Error in merging AP patches: " + str(e) + ", continue with next job")
+            return
 
         self.work_next_task_signal.emit("Save stacked image")
 
