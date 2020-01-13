@@ -775,8 +775,9 @@ class AlignmentPoints(object):
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride,
                     sub_pixel=self.configuration.alignment_points_local_search_subpixel)
-                if len(dev_r)>2 and shift_pixel==[0, 0]:
-                    success = False
+                # If a zero shift was returned after a search with radius>2, thie means that
+                # the search was not successfu.
+                success = len(dev_r)<=2 or shift_pixel!=[0, 0]
 
             # Use the steepest descent search method.
             elif self.configuration.alignment_points_method == 'SteepestDescent':
@@ -785,8 +786,7 @@ class AlignmentPoints(object):
                     frame_mono_blurred, y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                     self.configuration.alignment_points_search_width,
                     self.configuration.alignment_points_sampling_stride, self.dev_table)
-                if len(dev_r)>2 and shift_pixel==[0, 0]:
-                    success = False
+                success = len(dev_r)<=2 or shift_pixel!=[0, 0]
             else:
                 raise NotSupportedError("The point shift computation method " +
                                         self.configuration.alignment_points_method +
