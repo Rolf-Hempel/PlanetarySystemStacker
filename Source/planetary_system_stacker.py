@@ -831,6 +831,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             else:
                 sdv = ShiftDistributionViewerWidget(self,
                                                     self.workflow.stack_frames.shift_distribution,
+                                                    self.workflow.stack_frames.shift_failure_percent,
                                                     self.signal_save_stacked_image)
                 self.display_widget(sdv)
             self.busy = True

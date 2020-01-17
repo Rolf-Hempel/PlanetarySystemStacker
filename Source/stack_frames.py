@@ -260,7 +260,7 @@ class StackFrames(object):
         # Initialize the array for shift distribution statistics.
         self.shift_distribution = full((self.configuration.alignment_points_search_width*2,), 0,
                                           dtype=np_int)
-        self.failure_counter = 0
+        self.shift_failure_counter = 0
 
         # If multi-level correlation AP matching is selected, prepare frame-independent data
         # structures used by this particular search algorithm.
@@ -319,7 +319,7 @@ class StackFrames(object):
                 if success:
                     self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
                 else:
-                    self.failure_counter += 1
+                    self.shift_failure_counter += 1
 
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
@@ -427,6 +427,15 @@ class StackFrames(object):
         if self.progress_signal is not None:
             self.progress_signal.emit("Stack frames", 100)
 
+        # Compute counters for shift distribution analysis.
+        shift_counter = sum(self.shift_distribution)
+        self.shift_entries_total = shift_counter + self.shift_failure_counter
+        if self.shift_entries_total:
+            self.shift_failure_percent = round(
+                100. * self.shift_failure_counter / self.shift_entries_total, 3)
+        else:
+            self.shift_failure_percent = 0.
+
         # In debug mode: Close de-warp visualization window.
         if self.debug:
             self.terminate_image_window_signal.emit()
@@ -522,7 +531,9 @@ class StackFrames(object):
                 patch_x_low: patch_x_high] += alignment_point['stacking_buffer'] * \
                                               alignment_point['weights_yx']
 
-        # Divide the global stacking buffer pixel-wise by the number of image contributions.
+        # Divide the global stacking buffer pixel-wise by the number of image contributions. Please
+        # note that there is no division by zero because the array "sum_single_frame_weights" was
+        # initialized to 1.E-30.
         if self.frames.color:
             self.stacked_image_buffer /= self.sum_single_frame_weights[:, :, newaxis]
         else:
@@ -621,11 +632,6 @@ class StackFrames(object):
         :return: String with three lines to be printed to the protocol file(s)
         """
 
-        # Compute the total number of shift measurements.
-        shift_counter = sum(self.shift_distribution)
-        entries_total = shift_counter + self.failure_counter
-
-
         # Find the last non-zero entry in the array.
         if max(self.shift_distribution) > 0:
             max_index = [index for index, item in enumerate(self.shift_distribution) if item != 0][-1] \
@@ -640,7 +646,7 @@ class StackFrames(object):
             for index in range(max_index):
                 s += "|{:7d} ".format(index)
                 line += "---------"
-                t += "|{:7.3f} ".format(100.*self.shift_distribution[index]/entries_total)
+                t += "|{:7.3f} ".format(100.*self.shift_distribution[index]/self.shift_entries_total)
 
             # Finish the three table lines.
             s += "|"
@@ -650,7 +656,7 @@ class StackFrames(object):
             # Return the lines to be printed to the protocol.
             return s + "\n" + line + "\n" + t + "\n\n" + \
                    "           Failed shift measurements: {:7.3f} %".format(
-                                                            100.*self.failure_counter/entries_total)
+                       self.shift_failure_percent)
         else:
             return ""
 

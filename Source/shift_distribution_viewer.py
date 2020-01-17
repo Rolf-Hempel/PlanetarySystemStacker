@@ -83,13 +83,15 @@ class ShiftDistributionViewerWidget(QtWidgets.QFrame, Ui_shift_distribution_view
     up to the maximum frame shift the number of occurrences is displayed.
     """
 
-    def __init__(self, parent_gui, shift_distribution, signal_finished, parent=None):
+    def __init__(self, parent_gui, shift_distribution, shift_failure_percent, signal_finished,
+                 parent=None):
         """
         Initialize the Viewer. The widget has a fixed size and is rendered as a QFrame.
 
         :param parent_gui: GUI object by which the viewer is invoked.
         :param parent: Parent object
         :param shift_distribution: 1D Numpy array (int) with counts for each shift size.
+        :param shift_failure_percent: Percent of failed warp shift measurements.
         :param signal_finished: Qt signal with signature () telling the workflow thread that the
                                 viewer has finished, or None (no signalling).
         """
@@ -114,6 +116,14 @@ class ShiftDistributionViewerWidget(QtWidgets.QFrame, Ui_shift_distribution_view
         self.verticalLayout.insertWidget(0, Canvas(self.matplotlib_widget.fig))
 
         self.matplotlib_widget.draw_distribution(self.shift_distribution)
+
+        # Display the fraction of failed shift measurements. Use red ink if the value exceeds 5%.
+        self.failedShiftsLabel.setText(
+            "Failed shift measurements: " + str(shift_failure_percent) + "%")
+        if shift_failure_percent > 5.:
+            self.failedShiftsLabel.setStyleSheet('color: red')
+        else:
+            self.failedShiftsLabel.setStyleSheet('color: black')
 
     def accept(self):
         """
