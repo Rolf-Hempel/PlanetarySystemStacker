@@ -118,12 +118,15 @@ class ShiftDistributionViewerWidget(QtWidgets.QFrame, Ui_shift_distribution_view
         self.matplotlib_widget.draw_distribution(self.shift_distribution)
 
         # Display the fraction of failed shift measurements. Use red ink if the value exceeds 5%.
-        self.failedShiftsLabel.setText(
-            "Failed shift measurements: " + str(shift_failure_percent) + "%")
-        if shift_failure_percent > 5.:
-            self.failedShiftsLabel.setStyleSheet('color: red')
+        if shift_failure_percent >= 0.:
+            self.failedShiftsLabel.setText(
+                "Failed shift measurements: " + str(shift_failure_percent) + "%")
+            if shift_failure_percent > 5.:
+                self.failedShiftsLabel.setStyleSheet('color: red')
+            else:
+                self.failedShiftsLabel.setStyleSheet('color: black')
         else:
-            self.failedShiftsLabel.setStyleSheet('color: black')
+            self.failedShiftsLabel.setText("")
 
     def accept(self):
         """

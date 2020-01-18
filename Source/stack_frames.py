@@ -434,7 +434,8 @@ class StackFrames(object):
             self.shift_failure_percent = round(
                 100. * self.shift_failure_counter / self.shift_entries_total, 3)
         else:
-            self.shift_failure_percent = 0.
+            # If the value is <0, the percentage is not printed.
+            self.shift_failure_percent = -1.
 
         # In debug mode: Close de-warp visualization window.
         if self.debug:
