@@ -19,7 +19,6 @@ Input to the program can be either video files or a directories containing still
 
 Program execution is most efficient if the image data and all intermediate results can be keept in memory. This, however, requires much RAM space. Therefore, the level of buffering can be selected in the configuration dialog, ranging from 0 (no buffering) to 4 (maximum buffering).
 
-The program is started by executing the main program in module "planetary_system_stacker.py". As an alternative (for debugging),
-the program can be started without a GUI with the main program in module "main_program.py".
+The program is started by executing the main program in module "planetary_system_stacker.py".
 
-The program uses array operations (numpy) wherever possible to speed up execution. Qt5 is used as the GUI toolkit.
+The program uses array operations (OpenCV, numpy) wherever possible to speed up execution. Qt5 is used as the GUI toolkit.
