@@ -35,6 +35,10 @@ import numpy as np
 import psutil
 from PyQt5 import QtWidgets, QtCore, QtGui
 from numpy import uint8, uint16
+import scipy
+import astropy
+import skimage
+import pip
 
 from alignment_point_editor import AlignmentPointEditorWidget
 from alignment_points import AlignmentPoints
@@ -129,10 +133,9 @@ class DisplayImage(QtWidgets.QGraphicsView):
 
 class PlanetarySystemStacker(QtWidgets.QMainWindow):
     """
-    This class is the main class of the "Planetary System Stacker" software. It implements
-    the main GUI for the communication with the user. It creates the workflow thread which controls
-    all program activities asynchronously.
-
+    This is the main class of the "Planetary System Stacker" software. It implements the main GUI
+    for the communication with the user. It creates the workflow thread which controls all program
+    activities asynchronously.
     """
 
     signal_reset_masters = QtCore.pyqtSignal()
@@ -259,6 +262,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.job_index = 0
         self.jobs = []
         self.activity = 'Read frames'
+        self.error_occurred = False
 
         # Initialize the "backwards" combobox: The user can only go back to those program steps
         # which have been executed already.
@@ -874,10 +878,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             if self.job_index < self.job_number:
                 # If the end of the queue is not reached yet, start with reading frames of next job.
                 self.activity = "Read frames"
+                # If an error condition was set during the current job, reset it.
+                self.error_occurred = False
                 if not self.automatic:
                     pass
                 self.signal_frames.emit(self.jobs[self.job_index], False)
             else:
+                # If an error occurred, do not include all phases in "Go back to" combo list. This
+                # way the user cannot jump back to a phase of the aborted job which was not
+                # executed.
+                if self.error_occurred:
+                    self.activity = "Read frames"
+                    self.error_occurred = False
                 # End of queue reached, give control back to the user.
                 self.busy = False
 
@@ -898,6 +910,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Report the error.
         self.report_error(message)
+
+        # Set the error flag.
+        self.error_occurred = True
 
         # Abort the current job and go to the next one.
         self.work_next_task("Next job")
@@ -1112,18 +1127,22 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             # the interaction, the status line shows the "busy" status, and the workflow is
             # suspended. By pressing "Go back to:", however, the user can restart from a previous
             # task.
-            if self.activity not in ['Align frames', 'Select stack size', 'Set ROI',
+            if self.activity in ['Align frames', 'Select stack size', 'Set ROI',
                                      'Set alignment points']:
-                self.activate_gui_elements([self.ui.comboBox_back], False)
-            else:
                 self.activate_gui_elements([self.ui.comboBox_back], True)
+            else:
+                self.activate_gui_elements([self.ui.comboBox_back], False)
             self.activate_gui_elements([self.ui.pushButton_start,
                                         self.ui.pushButton_next_job, self.ui.menuFile,
                                         self.ui.menuEdit, self.ui.menuCalibrate], False)
             self.activate_gui_elements([self.ui.pushButton_pause], True)
             if self.job_index < self.job_number:
-                self.write_status_bar("Busy processing " + self.jobs[self.job_index].file_name,
-                                      "black")
+                if self.activity == 'Select stack size':
+                    self.write_status_bar("Select the number / percentage of frames to be stacked.",
+                                          "red")
+                else:
+                    self.write_status_bar("Busy processing " + self.jobs[self.job_index].file_name,
+                                          "black")
 
         # In manual mode, activate buttons and menu entries. Update the status bar.
         else:
@@ -1225,6 +1244,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         MATPLOTLIB_VERSION = matplotlib.__version__
         OPENCV_VERSION = cv2.__version__
         NUMPY_VERSION = np.__version__
+        PSUTIL_VERSION = psutil.__version__
+        SCIPY_VERSION = scipy.__version__
+        SKIMAGE_VERSION = skimage.__version__
+        ASTROPY_VERSION = astropy.__version__
+        PIP_VERSION = pip.__version__
 
         CONTENT = ('''        <b>{0}</b><br><br>
         Produce a sharp image of a planetary system object (moon, sun, planets)
@@ -1238,20 +1262,43 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         <br><br>
         System overview:<br>
         PC: {2}<br>
-        CPU Cores: {9}<br>
-        Memory: {10:.1f} [GB]<br>
+        CPU Cores: {4}<br>
+        Memory: {5:.1f} [GB]<br>
         OS: {3}<br>
         User: {1}<br>
         <br>
         Software versions used:<br>
-        Python: {4}<br>
-        Qt: {5}<br>
-        Matplotlib: {6}<br>
-        OpenCV: {7}<br>
-        Numpy: {8}'''.format(self.configuration.global_parameters_version, USER, PC, OS,
-                             PYTHON_VERSION, QT_VERSION,
-                             MATPLOTLIB_VERSION, OPENCV_VERSION, NUMPY_VERSION, CPU,
-                             MEMORY))
+        Python: {6}<br>
+        Qt: {7}<br>
+        Matplotlib: {8}<br>
+        OpenCV: {9}<br>
+        Numpy: {10}<br>
+        Psutil: {11}<br>
+        Scipy: {12}<br>
+        Scikit-image: {13}<br>
+        Astropy: {14}<br>
+        Pip: {15}'''.format(self.configuration.global_parameters_version, USER, PC, OS, CPU, MEMORY,
+                             PYTHON_VERSION,
+                             QT_VERSION,
+                             MATPLOTLIB_VERSION,
+                             OPENCV_VERSION,
+                             NUMPY_VERSION,
+                             PSUTIL_VERSION,
+                             SCIPY_VERSION,
+                             SKIMAGE_VERSION,
+                             ASTROPY_VERSION,
+                             PIP_VERSION
+                             ))
+
+        # MKL might not be installed as a separate package. Therefore add its version number only
+        # if it is available.
+        try:
+            import mkl
+            MKL_VERSION = mkl.__version__
+            CONTENT += ('''<br>
+            MKL: {0}'''.format(MKL_VERSION))
+        except:
+            pass
 
         msgBox = QtWidgets.QMessageBox()
         msgBox.setIcon(QtWidgets.QMessageBox.Information)

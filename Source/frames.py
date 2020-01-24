@@ -243,7 +243,7 @@ class ImageReader(object):
         :param file_path_list: List with path names to the image files.
         :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
                               "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
-                              "Force Bayer BGGR".
+                              "Force Bayer BGGR". This parameter is ignored for now.
         :param convert_to_grayscale: If True, convert color frames to grayscale;
                                      otherwise return RGB color frames.
         :return: (frame_count, color, dtype, shape) with
