@@ -340,7 +340,7 @@ class AlignFrames(object):
 
                     # If the local search was unsuccessful, quit the frame loop with an error.
                     if not success:
-                        raise InternalError("No valid shift computed for at least one frame")
+                        raise InternalError("frame " + str(idx))
 
                     # Update the cumulative shift values to be used as starting point for the
                     # next frame.

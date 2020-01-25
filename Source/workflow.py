@@ -492,14 +492,21 @@ class Workflow(QtCore.QObject):
                 # in the workflow. Therefore, try again with another stabilization patch.
                 except InternalError as e:
                     if self.configuration.global_parameters_protocol_level > 0:
-                        Miscellaneous.protocol("Warning: " + e.message + ", will try another"
-                                                                         " stabilization patch",
+                        Miscellaneous.protocol("Warning: No valid shift computed at " + e.message +
+                                               ", will try another stabilization patch",
                                                self.attached_log_file)
                     # If there is no more patch available, skip this job.
                     if patch_index == number_patches - 1:
-                        self.abort_job_signal.emit(
-                            "Error: Frame stabilization failed, continue with next job. "
-                            "Try a higher value for parameter 'stabilization search width'")
+                        if self.configuration.align_frames_search_width < self.configuration.align_frames_max_search_width:
+                            self.abort_job_signal.emit(
+                                "Error: Frame stabilization failed at " + e.message +
+                                ", continue with next job. "
+                                "Try a higher value for parameter 'stabilization search width'")
+                        else:
+                            self.abort_job_signal.emit(
+                                "Error: Frame stabilization failed at " + e.message +
+                                ", continue with next job. "
+                                "Try stabilizing the frames with another program, e.g. PIPP.")
                         self.my_timer.stop('Global frame alignment')
                         return
                     # Continue with the next best stabilization patch.
