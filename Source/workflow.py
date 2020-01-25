@@ -302,11 +302,11 @@ class Workflow(QtCore.QObject):
                             "calibration de-activated",
                             self.attached_log_file, precede_with_timestamp=False)
             except Error as e:
-                self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
+                self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
                 return
             except Exception as e:
                 self.abort_job_signal.emit(
-                    "Error in opening/reading frames: " + str(e) + ", continue with next job")
+                    "Error in opening/reading frames: " + str(e) + ", continuing with next job")
                 return
 
             # Look up the available RAM (without paging)
@@ -351,11 +351,11 @@ class Workflow(QtCore.QObject):
             try:
                 self.postproc_input_image = Frames.read_image(self.postproc_input_name)
             except Error as e:
-                self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
+                self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
                 return
             except Exception as e:
                 self.abort_job_signal.emit(
-                    "Error in reading image file: " + str(e) + ", continue with next job")
+                    "Error in reading image file: " + str(e) + ", continuing with next job")
                 return
 
             # Convert 8 bit to 16 bit.
@@ -378,12 +378,12 @@ class Workflow(QtCore.QObject):
             self.rank_frames.frame_score()
             self.my_timer.stop('Ranking images')
         except Error as e:
-            self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
+            self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
             self.my_timer.stop('Ranking images')
             return
         except Exception as e:
             self.abort_job_signal.emit(
-                "Error (probably out of RAM): " + str(e) + ", continue with next job")
+                "Error (probably out of RAM): " + str(e) + ", continuing with next job")
             self.my_timer.stop('Ranking images')
             return
 
@@ -485,7 +485,7 @@ class Workflow(QtCore.QObject):
                     # Everything is fine, no need to try another stabilization patch.
                     break
                 except (NotSupportedError, ArgumentError) as e:
-                    self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
+                    self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
                     self.my_timer.stop('Global frame alignment')
                     return
                 # For some frames no valid shift could be computed. This would create problems later
@@ -500,12 +500,12 @@ class Workflow(QtCore.QObject):
                         if self.configuration.align_frames_search_width < self.configuration.align_frames_max_search_width:
                             self.abort_job_signal.emit(
                                 "Error: Frame stabilization failed at " + e.message +
-                                ", continue with next job. "
-                                "Try a higher value for parameter 'stabilization search width'")
+                                ", continuing with next job. "
+                                "Try a higher value for parameter 'stabilization search width'.")
                         else:
                             self.abort_job_signal.emit(
                                 "Error: Frame stabilization failed at " + e.message +
-                                ", continue with next job. "
+                                ", continuing with next job. "
                                 "Try stabilizing the frames with another program, e.g. PIPP.")
                         self.my_timer.stop('Global frame alignment')
                         return
@@ -525,12 +525,12 @@ class Workflow(QtCore.QObject):
             try:
                 self.align_frames.align_frames()
             except Error as e:
-                self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
+                self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
                 self.my_timer.stop('Global frame alignment')
                 return
             except Exception as e:
                 self.abort_job_signal.emit(
-                    "Error in aligning frames: " + str(e) + ", continue with next job")
+                    "Error in aligning frames: " + str(e) + ", continuing with next job")
                 self.my_timer.stop('Global frame alignment')
                 return
 
@@ -648,11 +648,11 @@ class Workflow(QtCore.QObject):
         try:
             self.stack_frames.stack_frames()
         except Error as e:
-            self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
+            self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
             return
         except Exception as e:
             self.abort_job_signal.emit(
-                "Error in stacking frames: " + str(e) + ", continue with next job")
+                "Error in stacking frames: " + str(e) + ", continuing with next job")
             return
 
         if self.configuration.global_parameters_protocol_level > 1 and len(
@@ -671,11 +671,11 @@ class Workflow(QtCore.QObject):
         try:
             self.stack_frames.merge_alignment_point_buffers()
         except Error as e:
-            self.abort_job_signal.emit("Error: " + e.message + ", continue with next job")
+            self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
             return
         except Exception as e:
             self.abort_job_signal.emit(
-                "Error in merging AP patches: " + str(e) + ", continue with next job")
+                "Error in merging AP patches: " + str(e) + ", continuing with next job")
             return
 
         self.work_next_task_signal.emit("Save stacked image")
