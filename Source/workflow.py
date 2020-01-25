@@ -498,8 +498,8 @@ class Workflow(QtCore.QObject):
                     # If there is no more patch available, skip this job.
                     if patch_index == number_patches - 1:
                         self.abort_job_signal.emit(
-                            "Error: No alternative stabilization patch available, continue with "
-                            "next job")
+                            "Error: Frame stabilization failed, continue with next job. "
+                            "Try a higher value for parameter 'stabilization search width'")
                         self.my_timer.stop('Global frame alignment')
                         return
                     # Continue with the next best stabilization patch.
