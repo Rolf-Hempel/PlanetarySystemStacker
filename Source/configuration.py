@@ -155,7 +155,7 @@ class Configuration(object):
         self.align_frames_sampling_stride = 2
         self.align_frames_min_stabilization_patch_fraction = 0.2
         self.align_frames_max_stabilization_patch_fraction = 0.7
-        self.align_frames_max_search_width = 60
+        self.align_frames_max_search_width = 150
 
         self.alignment_points_min_half_box_width = 10
         self.alignment_points_contrast_threshold = 0

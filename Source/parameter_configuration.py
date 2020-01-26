@@ -88,7 +88,7 @@ class Ui_ConfigurationDialog(object):
         self.GridLayout.addWidget(self.afrsf_label_parameter, 5, 0, 1, 1)
         self.afsw_slider_value = QtWidgets.QSlider(ConfigurationDialog)
         self.afsw_slider_value.setMinimum(5)
-        self.afsw_slider_value.setMaximum(60)
+        self.afsw_slider_value.setMaximum(150)
         self.afsw_slider_value.setSingleStep(5)
         self.afsw_slider_value.setPageStep(5)
         self.afsw_slider_value.setProperty("value", 20)

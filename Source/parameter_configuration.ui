@@ -217,7 +217,7 @@ is warped such that it exactly matches the B/W image.</string>
       <number>5</number>
      </property>
      <property name="maximum">
-      <number>60</number>
+      <number>150</number>
      </property>
      <property name="singleStep">
       <number>5</number>
