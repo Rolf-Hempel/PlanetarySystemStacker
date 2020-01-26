@@ -544,6 +544,18 @@ class Workflow(QtCore.QObject):
                 self.align_frames.intersection_shape[1][1]), self.attached_log_file,
                                    precede_with_timestamp=False)
 
+            # Compute and print the maximum shift between two consecutive frames:
+            max_shift_y = max([abs(
+                self.align_frames.frame_shifts[idx][0] - self.align_frames.frame_shifts[idx - 1][0])
+                               for idx in range(1, self.frames.number)])
+            max_shift_x = max([abs(
+                self.align_frames.frame_shifts[idx][1] - self.align_frames.frame_shifts[idx - 1][1])
+                               for idx in range(1, self.frames.number)])
+            Miscellaneous.protocol(
+                "           Maximal pixel shift between consecutive frames, vertical: " + str(
+                    max_shift_y) + ", horizontal: " + str(max_shift_x), self.attached_log_file,
+                                   precede_with_timestamp=False)
+
         # Compute the average frame.
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start computing the average frame +++",
