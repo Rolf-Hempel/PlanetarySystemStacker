@@ -1308,7 +1308,7 @@ class Frames(object):
             if len(image.shape) == 3:
                 image = moveaxis(image, 0, -1).copy()
 
-            # Flip image horizontally to recover orignal orientation
+            # Flip image horizontally to recover original orientation
             image = flip(image, 0)
 
         # Case other supported image formats:
