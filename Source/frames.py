@@ -225,7 +225,6 @@ class ImageReader(object):
         Create the ImageReader object and initialize instance variables.
         """
 
-
         self.opened = False
         self.just_opened = False
         self.last_read = None
