@@ -53,6 +53,7 @@ class VideoReader(object):
     .mov, .mp4, .ser) should be supported.
     """
 
+
     def __init__(self):
         """
         Create the VideoReader object and initialize instance variables.
