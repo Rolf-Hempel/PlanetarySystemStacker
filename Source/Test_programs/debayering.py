@@ -149,7 +149,10 @@ def show_image(frame, comment):
     """
     print (comment + ", shape: " + str(frame.shape) + ", type: " + str(frame.dtype))
     plt.title(comment)
-    plt.imshow(frame)
+    if len(frame.shape) == 3:
+        plt.imshow(frame)
+    else:
+        plt.imshow(frame, cmap='gray')
     plt.show()
 
 filename = 'Photodisc.png'
