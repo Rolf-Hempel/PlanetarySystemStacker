@@ -20,31 +20,125 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-import ser_parser
 from glob import glob
+from math import ceil
 from os import path, remove, listdir, stat
 from os.path import splitext
 from pathlib import Path
 from time import time
 
 from PyQt5 import QtCore
+from astropy.io import fits
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
     COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
-    convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_UNCHANGED, \
-    flip
+    convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_UNCHANGED, flip, COLOR_BayerBG2RGB, \
+    COLOR_BayerGB2RGB, COLOR_BayerGR2RGB, COLOR_BayerRG2RGB, COLOR_GRAY2RGB
 from cv2 import mean as cv_mean
-from math import ceil
 from numpy import max as np_max
 from numpy import min as np_min
 from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, \
     moveaxis
 
+import ser_parser
 from configuration import Configuration
 from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError, Error, \
     InternalError
 from frames_old import FramesOld
-from astropy.io import fits
 
+
+def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
+    """
+    Process a given input frame "frame_in", either containing one layer (B/W) or three layers
+    (color) into an output frame "frame_out" as specified by the parameter "debayer_pattern".
+
+    The rules for this transformation are:
+    - If the "debayer_pattern" is "Auto detect color", the input frame is not changed, i.e. the
+      output frame is identical to the input frame. The same applies if the input frame is of type
+      color, and the "debayer_pattern" is "RGB", or if the input frame is of type "B/W" and the
+      "debayer_pattern" is "Grayscale".
+    - If the input frame is of type "color" and "debayer_pattern" is "Grayscale", the RGB image is
+      converted into a B/W one.
+    - If the input frame is of type "Grayscale" and "debayer_pattern" is "RGB", the result is a
+      three-channel RGB image where all channels are the same.
+    - If a non-standard "debayer_pattern" (i.e. "RGGB", "GRBG", "GBRG", "BGGR") is specified and the
+      input is a B/W image, decode the image using the given Bayer pattern. If the input image is
+      of type three-channel RGB, first convert it into grayscale and then decode the image as in the
+      B/W case.
+
+    :param frame_in: Input image, either 2D (grayscale) or 3D (color). The type is either 8 or 16
+                     bit unsigned int.
+    :param debayer_pattern: Pattern used to convert the input image into the output image. One out
+                            of 'Grayscale', 'RGB', 'Force Bayer RGGB', 'Force Bayer GRBG',
+                            'Force Bayer GBRG', 'Force Bayer BGGR'
+    :return: (frame_out, color_out) with frame_out: output image (see above)
+                                         color_out: True, if three-channel RGB. False otherwise.
+    """
+
+    debayer_codes = {
+        'Force Bayer RGGB': COLOR_BayerBG2RGB,
+        'Force Bayer GRBG': COLOR_BayerGB2RGB,
+        'Force Bayer GBRG': COLOR_BayerGR2RGB,
+        'Force Bayer BGGR': COLOR_BayerRG2RGB
+    }
+
+    type_in = frame_in.dtype
+
+    if type_in != uint8 and type_in != uint16:
+        raise Exception("Image type " + str(type_in) + " not supported")
+
+    # If the input frame is 3D, it represents a color image.
+    color_in = len(frame_in.shape) == 3
+
+    # Case color input image.
+    if color_in:
+        # Three-channel input, interpret as RGB color and leave it unchanged.
+        if debayer_pattern in ['Auto detect color', 'RGB']:
+            color_out = True
+            frame_out = frame_in
+
+        # Three-channel (color) input, reduce to two-channel (B/W) image.
+        elif debayer_pattern in ['Grayscale', 'Force Bayer RGGB', 'Force Bayer GRBG',
+                                 'Force Bayer GBRG', 'Force Bayer BGGR']:
+
+            frame_2D = cvtColor(frame_in, COLOR_RGB2GRAY)
+
+            # Output is B/W image.
+            if debayer_pattern == 'Grayscale':
+                color_out = False
+                frame_out = frame_2D
+
+            # Decode the B/W image into a color image using a Bayer pattern.
+            else:
+                color_out = True
+                frame_out = cvtColor(frame_2D, debayer_codes[debayer_pattern])
+
+        # Invalid debayer pattern specified.
+        else:
+            raise Exception("Debayer pattern " + debayer_pattern + " not supported")
+
+    # Case B/W input image.
+    else:
+        # Two-channel input, interpret as B/W image and leave it unchanged.
+        if debayer_pattern in ['Auto detect color', 'Grayscale']:
+            color_out = False
+            frame_out = frame_in
+
+        # Transform the one-channel B/W image in an RGB one where all three channels are the same.
+        elif debayer_pattern == 'RGB':
+            frame_out = cvtColor(frame_in, COLOR_GRAY2RGB)
+
+        # Non-standard Bayer pattern, decode into color image.
+        elif debayer_pattern in ['Force Bayer RGGB', 'Force Bayer GRBG',
+                                 'Force Bayer GBRG', 'Force Bayer BGGR']:
+            color_out = True
+            frame_out = cvtColor(frame_in, debayer_codes[debayer_pattern])
+
+        # Invalid Bayer pattern specified.
+        else:
+            raise Exception("Debayer pattern " + debayer_pattern + " not supported")
+
+    # Return the decoded image and the color flag.
+    return frame_out, color_out
 
 class VideoReader(object):
     """
