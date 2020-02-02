@@ -63,7 +63,7 @@ def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
     - If a non-standard "debayer_pattern" (i.e. "RGGB", "GRBG", "GBRG", "BGGR") is specified and the
       input is a B/W image, decode the image using the given Bayer pattern. If the input image is
       of type three-channel RGB, first convert it into grayscale and then decode the image as in the
-      B/W case.
+      B/W case. In both cases the result is a three-channel RGB color image.
 
     :param frame_in: Input image, either 2D (grayscale) or 3D (color). The type is either 8 or 16
                      bit unsigned int.
