@@ -1287,7 +1287,7 @@ class Frames(object):
     @staticmethod
     def read_image(filename):
         """
-        Read an image (either in Tiff or Fits format) from a file.
+        Read an image (in tiff, fits, png or jpg format) from a file.
 
         :param filename: Path name of the input image.
         :return: RGB or monochrome image.
