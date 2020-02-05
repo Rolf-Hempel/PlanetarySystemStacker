@@ -29,15 +29,15 @@ from time import time
 
 from PyQt5 import QtCore
 from astropy.io import fits
-from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_BGR2GRAY, \
-    COLOR_RGB2GRAY, COLOR_BGR2RGB, GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, \
-    convertScaleAbs, CAP_PROP_POS_FRAMES, IMREAD_UNCHANGED, flip, COLOR_BayerBG2RGB, \
-    COLOR_BayerGB2RGB, COLOR_BayerGR2RGB, COLOR_BayerRG2RGB, COLOR_GRAY2RGB
+from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_RGB2GRAY, \
+    COLOR_BGR2RGB, COLOR_BayerGB2BGR, COLOR_BayerBG2BGR, \
+    GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs, CAP_PROP_POS_FRAMES, \
+    IMREAD_UNCHANGED, flip, COLOR_GRAY2RGB, COLOR_BayerRG2BGR, COLOR_BayerGR2BGR
+
 from cv2 import mean as cv_mean
 from numpy import max as np_max
 from numpy import min as np_min
-from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, \
-    moveaxis
+from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, moveaxis
 
 import ser_parser
 from configuration import Configuration
@@ -56,29 +56,30 @@ def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
       output frame is identical to the input frame. The same applies if the input frame is of type
       color, and the "debayer_pattern" is "RGB", or if the input frame is of type "B/W" and the
       "debayer_pattern" is "Grayscale".
-    - If the input frame is of type "color" and "debayer_pattern" is "Grayscale", the RGB image is
-      converted into a B/W one.
-    - If the input frame is of type "Grayscale" and "debayer_pattern" is "RGB", the result is a
-      three-channel RGB image where all channels are the same.
+    - If the input frame is of type "color" and "debayer_pattern" is "Grayscale", the RGB / BGR
+      image is converted into a B/W one.
+    - If the input frame is of type "color" and "debayer_pattern" is "BGR", the "B" and "R" channels
+      are exchanged.
+    - If the input frame is of type "Grayscale" and "debayer_pattern" is "RGB" or "BGR", the result
+      is a three-channel RGB / BGR image where all channels are the same.
     - If a non-standard "debayer_pattern" (i.e. "RGGB", "GRBG", "GBRG", "BGGR") is specified and the
       input is a B/W image, decode the image using the given Bayer pattern. If the input image is
-      of type three-channel RGB, first convert it into grayscale and then decode the image as in the
-      B/W case. In both cases the result is a three-channel RGB color image.
+      of type "color" (three-channel RGB or BGR), first convert it into grayscale and then decode
+      the image as in the B/W case. In both cases the result is a three-channel RGB color image.
 
     :param frame_in: Input image, either 2D (grayscale) or 3D (color). The type is either 8 or 16
                      bit unsigned int.
     :param debayer_pattern: Pattern used to convert the input image into the output image. One out
                             of 'Grayscale', 'RGB', 'Force Bayer RGGB', 'Force Bayer GRBG',
                             'Force Bayer GBRG', 'Force Bayer BGGR'
-    :return: (frame_out, color_out) with frame_out: output image (see above)
-                                         color_out: True, if three-channel RGB. False otherwise.
+    :return: frame_out: output image (see above)
     """
 
     debayer_codes = {
-        'Force Bayer RGGB': COLOR_BayerBG2RGB,
-        'Force Bayer GRBG': COLOR_BayerGB2RGB,
-        'Force Bayer GBRG': COLOR_BayerGR2RGB,
-        'Force Bayer BGGR': COLOR_BayerRG2RGB
+        'Force Bayer RGGB': COLOR_BayerRG2BGR,
+        'Force Bayer GRBG': COLOR_BayerGR2BGR,
+        'Force Bayer GBRG': COLOR_BayerGB2BGR,
+        'Force Bayer BGGR': COLOR_BayerBG2BGR
     }
 
     type_in = frame_in.dtype
@@ -93,8 +94,11 @@ def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
     if color_in:
         # Three-channel input, interpret as RGB color and leave it unchanged.
         if debayer_pattern in ['Auto detect color', 'RGB']:
-            color_out = True
             frame_out = frame_in
+
+        # If the Bayer pattern is 'BGR', flip channels.
+        elif debayer_pattern == 'BGR':
+            frame_out = cvtColor(frame_in, COLOR_BGR2RGB)
 
         # Three-channel (color) input, reduce to two-channel (B/W) image.
         elif debayer_pattern in ['Grayscale', 'Force Bayer RGGB', 'Force Bayer GRBG',
@@ -104,12 +108,10 @@ def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
 
             # Output is B/W image.
             if debayer_pattern == 'Grayscale':
-                color_out = False
                 frame_out = frame_2D
 
             # Decode the B/W image into a color image using a Bayer pattern.
             else:
-                color_out = True
                 frame_out = cvtColor(frame_2D, debayer_codes[debayer_pattern])
 
         # Invalid debayer pattern specified.
@@ -120,25 +122,23 @@ def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
     else:
         # Two-channel input, interpret as B/W image and leave it unchanged.
         if debayer_pattern in ['Auto detect color', 'Grayscale']:
-            color_out = False
             frame_out = frame_in
 
         # Transform the one-channel B/W image in an RGB one where all three channels are the same.
-        elif debayer_pattern == 'RGB':
+        elif debayer_pattern == 'RGB' or debayer_pattern == 'BGR':
             frame_out = cvtColor(frame_in, COLOR_GRAY2RGB)
 
         # Non-standard Bayer pattern, decode into color image.
         elif debayer_pattern in ['Force Bayer RGGB', 'Force Bayer GRBG',
                                  'Force Bayer GBRG', 'Force Bayer BGGR']:
-            color_out = True
             frame_out = cvtColor(frame_in, debayer_codes[debayer_pattern])
 
         # Invalid Bayer pattern specified.
         else:
             raise Exception("Debayer pattern " + debayer_pattern + " not supported")
 
-    # Return the decoded image and the color flag.
-    return frame_out, color_out
+    # Return the decoded image.
+    return frame_out
 
 class VideoReader(object):
     """
@@ -175,17 +175,15 @@ class VideoReader(object):
         elif stat(file_path).st_size == 0:
             raise IOError("File is empty")
 
-    def open(self, file_path, bayer_pattern='Auto detect color', convert_to_grayscale=False):
+    def open(self, file_path, bayer_pattern='Auto detect color'):
         """
         Initialize the VideoReader object and return parameters with video metadata.
-         Throws an IOError if the video file format is not supported.
+        Throws an IOError if the video file format is not supported.
 
         :param file_path: Full name of the video file.
         :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
-                              "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
+                              "BGR", "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
                               "Force Bayer BGGR".
-        :param convert_to_grayscale: If True, convert color frames to grayscale;
-                                     otherwise return RGB color frames.
         :return: (frame_count, color, dtype, shape) with
                  frame_count: Total number of frames in video.
                  color: True, if frames are in color; False otherwise.
@@ -194,8 +192,7 @@ class VideoReader(object):
                         (num_px_y, num_px_x) for B/W.
         """
 
-        # Set the bayer pattern.
-        self.bayer_pattern = bayer_pattern
+
 
         # Do sanity check
         self.sanity_check(file_path)
@@ -205,17 +202,25 @@ class VideoReader(object):
 
         # Check if input file is SER file
         if self.SERFile:
-            # Create the VideoCapture object.
-            self.cap = ser_parser.SERParser(file_path)
+            try:
+                # Create the VideoCapture object.
+                self.cap = ser_parser.SERParser(file_path)
 
-            # Read the first frame.
-            self.last_frame_read = self.cap.read_frame(0)
+                # Read the first frame.
+                self.last_frame_read = self.cap.read_frame(0)
 
-            # Look up video metadata.
-            self.frame_count = self.cap.frame_count
-            self.shape = self.last_frame_read.shape
-            self.color = self.cap.color
-            self.dtype = self.cap.PixelDepthPerPlane
+                # Look up video metadata.
+                self.frame_count = self.cap.frame_count
+                self.color_in = self.cap.color
+                self.dtype = self.cap.PixelDepthPerPlane
+                # Set the bayer pattern. In automatic mode, use the pattern encoded in the SER
+                # file header.
+                if bayer_pattern == 'Auto detect color':
+                    self.bayer_pattern = self.cap.header['ColorIDDecoded']
+                else:
+                    self.bayer_pattern = bayer_pattern
+            except:
+                raise IOError("Error in reading first video frame")
         else:
             try:
                 # Create the VideoCapture object.
@@ -228,30 +233,35 @@ class VideoReader(object):
 
                 # Look up video metadata.
                 self.frame_count = int(self.cap.get(CAP_PROP_FRAME_COUNT))
-                self.shape = self.last_frame_read.shape
-                self.color = (len(self.shape) == 3)
+                self.color_in = (len(self.last_frame_read.shape) == 3)
                 self.dtype = self.last_frame_read.dtype
+
+                # Set the bayer pattern. For color frames swap B and R channels. This is
+                # necessary because OpenCV reads frames in BGR mode, while PSS assumes images to be
+                # stored in RGB mode.
+                if bayer_pattern == 'Auto detect color':
+                    if self.color_in:
+                        self.bayer_pattern = 'BGR'
+                    else:
+                        self.bayer_pattern = 'Grayscale'
+                else:
+                    # Swap RGB and BGR modes. Otherwise leave the pattern unchanged.
+                    if bayer_pattern == 'RGB':
+                        self.bayer_pattern = 'BGR'
+                    elif bayer_pattern == 'BGR':
+                        self.bayer_pattern = 'RGB'
+                    else:
+                        self.bayer_pattern = bayer_pattern
             except:
                 raise IOError("Error in reading first video frame")
 
         # Assign "last_read"
         self.last_read = 0
 
-        # If file is in color mode and grayscale output is requested, do the conversion and change
-        # metadata.
-        if self.color:
-            if convert_to_grayscale:
-                # Remember to do the conversion when reading frames later on.
-                self.convert_to_grayscale = True
-                if self.SERFile:
-                    self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
-                else:
-                    self.opencv_color_space = COLOR_BGR2GRAY
-                    self.last_frame_read = cvtColor(self.last_frame_read, self.opencv_color_space)
-                self.color = False
-                self.shape = self.last_frame_read.shape
-            elif not self.SERFile:
-                self.last_frame_read = cvtColor(self.last_frame_read, self.opencv_color_space)
+        # Convert the first frame read into the desired output format and set the metadata.
+        self.last_frame_read = debayer_frame(self.last_frame_read, debayer_pattern=self.bayer_pattern)
+        self.shape = self.last_frame_read.shape
+        self.color = (len(self.shape) == 3)
 
         # Return the metadata.
         return self.frame_count, self.color, self.dtype, self.shape
@@ -274,7 +284,9 @@ class VideoReader(object):
             # An index is the same as at last call, just return the last frame.
             return self.last_frame_read
         else:
-            # If it is the next frame after the one read last time, the frame pointer does not have to be set.
+            # If it is the next frame after the one read last time, for AVI videos the frame pointer
+            # does not have to be set. The read_frame method of the "ser_parser" module always does
+            # a seek operation.
             if not self.SERFile and index != self.last_read + 1:
                 self.cap.set(CAP_PROP_POS_FRAMES, index)
             self.last_read = index
@@ -284,16 +296,16 @@ class VideoReader(object):
             try:
                 # Read the next frame.
                 if self.SERFile:
-                    if self.convert_to_grayscale:
-                        self.last_frame_read = cvtColor(self.cap.read_frame(self.last_read), COLOR_RGB2GRAY)
-                    else:
-                        self.last_frame_read = self.cap.read_frame(self.last_read)
+                    self.last_frame_read = self.cap.read_frame_raw(self.last_read)
                 else:
-                    self.last_frame_read = cvtColor(self.cap.read()[1], self.opencv_color_space)
+                    self.last_frame_read = self.cap.read()[1]
             except:
                 raise IOError("Error in reading video frame, index: {0}".format(index))
         else:
             raise ArgumentError("Error in reading video frame, index {0} is out of bounds".format(index))
+
+        # Convert the frame read into the desired output format.
+        self.last_frame_read = debayer_frame(self.last_frame_read, debayer_pattern=self.bayer_pattern)
 
         return self.last_frame_read
 
@@ -330,7 +342,7 @@ class ImageReader(object):
         self.dtype = None
         self.bayer_pattern = None
 
-    def open(self, file_path_list, bayer_pattern='Auto detect color', convert_to_grayscale=False):
+    def open(self, file_path_list, bayer_pattern='Auto detect color'):
         """
         Initialize the ImageReader object and return parameters with image metadata.
 
@@ -338,8 +350,6 @@ class ImageReader(object):
         :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
                               "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
                               "Force Bayer BGGR". This parameter is ignored for now.
-        :param convert_to_grayscale: If True, convert color frames to grayscale;
-                                     otherwise return RGB color frames.
         :return: (frame_count, color, dtype, shape) with
                  frame_count: Total number of frames.
                  color: True, if frames are in color; False otherwise.
@@ -356,10 +366,8 @@ class ImageReader(object):
 
             self.last_frame_read = Frames.read_image(self.file_path_list[0])
 
-            if convert_to_grayscale:
+            if self.convert_to_grayscale:
                 self.last_frame_read = cvtColor(self.last_frame_read, COLOR_RGB2GRAY)
-                # Remember to do the conversion when reading frames later on.
-                self.convert_to_grayscale = True
 
             # Look up metadata.
             self.last_read = 0
@@ -816,7 +824,7 @@ class Frames(object):
         return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
 
     def __init__(self, configuration, names, type='video', bayer_pattern="Auto detect color",
-                 calibration=None, convert_to_grayscale=False, progress_signal=None,
+                 calibration=None, progress_signal=None,
                  buffer_original=True, buffer_monochrome=False, buffer_gaussian=True,
                  buffer_laplacian=True):
         """
@@ -831,7 +839,6 @@ class Frames(object):
                               "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
                                "Force Bayer BGGR".
         :param calibration: (Optional) calibration object for darks/flats correction.
-        :param convert_to_grayscale: If "True", convert frames to grayscale if they are RGB.
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
                                 (str, int) with the current activity (str) and the progress in
                                 percent (int).
@@ -854,7 +861,6 @@ class Frames(object):
         self.progress_signal = progress_signal
         self.type = type
         self.bayer_pattern = bayer_pattern
-        self.convert_to_grayscale = convert_to_grayscale
 
         self.buffer_original = buffer_original
         self.buffer_monochrome = buffer_monochrome
@@ -890,8 +896,7 @@ class Frames(object):
             raise TypeError("Image type " + self.type + " not supported")
 
         self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
-            bayer_pattern=self.bayer_pattern,
-            convert_to_grayscale=self.convert_to_grayscale)
+            bayer_pattern=self.bayer_pattern)
 
         # Set the depth value of all images to either 16 or 8 bits.
         if self.dt0 == 'uint16':
@@ -1451,7 +1456,6 @@ if __name__ == "__main__":
     if version == 'frames':
         try:
             frames = Frames(configuration, names, type=type, calibration=calibration,
-                            convert_to_grayscale=False,
                             buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
                             buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
         except Error as e:
@@ -1459,7 +1463,7 @@ if __name__ == "__main__":
             exit()
     else:
         try:
-            frames = FramesOld(configuration, names, type=type, convert_to_grayscale=False)
+            frames = FramesOld(configuration, names, type=type)
             frames.add_monochrome(configuration.frames_mono_channel)
         except Error as e:
             print("Error: " + e.message)

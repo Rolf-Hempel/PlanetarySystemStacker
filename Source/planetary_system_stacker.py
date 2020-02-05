@@ -141,7 +141,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     signal_reset_masters = QtCore.pyqtSignal()
     signal_load_master_dark = QtCore.pyqtSignal(str)
     signal_load_master_flat = QtCore.pyqtSignal(str)
-    signal_frames = QtCore.pyqtSignal(object, bool)
+    signal_frames = QtCore.pyqtSignal(object)
     signal_rank_frames = QtCore.pyqtSignal()
     signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
     signal_set_roi = QtCore.pyqtSignal(int, int, int, int)
@@ -704,7 +704,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         elif self.activity == "Read frames":
             # For the first activity (reading all frames from the file system) there is no
             # GUI interaction. Start the workflow action immediately.
-            self.signal_frames.emit(self.jobs[self.job_index], False)
+            self.signal_frames.emit(self.jobs[self.job_index])
             self.busy = True
 
         elif self.activity == "Rank frames":
@@ -882,7 +882,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 self.error_occurred = False
                 if not self.automatic:
                     pass
-                self.signal_frames.emit(self.jobs[self.job_index], False)
+                self.signal_frames.emit(self.jobs[self.job_index])
             else:
                 # If an error occurred, do not include all phases in "Go back to" combo list. This
                 # way the user cannot jump back to a phase of the aborted job which was not

@@ -55,8 +55,7 @@ class FramesOld(object):
 
     """
 
-    def __init__(self, configuration, names, type='video', convert_to_grayscale=False,
-                 progress_signal=None):
+    def __init__(self, configuration, names, type='video', progress_signal=None):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
@@ -65,7 +64,6 @@ class FramesOld(object):
         :param names: In case "video": name of the video file. In case "image": list of names for
                       all images.
         :param type: Either "video" or "image".
-        :param convert_to_grayscale: If "True", convert frames to grayscale if they are RGB.
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
                                 (str, int) with the current activity (str) and the progress in
                                 percent (int).
@@ -75,25 +73,22 @@ class FramesOld(object):
         self.progress_signal = progress_signal
 
         if type == 'image':
-            # Use scipy.misc to read in image files. If "convert_to_grayscale" is True, convert
-            # pixel values to 32bit floats.
+            # Use scipy.misc to read in image files.
             self.number = len(names)
             self.signal_step_size = max(int(self.number / 10), 1)
-            if convert_to_grayscale:
-                self.frames_original = [misc.imread(path, mode='F') for path in names]
-            else:
-                self.frames_original = []
-                for frame_index, path in enumerate(names):
-                    # After every "signal_step_size"th frame, send a progress signal to the main GUI.
-                    if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
-                        self.progress_signal.emit("Read all frames",
-                                             int((frame_index / self.number) * 100.))
-                    # Read the next frame.
-                    frame = imread(path, -1)
-                    self.frames_original.append(frame)
 
-                if self.progress_signal is not None:
-                    self.progress_signal.emit("Read all frames", 100)
+            self.frames_original = []
+            for frame_index, path in enumerate(names):
+                # After every "signal_step_size"th frame, send a progress signal to the main GUI.
+                if self.progress_signal is not None and frame_index%self.signal_step_size == 0:
+                    self.progress_signal.emit("Read all frames",
+                                         int((frame_index / self.number) * 100.))
+                # Read the next frame.
+                frame = imread(path, -1)
+                self.frames_original.append(frame)
+
+            if self.progress_signal is not None:
+                self.progress_signal.emit("Read all frames", 100)
             self.shape = self.frames_original[0].shape
             dt0 = self.frames_original[0].dtype
 
@@ -121,10 +116,7 @@ class FramesOld(object):
                 # Read the next frame.
                 ret, frame = cap.read()
                 if ret:
-                    if convert_to_grayscale:
-                        self.frames_original.append(cvtColor(frame, COLOR_BGR2GRAY))
-                    else:
-                        self.frames_original.append(cvtColor(frame, COLOR_BGR2RGB))
+                    self.frames_original.append(cvtColor(frame, COLOR_BGR2RGB))
                 else:
                     raise IOError("Error in reading video frame")
             cap.release()
@@ -362,12 +354,10 @@ if __name__ == "__main__":
 
     # Get configuration parameters.
     configuration = Configuration()
-    convert_to_grayscale = False
 
     start = time()
     try:
-        frames_old = FramesOld(configuration, names, type=type,
-                               convert_to_grayscale=convert_to_grayscale)
+        frames_old = FramesOld(configuration, names, type=type)
         print("Frames old: Number of images read: " + str(frames_old.number))
         print("Image shape: " + str(frames_old.shape))
     except Error as e:
@@ -385,7 +375,7 @@ if __name__ == "__main__":
         exit()
 
     # try:
-    #     frames = Frames(configuration, names, type=type, convert_to_grayscale=convert_to_grayscale,
+    #     frames = Frames(configuration, names, type=type,
     #                     buffer_original=False, buffer_monochrome=False, buffer_gaussian=False,
     #                     buffer_laplacian=False)
     #     print("\nFrames: Number of images: " + str(frames.number))

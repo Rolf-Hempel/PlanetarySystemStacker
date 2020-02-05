@@ -684,7 +684,7 @@ if __name__ == "__main__":
 
     my_timer.create('Read all frames')
     try:
-        frames = Frames(configuration, names, type=type, convert_to_grayscale=True)
+        frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Error as e:

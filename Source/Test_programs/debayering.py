@@ -104,23 +104,27 @@ image_bayer_encoded = apply_bayer(image_color, 'Force Bayer RGGB')
 
 show_image(image_bayer_encoded, "Image Bayer encoded RGGB")
 image_bayer_decoded = debayer_frame(image_bayer_encoded, 'Force Bayer RGGB')
-show_image(image_bayer_decoded[0], "Image Bayer decoded RGGB")
+show_image(image_bayer_decoded, "Image Bayer decoded RGGB")
 
 # Test Bayer encoding GRBG.
 image_bayer_encoded = apply_bayer(image_color, 'Force Bayer GRBG')
 image_bayer_decoded = debayer_frame(image_bayer_encoded, 'Force Bayer GRBG')
-show_image(image_bayer_decoded[0], "Image Bayer decoded GRBG")
+show_image(image_bayer_decoded, "Image Bayer decoded GRBG")
 
 # Test Bayer encoding GBRG.
 image_bayer_encoded = apply_bayer(image_color, 'Force Bayer GBRG')
 image_bayer_decoded = debayer_frame(image_bayer_encoded, 'Force Bayer GBRG')
-show_image(image_bayer_decoded[0], "Image Bayer decoded GBRG")
+show_image(image_bayer_decoded, "Image Bayer decoded GBRG")
 
 # Test Bayer encoding BGGR.
 image_bayer_encoded = apply_bayer(image_color, 'Force Bayer BGGR')
 image_bayer_decoded = debayer_frame(image_bayer_encoded, 'Force Bayer BGGR')
-show_image(image_bayer_decoded[0], "Image Bayer decoded BGGR")
+show_image(image_bayer_decoded, "Image Bayer decoded BGGR")
 
 # Test "Force Grayscale" with color input.
-image_bayer_decoded = debayer_frame(image_color, 'Grayscale')[0]
+image_bayer_decoded = debayer_frame(image_color, 'Grayscale')
 show_image(image_bayer_decoded, "Image Grayscale")
+
+# Test conversion to BGR with color input.
+image_bgr = debayer_frame(image_color, 'BGR')
+show_image(image_bgr, "Image BGR")

@@ -158,8 +158,8 @@ class Workflow(QtCore.QObject):
                                    precede_with_timestamp=True)
         self.calibration.reset_masters()
 
-    @QtCore.pyqtSlot(object, bool)
-    def execute_frames(self, job, convert_to_grayscale):
+    @QtCore.pyqtSlot(object)
+    def execute_frames(self, job):
         # self.work_next_task_signal.emit("Next job")
 
         # If objects are left over from previous run, delete them.
@@ -267,7 +267,6 @@ class Workflow(QtCore.QObject):
                 self.frames = Frames(self.configuration, names, type=job.type,
                                      bayer_pattern=job.bayer_pattern,
                                      calibration=self.calibration,
-                                     convert_to_grayscale=convert_to_grayscale,
                                      progress_signal=self.work_current_progress_signal,
                                      buffer_original=buffer_original,
                                      buffer_monochrome=buffer_monochrome,

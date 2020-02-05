@@ -85,11 +85,11 @@ class SERParser(object):
                 'ImageHeight', 'PixelDepthPerPlane', 'FrameCount', 'Observer',
                 'Instrument', 'Telescope', 'DateTime', 'DateTime_UTC')
 
-        ColorID = {0:   'MONO',
-                   8:   'BAYER_RGGB',
-                   9:   'BAYER_GRBG',
-                   10:  'BAYER_GBRG',
-                   11:  'BAYER_BGGR',
+        ColorID = {0:   'Grayscale',
+                   8:   'Force Bayer RGGB',
+                   9:   'Force Bayer GRBG',
+                   10:  'Force Bayer GBRG',
+                   11:  'Force Bayer BGGR',
                    16:  'BAYER_CYYM',
                    17:  'BAYER_YCMY',
                    18:  'BAYER_YMCY',
@@ -158,12 +158,45 @@ class SERParser(object):
 
         return header
 
+    def read_frame_raw(self, frame_number=None):
+        """
+        Read the "Image Data" of SER file. Return the 2D or 3D image data without changing the
+        content (e.g. debayering or conversion to / from grayscale).
+
+        :return:    image_data: Multi dimmensional Numpy array containig image frame data.
+        """
+
+        if frame_number is None:
+            frame_number = self.frame_number + 1
+
+        if 0 <= frame_number < self.frame_count:
+            if frame_number != self.frame_number + 1:
+                if frame_number == 0:
+                    self.fid.seek(178)
+                else:
+                    self.fid.seek(178 + frame_number * self.frame_size)
+        else:
+            raise IOError('Error in reading SER frame, index: {0} is out of bounds'.format(frame_number))
+
+        self.frame_number = frame_number
+
+        if self.header['NumberOfPlanes'] == 1:
+            return np.frombuffer(self.fid.read(self.frame_size),
+                    dtype=self.PixelDepthPerPlane).reshape(
+                    self.header['ImageHeight'],
+                    self.header['ImageWidth'])
+        else:
+            return np.frombuffer(self.fid.read(self.frame_size),
+                    dtype=self.PixelDepthPerPlane).reshape(
+                    self.header['ImageHeight'],
+                    self.header['ImageWidth'],
+                    self.header['NumberOfPlanes'])
+
     def read_frame(self, frame_number=None):
         """
         Read the "Image Data" of SER file.
 
-        :return:    image_data          Multi dimmensional Numpy array
-                                        containig image frame data
+        :return:    image_data: Multi dimmensional Numpy array containig image frame data.
         """
 
         if frame_number is None:
