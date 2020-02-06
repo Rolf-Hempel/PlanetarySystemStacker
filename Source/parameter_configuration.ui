@@ -399,7 +399,7 @@ rather than in a separate job</string>
    <item row="13" column="2">
     <widget class="QLabel" name="gpif_label_parameter">
      <property name="toolTip">
-      <string>Stacked and postprocessed images can be written either in &quot;tiff&quot; or &quot;fits&quot; format.</string>
+      <string>Stacked and postprocessed images can be written either in &quot;png&quot;, &quot;tiff&quot; or &quot;fits&quot; format.</string>
      </property>
      <property name="text">
       <string>Write images as</string>

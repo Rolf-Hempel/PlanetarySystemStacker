@@ -2,11 +2,13 @@
 
 # Form implementation generated from reading ui file 'parameter_configuration.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.13.0
 #
 # WARNING! All changes made in this file will be lost!
 
+
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_ConfigurationDialog(object):
     def setupUi(self, ConfigurationDialog):
@@ -339,7 +341,7 @@ class Ui_ConfigurationDialog(object):
 "rather than in a separate job"))
         self.spp_checkBox.setText(_translate("ConfigurationDialog", "Stacking plus postprocessing"))
         self.afsw_label_display.setText(_translate("ConfigurationDialog", "TextLabel"))
-        self.gpif_label_parameter.setToolTip(_translate("ConfigurationDialog", "Stacked and postprocessed images can be written either in \"tiff\" or \"fits\" format."))
+        self.gpif_label_parameter.setToolTip(_translate("ConfigurationDialog", "Stacked and postprocessed images can be written either in \"png\", \"tiff\" or \"fits\" format."))
         self.gpif_label_parameter.setText(_translate("ConfigurationDialog", "Write images as"))
         self.label.setToolTip(_translate("ConfigurationDialog", "Parameters used in the first matching phase. In this phase, the color image\n"
 "is rotated, shifted and stretched to match the B/W image."))
@@ -369,4 +371,3 @@ class Ui_ConfigurationDialog(object):
         self.apfp_label_parameter.setText(_translate("ConfigurationDialog", "Percentage of best frames\n"
 "to be stacked"))
         self.apfp_label_display.setText(_translate("ConfigurationDialog", "TextLabel"))
-

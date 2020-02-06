@@ -78,6 +78,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.gpspwr_checkBox.stateChanged.connect(self.gpspwr_changed)
         self.gppl_spinBox.valueChanged['int'].connect(self.gppl_changed)
         self.gpbl_spinBox.valueChanged['int'].connect(self.gpbl_changed)
+        self.gpif_comboBox.addItem('png')
         self.gpif_comboBox.addItem('tiff')
         self.gpif_comboBox.addItem('fits')
         self.gpif_comboBox.activated[str].connect(self.gpif_changed)

@@ -346,7 +346,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
     def save_version(self):
         """
-        save the result as 16bit Tiff at the standard location.
+        save the result as 16bit png, tiff or fits file at the standard location.
 
         :return: -
         """
@@ -359,16 +359,16 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
     def save_version_as(self):
         """
-        save the result as 16bit Tiff at a location selected by the user.
+        save the result as 16bit png, tiff or fits file at a location selected by the user.
 
         :return: -
         """
 
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
-                            "Save result as 16bit Tiff or Fits image",
+                            "Save result as 16bit png, tiff or fits image",
                             self.postproc_data_object.file_name_processed,
-                            "Image Files (*.tiff *.fits)", options=options)
+                            "Image Files (*.png *.tiff *.fits)", options=options)
 
         if filename and extension:
             Frames.save_image(filename,

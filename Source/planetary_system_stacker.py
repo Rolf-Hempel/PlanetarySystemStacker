@@ -478,7 +478,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             master_dark_file = QtWidgets.QFileDialog.getSaveFileName(self,
                                                  "Choose a file name for the new master dark frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*.tiff *.fits)",
+                                                 "Images (*png *.tiff *.fits)",
                                                  options=options)
 
             if master_dark_file[0]:
@@ -502,7 +502,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     def load_master_dark(self):
         """
         This method is invoked by selecting "Load master dark" from the "Calibration" menu. It
-        opens a file dialog for selecting a Tiff or Fits file with a master dark frame.
+        opens a file dialog for selecting a Png, Tiff or Fits file with a master dark frame.
 
         :return: -
         """
@@ -511,7 +511,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         master_dark_file = QtWidgets.QFileDialog.getOpenFileName(self,
                                                  "Select image file containing a master dark frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*.tiff *.fits)", options=options)
+                                                 "Images (*png *.tiff *.fits)", options=options)
 
         if master_dark_file[0]:
             self.signal_load_master_dark.emit(master_dark_file[0])
@@ -561,7 +561,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             master_flat_file = QtWidgets.QFileDialog.getSaveFileName(self,
                                                  "Choose a file name for the new master flat frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*.tiff *.fits)",
+                                                 "Images (*png *.tiff *.fits)",
                                                  options=options)
 
             if master_flat_file[0]:
@@ -585,7 +585,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     def load_master_flat(self):
         """
         This method is invoked by selecting "Load master flat" from the "Calibration" menu. It
-        opens a file dialog for selecting a Tiff or Fits file with a master flat frame.
+        opens a file dialog for selecting a Png, Tiff or Fits file with a master flat frame.
 
         :return: -
         """
@@ -594,7 +594,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         master_flat_file = QtWidgets.QFileDialog.getOpenFileName(self,
                                                  "Select image file containing a master dark frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*.tiff *.fits)", options=options)
+                                                 "Images (*png *.tiff *.fits)", options=options)
 
         if master_flat_file[0]:
             self.signal_load_master_flat.emit(master_flat_file[0])
@@ -708,11 +708,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.busy = True
 
         elif self.activity == "Rank frames":
-
-            # If batch mode is deselected, start GUI activity.
-            # if not self.automatic:
-            #     self.write_status_bar("Processing " + self.jobs[self.job_index].name + ".", "black")
-            #     self.place_holder_manual_activity('Rank frames')
 
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit()
@@ -944,7 +939,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
     def save_result(self):
         """
-        save the result as 16bit Tiff at the standard location.
+        save the result as 16bit Png, Tiff or Fits file at the standard location.
 
         :return: -
         """
@@ -956,15 +951,15 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
     def save_result_as(self):
         """
-        save the result as 16bit Tiff or Fits at a location selected by the user.
+        save the result as 16bit Png, Tiff or Fits file at a location selected by the user.
 
         :return: -
         """
 
         options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
-            "Save result as 16bit Tiff or Fits image", self.workflow.stacked_image_name,
-            "Image Files (*.tiff *.fits)", options=options)
+            "Save result as 16bit Png, Tiff or Fits image", self.workflow.stacked_image_name,
+            "Image Files (*png *.tiff *.fits)", options=options)
 
         if filename and extension:
             Frames.save_image(filename, self.workflow.stack_frames.stacked_image,

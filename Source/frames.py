@@ -1226,7 +1226,7 @@ class Frames(object):
                    header="PlanetarySystemStacker"):
         """
         Save an image to a file. If "avoid_overwriting" is set to False, images can have either
-        ".tiff" or ".fits" format.
+        ".png", ".tiff" or ".fits" format.
 
         :param filename: Name of the file where the image is to be written
         :param image: ndarray object containing the image data
@@ -1261,7 +1261,7 @@ class Frames(object):
                 if not suffix:
                     filename += '.tiff'
 
-        elif Path(filename).suffix == '.tiff':
+        elif Path(filename).suffix == '.png' or Path(filename).suffix == '.tiff':
             # Don't care if a file with the given name exists. Overwrite it if necessary.
             if path.exists(filename):
                 remove(filename)

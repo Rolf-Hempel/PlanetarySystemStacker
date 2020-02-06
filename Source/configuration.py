@@ -68,7 +68,7 @@ class ConfigurationParameters(object):
         self.global_parameters_store_protocol_with_result = False
         self.global_parameters_buffering_level = 2
         self.global_parameters_include_postprocessing = False
-        self.global_parameters_image_format = "tiff"
+        self.global_parameters_image_format = "png"
         self.frames_gauss_width = 7
         self.frames_debayering_default = 'Auto detect color'
         self.align_frames_mode = 'Surface'
