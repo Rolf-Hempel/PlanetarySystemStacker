@@ -241,9 +241,9 @@ class VideoReader(object):
                 # stored in RGB mode.
                 if bayer_pattern == 'Auto detect color':
                     if self.color_in:
-                        self.bayer_pattern = 'BGR'
+                        self.bayer_pattern = 'BGR'  # Replace by routine which compares noise in red and blue.
                     else:
-                        self.bayer_pattern = 'Grayscale'
+                        self.bayer_pattern = 'Grayscale'   # Replace by "detect_bayer" method.
                 else:
                     # Swap RGB and BGR modes. Otherwise leave the pattern unchanged.
                     if bayer_pattern == 'RGB':
@@ -253,7 +253,8 @@ class VideoReader(object):
                     else:
                         self.bayer_pattern = bayer_pattern
             except:
-                raise IOError("Error in reading first video frame")
+                raise IOError("Error in reading first video frame. Try to convert the video with "
+                              "PIPP into some standard format")
 
         # Assign "last_read"
         self.last_read = 0
@@ -298,9 +299,13 @@ class VideoReader(object):
                 if self.SERFile:
                     self.last_frame_read = self.cap.read_frame_raw(self.last_read)
                 else:
-                    self.last_frame_read = self.cap.read()[1]
+                    ret, self.last_frame_read = self.cap.read()
+                    if not ret:
+                        raise IOError("Error in reading video frame, index: {0}. Try to convert the video with "
+                              "PIPP into some standard format".format(index))
             except:
-                raise IOError("Error in reading video frame, index: {0}".format(index))
+                raise IOError("Error in reading video frame, index: {0}. Try to convert the video with "
+                              "PIPP into some standard format".format(index))
         else:
             raise ArgumentError("Error in reading video frame, index {0} is out of bounds".format(index))
 

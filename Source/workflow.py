@@ -382,7 +382,7 @@ class Workflow(QtCore.QObject):
             return
         except Exception as e:
             self.abort_job_signal.emit(
-                "Error (probably out of RAM): " + str(e) + ", continuing with next job")
+                "Error: " + str(e) + ", continuing with next job")
             self.my_timer.stop('Ranking images')
             return
 
