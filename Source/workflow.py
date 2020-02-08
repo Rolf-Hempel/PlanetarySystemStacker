@@ -265,7 +265,7 @@ class Workflow(QtCore.QObject):
                     Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
             try:
                 self.frames = Frames(self.configuration, names, type=job.type,
-                                     bayer_pattern=job.bayer_pattern,
+                                     bayer_option_selected=job.bayer_option_selected,
                                      calibration=self.calibration,
                                      progress_signal=self.work_current_progress_signal,
                                      buffer_original=buffer_original,
@@ -277,9 +277,16 @@ class Workflow(QtCore.QObject):
                         "           Number of images: " + str(self.frames.number) +
                         ", image shape: " + str(self.frames.shape), self.attached_log_file,
                         precede_with_timestamp=False)
-                    if job.bayer_pattern != 'Auto detect color':
+                    if job.bayer_option_selected == 'Auto detect color':
                         Miscellaneous.protocol(
-                            "           Debayer pattern selected manually: " + job.bayer_pattern,
+                            "           Debayer pattern detected automatically: '" +
+                            self.frames.bayer_pattern + "'",
+                            self.attached_log_file, precede_with_timestamp=False)
+                        job.bayer_pattern = self.frames.bayer_pattern
+                    else:
+                        Miscellaneous.protocol(
+                            "           Debayer pattern selected manually: '" +
+                            job.bayer_option_selected + "'",
                             self.attached_log_file, precede_with_timestamp=False)
                     if self.frames.calibration_matches:
                         if self.calibration.master_dark_frame_adapted is not None and \

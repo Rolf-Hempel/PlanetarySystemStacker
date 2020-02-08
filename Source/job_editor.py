@@ -70,8 +70,9 @@ class Job(object):
            - name: Path name string coming from the file chooser.
            - file_name: File name string without path.
            - type: Either 'video', or 'image' for stacking jobs, or 'postproc' for postprocessing.
-           - bayer_pattern: Initialized to 'Auto detect color' for file types for which
-                            debayering is supported. Otherwise None.
+           - bayer_option_selected: Initialized to 'Auto detect color' for file types for which
+                                    debayering is supported. Otherwise None.
+           - bayer_pattern: Initialized to None
 
         :param job_name: Name of the job (str)
         """
@@ -82,6 +83,7 @@ class Job(object):
 
         # Bayer patterns are only defined for type 'video'.
         self.bayer_pattern = None
+        self.bayer_option_selected = None
 
         # Set the type of the job based on the file name extension.
         image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
@@ -91,7 +93,7 @@ class Job(object):
             extension = path.suffix.lower()
             if extension in video_extensions:
                 self.type = 'video'
-                self.bayer_pattern = 'Auto detect color'
+                self.bayer_option_selected = 'Auto detect color'
             elif extension in image_extensions:
                 self.type = 'postproc'
             else:
@@ -202,7 +204,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
             for input_name in input_names:
                 if input_name not in [job.name for job in self.jobs]:
                     new_job = Job(input_name)
-                    new_job.bayer_pattern = self.configuration.frames_debayering_default
+                    new_job.bayer_option_selected = self.configuration.frames_debayering_default
                     self.jobs.append(new_job)
 
             # Save the current directory location. The next dialog will open at this position.
@@ -273,7 +275,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
             # supported.
             if selected_items:
                 # Create a list of patterns which are checked by the selected items initially.
-                checked_patterns = [self.jobs[source.row(item)].bayer_pattern
+                checked_patterns = [self.jobs[source.row(item)].bayer_option_selected
                                     for item in selected_items]
 
                 # Create the context menu. Mark those patterns checked which have been set for at least
@@ -326,7 +328,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
                 if menu.exec_(event.globalPos()) and self.pattern is not None:
                     for item in selected_items:
                         row = source.row(item)
-                        self.jobs[row].bayer_pattern = self.pattern
+                        self.jobs[row].bayer_option_selected = self.pattern
                 return True
 
         return super(JobEditor, self).eventFilter(source, event)

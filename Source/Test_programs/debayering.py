@@ -1,11 +1,7 @@
-from cv2 import cvtColor, COLOR_RGB2GRAY, COLOR_BayerBG2RGB, COLOR_BayerGB2RGB, \
-    COLOR_BayerGR2RGB, COLOR_BayerRG2RGB, COLOR_GRAY2RGB, COLOR_BGR2RGB, imread, IMREAD_UNCHANGED
-
-from numpy import uint8, uint16
-
 import matplotlib.pyplot as plt
-
+from cv2 import cvtColor, COLOR_RGB2GRAY, COLOR_BGR2RGB, imread, IMREAD_UNCHANGED
 from numpy import ndarray
+from numpy import uint8, uint16
 
 from frames import debayer_frame
 

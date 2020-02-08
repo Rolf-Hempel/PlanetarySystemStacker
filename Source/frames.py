@@ -33,11 +33,12 @@ from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_RGB2
     COLOR_BGR2RGB, COLOR_BayerGB2BGR, COLOR_BayerBG2BGR, \
     GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs, CAP_PROP_POS_FRAMES, \
     IMREAD_UNCHANGED, flip, COLOR_GRAY2RGB, COLOR_BayerRG2BGR, COLOR_BayerGR2BGR
-
 from cv2 import mean as cv_mean
 from numpy import max as np_max
 from numpy import min as np_min
-from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, moveaxis
+from numpy import sum as np_sum
+from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, moveaxis, \
+    unravel_index, ndarray
 
 import ser_parser
 from configuration import Configuration
@@ -140,6 +141,190 @@ def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
     # Return the decoded image.
     return frame_out
 
+
+def detect_bayer(frame):
+    """
+    Detect a Bayer pattern in a grayscale image. The assumption is that statistically the
+    brightness differences at adjacent pixels are greater than those at neighboring pixels of the
+    same color. It is also assumed that the noise in the blue channel is greater than in the red
+    and green channels.
+
+    Acknowledgements: This method uses an algorithm developed by Chris Garry for his 'PIPP'
+                      software package.
+
+    :param frame: Numpy array (2D or 3D) of type uint8 or uint16 containing the image data.
+    :return: If the input frame is a (3D) color image, 'Color' is returned.
+             If the input frame is a (2D or 3D) grayscale image without any detectable Bayer
+             pattern, 'Grayscale' is returned.
+             If a Bayer pattern is detected in the grayscale image, its type (one out of
+             'Force Bayer BGGR', 'Force Bayer GBRG', 'Force Bayer GRBG', 'Force Bayer RGGB') is
+             returned.
+             If none of the above is true, 'None' is returned.
+    """
+
+    # Frames are stored as 3D arrays. Test if all three color levels are the same.
+    if len(frame.shape) == 3 and frame.shape[2] == 3:
+        first_minus_second = np_max(abs(frame[:, :, 0] - frame[:, :, 1]))
+        first_minus_third = np_max(abs(frame[:, :, 0] - frame[:, :, 2]))
+        print("first_minus_second: " + str(first_minus_second) + ", first_minus_third: " + str(
+            first_minus_third))
+
+        # The color levels differ. Probably color image.
+        if first_minus_second > 0 or first_minus_third > 0:
+            return 'Color'
+
+        # All three levels are the same, convert to 2D grayscale image and proceed.
+        else:
+            frame_grayscale = cvtColor(frame, COLOR_RGB2GRAY)
+
+    # Input frame is already grayscale.
+    elif len(frame.shape) == 2:
+        frame_grayscale = frame
+
+    # Neither a color image nor grayscale.
+    else:
+        return 'None'
+
+    try:
+        height, width = frame_grayscale.shape
+        analysis_height = height - height % 2
+        analysis_width = width - width % 2
+
+        # Look for signs of a bayer pattern.
+        adjacent_pixel_diffs = np_sum(
+            abs(frame_grayscale[:, 0:analysis_width - 2] - frame_grayscale[:,
+                                                           1:analysis_width - 1]))
+        apart_pixel_diffs = np_sum(
+            abs(frame_grayscale[:, 0:analysis_width - 2] - frame_grayscale[:, 2:analysis_width]))
+
+        # Pixels are more like the pixels next to them than they are like the pixels 2 pixel away.
+        # This indicates that there is no bayer pattern present
+        if apart_pixel_diffs > adjacent_pixel_diffs:
+            return 'Grayscale'
+
+        # Analyse noise characteristics of image to guess at positions of R, G and B in bayer pattern.
+        noise_level = ndarray((2, 2), dtype=float)
+        for y in range(2):
+            for x in range(2):
+                # Apply a five point (Poisson) stencil and sum over all points.
+                neighbors = (frame_grayscale[y:analysis_height - 6 + y:2,
+                             2 + x:analysis_width - 4 + x:2] +
+                             frame_grayscale[4 + y:analysis_height - 2 + y:2,
+                             2 + x:analysis_width - 4 + x:2] +
+                             frame_grayscale[2 + y:analysis_height - 4 + y:2,
+                             x:analysis_width - 6 + x:2] +
+                             frame_grayscale[2 + y:analysis_height - 4 + y:2,
+                             4 + x:analysis_width - 2 + x:2]) / 4.
+                noise_level[y, x] = np_sum(
+                    abs(frame_grayscale[2 + y:analysis_height - 4 + y:2,
+                        2 + x:analysis_width - 4 + x:2] - neighbors))
+
+        # Normalize noise levels.
+        max_y, max_x = unravel_index(noise_level.argmax(), noise_level.shape)
+        max_noise_level = noise_level[max_y, max_x]
+        if max_noise_level > 0.:
+            noise_level = noise_level * (100. / max_noise_level)
+        # Zero noise - cannot detect bayer pattern.
+        else:
+            return 'Grayscale'
+
+        # Set the maximum allowed difference in noise levels at the two green pixels of the bayer
+        # matrix in percent of value at the blue pixel.
+        max_diff_green = 2.
+        # Set the maximum allowed noise level at Bayer matrix pixels other than blue, in percent of
+        # value at the blue pixel.
+        max_allowed_noise_level = 99.5
+
+        # The location of the maximum noise level is interpreted as the blue channel.
+        # It is in position (0, 0).
+        if (max_y, max_x) == (0, 0):
+            # The noise levels of the green pixels are too different for this to be a bayer pattern.
+            if abs(noise_level[0, 1] - noise_level[1, 0]) > max_diff_green:
+                return 'Grayscale'
+            # Noise levels of the other pixels are too close to the blue values for this to definitely
+            # be a bayer pattern.
+            if noise_level[0, 1] > max_allowed_noise_level or noise_level[
+                1, 0] > max_allowed_noise_level or noise_level[1, 1] > max_allowed_noise_level:
+                return 'Grayscale'
+            # Bayer pattern "BGGR" found.
+            return 'Force Bayer BGGR'
+
+        # Case "GBRG":
+        elif (max_y, max_x) == (0, 1):
+            if abs(noise_level[0, 0] - noise_level[1, 1]) > max_diff_green:
+                return 'Grayscale'
+            if noise_level[0, 0] > max_allowed_noise_level or noise_level[
+                1, 0] > max_allowed_noise_level or noise_level[1, 1] > max_allowed_noise_level:
+                return 'Grayscale'
+            # Bayer pattern "GBRG" found.
+            return 'Force Bayer GBRG'
+
+        # Case "GRBG":
+        elif (max_y, max_x) == (1, 0):
+            if abs(noise_level[0, 0] - noise_level[1, 1]) > max_diff_green:
+                return 'Grayscale'
+            if noise_level[0, 0] > max_allowed_noise_level or noise_level[
+                0, 1] > max_allowed_noise_level or noise_level[1, 1] > max_allowed_noise_level:
+                return 'Grayscale'
+            # Bayer pattern "GRBG" found.
+            return 'Force Bayer GRBG'
+
+        # Case "RGGB"
+        elif (max_y, max_x) == (1, 1):
+            if abs(noise_level[0, 1] - noise_level[1, 0]) > max_diff_green:
+                return 'Grayscale'
+            if noise_level[0, 0] > max_allowed_noise_level or noise_level[
+                0, 1] > max_allowed_noise_level or noise_level[1, 0] > max_allowed_noise_level:
+                return 'Grayscale'
+            # Bayer pattern "RGGB" found.
+            return 'Force Bayer RGGB'
+
+        # Theoretically this cannot be reached.
+        return 'None'
+
+    # If something bad has happened, return 'None'.
+    except Exception as e:
+        print("An Exception occurred: " + str(e))
+        return 'None'
+
+def detect_rgb_bgr(frame):
+    """
+    Given a color (3D) frame, find out if the channels are arranged as 'RGB' or 'BGR'. To this end,
+    the noise level of the first and third channels are compared. The channel with the highest noise
+    level is interpreted as the blue channel.
+
+    :param frame: Numpy array (3D) of type uint8 or uint16 containing the image data.
+    :return: Either 'RGB' or 'BGR', depending on whether the noise in the third or first channel is
+             highest. If an error occurs, 'None' is returned.
+    """
+
+    # Not a color (3D) frame:
+    if len(frame.shape) != 3:
+        return 'None'
+
+    try:
+        height, width = frame.shape[0:2]
+        analysis_height = height - height % 2
+        analysis_width = width - width % 2
+
+        # Analyse noise characteristics of image to guess at positions of R, G and B in bayer pattern.
+        noise_level = [0., 0.]
+        for channel in [0, 2]:
+            # Apply a five point (Poisson) stencil and sum over all points.
+            neighbors = (frame[0:analysis_height - 2, 1:analysis_width - 1, channel] +
+                         frame[2:analysis_height, 1:analysis_width - 1, channel] +
+                         frame[1:analysis_height - 1, 0:analysis_width - 2, channel] +
+                         frame[1:analysis_height - 1, 2:analysis_width, channel]) / 4.
+            noise_level[channel] = np_sum(
+                abs(frame[1:analysis_height - 1, 1:analysis_width - 1, channel] - neighbors))
+
+        if noise_level[0] > noise_level[1]:
+            return 'BGR'
+        else:
+            return 'RGB'
+    except:
+        return 'None'
+
 class VideoReader(object):
     """
     The VideoReader deals with the import of frames from a video file. Frames can be read either
@@ -160,6 +345,7 @@ class VideoReader(object):
         self.convert_to_grayscale = False
         self.dtype = None
         self.SERFile = False
+        self.bayer_option_selected = None
         self.bayer_pattern = None
         self.opencv_color_space = COLOR_BGR2RGB
 
@@ -175,15 +361,15 @@ class VideoReader(object):
         elif stat(file_path).st_size == 0:
             raise IOError("File is empty")
 
-    def open(self, file_path, bayer_pattern='Auto detect color'):
+    def open(self, file_path, bayer_option_selected='Auto detect color'):
         """
         Initialize the VideoReader object and return parameters with video metadata.
         Throws an IOError if the video file format is not supported.
 
         :param file_path: Full name of the video file.
-        :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
-                              "BGR", "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
-                              "Force Bayer BGGR".
+        :param bayer_option_selected: Bayer pattern, one out of: "Auto detect color", "Grayscale",
+                              "RGB", "BGR", "Force Bayer RGGB", "Force Bayer GRBG",
+                               "Force Bayer GBRG", "Force Bayer BGGR".
         :return: (frame_count, color, dtype, shape) with
                  frame_count: Total number of frames in video.
                  color: True, if frames are in color; False otherwise.
@@ -215,10 +401,10 @@ class VideoReader(object):
                 self.dtype = self.cap.PixelDepthPerPlane
                 # Set the bayer pattern. In automatic mode, use the pattern encoded in the SER
                 # file header.
-                if bayer_pattern == 'Auto detect color':
+                if bayer_option_selected == 'Auto detect color':
                     self.bayer_pattern = self.cap.header['ColorIDDecoded']
                 else:
-                    self.bayer_pattern = bayer_pattern
+                    self.bayer_pattern = bayer_option_selected
             except:
                 raise IOError("Error in reading first video frame")
         else:
@@ -236,22 +422,48 @@ class VideoReader(object):
                 self.color_in = (len(self.last_frame_read.shape) == 3)
                 self.dtype = self.last_frame_read.dtype
 
-                # Set the bayer pattern. For color frames swap B and R channels. This is
-                # necessary because OpenCV reads frames in BGR mode, while PSS assumes images to be
-                # stored in RGB mode.
-                if bayer_pattern == 'Auto detect color':
-                    if self.color_in:
-                        self.bayer_pattern = 'BGR'  # Replace by routine which compares noise in red and blue.
+                # Set the bayer pattern. Important note: For color frames swap B and R channels.
+                # This is necessary because OpenCV reads frames in BGR mode, while PSS assumes
+                # images to be stored in RGB mode.
+                if bayer_option_selected == 'Auto detect color':
+                    # Look for a Bayer pattern in the 2D or 3D data.
+                    bayer_pattern_computed = detect_bayer(self.last_frame_read)
+                    # If the image was classified as 'Color', test the ordering of color channels.
+                    if bayer_pattern_computed == 'Color':
+                        # Analyze first frame to detect ordering of color channels.
+                        rgb_order = detect_rgb_bgr(self.last_frame_read)
+                        if rgb_order == 'RGB':
+                            self.bayer_pattern = 'BGR'
+                            print("Color channel ordering 'RGB' detected")
+                        elif rgb_order == 'BGR':
+                            self.bayer_pattern = 'RGB'
+                            print("Color channel ordering  'BGR' detected")
+                        else:
+                            self.bayer_pattern = 'BGR'
+                            print("No color channel ordering  detected, apply 'RGB'")
+                    elif bayer_pattern_computed == 'Grayscale':
+                        self.bayer_pattern = 'Grayscale'
+                        print("Image has been found to be grayscale")
+                    elif bayer_pattern_computed == 'None':
+                        if self.color_in:
+                            self.bayer_pattern = 'BGR'
+                            print("No Bayer pattern detected, apply 'RGB' because 3D")
+                        else:
+                            self.bayer_pattern = 'Grayscale'
+                            print("No Bayer pattern detected, apply 'Grayscale' because 2D")
                     else:
-                        self.bayer_pattern = 'Grayscale'   # Replace by "detect_bayer" method.
+                        self.bayer_pattern = bayer_pattern_computed
+                        print("Bayer pattern " + bayer_pattern_computed + " detected")
+
+                # The user has selected a debayering mode explicitly.
                 else:
                     # Swap RGB and BGR modes. Otherwise leave the pattern unchanged.
-                    if bayer_pattern == 'RGB':
+                    if bayer_option_selected == 'RGB':
                         self.bayer_pattern = 'BGR'
-                    elif bayer_pattern == 'BGR':
+                    elif bayer_option_selected == 'BGR':
                         self.bayer_pattern = 'RGB'
                     else:
-                        self.bayer_pattern = bayer_pattern
+                        self.bayer_pattern = bayer_option_selected
             except:
                 raise IOError("Error in reading first video frame. Try to convert the video with "
                               "PIPP into some standard format")
@@ -347,14 +559,15 @@ class ImageReader(object):
         self.dtype = None
         self.bayer_pattern = None
 
-    def open(self, file_path_list, bayer_pattern='Auto detect color'):
+    def open(self, file_path_list, bayer_option_selected='Auto detect color'):
         """
         Initialize the ImageReader object and return parameters with image metadata.
 
         :param file_path_list: List with path names to the image files.
-        :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
-                              "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
-                              "Force Bayer BGGR". This parameter is ignored for now.
+        :param bayer_option_selected: Bayer pattern, one out of: "Auto detect color", "Grayscale",
+                              "RGB", "BGR", "Force Bayer RGGB", "Force Bayer GRBG",
+                               "Force Bayer GBRG", "Force Bayer BGGR".
+                                This parameter is ignored for now.
         :return: (frame_count, color, dtype, shape) with
                  frame_count: Total number of frames.
                  color: True, if frames are in color; False otherwise.
@@ -364,7 +577,8 @@ class ImageReader(object):
         """
 
         self.file_path_list = file_path_list
-        self.bayer_pattern = bayer_pattern
+        self.bayer_option_selected = bayer_option_selected
+        self.bayer_pattern = bayer_option_selected
 
         try:
             self.frame_count = len(self.file_path_list)
@@ -544,7 +758,7 @@ class Calibration(QtCore.QObject):
             if extension in ('.avi', '.mov', '.mp4', '.ser'):
                 reader = VideoReader()
                 frame_count, input_color, input_dtype, input_shape = reader.open(master_name,
-                                        bayer_pattern=self.configuration.frames_debayering_default)
+                                        bayer_option_selected=self.configuration.frames_debayering_default)
                 self.configuration.hidden_parameters_current_dir = str(Path(master_name).parent)
             else:
                 raise InternalError(
@@ -555,7 +769,7 @@ class Calibration(QtCore.QObject):
             names = [path.join(master_name, name) for name in listdir(master_name)]
             reader = ImageReader()
             frame_count, input_color, input_dtype, input_shape = reader.open(names,
-                                        bayer_pattern=self.configuration.frames_debayering_default)
+                                        bayer_option_selected=self.configuration.frames_debayering_default)
             self.configuration.hidden_parameters_current_dir = str(master_name)
         else:
             raise InternalError("Cannot decide if input file is video or image directory")
@@ -828,7 +1042,7 @@ class Frames(object):
 
         return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
 
-    def __init__(self, configuration, names, type='video', bayer_pattern="Auto detect color",
+    def __init__(self, configuration, names, type='video', bayer_option_selected="Auto detect color",
                  calibration=None, progress_signal=None,
                  buffer_original=True, buffer_monochrome=False, buffer_gaussian=True,
                  buffer_laplacian=True):
@@ -840,9 +1054,9 @@ class Frames(object):
         :param names: In case "video": name of the video file. In case "image": list of names for
                       all images.
         :param type: Either "video" or "image".
-        :param bayer_pattern: Bayer pattern, one out of: "Auto detect color", "Grayscale", "RGB",
-                              "Force Bayer RGGB", "Force Bayer GRBG", "Force Bayer GBRG",
-                               "Force Bayer BGGR".
+        :param bayer_option_selected: Bayer pattern, one out of: "Auto detect color", "Grayscale",
+                              "RGB", "BGR", "Force Bayer RGGB", "Force Bayer GRBG",
+                               "Force Bayer GBRG", "Force Bayer BGGR".
         :param calibration: (Optional) calibration object for darks/flats correction.
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
                                 (str, int) with the current activity (str) and the progress in
@@ -865,7 +1079,8 @@ class Frames(object):
         self.calibration = calibration
         self.progress_signal = progress_signal
         self.type = type
-        self.bayer_pattern = bayer_pattern
+        self.bayer_pattern = None
+        self.bayer_option_selected = bayer_option_selected
 
         self.buffer_original = buffer_original
         self.buffer_monochrome = buffer_monochrome
@@ -901,7 +1116,10 @@ class Frames(object):
             raise TypeError("Image type " + self.type + " not supported")
 
         self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
-            bayer_pattern=self.bayer_pattern)
+            bayer_option_selected=self.bayer_option_selected)
+
+        # Look up the Bayer pattern the reader has identified.
+        self.bayer_pattern = self.reader.bayer_pattern
 
         # Set the depth value of all images to either 16 or 8 bits.
         if self.dt0 == 'uint16':

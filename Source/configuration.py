@@ -143,6 +143,8 @@ class Configuration(object):
         self.window_icon = 'PSS-Icon-64.ico'
 
         self.frames_mono_channel = 'green'
+        self.frames_bayer_max_noise_diff_green = 2.
+        self.frames_bayer_min_distance_from_blue = 0.5
 
         self.rank_frames_pixel_stride = 2
         self.rank_frames_method = "Laplace"
