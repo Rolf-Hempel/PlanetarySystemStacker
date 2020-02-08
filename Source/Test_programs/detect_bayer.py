@@ -29,9 +29,9 @@ def show_image(frame, comment):
     plt.show()
 
 
-# filename = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\AVI_Chris-Garry\\20110929_005012_jupiter_gbrg_DIB.avi'
+filename = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\AVI_Chris-Garry\\20110929_005012_jupiter_gbrg_DIB.avi'
 # filename = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Saturn\sat_c11_ser_F0001-1731_short.avi'
-filename = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24/another_short_video.avi'
+# filename = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24/another_short_video.avi'
 
 # Create the VideoCapture object.
 cap = VideoCapture(filename)

@@ -180,11 +180,11 @@ def detect_bayer(frame):
 
         # All three levels are the same, convert to 2D grayscale image and proceed.
         else:
-            frame_grayscale = cvtColor(frame, COLOR_RGB2GRAY)
+            frame_grayscale = cvtColor(frame, COLOR_RGB2GRAY).astype(int32)
 
     # Input frame is already grayscale.
     elif len(frame.shape) == 2:
-        frame_grayscale = frame
+        frame_grayscale = frame.astype(int32)
 
     # Neither a color image nor grayscale.
     else:
@@ -313,16 +313,18 @@ def detect_rgb_bgr(frame):
         analysis_width = width - width % 2
 
         # Analyse noise characteristics of image to guess at positions of R, G and B in bayer pattern.
+        frame_int32 = frame.astype(int32)
         noise_level = [0., 0., 0.]
         for channel in [0, 2]:
             # Apply a five point (Poisson) stencil and sum over all points.
-            neighbors = (frame[0:analysis_height - 2, 1:analysis_width - 1, channel] +
-                         frame[2:analysis_height, 1:analysis_width - 1, channel] +
-                         frame[1:analysis_height - 1, 0:analysis_width - 2, channel] +
-                         frame[1:analysis_height - 1, 2:analysis_width, channel]) / 4.
+            neighbors = (frame_int32[0:analysis_height - 2, 1:analysis_width - 1, channel] +
+                         frame_int32[2:analysis_height, 1:analysis_width - 1, channel] +
+                         frame_int32[1:analysis_height - 1, 0:analysis_width - 2, channel] +
+                         frame_int32[1:analysis_height - 1, 2:analysis_width, channel]) / 4.
             noise_level[channel] = np_sum(
-                abs(frame[1:analysis_height - 1, 1:analysis_width - 1, channel] - neighbors))
+                abs(frame_int32[1:analysis_height - 1, 1:analysis_width - 1, channel] - neighbors))
 
+        # print("noise level 0:" + str(noise_level[0]) + ", noise level 2:" + str(noise_level[2]))
         if noise_level[0] > noise_level[2]:
             return 'BGR'
         else:
@@ -436,30 +438,31 @@ class VideoReader(object):
                     bayer_pattern_computed = detect_bayer(self.last_frame_read)
                     # If the image was classified as 'Color', test the ordering of color channels.
                     if bayer_pattern_computed == 'Color':
-                        # Analyze first frame to detect ordering of color channels.
+                        # Analyze first frame to detect ordering of color channels. Note that the
+                        # frame was read by OpenCV in BGR mode. Channels will be swapt later.
                         rgb_order = detect_rgb_bgr(self.last_frame_read)
-                        if rgb_order == 'RGB':
+                        if rgb_order == 'BGR':
                             self.bayer_pattern = 'RGB'
-                            print("Color channel ordering 'RGB' detected")
-                        elif rgb_order == 'BGR':
+                            # print("Color channel ordering 'RGB' detected")
+                        elif rgb_order == 'RGB':
                             self.bayer_pattern = 'BGR'
-                            print("Color channel ordering  'BGR' detected")
+                            # print("Color channel ordering  'BGR' detected")
                         else:
                             self.bayer_pattern = 'RGB'
-                            print("No color channel ordering  detected, apply 'RGB'")
+                            # print("No color channel ordering  detected, apply 'RGB'")
                     elif bayer_pattern_computed == 'Grayscale':
                         self.bayer_pattern = 'Grayscale'
-                        print("Image has been found to be grayscale")
+                        # print("Image has been found to be grayscale")
                     elif bayer_pattern_computed == 'None':
                         if self.color_in:
                             self.bayer_pattern = 'RGB'
-                            print("No Bayer pattern detected, apply 'RGB' because 3D")
+                            # print("No Bayer pattern detected, apply 'RGB' because 3D")
                         else:
                             self.bayer_pattern = 'Grayscale'
-                            print("No Bayer pattern detected, apply 'Grayscale' because 2D")
+                            # print("No Bayer pattern detected, apply 'Grayscale' because 2D")
                     else:
                         self.bayer_pattern = bayer_pattern_computed
-                        print("Bayer pattern " + bayer_pattern_computed + " detected")
+                        # print("Bayer pattern " + bayer_pattern_computed + " detected")
 
                 # The user has selected a debayering mode explicitly.
                 else:
