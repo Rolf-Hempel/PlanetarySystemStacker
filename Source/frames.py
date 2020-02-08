@@ -37,7 +37,7 @@ from cv2 import mean as cv_mean
 from numpy import max as np_max
 from numpy import min as np_min
 from numpy import sum as np_sum
-from numpy import uint8, uint16, float32, clip, zeros, float64, where, average, moveaxis, \
+from numpy import uint8, uint16, int32, float32, clip, zeros, float64, where, average, moveaxis, \
     unravel_index, ndarray
 
 import ser_parser
@@ -47,20 +47,20 @@ from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError,
 from frames_old import FramesOld
 
 
-def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
+def debayer_frame(frame_in, debayer_pattern='No change', BGR_input=False):
     """
     Process a given input frame "frame_in", either containing one layer (B/W) or three layers
     (color) into an output frame "frame_out" as specified by the parameter "debayer_pattern".
 
     The rules for this transformation are:
-    - If the "debayer_pattern" is "Auto detect color", the input frame is not changed, i.e. the
+    - If the "debayer_pattern" is "No change", the input frame is not changed, i.e. the
       output frame is identical to the input frame. The same applies if the input frame is of type
-      color, and the "debayer_pattern" is "RGB", or if the input frame is of type "B/W" and the
-      "debayer_pattern" is "Grayscale".
+       "B/W" and the "debayer_pattern" is "Grayscale".
     - If the input frame is of type "color" and "debayer_pattern" is "Grayscale", the RGB / BGR
       image is converted into a B/W one.
-    - If the input frame is of type "color" and "debayer_pattern" is "BGR", the "B" and "R" channels
-      are exchanged.
+    - If the input frame is of type "color", the "debayer_pattern" is "BGR" and "BGR_input" is
+     'False', the "B" and "R" channels are exchanged. The same happens if "debayer_pattern" is "RGB"
+      and "BGR_input" is 'True'. For the other two combinations the channels are not exchanged.
     - If the input frame is of type "Grayscale" and "debayer_pattern" is "RGB" or "BGR", the result
       is a three-channel RGB / BGR image where all channels are the same.
     - If a non-standard "debayer_pattern" (i.e. "RGGB", "GRBG", "GBRG", "BGGR") is specified and the
@@ -73,6 +73,8 @@ def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
     :param debayer_pattern: Pattern used to convert the input image into the output image. One out
                             of 'Grayscale', 'RGB', 'Force Bayer RGGB', 'Force Bayer GRBG',
                             'Force Bayer GBRG', 'Force Bayer BGGR'
+    :param BGR_input: If 'True', a color input frame is interpreted as 'BGR'; Otherwise as 'RGB'.
+                      OpenCV reads color images in 'BGR' format.
     :return: frame_out: output image (see above)
     """
 
@@ -94,11 +96,12 @@ def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
     # Case color input image.
     if color_in:
         # Three-channel input, interpret as RGB color and leave it unchanged.
-        if debayer_pattern in ['Auto detect color', 'RGB']:
+        if debayer_pattern == 'No change' or debayer_pattern == 'RGB' and not BGR_input or \
+                debayer_pattern == 'BGR' and BGR_input:
             frame_out = frame_in
 
-        # If the Bayer pattern is 'BGR', flip channels.
-        elif debayer_pattern == 'BGR':
+        # If the Bayer pattern and the BGR_input flag don't match, flip channels.
+        elif debayer_pattern == 'RGB' and BGR_input or debayer_pattern == 'BGR' and not BGR_input:
             frame_out = cvtColor(frame_in, COLOR_BGR2RGB)
 
         # Three-channel (color) input, reduce to two-channel (B/W) image.
@@ -122,7 +125,7 @@ def debayer_frame(frame_in, debayer_pattern='Auto detect color'):
     # Case B/W input image.
     else:
         # Two-channel input, interpret as B/W image and leave it unchanged.
-        if debayer_pattern in ['Auto detect color', 'Grayscale']:
+        if debayer_pattern in ['No change', 'Grayscale']:
             frame_out = frame_in
 
         # Transform the one-channel B/W image in an RGB one where all three channels are the same.
@@ -164,13 +167,15 @@ def detect_bayer(frame):
 
     # Frames are stored as 3D arrays. Test if all three color levels are the same.
     if len(frame.shape) == 3 and frame.shape[2] == 3:
-        first_minus_second = np_max(abs(frame[:, :, 0] - frame[:, :, 1]))
-        first_minus_third = np_max(abs(frame[:, :, 0] - frame[:, :, 2]))
-        print("first_minus_second: " + str(first_minus_second) + ", first_minus_third: " + str(
-            first_minus_third))
+        first_minus_second = np_max(abs(frame[:, :, 0].astype(int32) - frame[:, :, 1].astype(int32)))
+        first_minus_third = np_max(abs(frame[:, :, 0].astype(int32) - frame[:, :, 2].astype(int32)))
+        # print("first_minus_second: " + str(first_minus_second) + ", first_minus_third: " + str(
+        #     first_minus_third))
 
-        # The color levels differ. Probably color image.
-        if first_minus_second > 0 or first_minus_third > 0:
+        # The color levels differ more than some threshold. Probably color image.
+        color_difference_threshold = 5
+        if first_minus_second > color_difference_threshold \
+                or first_minus_third > color_difference_threshold:
             return 'Color'
 
         # All three levels are the same, convert to 2D grayscale image and proceed.
@@ -284,7 +289,7 @@ def detect_bayer(frame):
 
     # If something bad has happened, return 'None'.
     except Exception as e:
-        print("An Exception occurred: " + str(e))
+        # print("An Exception occurred: " + str(e))
         return 'None'
 
 def detect_rgb_bgr(frame):
@@ -308,7 +313,7 @@ def detect_rgb_bgr(frame):
         analysis_width = width - width % 2
 
         # Analyse noise characteristics of image to guess at positions of R, G and B in bayer pattern.
-        noise_level = [0., 0.]
+        noise_level = [0., 0., 0.]
         for channel in [0, 2]:
             # Apply a five point (Poisson) stencil and sum over all points.
             neighbors = (frame[0:analysis_height - 2, 1:analysis_width - 1, channel] +
@@ -318,11 +323,12 @@ def detect_rgb_bgr(frame):
             noise_level[channel] = np_sum(
                 abs(frame[1:analysis_height - 1, 1:analysis_width - 1, channel] - neighbors))
 
-        if noise_level[0] > noise_level[1]:
+        if noise_level[0] > noise_level[2]:
             return 'BGR'
         else:
             return 'RGB'
-    except:
+    except Exception as e:
+        # print("An Exception occurred: " + str(e))
         return 'None'
 
 class VideoReader(object):
@@ -347,7 +353,7 @@ class VideoReader(object):
         self.SERFile = False
         self.bayer_option_selected = None
         self.bayer_pattern = None
-        self.opencv_color_space = COLOR_BGR2RGB
+        self.BGR_input = None
 
     def sanity_check(self, file_path):
         """
@@ -378,8 +384,6 @@ class VideoReader(object):
                         (num_px_y, num_px_x) for B/W.
         """
 
-
-
         # Do sanity check
         self.sanity_check(file_path)
 
@@ -398,6 +402,7 @@ class VideoReader(object):
                 # Look up video metadata.
                 self.frame_count = self.cap.frame_count
                 self.color_in = self.cap.color
+                self.BGR_input = False
                 self.dtype = self.cap.PixelDepthPerPlane
                 # Set the bayer pattern. In automatic mode, use the pattern encoded in the SER
                 # file header.
@@ -417,14 +422,15 @@ class VideoReader(object):
                 if not ret:
                     raise IOError("Error in reading first video frame")
 
-                # Look up video metadata.
+                # Look up video metadata. Set "BGR_input" to 'True' because OpenCV reads color
+                # images in BGR channel ordering. R and B channels have to be swapped because
+                # PSS works with RGB color internally.
                 self.frame_count = int(self.cap.get(CAP_PROP_FRAME_COUNT))
                 self.color_in = (len(self.last_frame_read.shape) == 3)
+                self.BGR_input = True
                 self.dtype = self.last_frame_read.dtype
 
-                # Set the bayer pattern. Important note: For color frames swap B and R channels.
-                # This is necessary because OpenCV reads frames in BGR mode, while PSS assumes
-                # images to be stored in RGB mode.
+                # Set the bayer pattern.
                 if bayer_option_selected == 'Auto detect color':
                     # Look for a Bayer pattern in the 2D or 3D data.
                     bayer_pattern_computed = detect_bayer(self.last_frame_read)
@@ -433,20 +439,20 @@ class VideoReader(object):
                         # Analyze first frame to detect ordering of color channels.
                         rgb_order = detect_rgb_bgr(self.last_frame_read)
                         if rgb_order == 'RGB':
-                            self.bayer_pattern = 'BGR'
+                            self.bayer_pattern = 'RGB'
                             print("Color channel ordering 'RGB' detected")
                         elif rgb_order == 'BGR':
-                            self.bayer_pattern = 'RGB'
+                            self.bayer_pattern = 'BGR'
                             print("Color channel ordering  'BGR' detected")
                         else:
-                            self.bayer_pattern = 'BGR'
+                            self.bayer_pattern = 'RGB'
                             print("No color channel ordering  detected, apply 'RGB'")
                     elif bayer_pattern_computed == 'Grayscale':
                         self.bayer_pattern = 'Grayscale'
                         print("Image has been found to be grayscale")
                     elif bayer_pattern_computed == 'None':
                         if self.color_in:
-                            self.bayer_pattern = 'BGR'
+                            self.bayer_pattern = 'RGB'
                             print("No Bayer pattern detected, apply 'RGB' because 3D")
                         else:
                             self.bayer_pattern = 'Grayscale'
@@ -457,13 +463,8 @@ class VideoReader(object):
 
                 # The user has selected a debayering mode explicitly.
                 else:
-                    # Swap RGB and BGR modes. Otherwise leave the pattern unchanged.
-                    if bayer_option_selected == 'RGB':
-                        self.bayer_pattern = 'BGR'
-                    elif bayer_option_selected == 'BGR':
-                        self.bayer_pattern = 'RGB'
-                    else:
-                        self.bayer_pattern = bayer_option_selected
+                    # Leave the pattern unchanged.
+                    self.bayer_pattern = bayer_option_selected
             except:
                 raise IOError("Error in reading first video frame. Try to convert the video with "
                               "PIPP into some standard format")
@@ -472,7 +473,9 @@ class VideoReader(object):
         self.last_read = 0
 
         # Convert the first frame read into the desired output format and set the metadata.
-        self.last_frame_read = debayer_frame(self.last_frame_read, debayer_pattern=self.bayer_pattern)
+        self.last_frame_read = debayer_frame(self.last_frame_read,
+                                             debayer_pattern=self.bayer_pattern,
+                                             BGR_input=self.BGR_input)
         self.shape = self.last_frame_read.shape
         self.color = (len(self.shape) == 3)
 
@@ -522,7 +525,9 @@ class VideoReader(object):
             raise ArgumentError("Error in reading video frame, index {0} is out of bounds".format(index))
 
         # Convert the frame read into the desired output format.
-        self.last_frame_read = debayer_frame(self.last_frame_read, debayer_pattern=self.bayer_pattern)
+        self.last_frame_read = debayer_frame(self.last_frame_read,
+                                             debayer_pattern=self.bayer_pattern,
+                                             BGR_input=self.BGR_input)
 
         return self.last_frame_read
 
