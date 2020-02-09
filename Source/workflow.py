@@ -249,6 +249,9 @@ class Workflow(QtCore.QObject):
         self.my_timer.create('Execution over all')
 
         if self.activity == 'stacking':
+            # A new stacking job. Reset the stack size. The initial number is computed from the
+            # stack size (in percent) at the beginning of the corresponding GUI dialog.
+            self.configuration.alignment_points_frame_number = None
             # Write parameters to the protocol.
             if self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.print_stacking_parameters(self.configuration, self.attached_log_file)
