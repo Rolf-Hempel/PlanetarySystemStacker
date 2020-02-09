@@ -143,6 +143,7 @@ class Configuration(object):
         self.window_icon = 'PSS-Icon-64.ico'
 
         self.frames_mono_channel = 'green'
+        self.frames_normalization_threshold = 15
         self.frames_bayer_max_noise_diff_green = 2.
         self.frames_bayer_min_distance_from_blue = 0.5
 

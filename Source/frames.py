@@ -30,7 +30,7 @@ from time import time
 from PyQt5 import QtCore
 from astropy.io import fits
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_RGB2GRAY, \
-    COLOR_BGR2RGB, COLOR_BayerGB2BGR, COLOR_BayerBG2BGR, \
+    COLOR_BGR2RGB, COLOR_BayerGB2BGR, COLOR_BayerBG2BGR, THRESH_TOZERO, threshold, \
     GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs, CAP_PROP_POS_FRAMES, \
     IMREAD_UNCHANGED, flip, COLOR_GRAY2RGB, COLOR_BayerRG2BGR, COLOR_BayerGR2BGR
 from cv2 import mean as cv_mean
@@ -173,7 +173,7 @@ def detect_bayer(frame):
         #     first_minus_third))
 
         # The color levels differ more than some threshold. Probably color image.
-        color_difference_threshold = 5
+        color_difference_threshold = 0
         if first_minus_second > color_difference_threshold \
                 or first_minus_third > color_difference_threshold:
             return 'Color'
@@ -1326,13 +1326,23 @@ class Frames(object):
             # Normalize the overall frame brightness.
             frame_type = frame_mono.dtype
             if self.first_monochrome:
-                self.average_brightness_first_frame = cv_mean(frame_mono)[0]
+                self.average_brightness_first_frame = cv_mean(
+                    threshold(frame_mono, self.configuration.frames_normalization_threshold, 65535,
+                              THRESH_TOZERO)[1])[0]
                 frame_mono = frame_mono.astype(frame_type)
                 self.first_monochrome = False
+                # print("index first frame: " + str(index) + ", brightness: " + str(
+                #     self.average_brightness_first_frame))
             else:
-                average_brightness_current_frame = cv_mean(frame_mono)[0]
-                frame_mono = frame_mono * self.average_brightness_first_frame / \
-                                average_brightness_current_frame
+                average_brightness_current_frame = cv_mean(
+                    threshold(frame_mono, self.configuration.frames_normalization_threshold, 65535,
+                              THRESH_TOZERO)[1])[0]
+                # print("index: " + str(index) + ", brightness: " + str(
+                #     average_brightness_current_frame))
+                # frame_mono = frame_mono + (self.average_brightness_first_frame -
+                #                            average_brightness_current_frame)
+                frame_mono = frame_mono * (self.average_brightness_first_frame /
+                                           average_brightness_current_frame)
                 # Clip the pixel values to the range allowed.
                 if frame_type == uint8:
                     clip(frame_mono, 0, 255, out=frame_mono)
