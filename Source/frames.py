@@ -1326,8 +1326,18 @@ class Frames(object):
             # Normalize the overall frame brightness.
             frame_type = frame_mono.dtype
             if self.first_monochrome:
+                if frame_type == uint8:
+                    self.normalization_lower_threshold = \
+                        self.configuration.frames_normalization_threshold
+                    self.normalization_upper_threshold = 255
+                else:
+                    self.normalization_lower_threshold = \
+                        self.configuration.frames_normalization_threshold * 256
+                    self.normalization_upper_threshold = 255
+
                 self.average_brightness_first_frame = cv_mean(
-                    threshold(frame_mono, self.configuration.frames_normalization_threshold, 65535,
+                    threshold(frame_mono, self.normalization_lower_threshold,
+                              self.normalization_upper_threshold,
                               THRESH_TOZERO)[1])[0]
                 frame_mono = frame_mono.astype(frame_type)
                 self.first_monochrome = False
@@ -1335,12 +1345,11 @@ class Frames(object):
                 #     self.average_brightness_first_frame))
             else:
                 average_brightness_current_frame = cv_mean(
-                    threshold(frame_mono, self.configuration.frames_normalization_threshold, 65535,
+                    threshold(frame_mono, self.normalization_lower_threshold,
+                              self.normalization_upper_threshold,
                               THRESH_TOZERO)[1])[0]
                 # print("index: " + str(index) + ", brightness: " + str(
                 #     average_brightness_current_frame))
-                # frame_mono = frame_mono + (self.average_brightness_first_frame -
-                #                            average_brightness_current_frame)
                 frame_mono = frame_mono * (self.average_brightness_first_frame /
                                            average_brightness_current_frame)
                 # Clip the pixel values to the range allowed.
