@@ -9,7 +9,11 @@ def countlines(start, lines=0, header=True, begin_start=None):
 
     for thing in os.listdir(start):
         thing = os.path.join(start, thing)
-        if os.path.isfile(thing):
+
+        # With the following line only non-GUI code is counted.
+        if os.path.isfile(thing) and not os.path.isfile(thing[:-3] + '.ui'):
+        # As an alternative count all files.
+        # if os.path.isfile(thing):
             if thing.endswith('.py'):
                 with open(thing, 'r') as f:
                     newlines = f.readlines()
@@ -32,5 +36,5 @@ def countlines(start, lines=0, header=True, begin_start=None):
 
     return lines
 
-directory = r'E:\SW-Development\Python\PlanetarySystemStacker\Source'
+directory = r'D:\SW-Development\Python\PlanetarySystemStacker\Source'
 lines = countlines(directory)
