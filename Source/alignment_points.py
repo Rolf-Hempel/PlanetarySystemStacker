@@ -627,9 +627,15 @@ class AlignmentPoints(object):
                                  alignment_point['patch_x_high'] + self.align_frames.dx[
                                      frame_index])
                     # Compute the frame quality and append it to the list for this alignment point.
-                    alignment_point['frame_qualities'].append(
-                        method(frame[y_low:y_high, x_low:x_high],
-                               self.configuration.alignment_points_rank_pixel_stride))
+                    if self.configuration.frames_normalization:
+                        alignment_point['frame_qualities'].append(
+                            method(frame[y_low:y_high, x_low:x_high],
+                                   self.configuration.alignment_points_rank_pixel_stride) /
+                            self.frames.frames_average_brightness[frame_index])
+                    else:
+                        alignment_point['frame_qualities'].append(
+                            method(frame[y_low:y_high, x_low:x_high],
+                                   self.configuration.alignment_points_rank_pixel_stride))
         else:
             # Sampled-down Laplacians of all blurred frames have been computed in
             # "frames.frames_mono_blurred_laplacian". Cut out boxes around alignment points from
@@ -656,7 +662,13 @@ class AlignmentPoints(object):
                                      alignment_point['patch_x_high'] + self.align_frames.dx[
                                          frame_index]) / self.configuration.align_frames_sampling_stride)
                     # Compute the frame quality and append it to the list for this alignment point.
-                    alignment_point['frame_qualities'].append(meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0])
+                    if self.configuration.frames_normalization:
+                        alignment_point['frame_qualities'].append(
+                            meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0] /
+                            self.frames.frames_average_brightness[frame_index])
+                    else:
+                        alignment_point['frame_qualities'].append(
+                            meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0])
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank frames at APs", 100)

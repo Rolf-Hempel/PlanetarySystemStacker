@@ -1148,7 +1148,8 @@ class Miscellaneous(object):
         """
 
         # Compile all parameters and their values to be printed.
-        parameters = [["Noise level (add Gaussian blur)", str(configuration.frames_gauss_width)],
+        parameters = [["Debayering default", configuration.frames_debayering_default],
+                      ["Noise level (add Gaussian blur)", str(configuration.frames_gauss_width)],
                       ["Frame stabilization mode", configuration.align_frames_mode]]
 
         # The following parameters are only active in "Surface" mode.
@@ -1172,16 +1173,23 @@ class Miscellaneous(object):
                                    ["Minimum brightness",
                                     str(configuration.alignment_points_brightness_threshold)],
                                    ["Percentage of best frames to be stacked",
-                                    str(configuration.alignment_points_frame_percent)]
+                                    str(configuration.alignment_points_frame_percent)],
+                                   ["Normalize frame brightness", str(
+                                           configuration.frames_normalization)]
                                    ]
 
-        output_string = "\n           Stacking parameters:                                         | Value   |\n" \
-                        "           ------------------------------------------------------------------------" \
+        # If brightness normalization is checked, add the black cut-off value.
+        if configuration.frames_normalization:
+            parameters = parameters + [
+                ["Normalization black cut-off", str(configuration.frames_normalization_threshold)]]
+
+        output_string = "\n           Stacking parameters:                                         | Value             |\n" \
+                        "           ----------------------------------------------------------------------------------" \
                         "\n          "
 
         # Extend the output string with a line for every parameter to be printed.
         for line in parameters:
-            output_string += " {0:60s} | {1:8s}|\n          ".format(line[0], line[1])
+            output_string += " {0:60s} | {1:18s}|\n          ".format(line[0], line[1])
 
         # Write the complete table.
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)

@@ -86,7 +86,13 @@ class RankFrames(object):
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
                                               int(round(10*frame_index / self.number) * 10))
-                self.frame_ranks.append(method(frame, self.configuration.rank_frames_pixel_stride))
+                if self.configuration.frames_normalization:
+                    self.frame_ranks.append(
+                        method(frame, self.configuration.rank_frames_pixel_stride) /
+                        self.frames.frames_average_brightness[frame_index])
+                else:
+                    self.frame_ranks.append(
+                        method(frame, self.configuration.rank_frames_pixel_stride))
         else:
             for frame_index in range(self.frames.number):
                 frame = self.frames.frames_mono_blurred_laplacian(frame_index)
@@ -94,7 +100,11 @@ class RankFrames(object):
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
                                               int(round(10*frame_index / self.number) * 10))
-                self.frame_ranks.append(meanStdDev(frame)[1][0][0])
+                if self.configuration.frames_normalization:
+                    self.frame_ranks.append(meanStdDev(frame)[1][0][0] /
+                        self.frames.frames_average_brightness[frame_index])
+                else:
+                    self.frame_ranks.append(meanStdDev(frame)[1][0][0])
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank all frames", 100)

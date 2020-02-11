@@ -151,6 +151,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     signal_save_stacked_image = QtCore.pyqtSignal()
     signal_postprocess_image = QtCore.pyqtSignal()
     signal_save_postprocessed_image = QtCore.pyqtSignal(object)
+    signal_set_go_back_activity = QtCore.pyqtSignal(str)
 
     def __init__(self, parent=None):
         """
@@ -253,6 +254,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.signal_save_stacked_image.connect(self.workflow.execute_save_stacked_image)
         self.signal_postprocess_image.connect(self.workflow.execute_postprocess_image)
         self.signal_save_postprocessed_image.connect(self.workflow.execute_save_postprocessed_image)
+        self.signal_set_go_back_activity.connect(self.change_go_back_activity)
 
         # Initialize status variables
         self.automatic = self.ui.box_automatic.isChecked()
@@ -261,6 +263,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.job_number = 0
         self.job_index = 0
         self.jobs = []
+        self.activities = ['Read frames', 'Rank frames', 'Align frames', 'Select stack size',
+                           'Set ROI', 'Set alignment points', 'Compute frame qualities',
+                           'Stack frames', 'Save stacked image', 'Postprocessing',
+                           'Save postprocessed image']
         self.activity = 'Read frames'
         self.error_occurred = False
 
@@ -343,6 +349,27 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Display the configuration editor widget in the central QFrame.
         self.display_widget(ConfigurationEditor(self))
+
+    def change_go_back_activity(self, activity):
+        """
+        This method is triggered in the configuration editor if at least one parameter has been
+        changed. In this case it may be necessary to reset the workflow to an earlier phase. This
+        phase is set as the current activity, and later phases are deleted from the "go back"
+        button list.
+
+        :param activity: Workflow phase where the computation can be safely resumed.
+        :return: -
+        """
+
+        # Only if parameters are changed later in the workflow, write a message to the protocol.
+        if self.configuration.global_parameters_protocol_level > 1 and self.activity != 'Read frames':
+            Miscellaneous.protocol(
+                "+++ Parameter change: all phases after '" + activity + "' are invalidated +++",
+                self.workflow.attached_log_file, precede_with_timestamp=True)
+
+        # Reset the position in the workflow, and update the "go back" button list.
+        self.activity = activity
+        self.set_previous_actions_button()
 
     def display_widget(self, widget, display=True):
         """

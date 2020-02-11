@@ -1107,7 +1107,6 @@ class Frames(object):
 
         # Set a flag that no monochrome image has been computed before.
         self.first_monochrome = True
-        self.average_brightness_first_frame = None
 
         # Initialize the list of original frames.
         self.frames_original = None
@@ -1156,6 +1155,11 @@ class Frames(object):
         self.frames_monochrome = [None] * self.number
         self.frames_monochrome_blurred = [None] *self.number
         self.frames_monochrome_blurred_laplacian = [None] *self.number
+        if self.configuration.frames_normalization:
+            self.frames_average_brightness = [None] *self.number
+        else:
+            self.frames_average_brightness = None
+        self.first_monochrome_index = None
         self.used_alignment_points = None
 
     def compute_required_buffer_size(self, buffering_level):
@@ -1323,41 +1327,34 @@ class Frames(object):
             else:
                 frame_mono = frame_original
 
-            # Normalize the overall frame brightness.
-            frame_type = frame_mono.dtype
-            if self.first_monochrome:
-                if frame_type == uint8:
-                    self.normalization_lower_threshold = \
-                        self.configuration.frames_normalization_threshold
-                    self.normalization_upper_threshold = 255
-                else:
-                    self.normalization_lower_threshold = \
-                        self.configuration.frames_normalization_threshold * 256
-                    self.normalization_upper_threshold = 255
+            # Normalize the overall frame brightness. The first monochrome frame for which this
+            # method is invoked is taken as the reference. The average brightness of all other
+            # monochrome frames is adjusted to match the brightness of the referenence.
+            if self.configuration.frames_normalization:
+                frame_type = frame_mono.dtype
+                if self.first_monochrome:
+                    if frame_type == uint8:
+                        self.normalization_lower_threshold = \
+                            self.configuration.frames_normalization_threshold
+                        self.normalization_upper_threshold = 255
+                    else:
+                        self.normalization_lower_threshold = \
+                            self.configuration.frames_normalization_threshold * 256
+                        self.normalization_upper_threshold = 255
 
-                self.average_brightness_first_frame = cv_mean(
-                    threshold(frame_mono, self.normalization_lower_threshold,
-                              self.normalization_upper_threshold,
-                              THRESH_TOZERO)[1])[0]
-                frame_mono = frame_mono.astype(frame_type)
-                self.first_monochrome = False
-                # print("index first frame: " + str(index) + ", brightness: " + str(
-                #     self.average_brightness_first_frame))
-            else:
-                average_brightness_current_frame = cv_mean(
-                    threshold(frame_mono, self.normalization_lower_threshold,
-                              self.normalization_upper_threshold,
-                              THRESH_TOZERO)[1])[0]
-                # print("index: " + str(index) + ", brightness: " + str(
-                #     average_brightness_current_frame))
-                frame_mono = frame_mono * (self.average_brightness_first_frame /
-                                           average_brightness_current_frame)
-                # Clip the pixel values to the range allowed.
-                if frame_type == uint8:
-                    clip(frame_mono, 0, 255, out=frame_mono)
+                    self.frames_average_brightness[index] = cv_mean(
+                        threshold(frame_mono, self.normalization_lower_threshold,
+                                  self.normalization_upper_threshold,
+                                  THRESH_TOZERO)[1])[0] + 1.e-10
+                    # Keep the index of the first monochrome frame as the reference index.
+                    self.first_monochrome_index = index
+                    self.first_monochrome = False
+                # Not the first monochrome frame. Adjust brightness to match the reference.
                 else:
-                    clip(frame_mono, 0, 65535, out=frame_mono)
-                frame_mono = frame_mono.astype(frame_type)
+                    self.frames_average_brightness[index] = cv_mean(
+                        threshold(frame_mono, self.normalization_lower_threshold,
+                                  self.normalization_upper_threshold,
+                                  THRESH_TOZERO)[1])[0] + 1.e-10
 
             # If the monochrome frames are buffered, store it at the current index.
             if self.buffer_monochrome:

@@ -44,6 +44,8 @@ class ConfigurationParameters(object):
         self.global_parameters_image_format = None
         self.frames_gauss_width = None
         self.frames_debayering_default = None
+        self.frames_normalization = None
+        self.frames_normalization_threshold = None
         self.align_frames_mode = None
         self.align_frames_automation = None
         self.align_frames_rectangle_scale_factor = None
@@ -71,6 +73,8 @@ class ConfigurationParameters(object):
         self.global_parameters_image_format = "png"
         self.frames_gauss_width = 7
         self.frames_debayering_default = 'Auto detect color'
+        self.frames_normalization = True
+        self.frames_normalization_threshold = 15
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
         self.align_frames_rectangle_scale_factor = 3.
@@ -112,6 +116,8 @@ class ConfigurationParameters(object):
             configuration_object.global_parameters_image_format
         self.frames_gauss_width = configuration_object.frames_gauss_width
         self.frames_debayering_default = configuration_object.frames_debayering_default
+        self.frames_normalization = configuration_object.frames_normalization
+        self.frames_normalization_threshold = configuration_object.frames_normalization_threshold
         self.align_frames_mode = configuration_object.align_frames_mode
         self.align_frames_automation = configuration_object.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -143,7 +149,6 @@ class Configuration(object):
         self.window_icon = 'PSS-Icon-64.ico'
 
         self.frames_mono_channel = 'green'
-        self.frames_normalization_threshold = 15
         self.frames_bayer_max_noise_diff_green = 2.
         self.frames_bayer_min_distance_from_blue = 0.5
 
@@ -249,6 +254,9 @@ class Configuration(object):
             configuration_parameters.global_parameters_image_format
         self.frames_gauss_width = configuration_parameters.frames_gauss_width
         self.frames_debayering_default = configuration_parameters.frames_debayering_default
+        self.frames_normalization = configuration_parameters.frames_normalization
+        self.frames_normalization_threshold = \
+            configuration_parameters.frames_normalization_threshold
         self.align_frames_mode = configuration_parameters.align_frames_mode
         self.align_frames_automation = configuration_parameters.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -299,6 +307,8 @@ class Configuration(object):
 
         configuration_parameters.frames_gauss_width = self.frames_gauss_width
         configuration_parameters.frames_debayering_default = self.frames_debayering_default
+        configuration_parameters.frames_normalization = self.frames_normalization
+        configuration_parameters.frames_normalization_threshold = self.frames_normalization_threshold
 
         configuration_parameters.align_frames_mode = self.align_frames_mode
         configuration_parameters.align_frames_automation = self.align_frames_automation
@@ -356,6 +366,8 @@ class Configuration(object):
             'Global parameters', 'image format')
         self.frames_gauss_width = conf.getint('Frames', 'gauss width')
         self.frames_debayering_default = conf.get('Frames', 'debayering default')
+        self.frames_normalization = conf.getboolean('Frames', 'normalization')
+        self.frames_normalization_threshold = conf.getint('Frames', 'normalization threshold')
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
         self.align_frames_rectangle_scale_factor = conf.getfloat('Align frames',
@@ -416,6 +428,9 @@ class Configuration(object):
         self.config_parser_object.add_section('Frames')
         self.set_parameter('Frames', 'gauss width', str(self.frames_gauss_width))
         self.set_parameter('Frames', 'debayering default', self.frames_debayering_default)
+        self.set_parameter('Frames', 'normalization', str(self.frames_normalization))
+        self.set_parameter('Frames', 'normalization threshold',
+                           str(self.frames_normalization_threshold))
 
         self.config_parser_object.add_section('Align frames')
         self.set_parameter('Align frames', 'mode', self.align_frames_mode)
