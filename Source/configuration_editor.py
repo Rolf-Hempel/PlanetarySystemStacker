@@ -415,9 +415,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         # If the change of parameters require going back in the workflow, find the latest phase
         # which is safe to go back to.
         if go_back_to_activities:
-            print ("go back to activities not empty")
-            self.parent_gui.signal_set_go_back_activity.emit(self.parent_gui.activities[min(
-                [self.parent_gui.activities.index(item) for item in go_back_to_activities])])
+            self.parent_gui.signal_set_go_back_activity.emit(go_back_to_activities)
 
         self.close()
 
