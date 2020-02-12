@@ -57,7 +57,7 @@ Time = 2
 PlaySound = 0
 Allow = 0
 [Build]
-File = D:\SW-Development\Python\PlanetarySystemStacker\Windows_Installer\PlanetarySystemStacker_V0.7.0-beta_Windows-Installer.exe
+File = D:\SW-Development\Python\PlanetarySystemStacker\Windows_Installer\PlanetarySystemStacker_V0.7.0-beta-2_Windows-Installer.exe
 [Updater]
 Allow = 0
 1 = <appname>
