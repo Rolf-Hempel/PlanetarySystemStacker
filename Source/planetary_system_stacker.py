@@ -151,7 +151,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     signal_save_stacked_image = QtCore.pyqtSignal()
     signal_postprocess_image = QtCore.pyqtSignal()
     signal_save_postprocessed_image = QtCore.pyqtSignal(object)
-    signal_set_go_back_activity = QtCore.pyqtSignal(str)
+    signal_set_go_back_activity = QtCore.pyqtSignal(object)
 
     def __init__(self, parent=None):
         """
@@ -350,25 +350,33 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Display the configuration editor widget in the central QFrame.
         self.display_widget(ConfigurationEditor(self))
 
-    def change_go_back_activity(self, activity):
+    def change_go_back_activity(self, phases):
         """
         This method is triggered in the configuration editor if at least one parameter has been
         changed. In this case it may be necessary to reset the workflow to an earlier phase. This
         phase is set as the current activity, and later phases are deleted from the "go back"
         button list.
 
-        :param activity: Workflow phase where the computation can be safely resumed.
+        :param phases: List of phases after which the workflow has to be invalidated. The
+                       earliest phase on the list is relevant.
         :return: -
         """
+
+        # Include the current activity in the list to make sure that the workflow will not jump to
+        # a phase which is not yet prepared.
+        phases.append(self.activity)
+
+        # Reset the position in the workflow.
+        earliest_phase = self.activities[min([self.activities.index(item) for item in phases])]
 
         # Only if parameters are changed later in the workflow, write a message to the protocol.
         if self.configuration.global_parameters_protocol_level > 1 and self.activity != 'Read frames':
             Miscellaneous.protocol(
-                "+++ Parameter change: all phases after '" + activity + "' are invalidated +++",
+                "+++ Parameter change: all phases after '" + earliest_phase + "' are invalidated +++",
                 self.workflow.attached_log_file, precede_with_timestamp=True)
 
         # Reset the position in the workflow, and update the "go back" button list.
-        self.activity = activity
+        self.activity = earliest_phase
         self.set_previous_actions_button()
 
     def display_widget(self, widget, display=True):
