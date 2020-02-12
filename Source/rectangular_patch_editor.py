@@ -27,6 +27,7 @@ from sys import argv, exit
 from time import time
 
 from numpy import uint8, uint16, int32
+from cv2 import NORM_MINMAX, normalize
 from PyQt5 import QtCore, QtGui, QtWidgets
 
 from exceptions import InternalError, NotSupportedError, Error
@@ -229,6 +230,10 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
         image_uint8 = self.image.astype(uint8)
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
+
+        # Normalize the frame brightness.
+        image_uint8 = normalize(image_uint8, None, alpha=0, beta=255, norm_type=NORM_MINMAX)
+
         qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
                                 QtGui.QImage.Format_Grayscale8)
         pixmap = QtGui.QPixmap(qt_image)

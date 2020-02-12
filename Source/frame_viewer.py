@@ -28,14 +28,14 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 from glob import glob
 from sys import argv, exit
 from time import time, sleep
-from cv2 import COLOR_BGR2RGB, cvtColor
 
 import matplotlib.pyplot as plt
-from numpy import array, full, uint8, uint16
 from PyQt5 import QtCore, QtGui, QtWidgets
+from cv2 import NORM_MINMAX, normalize
 from matplotlib import patches
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
+from numpy import array, full, uint8, uint16
 
 from align_frames import AlignFrames
 from configuration import Configuration
@@ -282,6 +282,9 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
+
+        # Normalize the frame brightness.
+        image_uint8 = normalize(image_uint8, None, alpha=0, beta=255, norm_type=NORM_MINMAX)
 
         # The image is monochrome:
         if len(image_uint8.shape) == 2:
