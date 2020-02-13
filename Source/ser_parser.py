@@ -64,7 +64,7 @@ class SERParser(object):
 
             # Test how many of the 16 bits are not used. Set the parameter which is used from now
             # on to shift pixel values such that the full 16bit range is used.
-            self.shift_pixels = self.correct_dynamic_range()
+            self.correct_dynamic_range()
 
         self.color = 8 <= self.header['ColorID'] <= 19 and self.header['DebayerPattern'] is not None \
                      or 100 <= self.header['ColorID'] <= 101
@@ -343,7 +343,3 @@ if __name__ == "__main__":
     else:
         plt.imshow(last_frame_read, cmap='gray')
     plt.show()
-
-    cv2.imshow('image', last_frame_read)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()

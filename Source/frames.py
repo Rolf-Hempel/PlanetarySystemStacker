@@ -399,7 +399,7 @@ class VideoReader(object):
                 self.cap = ser_parser.SERParser(file_path)
 
                 # Read the first frame.
-                self.last_frame_read = self.cap.read_frame(0)
+                self.last_frame_read = self.cap.read_frame_raw(0)
 
                 # Look up video metadata.
                 self.frame_count = self.cap.frame_count
@@ -1734,10 +1734,13 @@ if __name__ == "__main__":
           " total: {2:7.3f} (seconds)".format(initialization_time, total_access_time,
                                               initialization_time + total_access_time))
 
+    frame = frames.frames(3)
+    print("Image type: " + str(frame.dtype))
+
     # Check the OpenCV BGR and Matplotlibs RGB color orders
     import matplotlib.pyplot as plt
     if frames.color:
-        plt.imshow(frames.frames(3))
+        plt.imshow(frame)
     else:
-        plt.imshow(frames.frames(3), cmap='gray')
+        plt.imshow(frame, cmap='gray')
     plt.show()
