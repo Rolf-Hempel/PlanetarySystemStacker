@@ -1654,10 +1654,16 @@ if __name__ == "__main__":
         names = glob(
             'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
     else:
-        names = 'Videos/another_short_video.avi'
+        # names = 'Videos/another_short_video.avi'
         # names = 'Videos/Moon_Tile-024_043939.avi'
-        name_flats = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Flat.avi'
-        name_darks = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Dark.avi'
+        names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
+                r'\SER_RGGB_16bit_LittleEndian_397_397.ser'
+        # names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
+        #         r'\SER_GRAYSCALED_16bit_LittleEndian_397_397.ser'
+        # names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
+        #         r'\SER_GRAYSCALED_12bit_BigEndian_352_400.ser'
+        # name_flats = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Flat.avi'
+        # name_darks = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Dark.avi'
 
     # Get configuration parameters.
     configuration = Configuration()
@@ -1727,3 +1733,11 @@ if __name__ == "__main__":
     print("\nInitialization time: {0:7.3f}, frame accesses and variant computations: {1:7.3f},"
           " total: {2:7.3f} (seconds)".format(initialization_time, total_access_time,
                                               initialization_time + total_access_time))
+
+    # Check the OpenCV BGR and Matplotlibs RGB color orders
+    import matplotlib.pyplot as plt
+    if frames.color:
+        plt.imshow(frames.frames(3))
+    else:
+        plt.imshow(frames.frames(3), cmap='gray')
+    plt.show()

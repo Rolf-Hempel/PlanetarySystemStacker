@@ -235,27 +235,28 @@ class AlignmentPoints(object):
 
         # Normalize the structure information for all alignment point boxes by dividing by the
         # maximum value.
-        structure_max = max(
-            alignment_point['structure'] for alignment_point in self.alignment_points)
-        alignment_points_dropped_structure_indices = []
-        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
-            alignment_point['structure'] /= structure_max
-            # Remove alignment points with too little structure and increment the counter.
-            if alignment_point['structure'] < structure_threshold:
-                alignment_points_dropped_structure_indices.append(alignment_point_index)
-                self.alignment_points_dropped_structure += 1
-
-        # Remove alignment points which do not satisfy the structure condition, if there is any.
-        if alignment_points_dropped_structure_indices:
-            alignment_points_new = []
-            dropped_index = 0
+        if self.alignment_points:
+            structure_max = max(
+                alignment_point['structure'] for alignment_point in self.alignment_points)
+            alignment_points_dropped_structure_indices = []
             for alignment_point_index, alignment_point in enumerate(self.alignment_points):
-                if alignment_point_index != alignment_points_dropped_structure_indices[
-                    dropped_index]:
-                    alignment_points_new.append(alignment_point)
-                elif dropped_index < len(alignment_points_dropped_structure_indices) - 1:
-                    dropped_index += 1
-            self.alignment_points = alignment_points_new
+                alignment_point['structure'] /= structure_max
+                # Remove alignment points with too little structure and increment the counter.
+                if alignment_point['structure'] < structure_threshold:
+                    alignment_points_dropped_structure_indices.append(alignment_point_index)
+                    self.alignment_points_dropped_structure += 1
+
+            # Remove alignment points which do not satisfy the structure condition, if there is any.
+            if alignment_points_dropped_structure_indices:
+                alignment_points_new = []
+                dropped_index = 0
+                for alignment_point_index, alignment_point in enumerate(self.alignment_points):
+                    if alignment_point_index != alignment_points_dropped_structure_indices[
+                        dropped_index]:
+                        alignment_points_new.append(alignment_point)
+                    elif dropped_index < len(alignment_points_dropped_structure_indices) - 1:
+                        dropped_index += 1
+                self.alignment_points = alignment_points_new
 
     def new_alignment_point(self, y, x, extend_x_low, extend_x_high, extend_y_low, extend_y_high):
         """

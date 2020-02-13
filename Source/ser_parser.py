@@ -49,12 +49,22 @@ class SERParser(object):
                           self.header['ImageHeight'] * \
                           self.header['BytesPerPixel']
 
+        # This parameter is the number of unused bits in pixel values. It will be determined
+        # experimentally later, based on a sample of frames. This is necessary because SER headers
+        # often contain incorrect values for PixelDepthPerPlane. Often this value is set to 16, but
+        # the image data only contain 8, 10 or 12 bits.
+        self.shift_pixels = 0
+
         if self.header['PixelDepthPerPlane'] <= 8:
             self.PixelDepthPerPlane = np.dtype(np.uint8)
         else:
             # FireCapture uses "LittleEndian".
             # Until FireCatpure 2.7 this flag was not set properly.
             self.PixelDepthPerPlane = np.dtype(np.uint16).newbyteorder('<')
+
+            # Test how many of the 16 bits are not used. Set the parameter which is used from now
+            # on to shift pixel values such that the full 16bit range is used.
+            self.shift_pixels = self.correct_dynamic_range()
 
         self.color = 8 <= self.header['ColorID'] <= 19 and self.header['DebayerPattern'] is not None \
                      or 100 <= self.header['ColorID'] <= 101
@@ -181,15 +191,26 @@ class SERParser(object):
         self.frame_number = frame_number
 
         if self.header['NumberOfPlanes'] == 1:
-            return np.frombuffer(self.fid.read(self.frame_size),
-                    dtype=self.PixelDepthPerPlane).reshape(
-                    self.header['ImageHeight'],
-                    self.header['ImageWidth'])
+            # If the pixel values do not use the full dynamic range, shift them accordingly.
+            if self.shift_pixels:
+                return np.frombuffer(self.fid.read(self.frame_size),
+                        dtype=self.PixelDepthPerPlane).reshape(
+                        self.header['ImageHeight'], self.header['ImageWidth']) << self.shift_pixels
+            else:
+                return np.frombuffer(self.fid.read(self.frame_size),
+                         dtype=self.PixelDepthPerPlane).reshape(
+                         self.header['ImageHeight'], self.header['ImageWidth'])
         else:
-            return np.frombuffer(self.fid.read(self.frame_size),
+            if self.shift_pixels:
+                return np.frombuffer(self.fid.read(self.frame_size),
+                        dtype=self.PixelDepthPerPlane).reshape(
+                        self.header['ImageHeight'],
+                        self.header['ImageWidth'],
+                        self.header['NumberOfPlanes']) << self.shift_pixels
+            else:
+                return np.frombuffer(self.fid.read(self.frame_size),
                     dtype=self.PixelDepthPerPlane).reshape(
-                    self.header['ImageHeight'],
-                    self.header['ImageWidth'],
+                    self.header['ImageHeight'], self.header['ImageWidth'],
                     self.header['NumberOfPlanes'])
 
     def read_frame(self, frame_number=None):
@@ -245,6 +266,31 @@ class SERParser(object):
     def read_all_frames(self):
         return [self.read_frame(idx) for idx in range(self.frame_count)]
 
+    def correct_dynamic_range(self):
+        """
+        Test if the pixel values in a sample of video frames use the full dynamic range of 16bit.
+        To this end, for three frames (first frame, middle frame, last frame) the maximal value
+        is determined. The "shift_pixels" parameter is set to the number of bits which are not used
+        in all the pixels tested. After the call to this method, calls to "read_frame_raw"
+        return frame values left-shifted by this number of bits.
+
+        :return: -
+        """
+
+        # If more than two frames are in the video, take a sample of three frames.
+        if self.frame_count > 2:
+            frame_ids = [0, int(self.frame_count / 2), self.frame_count-1]
+        else:
+            frame_ids = [0]
+
+        # Compute the maximal value of a (color) channel pixel within the sample.
+        max_pixel_value = max([np.max(self.read_frame_raw(frame_id)) for frame_id in frame_ids])
+
+        # Compute the number of unused "head room" bits. Subsequent calls to "read_frame_raw"
+        # will return pixel values left-shifted by this number.
+        self.shift_pixels = 16 - int(max_pixel_value).bit_length()
+        print ("shift pixels: " + str(self.shift_pixels))
+
     def read_trailer(self):
         """
         Read the "Trailer" of SER file with time stamps in UTC for every image
@@ -276,10 +322,15 @@ if __name__ == "__main__":
     import ser_parser
     import matplotlib.pyplot as plt
 
-    file_path = r'C:\Temp\SER\Mars_GRBG.ser'
+    # file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
+    #             r'\SER_GRAYSCALED_12bit_BigEndian_352_400.ser'
+    file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
+                r'\SER_GRAYSCALED_16bit_LittleEndian_397_397.ser'
+    # file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
+    #             r'\SER_RGGB_16bit_LittleEndian_397_397.ser'
 
     cap = ser_parser.SERParser(file_path)
-    last_frame_read = cap.read_frame(25)
+    last_frame_read = cap.read_frame(3)
     frame_count = cap.frame_count
     shape = last_frame_read.shape
     color = cap.color
