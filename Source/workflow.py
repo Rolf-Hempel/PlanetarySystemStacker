@@ -291,6 +291,21 @@ class Workflow(QtCore.QObject):
                             "           Debayer pattern selected manually: '" +
                             job.bayer_option_selected + "'",
                             self.attached_log_file, precede_with_timestamp=False)
+                    if self.frames.dt0 == 'uint16':
+                        dynamic_range = '16 bit'
+                    elif self.frames.dt0 == 'uint8':
+                        dynamic_range = '8 bit'
+                    else:
+                        dynamic_range = 'undefined'
+                    Miscellaneous.protocol(
+                        "           Dynamic range of input frames: " + dynamic_range + ".",
+                        self.attached_log_file, precede_with_timestamp=False)
+                    if self.frames.shift_pixels:
+                        Miscellaneous.protocol(
+                            "           Pixel values are multiplied by 2**" + str(
+                                self.frames.shift_pixels) + " to use the full dynamic range of 16 "
+                                                            "bits.",
+                            self.attached_log_file, precede_with_timestamp=False)
                     if self.frames.calibration_matches:
                         if self.calibration.master_dark_frame_adapted is not None and \
                                 self.calibration.inverse_master_flat_frame is not None:

@@ -353,6 +353,7 @@ class VideoReader(object):
         self.convert_to_grayscale = False
         self.dtype = None
         self.SERFile = False
+        self.shift_pixels = 0
         self.bayer_option_selected = None
         self.bayer_pattern = None
         self.BGR_input = None
@@ -369,7 +370,8 @@ class VideoReader(object):
         elif stat(file_path).st_size == 0:
             raise IOError("File is empty")
 
-    def open(self, file_path, bayer_option_selected='Auto detect color'):
+    def open(self, file_path, bayer_option_selected='Auto detect color',
+             SER_16bit_shift_correction=True):
         """
         Initialize the VideoReader object and return parameters with video metadata.
         Throws an IOError if the video file format is not supported.
@@ -378,12 +380,18 @@ class VideoReader(object):
         :param bayer_option_selected: Bayer pattern, one out of: "Auto detect color", "Grayscale",
                               "RGB", "BGR", "Force Bayer RGGB", "Force Bayer GRBG",
                                "Force Bayer GBRG", "Force Bayer BGGR".
+        :param SER_16bit_shift_correction: If True and the frame type is 16bit, the video frames
+                                           are analyzed to find the number of unused high bits in
+                                           pixel data. In read operations data are shifted up by
+                                           this number of bits.
         :return: (frame_count, color, dtype, shape) with
                  frame_count: Total number of frames in video.
                  color: True, if frames are in color; False otherwise.
                  dtype: Numpy type, either uint8 or uint16
                  shape: Tuple with the shape of a single frame; (num_px_y, num_px_x, 3) for color,
                         (num_px_y, num_px_x) for B/W.
+                 shift_pixels: Number of unused (high) bits in pixel values. Frame data can be
+                               left-shifted by this number without going into saturation.
         """
 
         # Do sanity check
@@ -396,7 +404,8 @@ class VideoReader(object):
         if self.SERFile:
             try:
                 # Create the VideoCapture object.
-                self.cap = ser_parser.SERParser(file_path)
+                self.cap = ser_parser.SERParser(file_path, SER_16bit_shift_correction)
+                self.shift_pixels = self.cap.shift_pixels
 
                 # Read the first frame.
                 self.last_frame_read = self.cap.read_frame_raw(0)
@@ -483,7 +492,7 @@ class VideoReader(object):
         self.color = (len(self.shape) == 3)
 
         # Return the metadata.
-        return self.frame_count, self.color, self.dtype, self.shape
+        return self.frame_count, self.color, self.dtype, self.shape, self.shift_pixels
 
     def read_frame(self, index=None):
         """
@@ -566,6 +575,7 @@ class ImageReader(object):
         self.convert_to_grayscale = False
         self.dtype = None
         self.bayer_pattern = None
+        self.shift_pixels = 0
 
     def open(self, file_path_list, bayer_option_selected='Auto detect color'):
         """
@@ -582,6 +592,8 @@ class ImageReader(object):
                  dtype: Numpy type, either uint8 or uint16
                  shape: Tuple with the shape of a single frame; (num_px_y, num_px_x, 3) for color,
                         (num_px_y, num_px_x) for B/W.
+                 shift_pixels: Number of unused (high) bits in pixel values. Frame data can be
+                               left-shifted by this number without going into saturation.
         """
 
         self.file_path_list = file_path_list
@@ -608,7 +620,7 @@ class ImageReader(object):
         self.just_opened = True
 
         # Return the metadata.
-        return self.frame_count, self.color, self.dtype, self.shape
+        return self.frame_count, self.color, self.dtype, self.shape, self.shift_pixels
 
     def read_frame(self, index=None):
         """
@@ -765,8 +777,10 @@ class Calibration(QtCore.QObject):
             extension = Path(master_name).suffix
             if extension in ('.avi', '.mov', '.mp4', '.ser'):
                 reader = VideoReader()
-                frame_count, input_color, input_dtype, input_shape = reader.open(master_name,
-                                        bayer_option_selected=self.configuration.frames_debayering_default)
+                # Switch off dynamic range correction for 16bit SER files.
+                frame_count, input_color, input_dtype, input_shape, shift_pixels = reader.open(master_name,
+                     bayer_option_selected=self.configuration.frames_debayering_default,
+                     SER_16bit_shift_correction=False)
                 self.configuration.hidden_parameters_current_dir = str(Path(master_name).parent)
             else:
                 raise InternalError(
@@ -776,7 +790,7 @@ class Calibration(QtCore.QObject):
         elif Path(master_name).is_dir():
             names = [path.join(master_name, name) for name in listdir(master_name)]
             reader = ImageReader()
-            frame_count, input_color, input_dtype, input_shape = reader.open(names,
+            frame_count, input_color, input_dtype, input_shape, shift_pixels = reader.open(names,
                                         bayer_option_selected=self.configuration.frames_debayering_default)
             self.configuration.hidden_parameters_current_dir = str(master_name)
         else:
@@ -937,11 +951,17 @@ class Calibration(QtCore.QObject):
 
         return color == self.color and shape == self.shape
 
-    def adapt_frame_type(self, frame_dtype):
+    def adapt_dark_frame(self, frame_dtype, shift_pixels):
         """
-        Adapt the type of the master frames to the type of frames to be corrected.
+        Adapt the type of the master dark frame to the type of frames to be corrected.
 
         :param frame_dtype: Dtype of frames to be corrected. Either uint8 or uint16.
+        :param shift_pixels: Number of unused (high) bits in pixel values. Frame data are
+                             left-shifted by this number so that they fill the full dynamic range.
+                             Since the dark frame is subtracted from all frames, it must be shifted
+                             by the same number of bits before being applied.
+
+                             This correction is only relevant for 16bit SER videos.
         :return: -
         """
 
@@ -955,7 +975,10 @@ class Calibration(QtCore.QObject):
             self.master_dark_frame_adapted = (self.master_dark_frame / 256.).astype(uint8)
         elif frame_dtype == uint16:
             self.high_value = 65535
-            self.master_dark_frame_adapted = self.master_dark_frame
+            if shift_pixels:
+                self.master_dark_frame_adapted = self.master_dark_frame << shift_pixels
+            else:
+                self.master_dark_frame_adapted = self.master_dark_frame
 
     def correct(self, frame):
         """
@@ -1089,6 +1112,7 @@ class Frames(object):
         self.type = type
         self.bayer_pattern = None
         self.bayer_option_selected = bayer_option_selected
+        self.shift_pixels = None
 
         self.buffer_original = buffer_original
         self.buffer_monochrome = buffer_monochrome
@@ -1122,7 +1146,7 @@ class Frames(object):
         else:
             raise TypeError("Image type " + self.type + " not supported")
 
-        self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
+        self.number, self.color, self.dt0, self.shape, self.shift_pixels = self.reader.open(self.names,
             bayer_option_selected=self.bayer_option_selected)
 
         # Look up the Bayer pattern the reader has identified.
@@ -1141,7 +1165,7 @@ class Frames(object):
             self.calibration_matches = self.calibration.flats_darks_match(self.color, self.shape)
             # If there are matching darks or flats, adapt their type to the current frame type.
             if self.calibration_matches:
-                self.calibration.adapt_frame_type(self.dt0)
+                self.calibration.adapt_dark_frame(self.dt0, self.shift_pixels)
         else:
             self.calibration_matches = False
 

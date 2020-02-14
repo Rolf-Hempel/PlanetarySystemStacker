@@ -174,7 +174,7 @@ class Frames(object):
         else:
             raise TypeError("Image type " + self.type + " not supported")
 
-        self.number, self.color, self.dt0, self.shape = self.reader.open(self.names,
+        self.number, self.color, self.dt0, self.shape, self.shift_pixels = self.reader.open(self.names,
             bayer_option_selected=self.bayer_option_selected)
 
         # Look up the Bayer pattern the reader has identified.
@@ -193,7 +193,7 @@ class Frames(object):
             self.calibration_matches = self.calibration.flats_darks_match(self.color, self.shape)
             # If there are matching darks or flats, adapt their type to the current frame type.
             if self.calibration_matches:
-                self.calibration.adapt_frame_type(self.dt0)
+                self.calibration.adapt_dark_frame(self.dt0, self.shift_pixels)
         else:
             self.calibration_matches = False
 

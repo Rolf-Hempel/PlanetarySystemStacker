@@ -34,7 +34,17 @@ class SERParser(object):
     __version__ = '1.1'
     __name__ = 'SER parser for PlanetarySystemStacker tool (PSS)'
 
-    def __init__(self, ser_file):
+    def __init__(self, ser_file, SER_16bit_shift_correction=True):
+        """
+        Parse video files of type SER (8 or 16 bit). Provide access to individual frames based on
+        the frame index.
+
+        :param ser_file: Full name of the video file.
+        :param SER_16bit_shift_correction: If True and the frame type is 16bit, the video frames
+                                           are analyzed to find the number of unused high bits in
+                                           pixel data. In read operations data are shifted up by
+                                           this number of bits.
+        """
         super().__init__()
 
         self.sanity_check(ser_file)
@@ -64,7 +74,8 @@ class SERParser(object):
 
             # Test how many of the 16 bits are not used. Set the parameter which is used from now
             # on to shift pixel values such that the full 16bit range is used.
-            self.correct_dynamic_range()
+            if SER_16bit_shift_correction:
+                self.correct_dynamic_range()
 
         self.color = 8 <= self.header['ColorID'] <= 19 and self.header['DebayerPattern'] is not None \
                      or 100 <= self.header['ColorID'] <= 101
@@ -289,7 +300,7 @@ class SERParser(object):
         # Compute the number of unused "head room" bits. Subsequent calls to "read_frame_raw"
         # will return pixel values left-shifted by this number.
         self.shift_pixels = 16 - int(max_pixel_value).bit_length()
-        print ("shift pixels: " + str(self.shift_pixels))
+        # print ("shift pixels: " + str(self.shift_pixels))
 
     def read_trailer(self):
         """

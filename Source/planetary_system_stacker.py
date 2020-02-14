@@ -263,10 +263,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.job_number = 0
         self.job_index = 0
         self.jobs = []
-        self.activities = ['Read frames', 'Rank frames', 'Align frames', 'Select stack size',
-                           'Set ROI', 'Set alignment points', 'Compute frame qualities',
-                           'Stack frames', 'Save stacked image', 'Postprocessing',
-                           'Save postprocessed image']
+        self.activities = ['Previous job', 'Read frames', 'Rank frames', 'Align frames',
+                           'Select stack size', 'Set ROI', 'Set alignment points',
+                           'Compute frame qualities', 'Stack frames', 'Save stacked image',
+                           'Postprocessing', 'Save postprocessed image', 'Next job']
         self.activity = 'Read frames'
         self.error_occurred = False
 
