@@ -40,7 +40,12 @@ cap = VideoCapture(filename)
 ret, first_frame_read = cap.read()
 show_image(first_frame_read, "First frame of Video")
 
-debayer_code = detect_bayer(first_frame_read)
+frames_bayer_max_noise_diff_green = 2.
+frames_bayer_min_distance_from_blue = 99.5
+frames_color_difference_threshold = 0
+debayer_code = detect_bayer(first_frame_read, frames_bayer_max_noise_diff_green,
+                            frames_bayer_min_distance_from_blue,
+                            frames_color_difference_threshold)
 print ("Debayer code found: " + debayer_code)
 
 if debayer_code == 'Color':

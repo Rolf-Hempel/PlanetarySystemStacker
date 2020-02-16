@@ -145,7 +145,8 @@ def debayer_frame(frame_in, debayer_pattern='No change', BGR_input=False):
     return frame_out
 
 
-def detect_bayer(frame):
+def detect_bayer(frame, frames_bayer_max_noise_diff_green, frames_bayer_min_distance_from_blue,
+                 frames_color_difference_threshold):
     """
     Detect a Bayer pattern in a grayscale image. The assumption is that statistically the
     brightness differences at adjacent pixels are greater than those at neighboring pixels of the
@@ -156,6 +157,17 @@ def detect_bayer(frame):
                       software package.
 
     :param frame: Numpy array (2D or 3D) of type uint8 or uint16 containing the image data.
+    :param frames_bayer_max_noise_diff_green: Maximum allowed difference in noise levels at the two
+                                              green pixels of the bayer matrix in percent of value
+                                              at the blue pixel.
+    :param frames_bayer_min_distance_from_blue: Maximum allowed noise level at Bayer matrix pixels
+                                                other than blue, in percent of value at the blue
+                                                pixel.
+    :param frames_color_difference_threshold: If the brightness values of all three color channels
+                                              of a three-channel frame at all pixels do not differ
+                                              by more than this value, the frame is regarded as
+                                              monochrome.
+
     :return: If the input frame is a (3D) color image, 'Color' is returned.
              If the input frame is a (2D or 3D) grayscale image without any detectable Bayer
              pattern, 'Grayscale' is returned.
@@ -167,15 +179,15 @@ def detect_bayer(frame):
 
     # Frames are stored as 3D arrays. Test if all three color levels are the same.
     if len(frame.shape) == 3 and frame.shape[2] == 3:
-        first_minus_second = np_max(abs(frame[:, :, 0].astype(int32) - frame[:, :, 1].astype(int32)))
+        first_minus_second = np_max(
+            abs(frame[:, :, 0].astype(int32) - frame[:, :, 1].astype(int32)))
         first_minus_third = np_max(abs(frame[:, :, 0].astype(int32) - frame[:, :, 2].astype(int32)))
         # print("first_minus_second: " + str(first_minus_second) + ", first_minus_third: " + str(
         #     first_minus_third))
 
         # The color levels differ more than some threshold. Probably color image.
-        color_difference_threshold = 0
-        if first_minus_second > color_difference_threshold \
-                or first_minus_third > color_difference_threshold:
+        if first_minus_second > frames_color_difference_threshold \
+                or first_minus_third > frames_color_difference_threshold:
             return 'Color'
 
         # All three levels are the same, convert to 2D grayscale image and proceed.
@@ -233,53 +245,50 @@ def detect_bayer(frame):
         else:
             return 'Grayscale'
 
-        # Set the maximum allowed difference in noise levels at the two green pixels of the bayer
-        # matrix in percent of value at the blue pixel.
-        max_diff_green = 2.
-        # Set the maximum allowed noise level at Bayer matrix pixels other than blue, in percent of
-        # value at the blue pixel.
-        max_allowed_noise_level = 99.5
-
         # The location of the maximum noise level is interpreted as the blue channel.
         # It is in position (0, 0).
         if (max_y, max_x) == (0, 0):
             # The noise levels of the green pixels are too different for this to be a bayer pattern.
-            if abs(noise_level[0, 1] - noise_level[1, 0]) > max_diff_green:
+            if abs(noise_level[0, 1] - noise_level[1, 0]) > frames_bayer_max_noise_diff_green:
                 return 'Grayscale'
             # Noise levels of the other pixels are too close to the blue values for this to definitely
             # be a bayer pattern.
-            if noise_level[0, 1] > max_allowed_noise_level or noise_level[
-                1, 0] > max_allowed_noise_level or noise_level[1, 1] > max_allowed_noise_level:
+            if noise_level[0, 1] > frames_bayer_min_distance_from_blue or noise_level[
+                1, 0] > frames_bayer_min_distance_from_blue or noise_level[
+                1, 1] > frames_bayer_min_distance_from_blue:
                 return 'Grayscale'
             # Bayer pattern "BGGR" found.
             return 'Force Bayer BGGR'
 
         # Case "GBRG":
         elif (max_y, max_x) == (0, 1):
-            if abs(noise_level[0, 0] - noise_level[1, 1]) > max_diff_green:
+            if abs(noise_level[0, 0] - noise_level[1, 1]) > frames_bayer_max_noise_diff_green:
                 return 'Grayscale'
-            if noise_level[0, 0] > max_allowed_noise_level or noise_level[
-                1, 0] > max_allowed_noise_level or noise_level[1, 1] > max_allowed_noise_level:
+            if noise_level[0, 0] > frames_bayer_min_distance_from_blue or noise_level[
+                1, 0] > frames_bayer_min_distance_from_blue or noise_level[
+                1, 1] > frames_bayer_min_distance_from_blue:
                 return 'Grayscale'
             # Bayer pattern "GBRG" found.
             return 'Force Bayer GBRG'
 
         # Case "GRBG":
         elif (max_y, max_x) == (1, 0):
-            if abs(noise_level[0, 0] - noise_level[1, 1]) > max_diff_green:
+            if abs(noise_level[0, 0] - noise_level[1, 1]) > frames_bayer_max_noise_diff_green:
                 return 'Grayscale'
-            if noise_level[0, 0] > max_allowed_noise_level or noise_level[
-                0, 1] > max_allowed_noise_level or noise_level[1, 1] > max_allowed_noise_level:
+            if noise_level[0, 0] > frames_bayer_min_distance_from_blue or noise_level[
+                0, 1] > frames_bayer_min_distance_from_blue or noise_level[
+                1, 1] > frames_bayer_min_distance_from_blue:
                 return 'Grayscale'
             # Bayer pattern "GRBG" found.
             return 'Force Bayer GRBG'
 
         # Case "RGGB"
         elif (max_y, max_x) == (1, 1):
-            if abs(noise_level[0, 1] - noise_level[1, 0]) > max_diff_green:
+            if abs(noise_level[0, 1] - noise_level[1, 0]) > frames_bayer_max_noise_diff_green:
                 return 'Grayscale'
-            if noise_level[0, 0] > max_allowed_noise_level or noise_level[
-                0, 1] > max_allowed_noise_level or noise_level[1, 0] > max_allowed_noise_level:
+            if noise_level[0, 0] > frames_bayer_min_distance_from_blue or noise_level[
+                0, 1] > frames_bayer_min_distance_from_blue or noise_level[
+                1, 0] > frames_bayer_min_distance_from_blue:
                 return 'Grayscale'
             # Bayer pattern "RGGB" found.
             return 'Force Bayer RGGB'
@@ -340,11 +349,14 @@ class VideoReader(object):
     .mov, .mp4, .ser) should be supported.
     """
 
-    def __init__(self):
+    def __init__(self, configuration):
         """
         Create the VideoReader object and initialize instance variables.
+
+        :param configuration: Configuration object with parameters
         """
 
+        self.configuration = configuration
         self.last_read = None
         self.last_frame_read = None
         self.frame_count = None
@@ -444,7 +456,10 @@ class VideoReader(object):
                 # Set the bayer pattern.
                 if bayer_option_selected == 'Auto detect color':
                     # Look for a Bayer pattern in the 2D or 3D data.
-                    bayer_pattern_computed = detect_bayer(self.last_frame_read)
+                    bayer_pattern_computed = detect_bayer(self.last_frame_read,
+                            self.configuration.frames_bayer_max_noise_diff_green,
+                            self.configuration.frames_bayer_min_distance_from_blue,
+                            self.configuration.frames_color_difference_threshold)
                     # If the image was classified as 'Color', test the ordering of color channels.
                     if bayer_pattern_computed == 'Color':
                         # Analyze first frame to detect ordering of color channels. Note that the
@@ -560,11 +575,14 @@ class ImageReader(object):
     lexicographic order of file names corresponds to their chronological order.
     """
 
-    def __init__(self):
+    def __init__(self, configuration):
         """
         Create the ImageReader object and initialize instance variables.
+
+        :param configuration: Configuration object with parameters.
         """
 
+        self.configuration = configuration
         self.opened = False
         self.just_opened = False
         self.last_read = None
@@ -776,7 +794,7 @@ class Calibration(QtCore.QObject):
         if Path(master_name).is_file():
             extension = Path(master_name).suffix
             if extension in ('.avi', '.mov', '.mp4', '.ser'):
-                reader = VideoReader()
+                reader = VideoReader(self.configuration)
                 # Switch off dynamic range correction for 16bit SER files.
                 frame_count, input_color, input_dtype, input_shape, shift_pixels = reader.open(master_name,
                      bayer_option_selected=self.configuration.frames_debayering_default,
@@ -789,7 +807,7 @@ class Calibration(QtCore.QObject):
         # Case image directory:
         elif Path(master_name).is_dir():
             names = [path.join(master_name, name) for name in listdir(master_name)]
-            reader = ImageReader()
+            reader = ImageReader(self.configuration)
             frame_count, input_color, input_dtype, input_shape, shift_pixels = reader.open(names,
                                         bayer_option_selected=self.configuration.frames_debayering_default)
             self.configuration.hidden_parameters_current_dir = str(master_name)
@@ -1140,9 +1158,9 @@ class Frames(object):
 
         # Initialize and open the reader object.
         if self.type == 'image':
-            self.reader = ImageReader()
+            self.reader = ImageReader(self.configuration)
         elif self.type == 'video':
-            self.reader = VideoReader()
+            self.reader = VideoReader(self.configuration)
         else:
             raise TypeError("Image type " + self.type + " not supported")
 

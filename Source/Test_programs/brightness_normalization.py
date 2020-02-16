@@ -168,9 +168,9 @@ class Frames(object):
 
         # Initialize and open the reader object.
         if self.type == 'image':
-            self.reader = ImageReader()
+            self.reader = ImageReader(self.configuration)
         elif self.type == 'video':
-            self.reader = VideoReader()
+            self.reader = VideoReader(self.configuration)
         else:
             raise TypeError("Image type " + self.type + " not supported")
 
