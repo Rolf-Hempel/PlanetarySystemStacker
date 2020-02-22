@@ -62,6 +62,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fdb_comboBox.addItem('Auto detect color')
         self.fdb_comboBox.addItem('Grayscale')
         self.fdb_comboBox.addItem('RGB')
+        self.fdb_comboBox.addItem('BGR')
         self.fdb_comboBox.addItem('Force Bayer RGGB')
         self.fdb_comboBox.addItem('Force Bayer GRBG')
         self.fdb_comboBox.addItem('Force Bayer GBRG')
