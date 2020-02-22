@@ -91,6 +91,11 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.apbt_slider_value.valueChanged['int'].connect(self.apbt_changed)
         self.apfp_slider_value.valueChanged['int'].connect(self.apfp_changed)
         self.spp_checkBox.stateChanged.connect(self.spp_changed)
+        self.ipfn_checkBox.stateChanged.connect(self.ipfn_changed)
+        self.nfs_checkBox.stateChanged.connect(self.nfs_changed)
+        self.pfs_checkBox.stateChanged.connect(self.pfs_changed)
+        self.apbs_checkBox.stateChanged.connect(self.apbs_changed)
+        self.nap_checkBox.stateChanged.connect(self.nap_changed)
 
         self.restore_standard_values.clicked.connect(self.restore_standard_parameters)
 
@@ -132,6 +137,11 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                                            QtCore.Qt.MatchFixedString)
         if index >= 0:
             self.gpif_comboBox.setCurrentIndex(index)
+        self.ipfn_checkBox.setChecked(self.config_copy.global_parameters_parameters_in_filename)
+        self.nfs_checkBox.setChecked(self.config_copy.global_parameters_stack_number_frames)
+        self.pfs_checkBox.setChecked(self.config_copy.global_parameters_stack_percent_frames)
+        self.apbs_checkBox.setChecked(self.config_copy.global_parameters_ap_box_size)
+        self.nap_checkBox.setChecked(self.config_copy.global_parameters_ap_number)
 
         self.aphbw_slider_value.setValue(self.config_copy.alignment_points_half_box_width * 2)
         self.aphbw_label_display.setText(str(self.config_copy.alignment_points_half_box_width * 2))
@@ -148,6 +158,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fn_activate_deactivate_widgets()
         self.fnt_slider_value.setValue(self.config_copy.frames_normalization_threshold)
         self.fnt_label_display.setText(str(self.config_copy.frames_normalization_threshold))
+        self.ipfn_activate_deactivate_widgets()
 
     def fgw_changed(self, value):
         """
@@ -205,6 +216,18 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.fnt_slider_value.setEnabled(False)
             self.fnt_label_parameter.setEnabled(False)
 
+    def ipfn_activate_deactivate_widgets(self):
+        if self.config_copy.global_parameters_parameters_in_filename:
+            self.nfs_checkBox.setEnabled(True)
+            self.pfs_checkBox.setEnabled(True)
+            self.apbs_checkBox.setEnabled(True)
+            self.nap_checkBox.setEnabled(True)
+        else:
+            self.nfs_checkBox.setEnabled(False)
+            self.pfs_checkBox.setEnabled(False)
+            self.apbs_checkBox.setEnabled(False)
+            self.nap_checkBox.setEnabled(False)
+
     def afa_changed(self, state):
         self.config_copy.align_frames_automation = (state == QtCore.Qt.Checked)
 
@@ -258,6 +281,22 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
     def fnt_changed(self, value):
         self.config_copy.frames_normalization_threshold = value
         self.fnt_label_display.setText(str(self.config_copy.frames_normalization_threshold))
+
+    def ipfn_changed(self, state):
+        self.config_copy.global_parameters_parameters_in_filename = (state == QtCore.Qt.Checked)
+        self.ipfn_activate_deactivate_widgets()
+
+    def nfs_changed(self, state):
+        self.config_copy.global_parameters_stack_number_frames = (state == QtCore.Qt.Checked)
+
+    def pfs_changed(self, state):
+        self.config_copy.global_parameters_stack_percent_frames = (state == QtCore.Qt.Checked)
+
+    def apbs_changed(self, state):
+        self.config_copy.global_parameters_ap_box_size = (state == QtCore.Qt.Checked)
+
+    def nap_changed(self, state):
+        self.config_copy.global_parameters_ap_number = (state == QtCore.Qt.Checked)
 
     def restore_standard_parameters(self):
         """
@@ -408,6 +447,36 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                 self.configuration.global_parameters_image_format:
             self.configuration.global_parameters_image_format = \
                 self.config_copy.global_parameters_image_format
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_parameters_in_filename != \
+                self.configuration.global_parameters_parameters_in_filename:
+            self.configuration.global_parameters_parameters_in_filename = \
+                self.config_copy.global_parameters_parameters_in_filename
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_stack_number_frames != \
+                self.configuration.global_parameters_stack_number_frames:
+            self.configuration.global_parameters_stack_number_frames = \
+                self.config_copy.global_parameters_stack_number_frames
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_stack_percent_frames != \
+                self.configuration.global_parameters_stack_percent_frames:
+            self.configuration.global_parameters_stack_percent_frames = \
+                self.config_copy.global_parameters_stack_percent_frames
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_ap_box_size != \
+                self.configuration.global_parameters_ap_box_size:
+            self.configuration.global_parameters_ap_box_size = \
+                self.config_copy.global_parameters_ap_box_size
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_ap_number != \
+                self.configuration.global_parameters_ap_number:
+            self.configuration.global_parameters_ap_number = \
+                self.config_copy.global_parameters_ap_number
             self.configuration.configuration_changed = True
 
         # Set dependent parameters.

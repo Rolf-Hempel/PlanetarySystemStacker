@@ -1225,7 +1225,7 @@ class Miscellaneous(object):
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
 
     @staticmethod
-    def compose_suffix(stack_f=None, stack_p=None, box_size=None, num_points=None):
+    def compose_suffix(stack_f, stack_p, box_size, num_points):
         """
         Compose a output file name suffix from stacking parameters.
 

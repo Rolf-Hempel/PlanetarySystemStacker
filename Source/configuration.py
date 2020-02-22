@@ -42,6 +42,11 @@ class ConfigurationParameters(object):
         self.global_parameters_buffering_level = None
         self.global_parameters_include_postprocessing = None
         self.global_parameters_image_format = None
+        self.global_parameters_parameters_in_filename = None
+        self.global_parameters_stack_number_frames = None
+        self.global_parameters_stack_percent_frames = None
+        self.global_parameters_ap_box_size = None
+        self.global_parameters_ap_number = None
         self.frames_gauss_width = None
         self.frames_debayering_default = None
         self.frames_normalization = None
@@ -71,6 +76,11 @@ class ConfigurationParameters(object):
         self.global_parameters_buffering_level = 2
         self.global_parameters_include_postprocessing = False
         self.global_parameters_image_format = "png"
+        self.global_parameters_parameters_in_filename = False
+        self.global_parameters_stack_number_frames = False
+        self.global_parameters_stack_percent_frames = False
+        self.global_parameters_ap_box_size = False
+        self.global_parameters_ap_number = False
         self.frames_gauss_width = 7
         self.frames_debayering_default = 'Auto detect color'
         self.frames_normalization = True
@@ -114,6 +124,16 @@ class ConfigurationParameters(object):
             configuration_object.global_parameters_include_postprocessing
         self.global_parameters_image_format = \
             configuration_object.global_parameters_image_format
+        self.global_parameters_parameters_in_filename = \
+            configuration_object.global_parameters_parameters_in_filename
+        self.global_parameters_stack_number_frames = \
+            configuration_object.global_parameters_stack_number_frames
+        self.global_parameters_stack_percent_frames = \
+            configuration_object.global_parameters_stack_percent_frames
+        self.global_parameters_ap_box_size = \
+            configuration_object.global_parameters_ap_box_size
+        self.global_parameters_ap_number = \
+            configuration_object.global_parameters_ap_number
         self.frames_gauss_width = configuration_object.frames_gauss_width
         self.frames_debayering_default = configuration_object.frames_debayering_default
         self.frames_normalization = configuration_object.frames_normalization
@@ -253,6 +273,16 @@ class Configuration(object):
             configuration_parameters.global_parameters_include_postprocessing
         self.global_parameters_image_format = \
             configuration_parameters.global_parameters_image_format
+        self.global_parameters_parameters_in_filename = \
+            configuration_parameters.global_parameters_parameters_in_filename
+        self.global_parameters_stack_number_frames = \
+            configuration_parameters.global_parameters_stack_number_frames
+        self.global_parameters_stack_percent_frames = \
+            configuration_parameters.global_parameters_stack_percent_frames
+        self.global_parameters_ap_box_size = \
+            configuration_parameters.global_parameters_ap_box_size
+        self.global_parameters_ap_number = \
+            configuration_parameters.global_parameters_ap_number
         self.frames_gauss_width = configuration_parameters.frames_gauss_width
         self.frames_debayering_default = configuration_parameters.frames_debayering_default
         self.frames_normalization = configuration_parameters.frames_normalization
@@ -305,6 +335,16 @@ class Configuration(object):
             self.global_parameters_include_postprocessing
         configuration_parameters.global_parameters_image_format = \
             self.global_parameters_image_format
+        configuration_parameters.global_parameters_parameters_in_filename = \
+            self.global_parameters_parameters_in_filename
+        configuration_parameters.global_parameters_stack_number_frames = \
+            self.global_parameters_stack_number_frames
+        configuration_parameters.global_parameters_stack_percent_frames = \
+            self.global_parameters_stack_percent_frames
+        configuration_parameters.global_parameters_ap_box_size = \
+            self.global_parameters_ap_box_size
+        configuration_parameters.global_parameters_ap_number = \
+            self.global_parameters_ap_number
 
         configuration_parameters.frames_gauss_width = self.frames_gauss_width
         configuration_parameters.frames_debayering_default = self.frames_debayering_default
@@ -354,6 +394,7 @@ class Configuration(object):
                                                                 'main window height')
         self.hidden_parameters_main_window_maximized = conf.getboolean('Hidden parameters',
                                                                        'main window maximized')
+
         self.global_parameters_protocol_level = conf.getint('Global parameters',
                                                             'protocol level')
         self.global_parameters_write_protocol_to_file = conf.getboolean('Global parameters',
@@ -365,10 +406,22 @@ class Configuration(object):
             'Global parameters', 'include postprocessing')
         self.global_parameters_image_format = conf.get(
             'Global parameters', 'image format')
+        self.global_parameters_parameters_in_filename = conf.getboolean(
+            'Global parameters', 'parameters in filename')
+        self.global_parameters_stack_number_frames = conf.getboolean(
+            'Global parameters', 'stack number frames')
+        self.global_parameters_stack_percent_frames = conf.getboolean(
+            'Global parameters', 'stack percent frames')
+        self.global_parameters_ap_box_size = conf.getboolean(
+            'Global parameters', 'ap box size')
+        self.global_parameters_ap_number = conf.getboolean(
+            'Global parameters', 'ap number')
+
         self.frames_gauss_width = conf.getint('Frames', 'gauss width')
         self.frames_debayering_default = conf.get('Frames', 'debayering default')
         self.frames_normalization = conf.getboolean('Frames', 'normalization')
         self.frames_normalization_threshold = conf.getint('Frames', 'normalization threshold')
+
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
         self.align_frames_rectangle_scale_factor = conf.getfloat('Align frames',
@@ -376,6 +429,7 @@ class Configuration(object):
         self.align_frames_search_width = conf.getint('Align frames', 'search width')
         self.align_frames_average_frame_percent = conf.getint('Align frames',
                                                               'average frame percent')
+
         self.alignment_points_half_box_width = conf.getint('Alignment points',
                                                            'half box width')
         self.alignment_points_search_width = conf.getint('Alignment points', 'search width')
@@ -425,6 +479,16 @@ class Configuration(object):
                            str(self.global_parameters_include_postprocessing))
         self.set_parameter('Global parameters', 'image format',
                            self.global_parameters_image_format)
+        self.set_parameter('Global parameters', 'parameters in filename',
+                           str(self.global_parameters_parameters_in_filename))
+        self.set_parameter('Global parameters', 'stack number frames',
+                           str(self.global_parameters_stack_number_frames))
+        self.set_parameter('Global parameters', 'stack percent frames',
+                           str(self.global_parameters_stack_percent_frames))
+        self.set_parameter('Global parameters', 'ap box size',
+                           str(self.global_parameters_ap_box_size))
+        self.set_parameter('Global parameters', 'ap number',
+                           str(self.global_parameters_ap_number))
 
         self.config_parser_object.add_section('Frames')
         self.set_parameter('Frames', 'gauss width', str(self.frames_gauss_width))

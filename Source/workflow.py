@@ -160,6 +160,7 @@ class Workflow(QtCore.QObject):
 
     @QtCore.pyqtSlot(object)
     def execute_frames(self, job):
+        self.job = job
         # self.work_next_task_signal.emit("Next job")
 
         # If objects are left over from previous run, delete them.
@@ -172,7 +173,7 @@ class Workflow(QtCore.QObject):
         gc.collect()
 
         # Update the status bar in the main GUI.
-        self.input_name = job.file_name
+        self.input_name = self.job.file_name
         self.set_status_bar_processing_phase("reading frames")
 
         # A jobs can either "stack" images or "postprocess" a single image. In the latter case,
@@ -182,35 +183,30 @@ class Workflow(QtCore.QObject):
         # photographs. In the first case, input_type is set to 'video', in the second case to
         # 'image'.
 
-        if job.type == 'postproc':
+        if self.job.type == 'postproc':
             self.activity = 'postproc'
-            self.postproc_input_name = job.name
+            self.postproc_input_name = self.job.name
 
             # Reset the postprocessed image to None. This way, in saving the postprocessing result,
             # it can be checked if an image was computed in the workflow thread.
             self.postprocessed_image = None
             self.postprocessed_image_name = PostprocDataObject.set_file_name_processed(
-                job.name, self.configuration.postproc_suffix,
+                self.job.name, self.configuration.postproc_suffix,
                 self.configuration.global_parameters_image_format)
-            self.attached_log_name = splitext(job.name)[0] + '_postproc-log.txt'
+            self.attached_log_name = splitext(self.job.name)[0] + '_postproc-log.txt'
 
         # For video file input, the Frames constructor expects the video file name for "names".
-        elif job.type == 'video':
+        elif self.job.type == 'video':
             self.activity = 'stacking'
-            names = job.name
-            self.stacked_image_name = splitext(job.name)[0] + \
-                                      self.configuration.stack_frames_suffix + '.' + \
-                                      self.configuration.global_parameters_image_format
-            self.attached_log_name = splitext(job.name)[0] + '_stacking-log.txt'
+            names = self.job.name
+            self.attached_log_name = splitext(self.job.name)[0] + '_stacking-log.txt'
 
         # For single image input, the Frames constructor expects a list of image file names for
         # "names".
         else:  # input_type = 'image'
             self.activity = 'stacking'
-            names = [join(job.name, name) for name in listdir(job.name)]
-            self.stacked_image_name = job.name + self.configuration.stack_frames_suffix + '.' + \
-                                      self.configuration.global_parameters_image_format
-            self.attached_log_name = job.name + '_stacking-log.txt'
+            names = [join(self.job.name, name) for name in listdir(self.job.name)]
+            self.attached_log_name = self.job.name + '_stacking-log.txt'
 
         # Redirect stdout to a file if requested.
         if self.configuration.global_parameters_write_protocol_to_file != self.output_redirected:
@@ -237,10 +233,10 @@ class Workflow(QtCore.QObject):
 
         # Write a header to stdout and optionally to the logfile.
         if self.configuration.global_parameters_protocol_level > 0:
-            decorator_line = (len(job.name) + 28) * "*"
+            decorator_line = (len(self.job.name) + 28) * "*"
             Miscellaneous.protocol(decorator_line, self.attached_log_file,
                                    precede_with_timestamp=False)
-            Miscellaneous.protocol("Start processing " + job.name, self.attached_log_file)
+            Miscellaneous.protocol("Start processing " + self.job.name, self.attached_log_file)
             Miscellaneous.protocol(decorator_line, self.attached_log_file,
                                    precede_with_timestamp=False)
 
@@ -267,8 +263,8 @@ class Workflow(QtCore.QObject):
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
             try:
-                self.frames = Frames(self.configuration, names, type=job.type,
-                                     bayer_option_selected=job.bayer_option_selected,
+                self.frames = Frames(self.configuration, names, type=self.job.type,
+                                     bayer_option_selected=self.job.bayer_option_selected,
                                      calibration=self.calibration,
                                      progress_signal=self.work_current_progress_signal,
                                      buffer_original=buffer_original,
@@ -280,16 +276,16 @@ class Workflow(QtCore.QObject):
                         "           Number of images: " + str(self.frames.number) +
                         ", image shape: " + str(self.frames.shape), self.attached_log_file,
                         precede_with_timestamp=False)
-                    if job.bayer_option_selected == 'Auto detect color':
+                    if self.job.bayer_option_selected == 'Auto detect color':
                         Miscellaneous.protocol(
                             "           Debayer pattern detected automatically: '" +
                             self.frames.bayer_pattern + "'",
                             self.attached_log_file, precede_with_timestamp=False)
-                        job.bayer_pattern = self.frames.bayer_pattern
+                        self.job.bayer_pattern = self.frames.bayer_pattern
                     else:
                         Miscellaneous.protocol(
                             "           Debayer pattern selected manually: '" +
-                            job.bayer_option_selected + "'",
+                            self.job.bayer_option_selected + "'",
                             self.attached_log_file, precede_with_timestamp=False)
                     if self.frames.dt0 == 'uint16':
                         dynamic_range = '16 bit'
@@ -720,6 +716,16 @@ class Workflow(QtCore.QObject):
     def execute_save_stacked_image(self):
 
         self.set_status_bar_processing_phase("saving result")
+        if self.job.type == 'video':
+            self.stacked_image_name = splitext(self.job.name)[0] + \
+                                      self.configuration.stack_frames_suffix + \
+                                      self.compose_suffix() + '.' + \
+                                      self.configuration.global_parameters_image_format
+        else:  # self.job.type == 'image'
+            self.stacked_image_name = self.job.name + self.configuration.stack_frames_suffix + \
+                                      self.compose_suffix() + '.' + \
+                                      self.configuration.global_parameters_image_format
+
         # Save the image as 16bit int (color or mono).
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start saving the stacked image +++", self.attached_log_file)
@@ -748,6 +754,36 @@ class Workflow(QtCore.QObject):
             self.my_timer.stop('Execution over all')
             if self.configuration.global_parameters_protocol_level > 0:
                 self.my_timer.protocol(self.attached_log_file)
+
+    def compose_suffix(self):
+        """
+        If process parameters are to be included in the stacked output file name, compose the
+        suffix from the parameters computed during the workflow.
+
+        :return: Additional suffix string
+        """
+
+        if self.configuration.global_parameters_parameters_in_filename:
+            if self.configuration.global_parameters_stack_number_frames:
+                stack_f = self.alignment_points.stack_size
+            else:
+                stack_f = None
+            if self.configuration.global_parameters_stack_percent_frames:
+                stack_p = int(round(100*self.alignment_points.stack_size/self.frames.number))
+            else:
+                stack_p = None
+            if self.configuration.global_parameters_ap_box_size:
+                box_size = self.configuration.alignment_points_half_box_width*2
+            else:
+                box_size = None
+            if self.configuration.global_parameters_ap_number:
+                num_points = len(self.alignment_points.alignment_points)
+            else:
+                num_points = None
+            return Miscellaneous.compose_suffix(stack_f, stack_p, box_size, num_points)
+        else:
+            return ''
+
 
     @QtCore.pyqtSlot()
     def execute_postprocess_image(self):
