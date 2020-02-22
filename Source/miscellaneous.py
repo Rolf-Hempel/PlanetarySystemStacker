@@ -1224,30 +1224,6 @@ class Miscellaneous(object):
 
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
 
-    @staticmethod
-    def compose_suffix(stack_f, stack_p, box_size, num_points):
-        """
-        Compose a output file name suffix from stacking parameters.
-
-        :param stack_f: Number of frames used in stacking.
-        :param stack_p: Percentage of frames used in stacking.
-        :param box_size: Alignment point box size in pixels.
-        :param num_points: Number of alignment points.
-        :return: String with the parameters separated by underscores.
-        """
-
-        string = ''
-        if stack_f:
-            string += '_f' + str(stack_f)
-        if stack_p:
-            string += '_p' + str(stack_p)
-        if box_size:
-            string += '_b' + str(box_size)
-        if num_points:
-            string += '_ap' + str(num_points)
-
-        return string
-
 
 if __name__ == "__main__":
 

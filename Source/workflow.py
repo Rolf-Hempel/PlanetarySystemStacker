@@ -762,27 +762,18 @@ class Workflow(QtCore.QObject):
 
         :return: Additional suffix string
         """
-
+        string = ''
         if self.configuration.global_parameters_parameters_in_filename:
             if self.configuration.global_parameters_stack_number_frames:
-                stack_f = self.alignment_points.stack_size
-            else:
-                stack_f = None
+                string += '_f' + str(self.alignment_points.stack_size)
             if self.configuration.global_parameters_stack_percent_frames:
-                stack_p = int(round(100*self.alignment_points.stack_size/self.frames.number))
-            else:
-                stack_p = None
+                string += '_p' + str(int(round(100*self.alignment_points.stack_size/self.frames.number)))
             if self.configuration.global_parameters_ap_box_size:
-                box_size = self.configuration.alignment_points_half_box_width*2
-            else:
-                box_size = None
+                string += '_b' + str(self.configuration.alignment_points_half_box_width*2)
             if self.configuration.global_parameters_ap_number:
-                num_points = len(self.alignment_points.alignment_points)
-            else:
-                num_points = None
-            return Miscellaneous.compose_suffix(stack_f, stack_p, box_size, num_points)
-        else:
-            return ''
+                string += '_ap' + str(len(self.alignment_points.alignment_points))
+
+        return string
 
 
     @QtCore.pyqtSlot()
