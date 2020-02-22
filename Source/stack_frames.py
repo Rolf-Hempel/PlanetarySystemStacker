@@ -106,7 +106,7 @@ class StackFrames(object):
         # If the alignment point patches do not cover the entire frame, a background image must
         # be computed and blended in. At this point it is not yet clear if this is necessary.
         self.background_patches = None
-        self.stacked_background_buffer = None
+        self.averaged_background = None
 
         # Allocate a buffer which for each pixel of the image accumulates the weights at each pixel.
         # This buffer is used to normalize the image buffer. It is initialized with a small value to

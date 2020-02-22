@@ -1210,22 +1210,22 @@ class Frames(object):
         which scale with the image size.
 
         Additional to the original images and their derivatives, the following large objects are
-        allocated during the workflow:
-            calibration.master_dark_frame: pixels * colors (float32)
-            calibration.master_dark_frame_uint8: pixels * colors (uint8)
-            calibration.master_dark_frame_uint16: pixels * colors (uint16)
-            calibration.master_flat_frame: pixels * colors (float32)
-            align_frames.mean_frame: image pixels (int32)
-            align_frames.mean_frame_original: image pixels (int32)
-            alignment_points, reference boxes: < 2 * image pixels (int32)
-            alignment_points, stacking buffers: < 2 * image pixels * colors (float32)
-            stack_frames.stacked_image_buffer: image pixels * colors (float32)
-            stack_frames.number_single_frame_contributions: image pixels (int32)
-            stack_frames.sum_single_frame_weights: image pixels (float32)
-            stack_frames.mask: image pixels (float32)
-            stack_frames.averaged_background: image pixels * colors (float32)
-            stack_frames.stacked_image: image pixels * colors (uint16)
-
+        allocated during the workflow:                                                   mono color
+            calibration.master_dark_frame: pixels * colors (float32)                       4    12
+            calibration.master_dark_frame_uint8: pixels * colors (uint8)                   1     3
+            calibration.master_dark_frame_uint16: pixels * colors (uint16)                 2     6
+            calibration.master_flat_frame: pixels * colors (float32)                       4    12
+            align_frames.mean_frame: image pixels (int32)                                  4     4
+            align_frames.mean_frame_original: image pixels (int32)                         4     4
+            alignment_points, reference boxes: < 2 * image pixels (int32)                  8     8
+            alignment_points, stacking buffers: < 2 * image pixels * colors (float32)      8    24
+            stack_frames.stacked_image_buffer: image pixels * colors (float32)             4    12
+            stack_frames.number_single_frame_contributions: image pixels (int32)           4     4
+            stack_frames.sum_single_frame_weights: image pixels (float32)                  4     4
+            stack_frames.averaged_background: image pixels * colors (float32)              4    12
+            stack_frames.stacked_image: image pixels * colors (uint16)                     2     6
+                                                                                          ---------
+                                                                  Total (bytes / pixel):  53   111
         :param buffering_level: Buffering level parameter.
         :return: Number of required buffer space in bytes.
         """
@@ -1265,10 +1265,12 @@ class Frames(object):
         # Multiply with the total number of frames.
         buffer_for_all_images = buffer_per_image * self.number
 
-        # Compute the size of additional workspace objects allocated during the workflow.
-        buffer_additional_workspace = number_pixel * 57
+        # Compute the size of additional workspace objects allocated during the workflow. For the
+        # details see the comment block at the beginning of this method.
         if self.color:
-            buffer_additional_workspace += number_pixel * 58
+            buffer_additional_workspace = number_pixel * 111
+        else:
+            buffer_additional_workspace = number_pixel * 53
 
         # Return the total buffer space required.
         return (buffer_for_all_images + buffer_additional_workspace) / 1e9

@@ -88,8 +88,9 @@ class SERParser(object):
         else:
             with open(ser_file, 'rb') as fid:
                 HEADER = fid.read(14).decode()
-            if HEADER != 'LUCAM-RECORDER':
-                raise IOError("File has structure not conform with SER file format")
+            if HEADER != 'LUCAM-RECORDER' and HEADER != 'GenikaAstro\x00\x00\x00':
+                raise IOError(
+                    "File does not conform to SER format, first 14 characters of header are: '" + HEADER + "'")
 
     def open_file(self, ser_file):
         return open(ser_file, 'rb')
@@ -335,10 +336,11 @@ if __name__ == "__main__":
 
     # file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
     #             r'\SER_GRAYSCALED_12bit_BigEndian_352_400.ser'
-    file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
-                r'\SER_GRAYSCALED_16bit_LittleEndian_397_397.ser'
+    # file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
+    #             r'\SER_GRAYSCALED_16bit_LittleEndian_397_397.ser'
     # file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
     #             r'\SER_RGGB_16bit_LittleEndian_397_397.ser'
+    file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\Sun_LauraMS\LauraMS_AR12680_2017-09-17_T_11-44-23-0221_SolarContinuum.ser'
 
     cap = ser_parser.SERParser(file_path)
     last_frame_read = cap.read_frame(3)
