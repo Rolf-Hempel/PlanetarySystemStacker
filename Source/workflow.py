@@ -20,14 +20,13 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
+import gc
+import platform
 import sys
 from ctypes import CDLL, byref, c_int
-from os import listdir
-import platform
-from os.path import splitext, join, basename
-from time import sleep
+from os import listdir, rename, remove
+from os.path import splitext, join
 
-import gc
 import psutil
 from PyQt5 import QtCore
 from numpy import uint16, uint8
@@ -75,6 +74,7 @@ class Workflow(QtCore.QObject):
         self.postproc_input_name = None
         self.activity = None
         self.attached_log_name = None
+        self.attached_log_name_new = None
         self.attached_log_file = None
         self.stdout_saved = None
         self.output_redirected = False
@@ -161,7 +161,10 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot(object)
     def execute_frames(self, job):
         self.job = job
-        # self.work_next_task_signal.emit("Next job")
+
+        # Reset the potential new log file name (required if parameters are to be encoded in file
+        # name).
+        self.attached_log_name_new = None
 
         # If objects are left over from previous run, delete them.
         for obj in [self.frames, self.rank_frames, self.align_frames, self.alignment_points,
@@ -716,14 +719,17 @@ class Workflow(QtCore.QObject):
     def execute_save_stacked_image(self):
 
         self.set_status_bar_processing_phase("saving result")
+
+        # Create suffix containing parameter info.
+        parameter_suffix = self.compose_suffix()
         if self.job.type == 'video':
             self.stacked_image_name = splitext(self.job.name)[0] + \
                                       self.configuration.stack_frames_suffix + \
-                                      self.compose_suffix() + '.' + \
+                                      parameter_suffix + '.' + \
                                       self.configuration.global_parameters_image_format
         else:  # self.job.type == 'image'
             self.stacked_image_name = self.job.name + self.configuration.stack_frames_suffix + \
-                                      self.compose_suffix() + '.' + \
+                                      parameter_suffix + '.' + \
                                       self.configuration.global_parameters_image_format
 
         # Save the image as 16bit int (color or mono).
@@ -738,6 +744,12 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol(
                 "           The stacked image was written to: " + self.stacked_image_name,
                 self.attached_log_file, precede_with_timestamp=False)
+
+        # If parameter info is to be included in output file names, compose the new name for
+        # the attached log file. The existing file will be renamed after closing.
+        if self.attached_log_file and self.configuration.global_parameters_parameters_in_filename:
+            self.attached_log_name_new = self.attached_log_name[:self.attached_log_name.index(
+                '_stacking-log')] + parameter_suffix + '_stacking-log.txt'
 
         # If postprocessing is included after stacking, set the stacked image as input.
         if self.configuration.global_parameters_include_postprocessing:
@@ -754,6 +766,15 @@ class Workflow(QtCore.QObject):
             self.my_timer.stop('Execution over all')
             if self.configuration.global_parameters_protocol_level > 0:
                 self.my_timer.protocol(self.attached_log_file)
+            if self.attached_log_file:
+                self.attached_log_file.close()
+                if self.attached_log_name_new:
+                    # If a logfile with the new name exists, remove it.
+                    try:
+                        remove(self.attached_log_name_new)
+                    except:
+                        pass
+                    rename(self.attached_log_name, self.attached_log_name_new)
 
     def compose_suffix(self):
         """
@@ -831,6 +852,16 @@ class Workflow(QtCore.QObject):
         self.my_timer.stop('Execution over all')
         if self.configuration.global_parameters_protocol_level > 0:
             self.my_timer.protocol(self.attached_log_file)
+        if self.attached_log_file:
+            self.attached_log_file.close()
+            # If the attached log name was defined for a stacking job, rename it to include
+            # parameter information.
+            if self.attached_log_name_new:
+                try:
+                    remove(self.attached_log_name_new)
+                except:
+                    pass
+                rename(self.attached_log_name, self.attached_log_name_new)
 
     def set_status_bar_processing_phase(self, phase):
         """
