@@ -747,9 +747,9 @@ class Workflow(QtCore.QObject):
 
         # If parameter info is to be included in output file names, compose the new name for
         # the attached log file. The existing file will be renamed after closing.
-        if self.attached_log_file and self.configuration.global_parameters_parameters_in_filename:
+        if self.attached_log_file:
             self.attached_log_name_new = self.attached_log_name[:self.attached_log_name.index(
-                '_stacking-log')] + parameter_suffix + '_stacking-log.txt'
+                '_stacking-log')] + '_stacking-log' + parameter_suffix + '.txt'
 
         # If postprocessing is included after stacking, set the stacked image as input.
         if self.configuration.global_parameters_include_postprocessing:
@@ -768,13 +768,14 @@ class Workflow(QtCore.QObject):
                 self.my_timer.protocol(self.attached_log_file)
             if self.attached_log_file:
                 self.attached_log_file.close()
-                if self.attached_log_name_new:
+                if self.attached_log_name_new and self.attached_log_name_new != self.attached_log_name:
                     # If a logfile with the new name exists, remove it.
                     try:
                         remove(self.attached_log_name_new)
                     except:
                         pass
                     rename(self.attached_log_name, self.attached_log_name_new)
+                    self.attached_log_name = self.attached_log_name_new
 
     def compose_suffix(self):
         """
@@ -856,12 +857,13 @@ class Workflow(QtCore.QObject):
             self.attached_log_file.close()
             # If the attached log name was defined for a stacking job, rename it to include
             # parameter information.
-            if self.attached_log_name_new:
+            if self.attached_log_name_new and self.attached_log_name_new != self.attached_log_name:
                 try:
                     remove(self.attached_log_name_new)
                 except:
                     pass
                 rename(self.attached_log_name, self.attached_log_name_new)
+                self.attached_log_name = self.attached_log_name_new
 
     def set_status_bar_processing_phase(self, phase):
         """
