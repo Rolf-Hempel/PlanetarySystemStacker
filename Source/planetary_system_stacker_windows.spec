@@ -8,7 +8,10 @@ astropy_path, = astropy.__path__
 
 a = Analysis(['planetary_system_stacker.py'],
              pathex=['D:\\SW-Development\\Python\\PlanetarySystemStacker\\Source'],
-             binaries=[],
+             binaries=[('C:\Python35\Lib\site-packages\opencv_ffmpeg342_64.dll', '.'),
+              ('C:\Program Files (x86)\Dropbox\Client\91.4.548\Api-ms-win-core-xstate-l2-1-0.dll', '.'),
+              ('C:\Program Files (x86)\Dropbox\Client\91.4.548\Api-ms-win-crt-private-l1-1-0.dll', '.'),
+              ('C:\Windows\System32\downlevel\API-MS-Win-Eventing-Provider-L1-1-0.dll', '.')],
              datas=[( 'D:\\SW-Development\\Python\\PlanetarySystemStacker\\Documentation\\Icon\\PSS-Icon-64.ico', '.' ),
              (astropy_path, 'astropy')],
              hiddenimports=['pywt._extensions._cwt', 'scipy._lib.messagestream', 'shelve', 'csv'],
