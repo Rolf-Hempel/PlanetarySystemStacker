@@ -23,6 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from configparser import ConfigParser
 from os.path import expanduser, join, isfile
 from os.path import splitext
+from copy import deepcopy
 
 from exceptions import IncompatibleVersionsError
 
@@ -683,6 +684,20 @@ class PostprocDataObject(object):
         """
 
         new_version = PostprocVersion()
+        self.versions.append(new_version)
+        self.number_versions += 1
+        self.version_selected = self.number_versions
+        return new_version
+
+    def new_postproc_version_from_existing(self):
+        """
+        Create a new postprocessing version by copying the currently selected one. Append the new
+        version to the list of postprocessing versions. Set the current version pointer to the new
+        version.
+        :return: New postprocessing version.
+        """
+
+        new_version = deepcopy(self.versions[self.version_selected])
         self.versions.append(new_version)
         self.number_versions += 1
         self.version_selected = self.number_versions

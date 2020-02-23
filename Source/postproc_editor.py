@@ -233,7 +233,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.spinBox_compare.setMaximum(configuration.postproc_data_object.number_versions)
         self.spinBox_compare.setMinimum(0)
 
-        # Set the spinbox to the newly created version
+        # Set the spinbox to the newly created version.
         self.spinBox_version.setValue(self.postproc_data_object.version_selected)
 
     def select_version(self):
@@ -260,10 +260,12 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
-        # Create a Version object, and add an initial layer (radius 1., amount 0).
-        new_version = self.postproc_data_object.add_postproc_version()
-        new_version.set_image(self.postproc_data_object.image_original)
-        new_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 0, False))
+        # Create a Version object by copying the parameters from the selected version.
+        new_version = self.postproc_data_object.new_postproc_version_from_existing()
+
+        # If the new version was created from the original image (version 0), add an initial layer.
+        if self.postproc_data_object.version_selected == 1:
+            new_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 0, False))
 
         # Set the image viewer to the new version, and increase the range of spinboxes to include
         # the new version.
@@ -285,8 +287,10 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         # Adjust the spinbox bounds, and set the current version parameters to the new selection.
         self.spinBox_version.setMaximum(self.postproc_data_object.number_versions)
-        self.spinBox_version.setValue(
-            min(self.spinBox_version.value(), self.postproc_data_object.number_versions))
+
+        # Set the spinbox to the version before the deleted one.
+        self.spinBox_version.setValue(self.postproc_data_object.version_selected)
+
         self.spinBox_compare.setMaximum(self.postproc_data_object.number_versions)
         self.spinBox_compare.setValue(
             min(self.spinBox_compare.value(), self.postproc_data_object.number_versions))
