@@ -657,7 +657,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Get the choice of the combobox button.
         task = self.ui.comboBox_back.currentText()
         if self.configuration.global_parameters_protocol_level > 0:
-            if self.configuration.global_parameters_store_protocol_with_result:
+            if self.configuration.global_parameters_store_protocol_with_result and \
+                    self.workflow.attached_log_file.closed:
                 try:
                     self.workflow.attached_log_file = open(self.workflow.attached_log_name, 'a')
                 except:
