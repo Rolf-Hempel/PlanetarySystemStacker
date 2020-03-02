@@ -42,8 +42,7 @@ from rank_frames import RankFrames
 from stack_frames import StackFrames
 from timer import timer
 
-def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=False,
-             automatic_ap_creation=True):
+def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=True):
     """
     Execute the whole stacking workflow for a test case. This can either use a video file (.avi .mov .mp4 .ser)
     or still images stored in a single directory.
@@ -52,8 +51,6 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
     :param input_type: Either "video" or "image" (see "input_name")
     :param roi: If specified, tuple (y_low, y_high, x_low, x_high) with pixel bounds for "region
                 of interest"
-    :param convert_to_grayscale: If True, input frames are converted to grayscale mode before
-                                 processing. In this case, the stacked image is grayscale as well.
     :return: average, [average_roi,] color_image_with_aps, stacked_image
              with: - average: global mean frame
                    - average_roi: mean frame restricted to ROI (only if roi is specified)
@@ -92,7 +89,6 @@ def workflow(input_name, input_type='video', roi=None, convert_to_grayscale=Fals
     my_timer.create('Read all frames')
     try:
         frames = Frames(configuration, names, type=input_type,
-                        convert_to_grayscale=convert_to_grayscale,
                         buffer_original=False, buffer_monochrome=False,
                         buffer_gaussian=True, buffer_laplacian=True)
         print("Number of images read: " + str(frames.number))
@@ -247,11 +243,10 @@ if __name__ == "__main__":
     redirect_stdout = False
     show_results = True
     input_type = 'video'
-    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
-    # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
+    # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
+    input_directory = 'E:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
     # input_type = 'image'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
-    convert_to_grayscale = False
     automatic_ap_creation = True
     roi = None
     # roi = (400, 700, 300, 800)
@@ -307,11 +302,11 @@ if __name__ == "__main__":
         for input_name in input_names:
             if roi:
                 average, average_roi, color_image_with_aps, stacked_image = workflow(input_name,
-                    input_type=input_type, roi=roi, convert_to_grayscale=convert_to_grayscale,
+                    input_type=input_type, roi=roi,
                     automatic_ap_creation=automatic_ap_creation)
             else:
                 average, color_image_with_aps, stacked_image = workflow(input_name,
-                    input_type=input_type, convert_to_grayscale=convert_to_grayscale,
+                    input_type=input_type,
                     automatic_ap_creation=automatic_ap_creation)
 
             # Interrupt the workflow to display resulting images only if requested.

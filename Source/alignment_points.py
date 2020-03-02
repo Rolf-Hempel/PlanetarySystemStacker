@@ -235,27 +235,28 @@ class AlignmentPoints(object):
 
         # Normalize the structure information for all alignment point boxes by dividing by the
         # maximum value.
-        structure_max = max(
-            alignment_point['structure'] for alignment_point in self.alignment_points)
-        alignment_points_dropped_structure_indices = []
-        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
-            alignment_point['structure'] /= structure_max
-            # Remove alignment points with too little structure and increment the counter.
-            if alignment_point['structure'] < structure_threshold:
-                alignment_points_dropped_structure_indices.append(alignment_point_index)
-                self.alignment_points_dropped_structure += 1
-
-        # Remove alignment points which do not satisfy the structure condition, if there is any.
-        if alignment_points_dropped_structure_indices:
-            alignment_points_new = []
-            dropped_index = 0
+        if self.alignment_points:
+            structure_max = max(
+                alignment_point['structure'] for alignment_point in self.alignment_points)
+            alignment_points_dropped_structure_indices = []
             for alignment_point_index, alignment_point in enumerate(self.alignment_points):
-                if alignment_point_index != alignment_points_dropped_structure_indices[
-                    dropped_index]:
-                    alignment_points_new.append(alignment_point)
-                elif dropped_index < len(alignment_points_dropped_structure_indices) - 1:
-                    dropped_index += 1
-            self.alignment_points = alignment_points_new
+                alignment_point['structure'] /= structure_max
+                # Remove alignment points with too little structure and increment the counter.
+                if alignment_point['structure'] < structure_threshold:
+                    alignment_points_dropped_structure_indices.append(alignment_point_index)
+                    self.alignment_points_dropped_structure += 1
+
+            # Remove alignment points which do not satisfy the structure condition, if there is any.
+            if alignment_points_dropped_structure_indices:
+                alignment_points_new = []
+                dropped_index = 0
+                for alignment_point_index, alignment_point in enumerate(self.alignment_points):
+                    if alignment_point_index != alignment_points_dropped_structure_indices[
+                        dropped_index]:
+                        alignment_points_new.append(alignment_point)
+                    elif dropped_index < len(alignment_points_dropped_structure_indices) - 1:
+                        dropped_index += 1
+                self.alignment_points = alignment_points_new
 
     def new_alignment_point(self, y, x, extend_x_low, extend_x_high, extend_y_low, extend_y_high):
         """
@@ -627,9 +628,15 @@ class AlignmentPoints(object):
                                  alignment_point['patch_x_high'] + self.align_frames.dx[
                                      frame_index])
                     # Compute the frame quality and append it to the list for this alignment point.
-                    alignment_point['frame_qualities'].append(
-                        method(frame[y_low:y_high, x_low:x_high],
-                               self.configuration.alignment_points_rank_pixel_stride))
+                    if self.configuration.frames_normalization:
+                        alignment_point['frame_qualities'].append(
+                            method(frame[y_low:y_high, x_low:x_high],
+                                   self.configuration.alignment_points_rank_pixel_stride) /
+                            self.frames.frames_average_brightness[frame_index])
+                    else:
+                        alignment_point['frame_qualities'].append(
+                            method(frame[y_low:y_high, x_low:x_high],
+                                   self.configuration.alignment_points_rank_pixel_stride))
         else:
             # Sampled-down Laplacians of all blurred frames have been computed in
             # "frames.frames_mono_blurred_laplacian". Cut out boxes around alignment points from
@@ -656,7 +663,13 @@ class AlignmentPoints(object):
                                      alignment_point['patch_x_high'] + self.align_frames.dx[
                                          frame_index]) / self.configuration.align_frames_sampling_stride)
                     # Compute the frame quality and append it to the list for this alignment point.
-                    alignment_point['frame_qualities'].append(meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0])
+                    if self.configuration.frames_normalization:
+                        alignment_point['frame_qualities'].append(
+                            meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0] /
+                            self.frames.frames_average_brightness[frame_index])
+                    else:
+                        alignment_point['frame_qualities'].append(
+                            meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0])
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank frames at APs", 100)

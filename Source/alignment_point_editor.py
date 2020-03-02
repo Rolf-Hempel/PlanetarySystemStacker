@@ -28,6 +28,7 @@ from time import time
 
 from numpy import uint8
 from PyQt5 import QtCore, QtGui, QtWidgets
+from cv2 import NORM_MINMAX, normalize
 
 from align_frames import AlignFrames
 from alignment_point_editor_gui import Ui_alignment_point_editor
@@ -436,6 +437,10 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         self.image = image
         # Convert the float32 monochrome image into uint8 format.
         image_uint8 = self.image.astype(uint8)
+
+        # Normalize the frame brightness.
+        image_uint8 = normalize(image_uint8, None, alpha=0, beta=255, norm_type=NORM_MINMAX)
+
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
         qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,

@@ -62,11 +62,14 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fdb_comboBox.addItem('Auto detect color')
         self.fdb_comboBox.addItem('Grayscale')
         self.fdb_comboBox.addItem('RGB')
+        self.fdb_comboBox.addItem('BGR')
         self.fdb_comboBox.addItem('Force Bayer RGGB')
         self.fdb_comboBox.addItem('Force Bayer GRBG')
         self.fdb_comboBox.addItem('Force Bayer GBRG')
         self.fdb_comboBox.addItem('Force Bayer BGGR')
         self.fdb_comboBox.activated[str].connect(self.fdb_changed)
+        self.fn_checkBox.stateChanged.connect(self.fn_changed)
+        self.fnt_slider_value.valueChanged['int'].connect(self.fnt_changed)
         self.afm_comboBox.addItem('Surface')
         self.afm_comboBox.addItem('Planet')
         self.afm_comboBox.activated[str].connect(self.afm_changed)
@@ -78,6 +81,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.gpspwr_checkBox.stateChanged.connect(self.gpspwr_changed)
         self.gppl_spinBox.valueChanged['int'].connect(self.gppl_changed)
         self.gpbl_spinBox.valueChanged['int'].connect(self.gpbl_changed)
+        self.gpif_comboBox.addItem('png')
         self.gpif_comboBox.addItem('tiff')
         self.gpif_comboBox.addItem('fits')
         self.gpif_comboBox.activated[str].connect(self.gpif_changed)
@@ -87,6 +91,11 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.apbt_slider_value.valueChanged['int'].connect(self.apbt_changed)
         self.apfp_slider_value.valueChanged['int'].connect(self.apfp_changed)
         self.spp_checkBox.stateChanged.connect(self.spp_changed)
+        self.ipfn_checkBox.stateChanged.connect(self.ipfn_changed)
+        self.nfs_checkBox.stateChanged.connect(self.nfs_changed)
+        self.pfs_checkBox.stateChanged.connect(self.pfs_changed)
+        self.apbs_checkBox.stateChanged.connect(self.apbs_changed)
+        self.nap_checkBox.stateChanged.connect(self.nap_changed)
 
         self.restore_standard_values.clicked.connect(self.restore_standard_parameters)
 
@@ -128,6 +137,11 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                                            QtCore.Qt.MatchFixedString)
         if index >= 0:
             self.gpif_comboBox.setCurrentIndex(index)
+        self.ipfn_checkBox.setChecked(self.config_copy.global_parameters_parameters_in_filename)
+        self.nfs_checkBox.setChecked(self.config_copy.global_parameters_stack_number_frames)
+        self.pfs_checkBox.setChecked(self.config_copy.global_parameters_stack_percent_frames)
+        self.apbs_checkBox.setChecked(self.config_copy.global_parameters_ap_box_size)
+        self.nap_checkBox.setChecked(self.config_copy.global_parameters_ap_number)
 
         self.aphbw_slider_value.setValue(self.config_copy.alignment_points_half_box_width * 2)
         self.aphbw_label_display.setText(str(self.config_copy.alignment_points_half_box_width * 2))
@@ -140,6 +154,11 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.apfp_slider_value.setValue(self.config_copy.alignment_points_frame_percent)
         self.apfp_label_display.setText(str(self.config_copy.alignment_points_frame_percent))
         self.spp_checkBox.setChecked(self.config_copy.global_parameters_include_postprocessing)
+        self.fn_checkBox.setChecked(self.config_copy.frames_normalization)
+        self.fn_activate_deactivate_widgets()
+        self.fnt_slider_value.setValue(self.config_copy.frames_normalization_threshold)
+        self.fnt_label_display.setText(str(self.config_copy.frames_normalization_threshold))
+        self.ipfn_activate_deactivate_widgets()
 
     def fgw_changed(self, value):
         """
@@ -187,6 +206,28 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.afsw_slider_value.setEnabled(True)
             self.afsw_label_display.setEnabled(True)
 
+    def fn_activate_deactivate_widgets(self):
+        if self.config_copy.frames_normalization:
+            self.fnt_label_display.setEnabled(True)
+            self.fnt_slider_value.setEnabled(True)
+            self.fnt_label_parameter.setEnabled(True)
+        else:
+            self.fnt_label_display.setEnabled(False)
+            self.fnt_slider_value.setEnabled(False)
+            self.fnt_label_parameter.setEnabled(False)
+
+    def ipfn_activate_deactivate_widgets(self):
+        if self.config_copy.global_parameters_parameters_in_filename:
+            self.nfs_checkBox.setEnabled(True)
+            self.pfs_checkBox.setEnabled(True)
+            self.apbs_checkBox.setEnabled(True)
+            self.nap_checkBox.setEnabled(True)
+        else:
+            self.nfs_checkBox.setEnabled(False)
+            self.pfs_checkBox.setEnabled(False)
+            self.apbs_checkBox.setEnabled(False)
+            self.nap_checkBox.setEnabled(False)
+
     def afa_changed(self, state):
         self.config_copy.align_frames_automation = (state == QtCore.Qt.Checked)
 
@@ -233,6 +274,30 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
     def spp_changed(self, state):
         self.config_copy.global_parameters_include_postprocessing = (state == QtCore.Qt.Checked)
 
+    def fn_changed(self, state):
+        self.config_copy.frames_normalization = (state == QtCore.Qt.Checked)
+        self.fn_activate_deactivate_widgets()
+
+    def fnt_changed(self, value):
+        self.config_copy.frames_normalization_threshold = value
+        self.fnt_label_display.setText(str(self.config_copy.frames_normalization_threshold))
+
+    def ipfn_changed(self, state):
+        self.config_copy.global_parameters_parameters_in_filename = (state == QtCore.Qt.Checked)
+        self.ipfn_activate_deactivate_widgets()
+
+    def nfs_changed(self, state):
+        self.config_copy.global_parameters_stack_number_frames = (state == QtCore.Qt.Checked)
+
+    def pfs_changed(self, state):
+        self.config_copy.global_parameters_stack_percent_frames = (state == QtCore.Qt.Checked)
+
+    def apbs_changed(self, state):
+        self.config_copy.global_parameters_ap_box_size = (state == QtCore.Qt.Checked)
+
+    def nap_changed(self, state):
+        self.config_copy.global_parameters_ap_number = (state == QtCore.Qt.Checked)
+
     def restore_standard_parameters(self):
         """
         Reset configuration parameters and GUI widget settings to standard values. Mark
@@ -253,6 +318,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         :return: -
         """
 
+        go_back_to_activities = []
         if self.config_copy.global_parameters_protocol_level != \
                 self.configuration.global_parameters_protocol_level:
             self.configuration.global_parameters_protocol_level = \
@@ -264,76 +330,88 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.configuration.alignment_points_frame_percent = \
                 self.config_copy.alignment_points_frame_percent
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Compute frame qualities'
+            go_back_to_activities.append('Compute frame qualities')
 
         if self.config_copy.alignment_points_brightness_threshold != \
                 self.configuration.alignment_points_brightness_threshold:
             self.configuration.alignment_points_brightness_threshold = \
                 self.config_copy.alignment_points_brightness_threshold
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Set alignment points'
+            go_back_to_activities.append('Set alignment points')
 
         if self.config_copy.alignment_points_structure_threshold != \
                 self.configuration.alignment_points_structure_threshold:
             self.configuration.alignment_points_structure_threshold = \
                 self.config_copy.alignment_points_structure_threshold
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Set alignment points'
+            go_back_to_activities.append('Set alignment points')
 
         if self.config_copy.alignment_points_search_width != \
                 self.configuration.alignment_points_search_width:
             self.configuration.alignment_points_search_width = \
                 self.config_copy.alignment_points_search_width
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Set alignment points'
+            go_back_to_activities.append('Set alignment points')
 
         if self.config_copy.alignment_points_half_box_width != \
                 self.configuration.alignment_points_half_box_width:
             self.configuration.alignment_points_half_box_width = \
                 self.config_copy.alignment_points_half_box_width
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Set alignment points'
+            go_back_to_activities.append('Set alignment points')
 
         if self.config_copy.align_frames_average_frame_percent != \
                 self.configuration.align_frames_average_frame_percent:
             self.configuration.align_frames_average_frame_percent = \
                 self.config_copy.align_frames_average_frame_percent
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Align frames'
+            go_back_to_activities.append('Align frames')
 
         if self.config_copy.align_frames_search_width != \
                 self.configuration.align_frames_search_width:
             self.configuration.align_frames_search_width = \
                 self.config_copy.align_frames_search_width
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Align frames'
+            go_back_to_activities.append('Align frames')
 
         if self.config_copy.align_frames_rectangle_scale_factor != \
                 self.configuration.align_frames_rectangle_scale_factor:
             self.configuration.align_frames_rectangle_scale_factor = \
                 self.config_copy.align_frames_rectangle_scale_factor
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Align frames'
+            go_back_to_activities.append('Align frames')
 
         if self.config_copy.align_frames_automation != self.configuration.align_frames_automation:
             self.configuration.align_frames_automation = self.config_copy.align_frames_automation
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Align frames'
+            go_back_to_activities.append('Align frames')
 
         if self.config_copy.align_frames_mode != self.configuration.align_frames_mode:
             self.configuration.align_frames_mode = self.config_copy.align_frames_mode
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Align frames'
+            go_back_to_activities.append('Align frames')
 
         if self.config_copy.frames_gauss_width != self.configuration.frames_gauss_width:
             self.configuration.frames_gauss_width = self.config_copy.frames_gauss_width
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Read frames'
+            go_back_to_activities.append('Read frames')
 
         if self.config_copy.frames_debayering_default != self.configuration.frames_debayering_default:
             self.configuration.frames_debayering_default = self.config_copy.frames_debayering_default
             self.configuration.configuration_changed = True
-            self.configuration.go_back_to_activity = 'Read frames'
+            go_back_to_activities.append('Read frames')
+
+        if self.config_copy.frames_normalization != self.configuration.frames_normalization:
+            self.configuration.frames_normalization = self.config_copy.frames_normalization
+            self.configuration.configuration_changed = True
+            go_back_to_activities.append('Compute frame qualities')
+
+        if self.config_copy.frames_normalization_threshold != \
+                self.configuration.frames_normalization_threshold:
+            self.configuration.frames_normalization_threshold = \
+                self.config_copy.frames_normalization_threshold
+            self.configuration.configuration_changed = True
+            go_back_to_activities.append('Compute frame qualities')
 
         if self.config_copy.global_parameters_store_protocol_with_result != \
                 self.configuration.global_parameters_store_protocol_with_result:
@@ -371,8 +449,43 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                 self.config_copy.global_parameters_image_format
             self.configuration.configuration_changed = True
 
+        if self.config_copy.global_parameters_parameters_in_filename != \
+                self.configuration.global_parameters_parameters_in_filename:
+            self.configuration.global_parameters_parameters_in_filename = \
+                self.config_copy.global_parameters_parameters_in_filename
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_stack_number_frames != \
+                self.configuration.global_parameters_stack_number_frames:
+            self.configuration.global_parameters_stack_number_frames = \
+                self.config_copy.global_parameters_stack_number_frames
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_stack_percent_frames != \
+                self.configuration.global_parameters_stack_percent_frames:
+            self.configuration.global_parameters_stack_percent_frames = \
+                self.config_copy.global_parameters_stack_percent_frames
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_ap_box_size != \
+                self.configuration.global_parameters_ap_box_size:
+            self.configuration.global_parameters_ap_box_size = \
+                self.config_copy.global_parameters_ap_box_size
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_ap_number != \
+                self.configuration.global_parameters_ap_number:
+            self.configuration.global_parameters_ap_number = \
+                self.config_copy.global_parameters_ap_number
+            self.configuration.configuration_changed = True
+
         # Set dependent parameters.
         self.configuration.set_derived_parameters()
+
+        # If the change of parameters require going back in the workflow, find the latest phase
+        # which is safe to go back to.
+        if go_back_to_activities:
+            self.parent_gui.signal_set_go_back_activity.emit(go_back_to_activities)
 
         self.close()
 

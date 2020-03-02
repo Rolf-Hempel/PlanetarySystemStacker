@@ -23,6 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from configparser import ConfigParser
 from os.path import expanduser, join, isfile
 from os.path import splitext
+from copy import deepcopy
 
 from exceptions import IncompatibleVersionsError
 
@@ -42,8 +43,15 @@ class ConfigurationParameters(object):
         self.global_parameters_buffering_level = None
         self.global_parameters_include_postprocessing = None
         self.global_parameters_image_format = None
+        self.global_parameters_parameters_in_filename = None
+        self.global_parameters_stack_number_frames = None
+        self.global_parameters_stack_percent_frames = None
+        self.global_parameters_ap_box_size = None
+        self.global_parameters_ap_number = None
         self.frames_gauss_width = None
         self.frames_debayering_default = None
+        self.frames_normalization = None
+        self.frames_normalization_threshold = None
         self.align_frames_mode = None
         self.align_frames_automation = None
         self.align_frames_rectangle_scale_factor = None
@@ -62,19 +70,26 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_width = 1200
         self.hidden_parameters_main_window_height = 800
         self.hidden_parameters_main_window_maximized = False
-        self.global_parameters_version = "PlanetarySystemStacker 0.7.0 beta"
+        self.global_parameters_version = "PlanetarySystemStacker 0.7.0"
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = False
         self.global_parameters_store_protocol_with_result = False
         self.global_parameters_buffering_level = 2
         self.global_parameters_include_postprocessing = False
-        self.global_parameters_image_format = "tiff"
+        self.global_parameters_image_format = "png"
+        self.global_parameters_parameters_in_filename = False
+        self.global_parameters_stack_number_frames = False
+        self.global_parameters_stack_percent_frames = False
+        self.global_parameters_ap_box_size = False
+        self.global_parameters_ap_number = False
         self.frames_gauss_width = 7
         self.frames_debayering_default = 'Auto detect color'
+        self.frames_normalization = True
+        self.frames_normalization_threshold = 15
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
         self.align_frames_rectangle_scale_factor = 3.
-        self.align_frames_search_width = 24
+        self.align_frames_search_width = 34
         self.align_frames_average_frame_percent = 5
         self.alignment_points_search_width = 14
         self.alignment_points_frame_percent = 10
@@ -110,8 +125,20 @@ class ConfigurationParameters(object):
             configuration_object.global_parameters_include_postprocessing
         self.global_parameters_image_format = \
             configuration_object.global_parameters_image_format
+        self.global_parameters_parameters_in_filename = \
+            configuration_object.global_parameters_parameters_in_filename
+        self.global_parameters_stack_number_frames = \
+            configuration_object.global_parameters_stack_number_frames
+        self.global_parameters_stack_percent_frames = \
+            configuration_object.global_parameters_stack_percent_frames
+        self.global_parameters_ap_box_size = \
+            configuration_object.global_parameters_ap_box_size
+        self.global_parameters_ap_number = \
+            configuration_object.global_parameters_ap_number
         self.frames_gauss_width = configuration_object.frames_gauss_width
         self.frames_debayering_default = configuration_object.frames_debayering_default
+        self.frames_normalization = configuration_object.frames_normalization
+        self.frames_normalization_threshold = configuration_object.frames_normalization_threshold
         self.align_frames_mode = configuration_object.align_frames_mode
         self.align_frames_automation = configuration_object.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -130,7 +157,7 @@ class ConfigurationParameters(object):
 
 class Configuration(object):
     def __init__(self):
-        self.global_parameters_version = "PlanetarySystemStacker 0.7.0 beta"
+        self.global_parameters_version = "PlanetarySystemStacker 0.7.0"
 
         # The config file for persistent parameter storage is located in the user's home
         # directory, as is the detailed logfile.
@@ -143,6 +170,9 @@ class Configuration(object):
         self.window_icon = 'PSS-Icon-64.ico'
 
         self.frames_mono_channel = 'green'
+        self.frames_color_difference_threshold = 0
+        self.frames_bayer_max_noise_diff_green = 2.
+        self.frames_bayer_min_distance_from_blue = 99.5
 
         self.rank_frames_pixel_stride = 2
         self.rank_frames_method = "Laplace"
@@ -155,6 +185,7 @@ class Configuration(object):
         self.align_frames_sampling_stride = 2
         self.align_frames_min_stabilization_patch_fraction = 0.2
         self.align_frames_max_stabilization_patch_fraction = 0.7
+        self.align_frames_max_search_width = 150
 
         self.alignment_points_min_half_box_width = 10
         self.alignment_points_contrast_threshold = 0
@@ -243,8 +274,21 @@ class Configuration(object):
             configuration_parameters.global_parameters_include_postprocessing
         self.global_parameters_image_format = \
             configuration_parameters.global_parameters_image_format
+        self.global_parameters_parameters_in_filename = \
+            configuration_parameters.global_parameters_parameters_in_filename
+        self.global_parameters_stack_number_frames = \
+            configuration_parameters.global_parameters_stack_number_frames
+        self.global_parameters_stack_percent_frames = \
+            configuration_parameters.global_parameters_stack_percent_frames
+        self.global_parameters_ap_box_size = \
+            configuration_parameters.global_parameters_ap_box_size
+        self.global_parameters_ap_number = \
+            configuration_parameters.global_parameters_ap_number
         self.frames_gauss_width = configuration_parameters.frames_gauss_width
         self.frames_debayering_default = configuration_parameters.frames_debayering_default
+        self.frames_normalization = configuration_parameters.frames_normalization
+        self.frames_normalization_threshold = \
+            configuration_parameters.frames_normalization_threshold
         self.align_frames_mode = configuration_parameters.align_frames_mode
         self.align_frames_automation = configuration_parameters.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -292,9 +336,21 @@ class Configuration(object):
             self.global_parameters_include_postprocessing
         configuration_parameters.global_parameters_image_format = \
             self.global_parameters_image_format
+        configuration_parameters.global_parameters_parameters_in_filename = \
+            self.global_parameters_parameters_in_filename
+        configuration_parameters.global_parameters_stack_number_frames = \
+            self.global_parameters_stack_number_frames
+        configuration_parameters.global_parameters_stack_percent_frames = \
+            self.global_parameters_stack_percent_frames
+        configuration_parameters.global_parameters_ap_box_size = \
+            self.global_parameters_ap_box_size
+        configuration_parameters.global_parameters_ap_number = \
+            self.global_parameters_ap_number
 
         configuration_parameters.frames_gauss_width = self.frames_gauss_width
         configuration_parameters.frames_debayering_default = self.frames_debayering_default
+        configuration_parameters.frames_normalization = self.frames_normalization
+        configuration_parameters.frames_normalization_threshold = self.frames_normalization_threshold
 
         configuration_parameters.align_frames_mode = self.align_frames_mode
         configuration_parameters.align_frames_automation = self.align_frames_automation
@@ -339,6 +395,7 @@ class Configuration(object):
                                                                 'main window height')
         self.hidden_parameters_main_window_maximized = conf.getboolean('Hidden parameters',
                                                                        'main window maximized')
+
         self.global_parameters_protocol_level = conf.getint('Global parameters',
                                                             'protocol level')
         self.global_parameters_write_protocol_to_file = conf.getboolean('Global parameters',
@@ -350,8 +407,22 @@ class Configuration(object):
             'Global parameters', 'include postprocessing')
         self.global_parameters_image_format = conf.get(
             'Global parameters', 'image format')
+        self.global_parameters_parameters_in_filename = conf.getboolean(
+            'Global parameters', 'parameters in filename')
+        self.global_parameters_stack_number_frames = conf.getboolean(
+            'Global parameters', 'stack number frames')
+        self.global_parameters_stack_percent_frames = conf.getboolean(
+            'Global parameters', 'stack percent frames')
+        self.global_parameters_ap_box_size = conf.getboolean(
+            'Global parameters', 'ap box size')
+        self.global_parameters_ap_number = conf.getboolean(
+            'Global parameters', 'ap number')
+
         self.frames_gauss_width = conf.getint('Frames', 'gauss width')
         self.frames_debayering_default = conf.get('Frames', 'debayering default')
+        self.frames_normalization = conf.getboolean('Frames', 'normalization')
+        self.frames_normalization_threshold = conf.getint('Frames', 'normalization threshold')
+
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
         self.align_frames_rectangle_scale_factor = conf.getfloat('Align frames',
@@ -359,6 +430,7 @@ class Configuration(object):
         self.align_frames_search_width = conf.getint('Align frames', 'search width')
         self.align_frames_average_frame_percent = conf.getint('Align frames',
                                                               'average frame percent')
+
         self.alignment_points_half_box_width = conf.getint('Alignment points',
                                                            'half box width')
         self.alignment_points_search_width = conf.getint('Alignment points', 'search width')
@@ -408,10 +480,23 @@ class Configuration(object):
                            str(self.global_parameters_include_postprocessing))
         self.set_parameter('Global parameters', 'image format',
                            self.global_parameters_image_format)
+        self.set_parameter('Global parameters', 'parameters in filename',
+                           str(self.global_parameters_parameters_in_filename))
+        self.set_parameter('Global parameters', 'stack number frames',
+                           str(self.global_parameters_stack_number_frames))
+        self.set_parameter('Global parameters', 'stack percent frames',
+                           str(self.global_parameters_stack_percent_frames))
+        self.set_parameter('Global parameters', 'ap box size',
+                           str(self.global_parameters_ap_box_size))
+        self.set_parameter('Global parameters', 'ap number',
+                           str(self.global_parameters_ap_number))
 
         self.config_parser_object.add_section('Frames')
         self.set_parameter('Frames', 'gauss width', str(self.frames_gauss_width))
         self.set_parameter('Frames', 'debayering default', self.frames_debayering_default)
+        self.set_parameter('Frames', 'normalization', str(self.frames_normalization))
+        self.set_parameter('Frames', 'normalization threshold',
+                           str(self.frames_normalization_threshold))
 
         self.config_parser_object.add_section('Align frames')
         self.set_parameter('Align frames', 'mode', self.align_frames_mode)
@@ -599,6 +684,20 @@ class PostprocDataObject(object):
         """
 
         new_version = PostprocVersion()
+        self.versions.append(new_version)
+        self.number_versions += 1
+        self.version_selected = self.number_versions
+        return new_version
+
+    def new_postproc_version_from_existing(self):
+        """
+        Create a new postprocessing version by copying the currently selected one. Append the new
+        version to the list of postprocessing versions. Set the current version pointer to the new
+        version.
+        :return: New postprocessing version.
+        """
+
+        new_version = deepcopy(self.versions[self.version_selected])
         self.versions.append(new_version)
         self.number_versions += 1
         self.version_selected = self.number_versions

@@ -2,12 +2,11 @@
 
 # Form implementation generated from reading ui file 'alignment_point_editor_gui.ui'
 #
-# Created by: PyQt5 UI code generator 5.12
+# Created by: PyQt5 UI code generator 5.11.2
 #
 # WARNING! All changes made in this file will be lost!
 
 from PyQt5 import QtCore, QtGui, QtWidgets
-
 
 class Ui_alignment_point_editor(object):
     def setupUi(self, alignment_point_editor):
@@ -178,7 +177,6 @@ class Ui_alignment_point_editor(object):
         self.btnUndo.setText(_translate("alignment_point_editor", "Undo"))
         self.btnRedo.setToolTip(_translate("alignment_point_editor", "Redo the last step."))
         self.btnRedo.setText(_translate("alignment_point_editor", "Redo"))
-        self.label_message.setText(_translate("alignment_point_editor", "Use the editor to create / modify alignemnt points. Confirm by pressing \'OK\'."))
+        self.label_message.setText(_translate("alignment_point_editor", "Create an AP grid, or create / modify alignment points manually (with the \'crtl\' button pressed). Confirm by pressing \'OK\'."))
         self.buttonBox.setToolTip(_translate("alignment_point_editor", "Confirm the current AP selection."))
-
 

@@ -64,18 +64,45 @@ class Job(object):
     Objects of this class encapsulate all information describing a PSS job.
     """
 
-    def __init__(self, job_name, parent=None):
+    def __init__(self, job_name):
         """
-        Initialize a Job object, given its name.
+        Initialize a Job object, given its name. The following instance variables are set:
+           - name: Path name string coming from the file chooser.
+           - file_name: File name string without path.
+           - type: Either 'video', or 'image' for stacking jobs, or 'postproc' for postprocessing.
+           - bayer_option_selected: Initialized to 'Auto detect color' for file types for which
+                                    debayering is supported. Otherwise None.
+           - bayer_pattern: Initialized to None
 
         :param job_name: Name of the job (str)
-        :param parent: Parent object
         """
 
         self.name = job_name
-        self.file_name = Path(job_name).name
-        self.type = None
-        self.bayer_pattern = 'Auto detect color'
+        path = Path(self.name)
+        self.file_name = path.name
+
+        # Bayer patterns are only defined for type 'video'.
+        self.bayer_pattern = None
+        self.bayer_option_selected = None
+
+        # Set the type of the job based on the file name extension.
+        image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
+        video_extensions = ['.avi', '.mov', '.mp4', '.ser']
+
+        if path.is_file():
+            extension = path.suffix.lower()
+            if extension in video_extensions:
+                self.type = 'video'
+                self.bayer_option_selected = 'Auto detect color'
+            elif extension in image_extensions:
+                self.type = 'postproc'
+            else:
+                raise InternalError(
+                    "Unsupported file type '" + extension + "' specified for job")
+        elif path.is_dir():
+            self.type = 'image'
+        else:
+            raise InternalError("Cannot decide if input file is video or image directory")
 
 
 class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
@@ -177,7 +204,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
             for input_name in input_names:
                 if input_name not in [job.name for job in self.jobs]:
                     new_job = Job(input_name)
-                    new_job.bayer_pattern = self.configuration.frames_debayering_default
+                    new_job.bayer_option_selected = self.configuration.frames_debayering_default
                     self.jobs.append(new_job)
 
             # Save the current directory location. The next dialog will open at this position.
@@ -209,6 +236,10 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         :return: True
         """
 
+        # Restrict the selected items to the subset for which debayering is supported.
+        selected_items = [item for item in self.job_list_widget.selectedItems() if
+                          self.jobs[source.row(item)].type == 'video']
+
         self.pattern = None
 
         # If a context menu item is pressed, remember the pattern.
@@ -216,80 +247,105 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
             self.pattern = 'Auto detect color'
 
         def action2_triggered(state):
-            self.pattern = 'Grayscale'
-
-        def action3_triggered(state):
             self.pattern = 'RGB'
 
+        def action3_triggered(state):
+            self.pattern = 'BGR'
+
         def action4_triggered(state):
-            self.pattern = 'Force Bayer RGGB'
+            self.pattern = 'Grayscale'
 
         def action5_triggered(state):
-            self.pattern = 'Force Bayer GRBG'
+            self.pattern = 'Force Bayer RGGB'
 
         def action6_triggered(state):
-            self.pattern = 'Force Bayer GBRG'
+            self.pattern = 'Force Bayer GRBG'
 
         def action7_triggered(state):
+            self.pattern = 'Force Bayer GBRG'
+
+        def action8_triggered(state):
             self.pattern = 'Force Bayer BGGR'
 
         # The context menu is opened on a job list entry.
         if (event.type() == QtCore.QEvent.ContextMenu and
                 source is self.job_list_widget):
 
-            # Create a list of patterns which are checked by the selected items initially.
-            checked_patterns = [self.jobs[source.row(item)].bayer_pattern
-                                for item in self.job_list_widget.selectedItems()]
+            # Show the context menu only if job items are selected for which debayering is
+            # supported.
+            if selected_items:
+                # Create a list of patterns which are checked by the selected items initially.
+                checked_patterns = [self.jobs[source.row(item)].bayer_option_selected
+                                    for item in selected_items]
 
-            # Create the context menu. Mark those patterns checked which have been set for at least
-            # one selected job list entry.
-            menu = QtWidgets.QMenu()
-            action1 = QtWidgets.QAction('Auto detect color', menu, checkable=True)
-            action1.triggered.connect(action1_triggered)
-            if 'Auto detect color' in checked_patterns:
-                action1.setChecked(True)
-            menu.addAction(action1)
-            menu.addSeparator()
-            action2 = QtWidgets.QAction('Grayscale', menu, checkable=True)
-            action2.triggered.connect(action2_triggered)
-            if 'Grayscale' in checked_patterns:
-                action2.setChecked(True)
-            menu.addAction(action2)
-            action3 = QtWidgets.QAction('RGB', menu, checkable=True)
-            action3.triggered.connect(action3_triggered)
-            if 'RGB' in checked_patterns:
-                action3.setChecked(True)
-            menu.addAction(action3)
-            action4 = QtWidgets.QAction('Force Bayer RGGB', menu, checkable=True)
-            action4.triggered.connect(action4_triggered)
-            if 'Force Bayer RGGB' in checked_patterns:
-                action4.setChecked(True)
-            menu.addAction(action4)
-            action5 = QtWidgets.QAction('Force Bayer GRBG', menu, checkable=True)
-            action5.triggered.connect(action5_triggered)
-            if 'Force Bayer GRBG' in checked_patterns:
-                action5.setChecked(True)
-            menu.addAction(action5)
-            action6 = QtWidgets.QAction('Force Bayer GBRG', menu, checkable=True)
-            action6.triggered.connect(action6_triggered)
-            if 'Force Bayer GBRG' in checked_patterns:
-                action6.setChecked(True)
-            menu.addAction(action6)
-            action7 = QtWidgets.QAction('Force Bayer BGGR', menu, checkable=True)
-            action7.triggered.connect(action7_triggered)
-            if 'Force Bayer BGGR' in checked_patterns:
-                action7.setChecked(True)
-            menu.addAction(action7)
+                # Create the context menu. Mark those patterns checked which have been set for at least
+                # one selected job list entry.
+                menu = QtWidgets.QMenu()
+                action1 = QtWidgets.QAction('Auto detect color', menu, checkable=True)
+                action1.triggered.connect(action1_triggered)
+                if 'Auto detect color' in checked_patterns:
+                    action1.setChecked(True)
+                menu.addAction(action1)
+                menu.addSeparator()
+                action2 = QtWidgets.QAction('RGB', menu, checkable=True)
+                action2.triggered.connect(action2_triggered)
+                if 'RGB' in checked_patterns:
+                    action2.setChecked(True)
+                menu.addAction(action2)
+                action3 = QtWidgets.QAction('BGR', menu, checkable=True)
+                action3.triggered.connect(action3_triggered)
+                if 'BGR' in checked_patterns:
+                    action3.setChecked(True)
+                menu.addAction(action3)
+                action4 = QtWidgets.QAction('Grayscale', menu, checkable=True)
+                action4.triggered.connect(action4_triggered)
+                if 'Grayscale' in checked_patterns:
+                    action4.setChecked(True)
+                menu.addAction(action4)
+                action5 = QtWidgets.QAction('Force Bayer RGGB', menu, checkable=True)
+                action5.triggered.connect(action5_triggered)
+                if 'Force Bayer RGGB' in checked_patterns:
+                    action5.setChecked(True)
+                menu.addAction(action5)
+                action6 = QtWidgets.QAction('Force Bayer GRBG', menu, checkable=True)
+                action6.triggered.connect(action6_triggered)
+                if 'Force Bayer GRBG' in checked_patterns:
+                    action6.setChecked(True)
+                menu.addAction(action6)
+                action7 = QtWidgets.QAction('Force Bayer GBRG', menu, checkable=True)
+                action7.triggered.connect(action7_triggered)
+                if 'Force Bayer GBRG' in checked_patterns:
+                    action7.setChecked(True)
+                menu.addAction(action7)
+                action8 = QtWidgets.QAction('Force Bayer BGGR', menu, checkable=True)
+                action8.triggered.connect(action8_triggered)
+                if 'Force Bayer BGGR' in checked_patterns:
+                    action8.setChecked(True)
+                menu.addAction(action8)
 
-            # Identify the selected items and their locations in the job list. Set the selected
-            # Bayer pattern in the corresponding job objects.
-            if menu.exec_(event.globalPos()) and self.pattern is not None:
-                for item in self.job_list_widget.selectedItems():
-                    row = source.row(item)
-                    self.jobs[row].bayer_pattern = self.pattern
-                    # print(item.text() + ", row: " + str(row) + ", pattern: " + str(self.pattern))
-            return True
+                # Identify the selected items and their locations in the job list. Set the selected
+                # Bayer pattern in the corresponding job objects.
+                if menu.exec_(event.globalPos()) and self.pattern is not None:
+                    for item in selected_items:
+                        row = source.row(item)
+                        self.jobs[row].bayer_option_selected = self.pattern
+                return True
+
         return super(JobEditor, self).eventFilter(source, event)
+
+    def keyPressEvent(self, event):
+        """
+        The + and - keys are used for zooming.
+
+        :param event: event object
+        :return: -
+        """
+
+        # If the "+" key is pressed, zoom in. If "-" is pressed, zoom out.
+        if event.key() == QtCore.Qt.Key_Delete:
+            self.remove_job_list()
+        else:
+            super(JobEditor, self).keyPressEvent(event)
 
     def accept(self):
         """
@@ -298,24 +354,6 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         :return: -
         """
-
-        image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
-        video_extensions = ['.avi', '.mov', '.mp4', '.ser']
-        # Set the job types of all current jobs on the list.
-        for job in self.jobs:
-            if Path(job.name).is_file():
-                extension = Path(job.name).suffix.lower()
-                if extension in video_extensions:
-                    job.type = 'video'
-                elif extension in image_extensions:
-                    job.type = 'postproc'
-                else:
-                    raise InternalError("Unsupported file type '" + extension + "' specified for job")
-            elif Path(job.name).is_dir():
-                job.type = 'image'
-            else:
-                raise InternalError("Cannot decide if input file is video or image directory")
-            # print ("name: " + job.name + ", type: " + job.type + ", pattern: " + job.bayer_pattern)
 
         # Update the job list and reset the current job index to the first entry.
         self.parent_gui.jobs = self.jobs

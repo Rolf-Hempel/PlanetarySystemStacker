@@ -30,6 +30,7 @@ from numpy import int as np_int
 from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
     sqrt, uint16, clip, minimum
 from skimage import img_as_uint, img_as_ubyte
+from statistics import median
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
@@ -105,7 +106,7 @@ class StackFrames(object):
         # If the alignment point patches do not cover the entire frame, a background image must
         # be computed and blended in. At this point it is not yet clear if this is necessary.
         self.background_patches = None
-        self.stacked_background_buffer = None
+        self.averaged_background = None
 
         # Allocate a buffer which for each pixel of the image accumulates the weights at each pixel.
         # This buffer is used to normalize the image buffer. It is initialized with a small value to
@@ -290,9 +291,24 @@ class StackFrames(object):
         if self.debug:
             self.create_image_window_signal.emit()
 
+        # If brightness normalization is switched on, prepare for adjusting frame brightness.
+        if self.configuration.frames_normalization:
+            median_brightness = median(self.frames.frames_average_brightness)
+            # print ("min: " + str(min(self.frames.frames_average_brightness)) + ", median: "
+            #        + str(median_brightness) + ", max: "
+            #        + str(max(self.frames.frames_average_brightness)))
+
         # Go through the list of all frames.
         for frame_index in range(self.frames.number):
-            frame = self.frames.frames(frame_index)
+
+            # If brightness normalization is switched on, change the brightness of this frame to
+            # the median of all frames.
+            if self.configuration.frames_normalization:
+                frame = self.frames.frames(frame_index) * median_brightness / \
+                        (self.frames.frames_average_brightness[frame_index] + 1.e-7)
+            else:
+                frame = self.frames.frames(frame_index)
+
             frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
 
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
@@ -684,7 +700,7 @@ if __name__ == "__main__":
 
     my_timer.create('Read all frames')
     try:
-        frames = Frames(configuration, names, type=type, convert_to_grayscale=True)
+        frames = Frames(configuration, names, type=type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Error as e:

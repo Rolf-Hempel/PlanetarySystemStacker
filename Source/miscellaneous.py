@@ -327,6 +327,14 @@ class Miscellaneous(object):
             # If the second phase was not successful, set the corresponding shifts to zero.
             if not success_second_phase:
                 shift_y_local_second_phase = shift_x_local_second_phase = 0
+            # # The following code computes the sub-pixel shift correction to be used in drizzling.
+            # else:
+            #     surroundings = result[maxLoc[1]-1:maxLoc[1]+2, maxLoc[0]-1:maxLoc[0]+2]
+            #     try:
+            #         y_corr, x_corr = Miscellaneous.sub_pixel_solve(surroundings)
+            #     except:
+            #         print ("Subpixel solve not successful")
+            #         y_corr, x_corr = (0., 0.)
 
         # If the first phase was unsuccessful, drop the second phase and set all warp shifts to 0.
         else:
@@ -1148,7 +1156,8 @@ class Miscellaneous(object):
         """
 
         # Compile all parameters and their values to be printed.
-        parameters = [["Noise level (add Gaussian blur)", str(configuration.frames_gauss_width)],
+        parameters = [["Debayering default", configuration.frames_debayering_default],
+                      ["Noise level (add Gaussian blur)", str(configuration.frames_gauss_width)],
                       ["Frame stabilization mode", configuration.align_frames_mode]]
 
         # The following parameters are only active in "Surface" mode.
@@ -1172,16 +1181,23 @@ class Miscellaneous(object):
                                    ["Minimum brightness",
                                     str(configuration.alignment_points_brightness_threshold)],
                                    ["Percentage of best frames to be stacked",
-                                    str(configuration.alignment_points_frame_percent)]
+                                    str(configuration.alignment_points_frame_percent)],
+                                   ["Normalize frame brightness", str(
+                                           configuration.frames_normalization)]
                                    ]
 
-        output_string = "\n           Stacking parameters:                                         | Value   |\n" \
-                        "           ------------------------------------------------------------------------" \
+        # If brightness normalization is checked, add the black cut-off value.
+        if configuration.frames_normalization:
+            parameters = parameters + [
+                ["Normalization black cut-off", str(configuration.frames_normalization_threshold)]]
+
+        output_string = "\n           Stacking parameters:                                         | Value             |\n" \
+                        "           ----------------------------------------------------------------------------------" \
                         "\n          "
 
         # Extend the output string with a line for every parameter to be printed.
         for line in parameters:
-            output_string += " {0:60s} | {1:8s}|\n          ".format(line[0], line[1])
+            output_string += " {0:60s} | {1:18s}|\n          ".format(line[0], line[1])
 
         # Write the complete table.
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)

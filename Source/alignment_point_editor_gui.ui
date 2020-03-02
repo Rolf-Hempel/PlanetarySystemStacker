@@ -329,7 +329,7 @@ values</string>
      <item>
       <widget class="QLabel" name="label_message">
        <property name="text">
-        <string>Use the editor to create / modify alignemnt points. Confirm by pressing 'OK'.</string>
+        <string>Create an AP grid, or create / modify alignment points manually (with the 'crtl' button pressed). Confirm by pressing 'OK'.</string>
        </property>
       </widget>
      </item>
