@@ -23,4 +23,4 @@ The program is started by executing the main program in module "planetary_system
 
 The program uses array operations (OpenCV, numpy) wherever possible to speed up execution. Qt5 is used as the GUI toolkit.
 
-A [discussion platform](https://forum.astronomie.de/forums/planetarysystemstacker-pss.237/) for all issues concerning this software project has been created in the context of the German amateur astronomy forum [Astronomie.de](https://www.astronomie.de/). Currently this forum is in German language only, but an English branch is in preparation.
+A [discussion platform](https://www.astronomie.de/PSS/GermanBoard/) for all issues concerning this software project has been created in the context of the German amateur astronomy forum [Astronomie.de](https://www.astronomie.de/). Currently this forum is in German language only, but an English branch is in preparation.
