@@ -686,13 +686,15 @@ class AlignmentPoints(object):
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)
 
     def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
-                                      de_warp=True, weight_matrix_first_phase=None):
+                                      de_warp=True, weight_matrix_first_phase=None,
+                                      subpixel_solve=False):
         """
         Compute the [y, x] pixel shift vector at a given alignment point relative to the mean frame.
         Four different methods can be used to compute the shift values:
         - a multilevel cross correlation algorithm (miscellaneous.multilevel_correlation). This
           method was implemented after PSS had shown bad performance for planetary videos captured
-          with bad seeing.
+          with bad seeing. Pixel shifts can be computed with subpixel accuracy, as specified with
+          the parameter "subpixel_solve". This is needed for drizzling.
         - a subpixel algorithm from "skimage.feature"
         - a phase correlation algorithm (miscellaneous.translation)
         - a local search algorithm (spiralling outwards), see method "search_local_match",
@@ -724,6 +726,10 @@ class AlignmentPoints(object):
                                           size of this 2D array in each coordinate direction is that
                                           of the reference_box_first_phase plus two times the first
                                           phase search width.
+        :param subpixel_solve: Used only for alignment method "MultiLevelCorrelation". If True,
+                               in the second phase the optimum is computed with sub-pixel accuracy
+                               (i.e. the returned shifts are not integer). If False, shifts are
+                               computed as integer values.
 
         :return: [shift_y, shift_x], success with: [shift_y, shift_x]: Local shift vector
                                          success: True, if computation successful; False, otherwise.
@@ -756,7 +762,8 @@ class AlignmentPoints(object):
                         alignment_point['reference_box_second_phase'],
                         y_low + dy, y_high + dy, x_low + dx, x_high + dx,
                         self.configuration.alignment_points_search_width,
-                        weight_matrix_first_phase=weight_matrix_first_phase)
+                        weight_matrix_first_phase=weight_matrix_first_phase,
+                        subpixel_solve=subpixel_solve)
 
                 # Compute the combined warp shifts from both phases.
                 shift_pixel = [shift_y_local_first_phase + shift_y_local_second_phase,

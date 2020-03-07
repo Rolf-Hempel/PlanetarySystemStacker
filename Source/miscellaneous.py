@@ -202,7 +202,7 @@ class Miscellaneous(object):
     def multilevel_correlation(reference_box_first_phase, frame_mono_blurred,
                                blurr_strength_first_phase, reference_box_second_phase,
                                y_low, y_high, x_low, x_high, search_width,
-                               weight_matrix_first_phase=None):
+                               weight_matrix_first_phase=None, subpixel_solve=False):
         """
         Determine the local warp shift at an alignment point using a multi-level approach based on
         normalized cross correlation. The first level uses a pixel grid which is coarser by a factor
@@ -243,6 +243,9 @@ class Miscellaneous(object):
                                           2D array in each coordinate direction is that of the
                                           reference_box_first_phase plus two times the first phase
                                           search width (see below).
+        :param subpixel_solve: If True, in the second phase the optimum is computed with
+                               sub-pixel accuracy (i.e. the returned shifts are not integer).
+                               If False, shifts are computed as integer values.
 
         :return: (shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase,
                   shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase)
@@ -327,14 +330,20 @@ class Miscellaneous(object):
             # If the second phase was not successful, set the corresponding shifts to zero.
             if not success_second_phase:
                 shift_y_local_second_phase = shift_x_local_second_phase = 0
-            # # The following code computes the sub-pixel shift correction to be used in drizzling.
-            # else:
-            #     surroundings = result[maxLoc[1]-1:maxLoc[1]+2, maxLoc[0]-1:maxLoc[0]+2]
-            #     try:
-            #         y_corr, x_corr = Miscellaneous.sub_pixel_solve(surroundings)
-            #     except:
-            #         print ("Subpixel solve not successful")
-            #         y_corr, x_corr = (0., 0.)
+            # The following code computes the sub-pixel shift correction to be used in drizzling.
+            elif subpixel_solve:
+                # Cut a 3x3 window around the optimum from the matching results.
+                surroundings = result[maxLoc[1]-1:maxLoc[1]+2, maxLoc[0]-1:maxLoc[0]+2]
+                try:
+                    # Compute the correction to the center position. Only if the found sub-pixel
+                    # correction is within the 3x3 box, it is trusted (and used).
+                    y_corr, x_corr = Miscellaneous.sub_pixel_solve(surroundings)
+                    if abs(y_corr) <= 1. and abs(x_corr) <= 1.:
+                        shift_y_local_second_phase += y_corr
+                        shift_x_local_second_phase += x_corr
+                except:
+                    # print ("Subpixel solve not successful")
+                    pass
 
         # If the first phase was unsuccessful, drop the second phase and set all warp shifts to 0.
         else:
@@ -449,8 +458,55 @@ class Miscellaneous(object):
         # If within the maximum search radius no optimum could be found, return [0, 0].
         return [0, 0], dev_r
 
+    # Define the matrix used in method "sub_pixel_solve" to solve the normal equations. It is
+    # computed once and for all as "inv(a_transpose * a) * a_transpose". Using this matrix, the
+    # solution of the normal equations is reduced to a simple matrix multiplication.
+    sub_pixel_solve_matrix = [
+        [0.16666667, -0.33333333, 0.16666667, 0.16666667, -0.33333333, 0.16666667, 0.16666667,
+         -0.33333333, 0.16666667],
+        [0.16666667, 0.16666667, 0.16666667, -0.33333333, -0.33333333, -0.33333333, 0.16666667,
+         0.16666667, 0.16666667], [0.25, 0., -0.25, 0., 0., 0., -0.25, 0., 0.25],
+        [-0.16666667, 0., 0.16666667, -0.16666667, 0., 0.16666667, -0.16666667, 0., 0.16666667],
+        [-0.16666667, -0.16666667, -0.16666667, 0., 0., 0., 0.16666667, 0.16666667, 0.16666667],
+        [-0.11111111, 0.22222222, -0.11111111, 0.22222222, 0.55555556, 0.22222222, -0.11111111,
+         0.22222222, -0.11111111]]
+
     @staticmethod
     def sub_pixel_solve(function_values):
+        """
+        Compute the sub-pixel correction for method "search_local_match".
+
+        :param function_values: Matching differences at (3 x 3) pixels around the minimum / maximum
+                                found
+        :return: Corrections in y and x to the center position for local minimum / maximum
+        """
+
+        # If the functions are not yet reduced to 1D, do it now.
+        function_values_1d = function_values.reshape((9,))
+
+        # Solve for parameters of the fitting function:
+        # f = a_f * x ** 2 + b_f * y ** 2 + c_f * x * y + d_f * x + e_f * y + g_f
+        # using normal equations. The problem is reduced to a matrix multiplication with the fixed
+        # system matrix defined above.
+        a_f, b_f, c_f, d_f, e_f, g_f = matmul(Miscellaneous.sub_pixel_solve_matrix, function_values_1d)
+        # print("\nSolve, coeffs: " + str((a_f, b_f, c_f, d_f, e_f, g_f)))
+
+        # The corrected pixel values of the minimum result from setting the first derivatives of
+        # the fitting funtion in y and x direction to zero, and solving for y and x.
+        denominator_y = c_f ** 2 - 4. * a_f * b_f
+        if abs(denominator_y) > 1.e-10 and abs(a_f) > 1.e-10:
+            y_correction = (2. * a_f * e_f - c_f * d_f) / denominator_y
+            x_correction = (- c_f * y_correction - d_f) / (2. * a_f)
+        elif abs(denominator_y) > 1.e-10 and abs(c_f) > 1.e-10:
+            y_correction = (2. * a_f * e_f - c_f * d_f) / denominator_y
+            x_correction = (-2. * b_f * y_correction - e_f) / c_f
+        else:
+            raise DivideByZeroError("Sub-pixel shift cannot be computed, set to zero")
+
+        return y_correction, x_correction
+
+    @staticmethod
+    def sub_pixel_solve_old(function_values):
         """
         Compute the sub-pixel correction for method "search_local_match".
 
