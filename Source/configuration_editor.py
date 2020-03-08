@@ -319,11 +319,6 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         """
 
         go_back_to_activities = []
-        if self.config_copy.global_parameters_protocol_level != \
-                self.configuration.global_parameters_protocol_level:
-            self.configuration.global_parameters_protocol_level = \
-                self.config_copy.global_parameters_protocol_level
-            self.configuration.configuration_changed = True
 
         if self.config_copy.alignment_points_frame_percent != \
                 self.configuration.alignment_points_frame_percent:

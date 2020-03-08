@@ -1,8 +1,12 @@
 from PyQt5 import QtCore
-from sys import exit, argv
 from argparse import ArgumentParser, ArgumentTypeError
+from time import sleep
 
 from configuration import Configuration
+from workflow import Workflow
+from miscellaneous import Miscellaneous
+from job_editor import Job
+from exceptions import InternalError
 
 def noise_type(x):
     x = int(x)
@@ -87,13 +91,33 @@ def normalize_bco_type(x):
     return x
 
 class PssConsole(QtCore.QObject):
-    all_work_done = QtCore.pyqtSignal()
+
+    signal_reset_masters = QtCore.pyqtSignal()
+    signal_load_master_dark = QtCore.pyqtSignal(str)
+    signal_load_master_flat = QtCore.pyqtSignal(str)
+    signal_frames = QtCore.pyqtSignal(object)
+    signal_rank_frames = QtCore.pyqtSignal()
+    signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
+    signal_set_roi = QtCore.pyqtSignal(int, int, int, int)
+    signal_set_alignment_points = QtCore.pyqtSignal()
+    signal_compute_frame_qualities = QtCore.pyqtSignal()
+    signal_stack_frames = QtCore.pyqtSignal()
+    signal_save_stacked_image = QtCore.pyqtSignal()
+    signal_postprocess_image = QtCore.pyqtSignal()
+    signal_save_postprocessed_image = QtCore.pyqtSignal(object)
+    signal_set_go_back_activity = QtCore.pyqtSignal(object)
 
     def __init__(self, parent=None):
         super(PssConsole, self).__init__(parent)
         self.control_workflow()
 
     def setup_configuration(self):
+        """
+        Parse the command line arguments, initialize the configuration object and update
+        configuration parameters with values passed via command line arguments.
+
+        :return: -
+        """
         parser = ArgumentParser()
         parser.add_argument("job_input", nargs='+', help="input video files or still image folders")
 
@@ -156,8 +180,200 @@ class PssConsole(QtCore.QObject):
         self.configuration = Configuration()
         self.configuration.initialize_configuration(read_from_file=False)
 
+        self.configuration.global_parameters_store_protocol_with_result = arguments.protocol
+        self.configuration.global_parameters_protocol_level = arguments.protocol_detail
+        self.configuration.global_parameters_buffering_level = arguments.buffering_level
+        self.configuration.global_parameters_image_format = arguments.out_format
+        self.configuration.global_parameters_stack_number_frames = arguments.name_add_f
+        self.configuration.global_parameters_stack_percent_frames = arguments.name_add_p
+        self.configuration.global_parameters_ap_box_size = arguments.name_add_apb
+        self.configuration.global_parameters_ap_number = arguments.name_add_apn
+
+        self.configuration.frames_debayering_default = arguments.debayering
+        self.configuration.frames_gauss_width = arguments.noise
+
+        self.configuration.align_frames_mode = arguments.stab_mode
+        self.configuration.align_frames_rectangle_scale_factor = 100./arguments.stab_size
+        self.configuration.align_frames_search_width = arguments.stab_sw
+        self.configuration.align_frames_average_frame_percent = arguments.rf_percent
+
+        self.configuration.alignment_points_half_box_width = int(round(arguments.align_box_width / 2))
+        self.configuration.alignment_points_search_width = arguments.align_search_width
+        self.configuration.alignment_points_structure_threshold = arguments.align_min_struct
+        self.configuration.alignment_points_brightness_threshold = arguments.align_min_bright
+
+        self.configuration.alignment_points_frame_percent = arguments.stack_percent
+        # Add something here for "number of frames to be stacked"
+
+        self.configuration.frames_normalization = arguments.normalize_bright
+        self.configuration.frames_normalization_threshold = arguments.normalize_bco
+
+        self.configuration.set_derived_parameters()
+
+        # Create the workflow thread and start it.
+        self.thread = QtCore.QThread()
+        self.workflow = Workflow(self)
+        self.workflow.moveToThread(self.thread)
+        self.workflow.calibration.report_calibration_error_signal.connect(
+            self.report_calibration_error)
+        self.workflow.work_next_task_signal.connect(self.work_next_task)
+        self.workflow.report_error_signal.connect(self.report_error)
+        self.workflow.abort_job_signal.connect(self.next_job_after_error)
+        self.thread.start()
+
+        # Connect signals to start activities on the workflow thread (e.g. in method
+        # "work_next_task").
+        self.signal_load_master_dark.connect(self.workflow.calibration.load_master_dark)
+        self.signal_load_master_flat.connect(self.workflow.calibration.load_master_flat)
+        self.signal_frames.connect(self.workflow.execute_frames)
+        self.signal_rank_frames.connect(self.workflow.execute_rank_frames)
+        self.signal_align_frames.connect(self.workflow.execute_align_frames)
+        self.signal_set_alignment_points.connect(self.workflow.execute_set_alignment_points)
+        self.signal_compute_frame_qualities.connect(
+            self.workflow.execute_compute_frame_qualities)
+        self.signal_stack_frames.connect(self.workflow.execute_stack_frames)
+        self.signal_save_stacked_image.connect(self.workflow.execute_save_stacked_image)
+
+        # Initialize status variables
+        self.automatic = True
+        self.jobs = []
+        for name in arguments.job_input:
+            try:
+                self.jobs.append(Job(name))
+            except InternalError:
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol(
+                        "Error: " + name + " does not contain valid input for a stacking job,"
+                                           " continune with next job.",
+                        self.workflow.attached_log_file)
+
+        self.job_number = len(self.jobs)
+        if self.job_number == 0:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol(
+                    "Error: No valid job specified, execution halted.",
+                    self.workflow.attached_log_file)
+            self.stop_execution()
+
+        self.job_index = 0
+
+        if arguments.dark:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("+++ Loading master dark frame +++",
+                                       self.workflow.attached_log_file)
+            self.signal_load_master_dark.emit(arguments.dark)
+        if arguments.flat:
+            if self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("+++ Loading master flat frame +++",
+                                       self.workflow.attached_log_file)
+            self.signal_load_master_flat.emit(arguments.flat)
+
+    @QtCore.pyqtSlot(str)
+    def report_calibration_error(self, message):
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("           " + message,
+                                   self.workflow.attached_log_file, precede_with_timestamp=False)
+
+    @QtCore.pyqtSlot(str)
+    def report_error(self, message):
+        """
+        This method is triggered by the workflow thread via a signal when an error is to be
+        reported. Depending on the protocol level, the error message is written to the
+        protocol (file).
+
+        :param message: Error message to be displayed
+        :return: -
+        """
+
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol(message + "\n", self.workflow.attached_log_file)
+
+    @QtCore.pyqtSlot(str)
+    def next_job_after_error(self, message):
+        """
+        This method is triggered by the workflow thread via a signal when an error causes a job to
+        be aborted. Depending on the protocol level, the error message is written to the
+        protocol (file).
+
+        :param message: Error message to be displayed
+        :return: -
+        """
+
+        # Report the error.
+        self.report_error(message)
+
+        # Abort the current job and go to the next one.
+        self.work_next_task("Next job")
+
+    def work_next_task(self, next_activity):
+        """
+        This is the central place where all activities are scheduled. Depending on the
+         "next_activity" chosen, the appropriate activity is started on the workflow thread.
+
+        :param next_activity: Activity to be performed next.
+        :return: -
+        """
+
+        # Make sure not to process an empty job list, or a job index out of range.
+        if not self.jobs or self.job_index >= self.job_number:
+            return
+
+        self.activity = next_activity
+
+        # Start workflow activities. When a workflow method terminates, it invokes this method on
+        # the GUI thread, with "next_activity" denoting the next step in the processing chain.
+        if self.activity == "Read frames":
+            # For the first activity (reading all frames from the file system) there is no
+            # GUI interaction. Start the workflow action immediately.
+            print ("emitting signal")
+            self.signal_frames.emit(self.jobs[self.job_index])
+
+        elif self.activity == "Rank frames":
+
+            # Now start the corresponding action on the workflow thread.
+            self.signal_rank_frames.emit()
+
+        elif self.activity == "Align frames":
+
+            # If all index bounds are set to zero, the stabilization patch is computed
+            # automatically by the workflow thread.
+            self.signal_align_frames.emit(0, 0, 0, 0)
+
+        elif self.activity == "Select stack size":
+
+            # In automatic mode, nothing is to be done in the workflow thread. Start the next
+            # activity on the main thread immediately.
+            self.workflow.work_next_task_signal.emit("Set ROI")
+
+        elif self.activity == "Set ROI":
+
+            # If all index bounds are set to zero, no ROI is selected.
+            self.signal_set_roi.emit(0, 0, 0, 0)
+
+        elif self.activity == "Set alignment points":
+
+            # In automatic mode, compute the AP grid automatically in the workflow thread. In this
+            # case, the AlignmentPoints object is created there as well.
+            self.signal_set_alignment_points.emit()
+
+        elif self.activity == "Compute frame qualities":
+            self.signal_compute_frame_qualities.emit()
+
+        elif self.activity == "Stack frames":
+            self.signal_stack_frames.emit()
+
+        elif self.activity == "Save stacked image":
+            self.signal_save_stacked_image.emit()
+
+        elif self.activity == "Next job":
+            self.job_index += 1
+            if self.job_index < self.job_number:
+                # If the end of the queue is not reached yet, start with reading frames of next job.
+                self.activity = "Read frames"
+                self.signal_frames.emit(self.jobs[self.job_index])
+
     def print_arguments(self, arguments):
-        print(str(arguments.job_input))
+        print("Jobs: " + str(arguments.job_input))
         print("Store protocol with results: " + str(arguments.protocol))
         print("Protocol detail level: " + str(arguments.protocol_detail))
         print("Buffering level: " + str(arguments.buffering_level))
@@ -194,5 +410,7 @@ class PssConsole(QtCore.QObject):
     def control_workflow(self):
         self.setup_configuration()
 
-        # Exit the main loop.
-        quit()
+        self.work_next_task("Read frames")
+
+    def stop_execution(self):
+        quit(0)
