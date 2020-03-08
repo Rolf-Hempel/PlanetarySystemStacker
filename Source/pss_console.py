@@ -1,4 +1,5 @@
 from argparse import ArgumentParser, ArgumentTypeError
+from time import sleep
 
 from PyQt5 import QtCore
 
@@ -455,4 +456,6 @@ class PssConsole(QtCore.QObject):
 
         :return: -
         """
+        # Wait a little before exiting, so that output buffers can be purged.
+        sleep(0.2)
         quit(0)
