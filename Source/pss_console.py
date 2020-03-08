@@ -1,18 +1,20 @@
-from PyQt5 import QtCore
 from argparse import ArgumentParser, ArgumentTypeError
-from time import sleep
+
+from PyQt5 import QtCore
 
 from configuration import Configuration
-from workflow import Workflow
-from miscellaneous import Miscellaneous
-from job_editor import Job
 from exceptions import InternalError
+from job_editor import Job
+from miscellaneous import Miscellaneous
+from workflow import Workflow
+
 
 def noise_type(x):
     x = int(x)
     if not 0 <= x <= 11:
         raise ArgumentTypeError("Noise level must be between 0 and 11")
     return x
+
 
 def stab_size_type(x):
     x = int(x)
@@ -76,12 +78,14 @@ def stack_percent_type(x):
             "Percentage of best frames to be stacked must be between 1 and 100")
     return x
 
+
 def stack_number_type(x):
     x = int(x)
     if not 1 <= x:
         raise ArgumentTypeError(
             "Number of best frames to be stacked must be greater or equal 1")
     return x
+
 
 def normalize_bco_type(x):
     x = int(x)
@@ -90,9 +94,8 @@ def normalize_bco_type(x):
             "Normalization black cut-off must be between 0 and 40")
     return x
 
-class PssConsole(QtCore.QObject):
 
-    signal_reset_masters = QtCore.pyqtSignal()
+class PssConsole(QtCore.QObject):
     signal_load_master_dark = QtCore.pyqtSignal(str)
     signal_load_master_flat = QtCore.pyqtSignal(str)
     signal_frames = QtCore.pyqtSignal(object)
@@ -103,9 +106,6 @@ class PssConsole(QtCore.QObject):
     signal_compute_frame_qualities = QtCore.pyqtSignal()
     signal_stack_frames = QtCore.pyqtSignal()
     signal_save_stacked_image = QtCore.pyqtSignal()
-    signal_postprocess_image = QtCore.pyqtSignal()
-    signal_save_postprocessed_image = QtCore.pyqtSignal(object)
-    signal_set_go_back_activity = QtCore.pyqtSignal(object)
 
     def __init__(self, parent=None):
         super(PssConsole, self).__init__(parent)
@@ -174,7 +174,7 @@ class PssConsole(QtCore.QObject):
         parser.add_argument("--normalize_bco", type=normalize_bco_type, default=15,
                             help="Normalization black cut-off")
 
-        arguments =  parser.parse_args()
+        arguments = parser.parse_args()
         # self.print_arguments(arguments)
 
         self.configuration = Configuration()
@@ -193,11 +193,12 @@ class PssConsole(QtCore.QObject):
         self.configuration.frames_gauss_width = arguments.noise
 
         self.configuration.align_frames_mode = arguments.stab_mode
-        self.configuration.align_frames_rectangle_scale_factor = 100./arguments.stab_size
+        self.configuration.align_frames_rectangle_scale_factor = 100. / arguments.stab_size
         self.configuration.align_frames_search_width = arguments.stab_sw
         self.configuration.align_frames_average_frame_percent = arguments.rf_percent
 
-        self.configuration.alignment_points_half_box_width = int(round(arguments.align_box_width / 2))
+        self.configuration.alignment_points_half_box_width = int(
+            round(arguments.align_box_width / 2))
         self.configuration.alignment_points_search_width = arguments.align_search_width
         self.configuration.alignment_points_structure_threshold = arguments.align_min_struct
         self.configuration.alignment_points_brightness_threshold = arguments.align_min_bright
@@ -228,6 +229,7 @@ class PssConsole(QtCore.QObject):
         self.signal_frames.connect(self.workflow.execute_frames)
         self.signal_rank_frames.connect(self.workflow.execute_rank_frames)
         self.signal_align_frames.connect(self.workflow.execute_align_frames)
+        self.signal_set_roi.connect(self.workflow.execute_set_roi)
         self.signal_set_alignment_points.connect(self.workflow.execute_set_alignment_points)
         self.signal_compute_frame_qualities.connect(
             self.workflow.execute_compute_frame_qualities)
@@ -325,7 +327,7 @@ class PssConsole(QtCore.QObject):
         if self.activity == "Read frames":
             # For the first activity (reading all frames from the file system) there is no
             # GUI interaction. Start the workflow action immediately.
-            print ("emitting signal")
+            print("emitting signal")
             self.signal_frames.emit(self.jobs[self.job_index])
 
         elif self.activity == "Rank frames":
@@ -371,6 +373,8 @@ class PssConsole(QtCore.QObject):
                 # If the end of the queue is not reached yet, start with reading frames of next job.
                 self.activity = "Read frames"
                 self.signal_frames.emit(self.jobs[self.job_index])
+            else:
+                self.stop_execution()
 
     def print_arguments(self, arguments):
         print("Jobs: " + str(arguments.job_input))
