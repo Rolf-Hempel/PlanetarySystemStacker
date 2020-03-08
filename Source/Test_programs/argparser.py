@@ -94,11 +94,11 @@ def normalize_bco_type(x):
 parser = argparse.ArgumentParser()
 parser.add_argument("job_input", nargs='+', help="input video files or still image folders")
 
-parser.add_argument("--protocol", action="store_true",
+parser.add_argument("-p", "--protocol", action="store_true",
                     help="Store protocol with results")
 parser.add_argument("--protocol_detail", type=int, choices=[0, 1, 2], default=1,
                     help="Protocol detail level")
-parser.add_argument("--buffering_level", type=int, choices=[0, 1, 2, 3, 4], default=2,
+parser.add_argument("-b", "--buffering_level", type=int, choices=[0, 1, 2, 3, 4], default=2,
                     help="Buffering level")
 parser.add_argument("--out_format", choices=["png", "tiff", "fits"], default="png",
                     help="Image format for output")
@@ -116,7 +116,7 @@ parser.add_argument("--debayering", choices=["Auto detect color", "Grayscale", "
                                              "Force Bayer GBRG", "Force Bayer BGGR"],
                     default="Auto detect color", help="Debayering option")
 parser.add_argument("--noise", type=noise_type, default=7, help="Noise level (add Gaussian blur)")
-parser.add_argument("--stab_mode", choices=["Surface", "Planet"], default="Surface",
+parser.add_argument("-m", "--stab_mode", choices=["Surface", "Planet"], default="Surface",
                     help="Frame stabilization mode")
 parser.add_argument("--stab_size", type=stab_size_type, default=33,
                     help="Stabilization patch size (% of frame)")
@@ -124,21 +124,23 @@ parser.add_argument("--stab_sw", type=stab_sw_type, default=34,
                     help="Stabilization search width (pixels)")
 parser.add_argument("--rf_percent", type=rf_percent_type, default=5,
                     help="Percentage of best frames for reference frame computation")
+parser.add_argument("-d", "--dark", help="Image file for dark frame correction")
+parser.add_argument("-f", "--flat", help="Image file for flat frame correction")
 
-parser.add_argument("--align_box_width", type=align_box_width_type, default=48,
+parser.add_argument("-a", "--align_box_width", type=align_box_width_type, default=48,
                     help="Alignment point box width (pixels)")
-parser.add_argument("--align_search_width", type=align_search_width_type, default=14,
+parser.add_argument("-w", "--align_search_width", type=align_search_width_type, default=14,
                     help="Alignment point search width (pixels)")
 parser.add_argument("--align_min_struct", type=align_min_struct_type, default=0.04,
                     help="Alignment point minimum structure")
 parser.add_argument("--align_min_bright", type=align_min_bright_type, default=10,
                     help="Alignment point minimum brightness")
 
-parser.add_argument("--stack_percent", type=stack_percent_type, default=10,
+parser.add_argument("-s", "--stack_percent", type=stack_percent_type, default=10,
                     help="Percentage of best frames to be stacked")
 parser.add_argument("--stack_number", type=stack_number_type,
                     help="Number of best frames to be stacked")
-parser.add_argument("--normalize_bright", action="store_true",
+parser.add_argument("-n", "--normalize_bright", action="store_true",
                     help="Normalize frame brightness")
 parser.add_argument("--normalize_bco", type=normalize_bco_type, default=15,
                     help="Normalization black cut-off")
@@ -161,6 +163,10 @@ print("Frame stabilization mode: " + args.stab_mode)
 print("Stabilization patch size (% of frame): " + str(args.stab_size))
 print("Stabilization search width (pixels): " + str(args.stab_sw))
 print("Percentage of best frames for reference frame computation: " + str(args.rf_percent))
+if args.dark:
+    print("Image file for dark frame correction: " + args.dark)
+if args.flat:
+    print("Image file for flat frame correction: " + args.flat)
 print("")
 print("Alignment point box width (pixels): " + str(args.align_box_width))
 print("Alignment point search width (pixels): " + str(args.align_search_width))
