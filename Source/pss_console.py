@@ -8,7 +8,7 @@ from job_editor import Job
 from miscellaneous import Miscellaneous
 from workflow import Workflow
 
-
+# Definition of data types, including value bounds, used in command line argument parsing.
 def noise_type(x):
     x = int(x)
     if not 0 <= x <= 11:
@@ -96,6 +96,12 @@ def normalize_bco_type(x):
 
 
 class PssConsole(QtCore.QObject):
+    """
+    This class replaces the class PlanetarySystemStacker if the program is started from the
+    command line. In this case no GUI activity is created, and there is no interactive mode.
+    """
+
+    # Define signals which trigger activities on the workflow thread.
     signal_load_master_dark = QtCore.pyqtSignal(str)
     signal_load_master_flat = QtCore.pyqtSignal(str)
     signal_frames = QtCore.pyqtSignal(object)
@@ -109,7 +115,12 @@ class PssConsole(QtCore.QObject):
 
     def __init__(self, parent=None):
         super(PssConsole, self).__init__(parent)
-        self.control_workflow()
+
+        # Create the configuration object and modify it as specified in command line arguments.
+        self.setup_configuration()
+
+        # Start the workflow.
+        self.work_next_task("Read frames")
 
     def setup_configuration(self):
         """
@@ -177,9 +188,13 @@ class PssConsole(QtCore.QObject):
         arguments = parser.parse_args()
         # self.print_arguments(arguments)
 
+        # Create and initialize the configuration object. The configuration stored in the .ini file
+        # in the user's home directory is ignored in this case. Modifications to standard values
+        # come as command line arguments.
         self.configuration = Configuration()
         self.configuration.initialize_configuration(read_from_file=False)
 
+        # Modify the standard configuration as specified in the command line arguments.
         self.configuration.global_parameters_store_protocol_with_result = arguments.protocol
         self.configuration.global_parameters_protocol_level = arguments.protocol_detail
         self.configuration.global_parameters_buffering_level = arguments.buffering_level
@@ -209,6 +224,7 @@ class PssConsole(QtCore.QObject):
         self.configuration.frames_normalization = arguments.normalize_bright
         self.configuration.frames_normalization_threshold = arguments.normalize_bco
 
+        # Re-compute derived parameters after the configuration was changed.
         self.configuration.set_derived_parameters()
 
         # Create the workflow thread and start it.
@@ -236,12 +252,24 @@ class PssConsole(QtCore.QObject):
         self.signal_stack_frames.connect(self.workflow.execute_stack_frames)
         self.signal_save_stacked_image.connect(self.workflow.execute_save_stacked_image)
 
-        # Initialize status variables
+        # Set "automatic" to True. There is no interactive mode in this case.
         self.automatic = True
+
+        # Create the job objects using the names passed as positional arguments.
         self.jobs = []
         for name in arguments.job_input:
             try:
-                self.jobs.append(Job(name))
+                job = Job(name)
+
+                # Test if the path specifies a stacking job.
+                if job.type == 'video' or job.type == 'image':
+                    self.jobs.append(job)
+                else:
+                    if self.configuration.global_parameters_protocol_level > 0:
+                        Miscellaneous.protocol(
+                            "Error: " + name + " does not contain valid input for a stacking job,"
+                                               " continune with next job.",
+                            self.workflow.attached_log_file)
             except InternalError:
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol(
@@ -259,11 +287,14 @@ class PssConsole(QtCore.QObject):
 
         self.job_index = 0
 
+        # If a dark frame was specified, load it.
         if arguments.dark:
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("+++ Loading master dark frame +++",
                                        self.workflow.attached_log_file)
             self.signal_load_master_dark.emit(arguments.dark)
+
+        # If a flat frame was specified, load it.
         if arguments.flat:
             if self.configuration.global_parameters_protocol_level > 0:
                 Miscellaneous.protocol("+++ Loading master flat frame +++",
@@ -377,6 +408,13 @@ class PssConsole(QtCore.QObject):
                 self.stop_execution()
 
     def print_arguments(self, arguments):
+        """
+        This is an auxiliary method for debugging. It prints all arguments passed to the program.
+
+        :param arguments: Arguments object created by the ArgumentParser
+        :return: -
+        """
+
         print("Jobs: " + str(arguments.job_input))
         print("Store protocol with results: " + str(arguments.protocol))
         print("Protocol detail level: " + str(arguments.protocol_detail))
@@ -411,10 +449,10 @@ class PssConsole(QtCore.QObject):
         print("Normalize frame brightness: " + str(arguments.normalize_bright))
         print("Normalization black cut-off: " + str(arguments.normalize_bco))
 
-    def control_workflow(self):
-        self.setup_configuration()
-
-        self.work_next_task("Read frames")
-
     def stop_execution(self):
+        """
+        Halt the application. (There might be a more elegant way to do this!)
+
+        :return: -
+        """
         quit(0)
