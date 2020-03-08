@@ -159,12 +159,6 @@ class Configuration(object):
     def __init__(self):
         self.global_parameters_version = "PlanetarySystemStacker 0.7.0"
 
-        # The config file for persistent parameter storage is located in the user's home
-        # directory, as is the detailed logfile.
-        self.home = expanduser("~")
-        self.config_filename = join(self.home, ".PlanetarySystemStacker.ini")
-        self.protocol_filename = join(self.home, "PlanetarySystemStacker.log")
-
         # Set fixed parameters which are hidden from the user. Hidden parameters which are
         # changeable are stored in the configuration object.
         self.window_icon = 'PSS-Icon-64.ico'
@@ -213,8 +207,28 @@ class Configuration(object):
         # Create and initialize the central data object for postprocessing.
         self.postproc_data_object = PostprocDataObject(self.postproc_suffix)
 
-        # Determine if there is a configuration file from a previous run.
-        self.config_file_exists = isfile(self.config_filename)
+    def initialize_configuration(self, read_from_file=True):
+        """
+        Initialize the configuration with parameters stored during the previous PSS run. This
+        initialization is skipped if PSS is executed from the command line. Finally, set derived
+        parameters, i.e. parameters which are computed from other parameters.
+
+        :param read_from_file: If True, read parameters from a configuration file.
+                               If False, skip this step.
+        :return: -
+        """
+
+        if read_from_file:
+            # The config file for persistent parameter storage is located in the user's home
+            # directory, as is the detailed logfile.
+            self.home = expanduser("~")
+            self.config_filename = join(self.home, ".PlanetarySystemStacker.ini")
+            self.protocol_filename = join(self.home, "PlanetarySystemStacker.log")
+
+            # Determine if there is a configuration file from a previous run.
+            self.config_file_exists = isfile(self.config_filename)
+        else:
+            self.config_file_exists = False
 
         # If an existing config file is found, read it in. Set flag to indicate if parameters were
         # read from file successfully.
@@ -244,9 +258,9 @@ class Configuration(object):
 
     def import_from_configuration_parameters(self, configuration_parameters):
         """
-        Set all current parameters to the corresponding values of a ConfigurarionParameters object.
+        Set all current parameters to the corresponding values of a ConfigurationParameters object.
 
-        :param configuration_parameters: ConfigurarionParameters object with new parameter values.
+        :param configuration_parameters: ConfigurationParameters object with new parameter values.
         :return: -
         """
 

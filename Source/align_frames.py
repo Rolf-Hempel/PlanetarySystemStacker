@@ -636,6 +636,7 @@ if __name__ == "__main__":
 
     # Get configuration parameters.
     configuration = Configuration()
+    configuration.initialize_configuration()
     try:
         # In creating the Frames object the images are read from the specified file(s).
         frames = Frames(configuration, names, type=type)

@@ -354,6 +354,7 @@ if __name__ == "__main__":
 
     # Get configuration parameters.
     configuration = Configuration()
+    configuration.initialize_configuration()
 
     start = time()
     try:

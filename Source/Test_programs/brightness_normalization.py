@@ -669,6 +669,7 @@ if __name__ == "__main__":
 
     # Get configuration parameters.
     configuration = Configuration()
+    configuration.initialize_configuration()
 
     # Read the frames.
     print("+++ Start reading frames")
@@ -713,6 +714,7 @@ if __name__ == "__main__":
 
     # Get configuration parameters.
     configuration = Configuration()
+    configuration.initialize_configuration()
 
     # Read the frames.
     print("+++ Start reading frames")

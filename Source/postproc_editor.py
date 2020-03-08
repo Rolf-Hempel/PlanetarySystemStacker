@@ -840,6 +840,7 @@ if __name__ == '__main__':
     input_image = cvtColor(imread(input_file_name, -1), COLOR_BGR2RGB)
 
     configuration = Configuration()
+    configuration.initialize_configuration()
     dummy_status_bar = EmulateStatusBar()
     app = QtWidgets.QApplication(argv)
     window = PostprocEditorWidget(configuration, input_image, input_file_name,

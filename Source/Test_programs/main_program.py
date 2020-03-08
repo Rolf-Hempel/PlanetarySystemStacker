@@ -83,6 +83,7 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
 
     # Get configuration parameters.
     configuration = Configuration()
+    configuration.initialize_configuration()
 
     # Read the frames.
     print("+++ Start reading frames")

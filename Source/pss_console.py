@@ -2,6 +2,8 @@ from PyQt5 import QtCore
 from sys import exit, argv
 from argparse import ArgumentParser, ArgumentTypeError
 
+from configuration import Configuration
+
 def noise_type(x):
     x = int(x)
     if not 0 <= x <= 11:
@@ -91,7 +93,7 @@ class PssConsole(QtCore.QObject):
         super(PssConsole, self).__init__(parent)
         self.control_workflow()
 
-    def parse_arguments(self):
+    def setup_configuration(self):
         parser = ArgumentParser()
         parser.add_argument("job_input", nargs='+', help="input video files or still image folders")
 
@@ -148,7 +150,11 @@ class PssConsole(QtCore.QObject):
         parser.add_argument("--normalize_bco", type=normalize_bco_type, default=15,
                             help="Normalization black cut-off")
 
-        return parser.parse_args()
+        arguments =  parser.parse_args()
+        # self.print_arguments(arguments)
+
+        self.configuration = Configuration()
+        self.configuration.initialize_configuration(read_from_file=False)
 
     def print_arguments(self, arguments):
         print(str(arguments.job_input))
@@ -186,8 +192,7 @@ class PssConsole(QtCore.QObject):
         print("Normalization black cut-off: " + str(arguments.normalize_bco))
 
     def control_workflow(self):
-        self.arguments = self.parse_arguments()
-        self.print_arguments(self.arguments)
+        self.setup_configuration()
 
         # Exit the main loop.
         quit()

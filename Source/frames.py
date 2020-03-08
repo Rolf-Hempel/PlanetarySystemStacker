@@ -1711,6 +1711,7 @@ if __name__ == "__main__":
 
     # Get configuration parameters.
     configuration = Configuration()
+    configuration.initialize_configuration()
 
     # Initialize the Dark / Flat correction.
     if name_darks or name_flats:

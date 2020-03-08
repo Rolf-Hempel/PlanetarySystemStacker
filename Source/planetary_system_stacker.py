@@ -179,6 +179,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Create configuration object and set configuration parameters to standard values.
         self.configuration = Configuration()
+        self.configuration.initialize_configuration()
 
         # Set the window icon to the PSS icon.
         self.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
