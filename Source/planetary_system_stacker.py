@@ -54,6 +54,7 @@ from postproc_editor import PostprocEditorWidget
 from rectangular_patch_editor import RectangularPatchEditorWidget
 from shift_distribution_viewer import ShiftDistributionViewerWidget
 from workflow import Workflow
+from pss_console import PssConsole
 
 
 class DisplayImage(QtWidgets.QGraphicsView):
@@ -1403,7 +1404,15 @@ if __name__ == "__main__":
     # "pyinstaller planetary_system_stacker_linux.spec" on Linux
     #
 
-    app = QtWidgets.QApplication(argv)
-    myapp = PlanetarySystemStacker()
-    myapp.show()
-    exit(app.exec_())
+    # If PSS is started without command line arguments, open the GUI.
+    if len(argv) <= 1:
+        app = QtWidgets.QApplication(argv)
+        myapp = PlanetarySystemStacker()
+        myapp.show()
+        exit(app.exec_())
+
+    # If command line arguments are passed, execute PSS without a GUI.
+    else:
+        app = QtCore.QCoreApplication(argv)
+        console = PssConsole()
+        exit(app.exec_())
