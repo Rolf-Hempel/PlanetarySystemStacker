@@ -356,9 +356,9 @@ class PssConsole(QtCore.QObject):
         # Start workflow activities. When a workflow method terminates, it invokes this method on
         # the GUI thread, with "next_activity" denoting the next step in the processing chain.
         if self.activity == "Read frames":
+
             # For the first activity (reading all frames from the file system) there is no
             # GUI interaction. Start the workflow action immediately.
-            print("emitting signal")
             self.signal_frames.emit(self.jobs[self.job_index])
 
         elif self.activity == "Rank frames":
