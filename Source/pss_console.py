@@ -1,5 +1,6 @@
 from argparse import ArgumentParser, ArgumentTypeError
 from time import sleep
+from glob import glob
 
 from PyQt5 import QtCore
 
@@ -258,7 +259,7 @@ class PssConsole(QtCore.QObject):
 
         # Create the job objects using the names passed as positional arguments.
         self.jobs = []
-        for name in arguments.job_input:
+        for name in [f for name in arguments.job_input for f in glob(name)]:
             try:
                 job = Job(name)
 
@@ -268,14 +269,14 @@ class PssConsole(QtCore.QObject):
                 else:
                     if self.configuration.global_parameters_protocol_level > 0:
                         Miscellaneous.protocol(
-                            "Error: " + name + " does not contain valid input for a stacking job,"
-                                               " continune with next job.",
+                            "Error: '" + name + "' does not contain valid input for a stacking job,"
+                                               " continune with next job.\n",
                             self.workflow.attached_log_file)
             except InternalError:
                 if self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol(
-                        "Error: " + name + " does not contain valid input for a stacking job,"
-                                           " continune with next job.",
+                        "Error: '" + name + "' does not contain valid input for a stacking job,"
+                                           " continune with next job.\n",
                         self.workflow.attached_log_file)
 
         self.job_number = len(self.jobs)
