@@ -293,7 +293,8 @@ class StackFrames(object):
 
         # If brightness normalization is switched on, prepare for adjusting frame brightness.
         if self.configuration.frames_normalization:
-            median_brightness = median(self.frames.frames_average_brightness)
+            median_brightness = median([self.frames.average_brightness(index)
+                                        for index in range(self.frames.number)])
             # print ("min: " + str(min(self.frames.frames_average_brightness)) + ", median: "
             #        + str(median_brightness) + ", max: "
             #        + str(max(self.frames.frames_average_brightness)))
@@ -305,7 +306,7 @@ class StackFrames(object):
             # the median of all frames.
             if self.configuration.frames_normalization:
                 frame = self.frames.frames(frame_index) * median_brightness / \
-                        (self.frames.frames_average_brightness[frame_index] + 1.e-7)
+                        (self.frames.average_brightness(frame_index) + 1.e-7)
             else:
                 frame = self.frames.frames(frame_index)
 

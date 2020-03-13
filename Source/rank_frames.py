@@ -51,6 +51,11 @@ class RankFrames(object):
                                 percent (int).
         """
 
+        frames.index_included[10] = False
+        frames.index_included[15] = False
+        frames.index_included[19] = False
+        frames.update_index_translation()
+
         self.number = frames.number
         self.shape = frames.shape
         self.configuration = configuration
@@ -89,7 +94,7 @@ class RankFrames(object):
                 if self.configuration.frames_normalization:
                     self.frame_ranks.append(
                         method(frame, self.configuration.rank_frames_pixel_stride) /
-                        self.frames.frames_average_brightness[frame_index])
+                        self.frames.average_brightness(frame_index))
                 else:
                     self.frame_ranks.append(
                         method(frame, self.configuration.rank_frames_pixel_stride))
@@ -102,7 +107,7 @@ class RankFrames(object):
                                               int(round(10*frame_index / self.number) * 10))
                 if self.configuration.frames_normalization:
                     self.frame_ranks.append(meanStdDev(frame)[1][0][0] /
-                        self.frames.frames_average_brightness[frame_index])
+                        self.frames.average_brightness(frame_index))
                 else:
                     self.frame_ranks.append(meanStdDev(frame)[1][0][0])
 

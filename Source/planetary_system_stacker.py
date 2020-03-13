@@ -373,6 +373,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Only if parameters are changed later in the workflow, write a message to the protocol.
         if self.configuration.global_parameters_protocol_level > 1 and self.activity != 'Read frames':
+            # If the attached logfile has been closed, re-open it.
+            if self.configuration.global_parameters_store_protocol_with_result and \
+                    self.workflow.attached_log_file.closed:
+                try:
+                    self.workflow.attached_log_file = open(self.workflow.attached_log_name, 'a')
+                except:
+                    pass
             Miscellaneous.protocol(
                 "+++ Parameter change: all phases after '" + earliest_phase + "' are invalidated +++",
                 self.workflow.attached_log_file, precede_with_timestamp=True)

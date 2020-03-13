@@ -632,7 +632,7 @@ class AlignmentPoints(object):
                         alignment_point['frame_qualities'].append(
                             method(frame[y_low:y_high, x_low:x_high],
                                    self.configuration.alignment_points_rank_pixel_stride) /
-                            self.frames.frames_average_brightness[frame_index])
+                            self.frames.average_brightness(frame_index))
                     else:
                         alignment_point['frame_qualities'].append(
                             method(frame[y_low:y_high, x_low:x_high],
@@ -666,7 +666,7 @@ class AlignmentPoints(object):
                     if self.configuration.frames_normalization:
                         alignment_point['frame_qualities'].append(
                             meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0] /
-                            self.frames.frames_average_brightness[frame_index])
+                            self.frames.average_brightness(frame_index))
                     else:
                         alignment_point['frame_qualities'].append(
                             meanStdDev(frame[y_low:y_high, x_low:x_high])[1][0][0])

@@ -1187,6 +1187,12 @@ class Frames(object):
         else:
             self.calibration_matches = False
 
+        # Initialize an index translation list which is used later to exclude a subset of indices
+        # in the stacking workflow. Initially, all indices are included.
+        self.number_original = self.number
+        self.index_translation = [item for item in range(self.number_original)]
+        self.index_included = [True] * self.number_original
+
         # Initialize lists of monochrome frames (with and without Gaussian blur) and their
         # Laplacians.
         colors = ['red', 'green', 'blue', 'panchromatic']
@@ -1194,11 +1200,11 @@ class Frames(object):
             self.color_index = colors.index(self.configuration.frames_mono_channel)
         else:
             raise ArgumentError("Invalid color selected for channel extraction")
-        self.frames_monochrome = [None] * self.number
-        self.frames_monochrome_blurred = [None] *self.number
-        self.frames_monochrome_blurred_laplacian = [None] *self.number
+        self.frames_monochrome = [None] * self.number_original
+        self.frames_monochrome_blurred = [None] *self.number_original
+        self.frames_monochrome_blurred_laplacian = [None] *self.number_original
         if self.configuration.frames_normalization:
-            self.frames_average_brightness = [None] *self.number
+            self.frames_average_brightness = [None] *self.number_original
         else:
             self.frames_average_brightness = None
         self.first_monochrome_index = None
@@ -1263,7 +1269,7 @@ class Frames(object):
             buffer_per_image += image_size_laplacian_bytes
 
         # Multiply with the total number of frames.
-        buffer_for_all_images = buffer_per_image * self.number
+        buffer_for_all_images = buffer_per_image * self.number_original
 
         # Compute the size of additional workspace objects allocated during the workflow. For the
         # details see the comment block at the beginning of this method.
@@ -1275,29 +1281,41 @@ class Frames(object):
         # Return the total buffer space required.
         return (buffer_for_all_images + buffer_additional_workspace) / 1e9
 
-    def frames(self, index):
+    def frames(self, index, index_translation=True):
         """
         Read or look up the original frame object with a given index.
 
         :param index: Frame index
+        :param index_translation: If True, translate the parameter index according to the index
+                                  translation table (used to exclude a subset of indices in the
+                                  stacking workflow). If False, "index" refers to the original
+                                  list of image frames.
         :return: Frame with index "index".
         """
 
-        if not 0 <= index < self.number:
-            raise ArgumentError("Frame index " + str(index) + " is out of bounds")
         # print ("Accessing frame " + str(index))
+
+        # Check if the requested index is within bounds. Translate index, if necessary.
+        if index_translation:
+            if not 0 <= index < self.number:
+                raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
+            index_original = self.index_translation[index]
+        else:
+            if not 0 <= index < self.number_original:
+                raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+            index_original = index
 
         # If the original frames are to be buffered, read them in one go at the first call to this
         # method. In this case, a progress bar is displayed in the main GUI.
         if self.frames_original is None:
             if self.buffer_original:
                 self.frames_original = []
-                self.signal_step_size = max(int(self.number / 10), 1)
-                for frame_index in range(self.number):
+                self.signal_step_size = max(int(self.number_original / 10), 1)
+                for frame_index in range(self.number_original):
                     # After every "signal_step_size"th frame, send a progress signal to the main GUI.
                     if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                         self.progress_signal.emit("Read all frames",
-                                                  int(round(10 * frame_index / self.number) * 10))
+                                                  int(round(10 * frame_index / self.number_original) * 10))
                     # Read the next frame. If dark/flat correction is active, do the corrections.
                     if self.calibration_matches:
                         self.frames_original.append(self.calibration.correct(
@@ -1310,56 +1328,67 @@ class Frames(object):
             # If original frames are not buffered, initialize an empty frame list, so frames can be
             # read later in non-consecutive order.
             else:
-                self.frames_original = [None] *self.number
+                self.frames_original = [None] *self.number_original
 
         # The original frames are buffered. Just return the frame.
         if self.buffer_original:
-            return self.frames_original[index]
+            return self.frames_original[index_original]
 
         # This frame has been cached. Just return it.
-        if self.original_available_index == index:
+        if self.original_available_index == index_original:
             return self.original_available
 
         # The frame has not been stored for re-use, read it. If dark/flat correction is active, do
         # the corrections.
         else:
             if self.calibration_matches:
-                frame = self.calibration.correct(self.reader.read_frame(index))
+                frame = self.calibration.correct(self.reader.read_frame(index_original))
             else:
-                frame = self.reader.read_frame(index)
+                frame = self.reader.read_frame(index_original)
 
             # Cache the frame just read.
             self.original_available = frame
-            self.original_available_index = index
+            self.original_available_index = index_original
 
             return frame
 
-    def frames_mono(self, index):
+    def frames_mono(self, index, index_translation=True):
         """
         Look up or compute the monochrome version of the frame object with a given index.
 
         :param index: Frame index
+        :param index_translation: If True, translate the parameter index according to the index
+                                  translation table (used to exclude a subset of indices in the
+                                  stacking workflow). If False, "index" refers to the original
+                                  list of image frames.
         :return: Monochrome frame with index "index".
         """
 
-        if not 0 <= index < self.number:
-            raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+        # Check if the requested index is within bounds. Translate index, if necessary.
+        if index_translation:
+            if not 0 <= index < self.number:
+                raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
+            index_original = self.index_translation[index]
+        else:
+            if not 0 <= index < self.number_original:
+                raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+            index_original = index
 
         # print("Accessing frame monochrome " + str(index))
         # The monochrome frames are buffered, and this frame has been stored before. Just return
         # the frame.
-        if self.frames_monochrome[index] is not None:
-            return self.frames_monochrome[index]
+        if self.frames_monochrome[index_original] is not None:
+            return self.frames_monochrome[index_original]
 
         # If the monochrome frame is cached, just return it.
-        if self.monochrome_available_index == index:
+        if self.monochrome_available_index == index_original:
             return self.monochrome_available
 
         # The frame has not been stored for re-use, compute it.
         else:
 
             # Get the original frame. If it is not cached, this involves I/O.
-            frame_original = self.frames(index)
+            frame_original = self.frames(index_original, index_translation=False)
 
             # If frames are in color mode produce a B/W version.
             if self.color:
@@ -1386,57 +1415,68 @@ class Frames(object):
                             self.configuration.frames_normalization_threshold * 256
                         self.normalization_upper_threshold = 255
 
-                    self.frames_average_brightness[index] = cv_mean(
+                    self.frames_average_brightness[index_original] = cv_mean(
                         threshold(frame_mono, self.normalization_lower_threshold,
                                   self.normalization_upper_threshold,
                                   THRESH_TOZERO)[1])[0] + 1.e-10
                     # Keep the index of the first monochrome frame as the reference index.
-                    self.first_monochrome_index = index
+                    self.first_monochrome_index = index_original
                     self.first_monochrome = False
                 # Not the first monochrome frame. Adjust brightness to match the reference.
                 else:
-                    self.frames_average_brightness[index] = cv_mean(
+                    self.frames_average_brightness[index_original] = cv_mean(
                         threshold(frame_mono, self.normalization_lower_threshold,
                                   self.normalization_upper_threshold,
                                   THRESH_TOZERO)[1])[0] + 1.e-10
 
             # If the monochrome frames are buffered, store it at the current index.
             if self.buffer_monochrome:
-                self.frames_monochrome[index] = frame_mono
+                self.frames_monochrome[index_original] = frame_mono
 
             # If frames are not buffered, cache the current frame.
             else:
-                self.monochrome_available_index = index
+                self.monochrome_available_index = index_original
                 self.monochrome_available = frame_mono
 
             return frame_mono
 
-    def frames_mono_blurred(self, index):
+    def frames_mono_blurred(self, index, index_translation=True):
         """
         Look up a Gaussian-blurred frame object with a given index.
 
         :param index: Frame index
+        :param index_translation: If True, translate the parameter index according to the index
+                                  translation table (used to exclude a subset of indices in the
+                                  stacking workflow). If False, "index" refers to the original
+                                  list of image frames.
         :return: Gaussian-blurred frame with index "index".
         """
 
-        if not 0 <= index < self.number:
-            raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+        # Check if the requested index is within bounds. Translate index, if necessary.
+        if index_translation:
+            if not 0 <= index < self.number:
+                raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
+            index_original = self.index_translation[index]
+        else:
+            if not 0 <= index < self.number_original:
+                raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+            index_original = index
 
         # print("Accessing frame with Gaussian blur " + str(index))
         # The blurred frames are buffered, and this frame has been stored before. Just return
         # the frame.
-        if self.frames_monochrome_blurred[index] is not None:
-            return self.frames_monochrome_blurred[index]
+        if self.frames_monochrome_blurred[index_original] is not None:
+            return self.frames_monochrome_blurred[index_original]
 
         # If the blurred frame is cached, just return it.
-        if self.gaussian_available_index == index:
+        if self.gaussian_available_index == index_original:
             return self.gaussian_available
 
         # The frame has not been stored for re-use, compute it.
         else:
 
             # Get the monochrome frame. If it is not cached, this involves I/O.
-            frame_mono = self.frames_mono(index)
+            frame_mono = self.frames_mono(index_original, index_translation=False)
 
             # If the mono image is 8bit, interpolate it to 16bit.
             if frame_mono.dtype == uint8:
@@ -1449,40 +1489,51 @@ class Frames(object):
 
             # If the blurred frames are buffered, store the current frame at the current index.
             if self.buffer_gaussian:
-                self.frames_monochrome_blurred[index] = frame_monochrome_blurred
+                self.frames_monochrome_blurred[index_original] = frame_monochrome_blurred
 
             # If frames are not buffered, cache the current frame.
             else:
-                self.gaussian_available_index = index
+                self.gaussian_available_index = index_original
                 self.gaussian_available = frame_monochrome_blurred
 
             return frame_monochrome_blurred
 
-    def frames_mono_blurred_laplacian(self, index):
+    def frames_mono_blurred_laplacian(self, index, index_translation=True):
         """
         Look up a Laplacian-of-Gaussian of a frame object with a given index.
 
         :param index: Frame index
+        :param index_translation: If True, translate the parameter index according to the index
+                                  translation table (used to exclude a subset of indices in the
+                                  stacking workflow). If False, "index" refers to the original
+                                  list of image frames.
         :return: LoG of a frame with index "index".
         """
 
-        if not 0 <= index < self.number:
-            raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+        # Check if the requested index is within bounds. Translate index, if necessary.
+        if index_translation:
+            if not 0 <= index < self.number:
+                raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
+            index_original = self.index_translation[index]
+        else:
+            if not 0 <= index < self.number_original:
+                raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+            index_original = index
 
         # print("Accessing LoG number " + str(index))
         # The LoG frames are buffered, and this frame has been stored before. Just return the frame.
-        if self.frames_monochrome_blurred_laplacian[index] is not None:
-            return self.frames_monochrome_blurred_laplacian[index]
+        if self.frames_monochrome_blurred_laplacian[index_original] is not None:
+            return self.frames_monochrome_blurred_laplacian[index_original]
 
         # If the blurred frame is cached, just return it.
-        if self.laplacian_available_index == index:
+        if self.laplacian_available_index == index_original:
             return self.laplacian_available
 
         # The frame has not been stored for re-use, compute it.
         else:
 
             # Get the monochrome frame. If it is not cached, this involves I/O.
-            frame_monochrome_blurred = self.frames_mono_blurred(index)
+            frame_monochrome_blurred = self.frames_mono_blurred(index_original, index_translation=False)
 
             # Compute a version of the frame with Gaussian blur added.
             frame_monochrome_laplacian = convertScaleAbs(Laplacian(
@@ -1492,14 +1543,63 @@ class Frames(object):
 
             # If the blurred frames are buffered, store the current frame at the current index.
             if self.buffer_laplacian:
-                self.frames_monochrome_blurred_laplacian[index] = frame_monochrome_laplacian
+                self.frames_monochrome_blurred_laplacian[index_original] = frame_monochrome_laplacian
 
             # If frames are not buffered, cache the current frame.
             else:
-                self.laplacian_available_index = index
+                self.laplacian_available_index = index_original
                 self.laplacian_available = frame_monochrome_laplacian
 
             return frame_monochrome_laplacian
+
+    def average_brightness(self, index, index_translation=True):
+        """
+        Look up the average brightness of a frame with given index.
+
+        :param index: Frame index
+        :param index_translation: If True, translate the parameter index according to the index
+                                  translation table (used to exclude a subset of indices in the
+                                  stacking workflow). If False, "index" refers to the original
+                                  list of image frames.
+        :return: average brightness of the requested frame
+        """
+
+        # Check if the requested index is within bounds. Translate index, if necessary.
+        if index_translation:
+            if not 0 <= index < self.number:
+                raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
+            index_original = self.index_translation[index]
+        else:
+            if not 0 <= index < self.number_original:
+                raise ArgumentError("Frame index " + str(index) + " is out of bounds")
+            index_original = index
+
+        ab = self.frames_average_brightness[index_original]
+        if ab:
+            return ab
+        else:
+            raise InternalError("Accessing average frame brightness before computing it, frame: " +
+                                str(index_original))
+
+    def update_index_translation(self):
+        """
+        Update the index translation table. The list "self.index_included" for every original frame
+        index specifies if the frame is included in the processing workflow (True) or not (False).
+        Based on this list, a translation table "self.index_translation" is constructed. For the
+        reduced set of frames which take part in the processing workflow it contains the original
+        frame indices.
+
+        :return: -
+        """
+
+        index_reduced = 0
+        for index in range(self.number_original):
+            if self.index_included[index]:
+                self.index_translation[index_reduced] = index
+                index_reduced += 1
+
+        # Set the number of frames which will take part in the processing workflow.
+        self.number = index_reduced
 
     def reset_alignment_point_lists(self):
         """
