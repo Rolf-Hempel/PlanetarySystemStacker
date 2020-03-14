@@ -52,6 +52,7 @@ class ConfigurationParameters(object):
         self.frames_debayering_default = None
         self.frames_normalization = None
         self.frames_normalization_threshold = None
+        self.frames_add_selection_dialog = None
         self.align_frames_mode = None
         self.align_frames_automation = None
         self.align_frames_rectangle_scale_factor = None
@@ -86,6 +87,7 @@ class ConfigurationParameters(object):
         self.frames_debayering_default = 'Auto detect color'
         self.frames_normalization = True
         self.frames_normalization_threshold = 15
+        self.frames_add_selection_dialog = False
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
         self.align_frames_rectangle_scale_factor = 3.
@@ -139,6 +141,7 @@ class ConfigurationParameters(object):
         self.frames_debayering_default = configuration_object.frames_debayering_default
         self.frames_normalization = configuration_object.frames_normalization
         self.frames_normalization_threshold = configuration_object.frames_normalization_threshold
+        self.frames_add_selection_dialog = configuration_object.frames_add_selection_dialog
         self.align_frames_mode = configuration_object.align_frames_mode
         self.align_frames_automation = configuration_object.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -303,6 +306,8 @@ class Configuration(object):
         self.frames_normalization = configuration_parameters.frames_normalization
         self.frames_normalization_threshold = \
             configuration_parameters.frames_normalization_threshold
+        self.frames_add_selection_dialog = \
+            configuration_parameters.frames_add_selection_dialog
         self.align_frames_mode = configuration_parameters.align_frames_mode
         self.align_frames_automation = configuration_parameters.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -365,6 +370,7 @@ class Configuration(object):
         configuration_parameters.frames_debayering_default = self.frames_debayering_default
         configuration_parameters.frames_normalization = self.frames_normalization
         configuration_parameters.frames_normalization_threshold = self.frames_normalization_threshold
+        configuration_parameters.frames_add_selection_dialog = self.frames_add_selection_dialog
 
         configuration_parameters.align_frames_mode = self.align_frames_mode
         configuration_parameters.align_frames_automation = self.align_frames_automation
@@ -436,6 +442,7 @@ class Configuration(object):
         self.frames_debayering_default = conf.get('Frames', 'debayering default')
         self.frames_normalization = conf.getboolean('Frames', 'normalization')
         self.frames_normalization_threshold = conf.getint('Frames', 'normalization threshold')
+        self.frames_add_selection_dialog = conf.getboolean('Frames', 'add selection dialog')
 
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
@@ -511,6 +518,7 @@ class Configuration(object):
         self.set_parameter('Frames', 'normalization', str(self.frames_normalization))
         self.set_parameter('Frames', 'normalization threshold',
                            str(self.frames_normalization_threshold))
+        self.set_parameter('Frames', 'add selection dialog', str(self.frames_add_selection_dialog))
 
         self.config_parser_object.add_section('Align frames')
         self.set_parameter('Align frames', 'mode', self.align_frames_mode)

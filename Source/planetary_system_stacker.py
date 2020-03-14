@@ -759,6 +759,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         elif self.activity == "Rank frames":
 
+            # If the dialog to mark frames to be excluded from stacking was requested, open the
+            # dialog now.
+            if not self.automatic and self.configuration.frames_add_selection_dialog:
+                print ("Add the frames selection dialog here")
+
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit()
             self.busy = True

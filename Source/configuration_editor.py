@@ -77,6 +77,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.afrsf_slider_value.valueChanged['int'].connect(self.afrsf_changed)
         self.afsw_slider_value.valueChanged['int'].connect(self.afsw_changed)
         self.afafp_slider_value.valueChanged['int'].connect(self.afafp_changed)
+        self.efs_checkBox.stateChanged.connect(self.efs_changed)
         self.gpwptf_checkBox.stateChanged.connect(self.gpwptf_changed)
         self.gpspwr_checkBox.stateChanged.connect(self.gpspwr_changed)
         self.gppl_spinBox.valueChanged['int'].connect(self.gppl_changed)
@@ -128,6 +129,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.afsw_label_display.setText(str(self.config_copy.align_frames_search_width))
         self.afafp_slider_value.setValue(self.config_copy.align_frames_average_frame_percent)
         self.afafp_label_display.setText(str(self.config_copy.align_frames_average_frame_percent))
+        self.efs_checkBox.setChecked(self.config_copy.frames_add_selection_dialog)
         self.gpwptf_checkBox.setChecked(self.config_copy.global_parameters_write_protocol_to_file)
         self.gpspwr_checkBox.setChecked(
             self.config_copy.global_parameters_store_protocol_with_result)
@@ -239,6 +241,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
     def afafp_changed(self, value):
         self.config_copy.align_frames_average_frame_percent = value
+
+    def efs_changed(self, state):
+        self.config_copy.frames_add_selection_dialog = (state == QtCore.Qt.Checked)
 
     def gpwptf_changed(self, state):
         self.config_copy.global_parameters_write_protocol_to_file = (state == QtCore.Qt.Checked)
@@ -407,6 +412,12 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                 self.config_copy.frames_normalization_threshold
             self.configuration.configuration_changed = True
             go_back_to_activities.append('Compute frame qualities')
+
+        if self.config_copy.frames_add_selection_dialog != \
+                self.configuration.frames_add_selection_dialog:
+            self.configuration.frames_add_selection_dialog = \
+                self.config_copy.frames_add_selection_dialog
+            self.configuration.configuration_changed = True
 
         if self.config_copy.global_parameters_store_protocol_with_result != \
                 self.configuration.global_parameters_store_protocol_with_result:
