@@ -763,6 +763,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             # dialog now.
             if not self.automatic and self.configuration.frames_add_selection_dialog:
                 print ("Add the frames selection dialog here")
+                self.workflow.frames.index_included[10] = False
+                self.workflow.frames.index_included[15] = False
+                self.workflow.frames.index_included[19] = False
+                self.workflow.frames.update_index_translation()
 
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit()

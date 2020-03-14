@@ -51,11 +51,6 @@ class RankFrames(object):
                                 percent (int).
         """
 
-        frames.index_included[10] = False
-        frames.index_included[15] = False
-        frames.index_included[19] = False
-        frames.update_index_translation()
-
         self.number = frames.number
         self.shape = frames.shape
         self.configuration = configuration
