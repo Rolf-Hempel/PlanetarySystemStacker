@@ -768,8 +768,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 self.workflow.frames.index_included[19] = False
                 self.workflow.frames.update_index_translation()
 
-            # Now start the corresponding action on the workflow thread.
-            self.signal_rank_frames.emit()
+                # This signal will be emitted from the dialog on closure.
+                self.signal_rank_frames.emit()
+
+            else:
+                # Now start the corresponding action on the workflow thread.
+                self.signal_rank_frames.emit()
+
             self.busy = True
 
         elif self.activity == "Align frames":
