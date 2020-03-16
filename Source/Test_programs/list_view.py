@@ -19,12 +19,14 @@ class ListView(QtWidgets.QWidget, Ui_ListViewWidget):
         self.frames_included = []
         self.items_selected = None
 
-        self.listWidget.setSelectionMode(
-            QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.background_included = QtGui.QColor(130, 255, 130)
+        self.background_excluded = QtGui.QColor(120, 120, 120)
+
+        self.listWidget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
         for i in range(30):
             item = QtWidgets.QListWidgetItem("Frame %i included" % i)
-            item.setBackground(QtGui.QColor(0, 255, 0))
+            item.setBackground(self.background_included)
             item.setForeground(QtGui.QColor(0, 0, 0))
             self.listWidget.addItem(item)
             self.frames_included.append(True)
@@ -68,7 +70,7 @@ class ListView(QtWidgets.QWidget, Ui_ListViewWidget):
             for index, item in enumerate(self.items_selected):
                 index_selcted = self.indices_selected[index]
                 item.setText("Frame %i included" % index_selcted)
-                item.setBackground(QtGui.QColor(0, 255, 0))
+                item.setBackground(self.background_included)
                 item.setForeground(QtGui.QColor(0, 0, 0))
                 self.frames_included[index_selcted] = True
 
@@ -79,7 +81,7 @@ class ListView(QtWidgets.QWidget, Ui_ListViewWidget):
             for index, item in enumerate(self.items_selected):
                 index_selcted = self.indices_selected[index]
                 item.setText("Frame %i excluded" % index_selcted)
-                item.setBackground(QtGui.QColor(100, 100, 100))
+                item.setBackground(self.background_excluded)
                 item.setForeground(QtGui.QColor(255, 255, 255))
                 self.frames_included[index_selcted] = False
 
