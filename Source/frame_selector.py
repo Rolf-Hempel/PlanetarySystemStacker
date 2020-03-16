@@ -27,195 +27,18 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 
 from glob import glob
 from sys import argv, exit
-from time import time, sleep
+from time import sleep
 
 from PyQt5 import QtCore, QtGui, QtWidgets
 from PyQt5.QtCore import Qt
-from cv2 import NORM_MINMAX, normalize
-from numpy import uint8, uint16
 
-from align_frames import AlignFrames
 from configuration import Configuration
-from exceptions import NotSupportedError, InternalError, Error
-from frame_viewer_gui import Ui_frame_viewer
-from frames import Frames
+from exceptions import Error
 from frame_selector_gui import Ui_frame_selector
+from frame_viewer import FrameViewer
+from frames import Frames
 from miscellaneous import Miscellaneous
-from rank_frames import RankFrames
 
-
-class FrameViewer(QtWidgets.QGraphicsView):
-    """
-    This widget implements a frame viewer. Panning and zooming is implemented by using the mouse
-    and scroll wheel.
-
-    """
-
-    resized = QtCore.pyqtSignal()
-
-    def __init__(self):
-        super(FrameViewer, self).__init__()
-        self._zoom = 0
-        self._empty = True
-
-        # Initialize a flag which indicates when an image is being loaded.
-        self.image_loading_busy = False
-
-        # Initialize the scene. This object handles mouse events if not in drag mode.
-        self._scene = QtWidgets.QGraphicsScene()
-        # Initialize the photo object. No image is loaded yet.
-        self._photo = QtWidgets.QGraphicsPixmapItem()
-        self._scene.addItem(self._photo)
-        self.setScene(self._scene)
-
-        self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(30, 30, 30)))
-        self.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
-        self.drag_mode = True
-
-        self.resized.connect(self.fitInView)
-
-        # Set the focus on the viewer.
-        self.setFocus()
-
-    def resizeEvent(self, event):
-        self.resized.emit()
-        return super(FrameViewer, self).resizeEvent(event)
-
-    def hasPhoto(self):
-        return not self._empty
-
-    def fitInView(self):
-        """
-        Scale the scene such that it fits into the window completely.
-
-        :return: -
-        """
-
-        rect = QtCore.QRectF(self._photo.pixmap().rect())
-        if not rect.isNull():
-            self.setSceneRect(rect)
-            if self.hasPhoto():
-                unity = self.transform().mapRect(QtCore.QRectF(0, 0, 1, 1))
-                self.scale(1 / unity.width(), 1 / unity.height())
-                viewrect = self.viewport().rect()
-                scenerect = self.transform().mapRect(rect)
-                factor = min(viewrect.width() / scenerect.width(),
-                             viewrect.height() / scenerect.height())
-                self.scale(factor, factor)
-            self._zoom = 0
-
-    def setPhoto(self, image):
-        """
-        Convert a color or grayscale image to a pixmap and assign it to the photo object.
-
-        :param image: Image to be displayed. The image is assumed to be in color or grayscale
-                      format of length uint8 or uint16.
-        :return: -
-        """
-
-        # Indicate that an image is being loaded.
-        self.image_loading_busy = True
-
-        # Convert the image into uint8 format. If the frame type is uint16, values correspond to
-        # 16bit resolution.
-        if image.dtype == uint16:
-            image_uint8 = (image / 256.).astype(uint8)
-        elif image.dtype == uint8:
-            image_uint8 = image.astype(uint8)
-        else:
-            raise NotSupportedError("Attempt to set a photo in frame viewer with type neither"
-                                    " uint8 nor uint16")
-
-        self.shape_y = image_uint8.shape[0]
-        self.shape_x = image_uint8.shape[1]
-
-        # Normalize the frame brightness.
-        image_uint8 = normalize(image_uint8, None, alpha=0, beta=255, norm_type=NORM_MINMAX)
-
-        # The image is monochrome:
-        if len(image_uint8.shape) == 2:
-            qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
-                                    QtGui.QImage.Format_Grayscale8)
-        # The image is RGB color.
-        else:
-            qt_image = QtGui.QImage(image_uint8, self.shape_x,
-                                    self.shape_y, 3*self.shape_x, QtGui.QImage.Format_RGB888)
-        pixmap = QtGui.QPixmap(qt_image)
-
-        if pixmap and not pixmap.isNull():
-            self._empty = False
-            self._photo.setPixmap(pixmap)
-        else:
-            self._empty = True
-            self._photo.setPixmap(QtGui.QPixmap())
-
-        # Release the image loading flag.
-        self.image_loading_busy = False
-
-    def wheelEvent(self, event):
-        """
-        Handle scroll events for zooming in and out of the scene. This is only active when a photo
-        is loaded.
-
-        :param event: wheel event object
-        :return: -
-        """
-
-        if self.drag_mode:
-            # Depending of wheel direction, set the direction value to greater or smaller than 1.
-            self.zoom(event.angleDelta().y())
-
-        # If not in drag mode, the wheel event is handled at the scene level.
-        else:
-            self._scene.wheelEvent(event)
-
-    def zoom(self, direction):
-        """
-        Zoom in or out. This is only active when a photo is loaded
-
-        :param direction: If > 0, zoom in, otherwise zoom out.
-        :return: -
-        """
-
-        if self.hasPhoto():
-
-            # Depending of direction value, set the zoom factor to greater or smaller than 1.
-            if direction > 0:
-                factor = 1.25
-                self._zoom += 1
-            else:
-                factor = 0.8
-                self._zoom -= 1
-
-            # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene
-            # to the window size.
-            if self._zoom > 0:
-                self.scale(factor, factor)
-            elif self._zoom == 0:
-                self.fitInView()
-            else:
-                self._zoom = 0
-
-    def keyPressEvent(self, event):
-        """
-        The + and - keys are used for zooming.
-
-        :param event: event object
-        :return: -
-        """
-
-        # If the "+" key is pressed, zoom in. If "-" is pressed, zoom out.
-        if event.key() == QtCore.Qt.Key_Plus and not event.modifiers() & QtCore.Qt.ControlModifier:
-            self.zoom(1)
-        elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
-            self.zoom(-1)
-        else:
-            super(FrameViewer, self).keyPressEvent(event)
 
 class VideoFrameSelector(FrameViewer):
     """
@@ -364,7 +187,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         # Update the image in the viewer.
         self.frame_selector.setPhoto(self.frame_index)
-        print(self.indices_selected)
+        # print(self.indices_selected)
 
     def eventFilter(self, source, event):
         if source is self.listWidget:
@@ -423,6 +246,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         # Update the image in the viewer.
         self.frame_selector.setPhoto(self.frame_index)
+        self.listWidget.setFocus()
 
     def pushbutton_stop_clicked(self):
         """
@@ -455,10 +279,14 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         # Write the changes in frame selection to the protocol.
         if indices_included and self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol("           The user has included the following frames into the stacking workflow: " + str(indices_included),
+            Miscellaneous.protocol(
+                "           The user has included the following frames into the stacking workflow: " + str(
+                    indices_included),
                 self.stacked_image_log_file, precede_with_timestamp=False)
         if indices_excluded and self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol("           The user has excluded the following frames from the stacking workflow: " + str(indices_excluded),
+            Miscellaneous.protocol(
+                "           The user has excluded the following frames from the stacking workflow: " + str(
+                    indices_excluded),
                 self.stacked_image_log_file, precede_with_timestamp=False)
 
         # Send a completion message.
@@ -492,15 +320,15 @@ class FramePlayer(QtCore.QObject):
     """
     set_photo_signal = QtCore.pyqtSignal(int)
 
-    def __init__(self, frame_viewer_widget):
+    def __init__(self, frame_selector_widget):
         super(FramePlayer, self).__init__()
 
-        # Store a reference of the frame viewer widget and create a list of GUI elements. This makes
+        # Store a reference of the frame selector widget and create a list of GUI elements. This makes
         # it easier to perform the same operation on all elements.
-        self.frame_viewer_widget = frame_viewer_widget
-        self.frame_viewer_widget_elements = [self.frame_viewer_widget.listWidget,
-                                             self.frame_viewer_widget.addButton,
-                                             self.frame_viewer_widget.removeButton]
+        self.frame_selector_widget = frame_selector_widget
+        self.frame_selector_widget_elements = [self.frame_selector_widget.listWidget,
+                                               self.frame_selector_widget.addButton,
+                                               self.frame_selector_widget.removeButton]
 
         # Initialize a variable used to stop the player in the GUI thread.
         self.run_player = False
@@ -513,29 +341,31 @@ class FramePlayer(QtCore.QObject):
 
         # Block signals from GUI elements to avoid cross-talk, and disable them to prevent unwanted
         # user interaction.
-        for element in self.frame_viewer_widget_elements:
+        for element in self.frame_selector_widget_elements:
             element.blockSignals(True)
             element.setDisabled(True)
 
         # Set the player running.
         self.run_player = True
 
-        while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.frames.number_original \
+        while self.frame_selector_widget.frame_index < self.frame_selector_widget.frames.number_original \
                 - 1 and self.run_player:
-            if not self.frame_viewer_widget.frame_selector.image_loading_busy:
-                self.frame_viewer_widget.frame_index += 1
-                self.frame_viewer_widget.slider_frames.setValue(
-                    self.frame_viewer_widget.frame_index + 1)
-                self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
+            if not self.frame_selector_widget.frame_selector.image_loading_busy:
+                self.frame_selector_widget.frame_index += 1
+                self.frame_selector_widget.slider_frames.setValue(
+                    self.frame_selector_widget.frame_index + 1)
+                self.set_photo_signal.emit(self.frame_selector_widget.frame_index)
             sleep(0.1)
-            self.frame_viewer_widget.update()
+            self.frame_selector_widget.update()
 
         self.run_player = False
 
         # Re-set the GUI elements to their normal state.
-        for element in self.frame_viewer_widget_elements:
+        for element in self.frame_selector_widget_elements:
             element.blockSignals(False)
             element.setDisabled(False)
+
+        self.frame_selector_widget.listWidget.setFocus()
 
 
 if __name__ == '__main__':
