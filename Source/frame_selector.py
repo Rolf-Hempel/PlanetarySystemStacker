@@ -49,16 +49,19 @@ class VideoFrameSelector(FrameViewer):
 
     resized = QtCore.pyqtSignal()
 
-    def __init__(self, frames, frame_index=0):
+    def __init__(self, frames, index_included, frame_index=0):
         super(VideoFrameSelector, self).__init__()
         self.frames = frames
+        self.index_included = index_included
         self.frame_index = frame_index
 
         self.setPhoto(self.frame_index)
 
     def setPhoto(self, index):
         """
-        Convert a grayscale image to a pixmap and assign it to the photo object.
+        Convert a grayscale image to a pixmap and assign it to the photo object. If the image is
+        marked as excluded from the stacking workflow, place a crossed-out red circle in the
+        upper left image corner.
 
         :param index: Index into the frame list. Frames are assumed to be grayscale image in format
                       float32.
@@ -70,7 +73,8 @@ class VideoFrameSelector(FrameViewer):
 
         image = self.frames.frames_mono(index)
 
-        super(VideoFrameSelector, self).setPhoto(image)
+        super(VideoFrameSelector, self).setPhoto(image,
+                                        overlay_exclude_mark=not self.index_included[index])
 
 
 class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
@@ -80,7 +84,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
     """
 
     def __init__(self, parent_gui, configuration, frames,
-                 stacked_image_log_file, signal_finished, signal_payload):
+                 stacked_image_log_file, signal_finished):
         """
         Initialization of the widget.
 
@@ -90,7 +94,6 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         :param stacked_image_log_file: Log file to be stored with results, or None.
         :param signal_finished: Qt signal with signature (str) to trigger the next activity when
                                 the viewer exits.
-        :param signal_payload: Payload of "signal_finished" (str).
         """
 
         super(FrameSelectorWidget, self).__init__(parent_gui)
@@ -101,13 +104,12 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.configuration = configuration
         self.stacked_image_log_file = stacked_image_log_file
         self.signal_finished = signal_finished
-        self.signal_payload = signal_payload
         self.frames = frames
         self.index_included = frames.index_included.copy()
 
         # Initialize the frame list selection.
         self.items_selected = None
-        self.indices_selected = []
+        self.indices_selected = None
 
         # Set colors for the frame list.
         self.background_included = QtGui.QColor(130, 255, 130)
@@ -139,7 +141,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.frame_index = 0
 
         # Set up the frame viewer and put it in the upper left corner.
-        self.frame_selector = VideoFrameSelector(self.frames, self.frame_index)
+        self.frame_selector = VideoFrameSelector(self.frames, self.index_included, self.frame_index)
         self.frame_selector.setObjectName("framewiever")
         self.gridLayout.addWidget(self.frame_selector, 0, 0, 1, 3)
 
@@ -175,7 +177,16 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.pushButton_play.clicked.connect(self.frame_player.play)
         self.pushButton_stop.clicked.connect(self.pushbutton_stop_clicked)
 
+        if self.configuration.global_parameters_protocol_level > 0:
+            Miscellaneous.protocol("+++ Start selecting frames +++", self.stacked_image_log_file)
+
     def select_items(self):
+        """
+        If a list item or a range of items is selected, store the items and corresponding indices.
+        Set the frame slider to the first selected item and display it.
+
+        :return: -
+        """
         self.items_selected = self.listWidget.selectedItems()
         self.indices_selected = [self.listWidget.row(item) for item in self.items_selected]
         self.frame_index = self.indices_selected[0]
@@ -190,9 +201,21 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         # print(self.indices_selected)
 
     def eventFilter(self, source, event):
+        """
+        This eventFilter is listening for events on the listWidget. List items can be marked as
+        included / excluded by either using a context menu, by pressing the "+" or "-" buttons, or
+        by pressing the keyboard keys "+" or "-".
+
+        :param source: Source object to listen on.
+        :param event: Event found
+        :return: -
+        """
+
         if source is self.listWidget:
+
+            # Open a context menu with two choices. Depending on the user's choice, either
+            # trigger the "use_triggered" or "not_use_triggered" method below.
             if event.type() == QtCore.QEvent.ContextMenu:
-                print("Context menu opened")
                 menu = QtWidgets.QMenu()
                 action1 = QtWidgets.QAction('Use for stacking', menu)
                 action1.triggered.connect(self.use_triggered)
@@ -201,6 +224,8 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
                 action2.triggered.connect(self.not_use_triggered)
                 menu.addAction((action2))
                 menu.exec_(event.globalPos())
+
+            # Do the same as above if the user prefers to use the keyboard keys "+" or "-".
             elif event.type() == QtCore.QEvent.KeyPress:
                 if event.key() == Qt.Key_Plus:
                     self.use_triggered()
@@ -212,6 +237,15 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         return super(FrameSelectorWidget, self).eventFilter(source, event)
 
     def use_triggered(self):
+        """
+        The user has selected a list item or a range of items to be included in the stacking
+        workflow. Change the appearance of the list entry, update the "index_included" values for
+        the corresponding frames, and reload the image of the current index. The latter step is
+        important to update the overlay mark in the upper left image corner.
+
+        :return: -
+        """
+
         if self.items_selected:
             for index, item in enumerate(self.items_selected):
                 index_selcted = self.indices_selected[index]
@@ -219,8 +253,14 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
                 item.setBackground(self.background_included)
                 item.setForeground(QtGui.QColor(0, 0, 0))
                 self.index_included[index_selcted] = True
+                self.frame_selector.setPhoto(self.frame_index)
 
     def not_use_triggered(self):
+        """
+        Same as above in case the user has de-selected a list item or a range of items.
+        :return: -
+        """
+
         if self.items_selected:
             for index, item in enumerate(self.items_selected):
                 index_selcted = self.indices_selected[index]
@@ -228,10 +268,12 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
                 item.setBackground(self.background_excluded)
                 item.setForeground(QtGui.QColor(255, 255, 255))
                 self.index_included[index_selcted] = False
+                self.frame_selector.setPhoto(self.frame_index)
 
     def slider_frames_changed(self):
         """
-        The frames slider is changed by the user. Update the frame in the viewer.
+        The frames slider is changed by the user. Update the frame in the viewer and scroll the
+        frame list to show the current frame index.
 
         :return: -
         """
@@ -278,20 +320,29 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
                 self.frames.index_included[index] = False
 
         # Write the changes in frame selection to the protocol.
-        if indices_included and self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol(
-                "           The user has included the following frames into the stacking workflow: " + str(
-                    indices_included),
-                self.stacked_image_log_file, precede_with_timestamp=False)
-        if indices_excluded and self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol(
-                "           The user has excluded the following frames from the stacking workflow: " + str(
-                    indices_excluded),
-                self.stacked_image_log_file, precede_with_timestamp=False)
+        if self.configuration.global_parameters_protocol_level > 1:
+            if indices_included:
+                Miscellaneous.protocol(
+                    "           The user has included the following frames into the stacking workflow: " + str(
+                        indices_included),
+                    self.stacked_image_log_file, precede_with_timestamp=False)
+            if indices_excluded:
+                Miscellaneous.protocol(
+                    "           The user has excluded the following frames from the stacking workflow: " + str(
+                        indices_excluded),
+                    self.stacked_image_log_file, precede_with_timestamp=False)
+            frames_remaining = sum(self.frames.index_included)
+            if frames_remaining != self.frames.number:
+                Miscellaneous.protocol(
+                    "           " + str(frames_remaining) + " frames will be used in the stacking workflow.",
+                    self.stacked_image_log_file, precede_with_timestamp=False)
 
-        # Send a completion message.
+
+        # Send a completion message. The "execute_rank_frames" method is triggered on the workflow
+        # thread. The signal payload is True if the status was changed for at least one frame.
+        # In this case, the index translation table is updated before the frame ranking starts.
         if self.parent_gui is not None:
-            self.signal_finished.emit(self.signal_payload)
+            self.signal_finished.emit(bool(indices_included) or bool(indices_excluded))
 
         # Close the Window.
         self.close()
@@ -392,7 +443,7 @@ if __name__ == '__main__':
         exit()
 
     app = QtWidgets.QApplication(argv)
-    window = FrameSelectorWidget(None, configuration, frames, None, None, None)
+    window = FrameSelectorWidget(None, configuration, frames, None, None)
     window.setMinimumSize(800, 600)
     # window.showMaximized()
     window.show()

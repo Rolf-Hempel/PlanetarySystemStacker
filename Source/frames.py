@@ -1324,6 +1324,8 @@ class Frames(object):
                         self.frames_original.append(self.reader.read_frame(frame_index))
 
                 self.reader.close()
+                if self.progress_signal is not None:
+                    self.progress_signal.emit("Read all frames", 100)
 
             # If original frames are not buffered, initialize an empty frame list, so frames can be
             # read later in non-consecutive order.

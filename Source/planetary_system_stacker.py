@@ -45,6 +45,7 @@ from alignment_points import AlignmentPoints
 from configuration import Configuration
 from configuration_editor import ConfigurationEditor
 from exceptions import NotSupportedError
+from frame_selector import FrameSelectorWidget
 from frame_viewer import FrameViewerWidget
 from frames import Frames
 from job_editor import JobEditor, FileDialog
@@ -143,7 +144,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     signal_load_master_dark = QtCore.pyqtSignal(str)
     signal_load_master_flat = QtCore.pyqtSignal(str)
     signal_frames = QtCore.pyqtSignal(object)
-    signal_rank_frames = QtCore.pyqtSignal()
+    signal_rank_frames = QtCore.pyqtSignal(bool)
     signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
     signal_set_roi = QtCore.pyqtSignal(int, int, int, int)
     signal_set_alignment_points = QtCore.pyqtSignal()
@@ -762,18 +763,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             # If the dialog to mark frames to be excluded from stacking was requested, open the
             # dialog now.
             if not self.automatic and self.configuration.frames_add_selection_dialog:
-                print ("Add the frames selection dialog here")
-                self.workflow.frames.index_included[10] = False
-                self.workflow.frames.index_included[15] = False
-                self.workflow.frames.index_included[19] = False
-                self.workflow.frames.update_index_translation()
+                fsw = FrameSelectorWidget(self, self.configuration, self.workflow.frames,
+                                          self.workflow.attached_log_file, self.signal_rank_frames)
 
-                # This signal will be emitted from the dialog on closure.
-                self.signal_rank_frames.emit()
+                self.display_widget(fsw)
+                fsw.listWidget.setFocus()
+                self.write_status_bar("Select / de-select frames to be used for stacking.",
+                                      "red")
 
             else:
-                # Now start the corresponding action on the workflow thread.
-                self.signal_rank_frames.emit()
+                # Now start the corresponding action on the workflow thread. No index translation
+                # table change is necessary because the selection dialog was not executed.
+                self.signal_rank_frames.emit(False)
 
             self.busy = True
 
@@ -1198,6 +1199,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             if self.job_index < self.job_number:
                 if self.activity == 'Select stack size':
                     self.write_status_bar("Select the number / percentage of frames to be stacked.",
+                                          "red")
+                elif self.activity == 'Rank frames':
+                    self.write_status_bar("Select / de-select frames to be used for stacking.",
                                           "red")
                 else:
                     self.write_status_bar("Busy processing " + self.jobs[self.job_index].file_name,

@@ -31,7 +31,7 @@ from time import time, sleep
 
 import matplotlib.pyplot as plt
 from PyQt5 import QtCore, QtGui, QtWidgets
-from cv2 import NORM_MINMAX, normalize
+from cv2 import NORM_MINMAX, normalize, cvtColor, COLOR_GRAY2RGB, circle, line
 from matplotlib import patches
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
@@ -258,12 +258,14 @@ class FrameViewer(QtWidgets.QGraphicsView):
                 self.scale(factor, factor)
             self._zoom = 0
 
-    def setPhoto(self, image):
+    def setPhoto(self, image, overlay_exclude_mark=False):
         """
         Convert a color or grayscale image to a pixmap and assign it to the photo object.
 
         :param image: Image to be displayed. The image is assumed to be in color or grayscale
                       format of length uint8 or uint16.
+        :param overlay_exclude_mark: If True, overlay a crossed-out red circle in the upper left
+                                     corner of the image.
         :return: -
         """
 
@@ -285,6 +287,19 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
         # Normalize the frame brightness.
         image_uint8 = normalize(image_uint8, None, alpha=0, beta=255, norm_type=NORM_MINMAX)
+
+        # Overlay a crossed-out red circle in the upper left image corner.
+        if overlay_exclude_mark:
+            if len(image_uint8.shape) == 2:
+                image_uint8 = cvtColor(image_uint8, COLOR_GRAY2RGB)
+
+            # The position and size of the mark are relative to the image size.
+            pos_x = int(round(self.shape_x / 10))
+            pos_y = int(round(self.shape_y / 10))
+            diameter = int(round(min(pos_x, pos_y) / 4))
+            circle(image_uint8, (pos_x, pos_y), diameter, (255, 0, 0), 2)
+            line(image_uint8, (pos_x - diameter, pos_y + diameter),
+                 (pos_x + diameter, pos_y - diameter), (255, 0, 0), 2)
 
         # The image is monochrome:
         if len(image_uint8.shape) == 2:

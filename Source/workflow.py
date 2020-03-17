@@ -276,7 +276,7 @@ class Workflow(QtCore.QObject):
                                      buffer_laplacian=buffer_laplacian)
                 if self.configuration.global_parameters_protocol_level > 1:
                     Miscellaneous.protocol(
-                        "           Number of images: " + str(self.frames.number) +
+                        "           Number of frames: " + str(self.frames.number) +
                         ", image shape: " + str(self.frames.shape), self.attached_log_file,
                         precede_with_timestamp=False)
                     if self.job.bayer_option_selected == 'Auto detect color':
@@ -386,28 +386,33 @@ class Workflow(QtCore.QObject):
                 self.postproc_input_image = self.postproc_input_image.astype(uint16) * 256
             self.work_next_task_signal.emit("Postprocessing")
 
-    @QtCore.pyqtSlot()
-    def execute_rank_frames(self):
+    @QtCore.pyqtSlot(bool)
+    def execute_rank_frames(self, update_index_translation_table):
+
+        # If in the frame selection dialog the status of at least one frame was changed, update
+        # the index translation table.
+        if update_index_translation_table:
+            self.frames.update_index_translation()
 
         self.set_status_bar_processing_phase("ranking frames")
         # Rank the frames by their overall local contrast.
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start ranking images +++", self.attached_log_file)
-        self.my_timer.create_no_check('Ranking images')
+            Miscellaneous.protocol("+++ Start ranking frames +++", self.attached_log_file)
+        self.my_timer.create_no_check('Ranking frames')
 
         try:
             self.rank_frames = RankFrames(self.frames, self.configuration,
                                           self.work_current_progress_signal)
             self.rank_frames.frame_score()
-            self.my_timer.stop('Ranking images')
+            self.my_timer.stop('Ranking frames')
         except Error as e:
             self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
-            self.my_timer.stop('Ranking images')
+            self.my_timer.stop('Ranking frames')
             return
         except Exception as e:
             self.abort_job_signal.emit(
                 "Error: " + str(e) + ", continuing with next job")
-            self.my_timer.stop('Ranking images')
+            self.my_timer.stop('Ranking frames')
             return
 
         if self.configuration.global_parameters_protocol_level > 1:
