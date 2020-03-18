@@ -74,7 +74,8 @@ class VideoFrameSelector(FrameViewer):
         image = self.frames.frames_mono(index)
 
         super(VideoFrameSelector, self).setPhoto(image,
-                                        overlay_exclude_mark=not self.index_included[index])
+                                                 overlay_exclude_mark=not self.index_included[
+                                                     index])
 
 
 class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
@@ -83,8 +84,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
     qualities, and to manipulate the stack limits.
     """
 
-    def __init__(self, parent_gui, configuration, frames,
-                 stacked_image_log_file, signal_finished):
+    def __init__(self, parent_gui, configuration, frames, stacked_image_log_file, signal_finished):
         """
         Initialization of the widget.
 
@@ -121,12 +121,13 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         # Initialize the inclusion / exclusion state of frames in the frame list.
         for i in range(frames.number_original):
+            frame_number = i + 1
             if self.index_included[i]:
-                item = QtWidgets.QListWidgetItem("Frame %i included" % i)
+                item = QtWidgets.QListWidgetItem("Frame %i included" % frame_number)
                 item.setBackground(self.background_included)
                 item.setForeground(self.foreground_included)
             else:
-                item = QtWidgets.QListWidgetItem("Frame %i excluded" % i)
+                item = QtWidgets.QListWidgetItem("Frame %i excluded" % frame_number)
                 item.setBackground(self.background_excluded)
                 item.setForeground(self.foreground_excluded)
             self.listWidget.addItem(item)
@@ -197,8 +198,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.slider_frames.blockSignals(False)
 
         # Update the image in the viewer.
-        self.frame_selector.setPhoto(self.frame_index)
-        # print(self.indices_selected)
+        self.frame_selector.setPhoto(self.frame_index)  # print(self.indices_selected)
 
     def eventFilter(self, source, event):
         """
@@ -248,11 +248,12 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         if self.items_selected:
             for index, item in enumerate(self.items_selected):
-                index_selcted = self.indices_selected[index]
-                item.setText("Frame %i included" % index_selcted)
+                index_selected = self.indices_selected[index]
+                frame_selected = index_selected + 1
+                item.setText("Frame %i included" % frame_selected)
                 item.setBackground(self.background_included)
                 item.setForeground(QtGui.QColor(0, 0, 0))
-                self.index_included[index_selcted] = True
+                self.index_included[index_selected] = True
                 self.frame_selector.setPhoto(self.frame_index)
 
     def not_use_triggered(self):
@@ -263,11 +264,12 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         if self.items_selected:
             for index, item in enumerate(self.items_selected):
-                index_selcted = self.indices_selected[index]
-                item.setText("Frame %i excluded" % index_selcted)
+                index_selected = self.indices_selected[index]
+                frame_selected = index_selected + 1
+                item.setText("Frame %i excluded" % frame_selected)
                 item.setBackground(self.background_excluded)
                 item.setForeground(QtGui.QColor(255, 255, 255))
-                self.index_included[index_selcted] = False
+                self.index_included[index_selected] = False
                 self.frame_selector.setPhoto(self.frame_index)
 
     def slider_frames_changed(self):
@@ -323,20 +325,21 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         if self.configuration.global_parameters_protocol_level > 1:
             if indices_included:
                 Miscellaneous.protocol(
-                    "           The user has included the following frames into the stacking workflow: " + str(
-                        indices_included),
-                    self.stacked_image_log_file, precede_with_timestamp=False)
+                    "           The user has included the following frames into the stacking "
+                    "workflow: " + str(
+                        [item + 1 for item in indices_included]), self.stacked_image_log_file,
+                    precede_with_timestamp=False)
             if indices_excluded:
                 Miscellaneous.protocol(
-                    "           The user has excluded the following frames from the stacking workflow: " + str(
-                        indices_excluded),
-                    self.stacked_image_log_file, precede_with_timestamp=False)
+                    "           The user has excluded the following frames from the stacking "
+                    "workflow: " + str(
+                        [item + 1 for item in indices_excluded]), self.stacked_image_log_file,
+                    precede_with_timestamp=False)
             frames_remaining = sum(self.frames.index_included)
             if frames_remaining != self.frames.number:
-                Miscellaneous.protocol(
-                    "           " + str(frames_remaining) + " frames will be used in the stacking workflow.",
+                Miscellaneous.protocol("           " + str(
+                    frames_remaining) + " frames will be used in the stacking workflow.",
                     self.stacked_image_log_file, precede_with_timestamp=False)
-
 
         # Send a completion message. The "execute_rank_frames" method is triggered on the workflow
         # thread. The signal payload is True if the status was changed for at least one frame.
@@ -374,8 +377,8 @@ class FramePlayer(QtCore.QObject):
     def __init__(self, frame_selector_widget):
         super(FramePlayer, self).__init__()
 
-        # Store a reference of the frame selector widget and create a list of GUI elements. This makes
-        # it easier to perform the same operation on all elements.
+        # Store a reference of the frame selector widget and create a list of GUI elements. This
+        # makes it easier to perform the same operation on all elements.
         self.frame_selector_widget = frame_selector_widget
         self.frame_selector_widget_elements = [self.frame_selector_widget.listWidget,
                                                self.frame_selector_widget.addButton,
@@ -399,8 +402,8 @@ class FramePlayer(QtCore.QObject):
         # Set the player running.
         self.run_player = True
 
-        while self.frame_selector_widget.frame_index < self.frame_selector_widget.frames.number_original \
-                - 1 and self.run_player:
+        while self.frame_selector_widget.frame_index < \
+                self.frame_selector_widget.frames.number_original - 1 and self.run_player:
             if not self.frame_selector_widget.frame_selector.image_loading_busy:
                 self.frame_selector_widget.frame_index += 1
                 self.frame_selector_widget.slider_frames.setValue(

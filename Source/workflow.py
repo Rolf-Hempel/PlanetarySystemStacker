@@ -417,7 +417,7 @@ class Workflow(QtCore.QObject):
 
         if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol(
-                "           Index of best frame: " + str(self.rank_frames.frame_ranks_max_index),
+                "           Index of best frame: " + str(self.rank_frames.frame_ranks_max_index + 1),
                 self.attached_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Align frames")
