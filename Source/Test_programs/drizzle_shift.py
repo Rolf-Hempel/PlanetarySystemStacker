@@ -1,51 +1,51 @@
-from numpy import array, modf, argmin, arange, zeros
-from numpy import abs as np_abs
 from math import ceil
 
-frame = arange(30.)
-frame_d = zeros((45,))
+from numpy import arange, zeros
 
-shifts = arange(-3., 3., 0.1, dtype=float)
 
-# shift_even = int(round(1.5*shift))
-# print (str(shift_even))
-# shift_odd = int(round(1.5*(shift-1./3.)))
-#
-# ilo = 15
-# ihi = 26
-#
-# if ilo%2:
-#     frame_d[int((ilo+1)/2*3)+shift_even:int(ihi/2*3)+shift_even:3] = frame[ilo+1:ihi:2]
-#     frame_d[int((ilo*3+1)/2) + shift_odd:int(ihi / 2 * 3) + shift_even:3] = frame[
-#                                                                                    ilo:ihi:2]
-# else:
-#     frame_d[int(ilo/2*3)+shift_even:int(ihi/2*3)+shift_even:3] = frame[ilo:ihi:2]
+def drizzle_shift():
+    shifts = arange(-3., 3., 0.1, dtype=float)
+    for shift in shifts:
+        shift_ceil = ceil(shift / 2) * 2
+        frac = shift_ceil - shift - 1. / 3.
+        frac_shift = int(round(frac * 3. / 2.))
 
-for shift in shifts:
-    shift_ceil = ceil((shift - 1. / 3.) / 2) * 2
-    frac = shift_ceil - shift
-    frac_shift = int(round(frac * 3. / 2.))
+        print("shift: " + str(shift) + ", ceil: " + str(shift_ceil) + ", frac:" + str(frac_shift))
 
-    print("shift: " + str(shift) + ", ceil: " + str(shift_ceil) + ", frac:" + str(frac_shift))
 
-shift = 1.3
-shift_ceil_even = ceil((shift - 1. / 3.) / 2) * 2
-frac = shift_ceil_even - shift
-frac_shift_even = int(round(frac * 3. / 2.))
+def drizzle_shift_patch(shift, ilo, ihi):
+    frame = arange(30.)
+    frame_d = zeros((45,))
 
-ilo = 15
-ihi = 23
+    shift_ceil_even = ceil((shift - 1. / 3.) / 2) * 2
+    frac = shift_ceil_even - shift
+    frac_shift_even = int(round(frac * 3. / 2.))
+    shift_ceil_odd = ceil(shift / 2) * 2
+    frac = shift_ceil_odd - shift - 1. / 3.
+    frac_shift_odd = int(round(frac * 3. / 2.))
+    if ilo % 2:
+        frame_low_even = ilo + 1 + shift_ceil_even
+        frame_high_even = ihi + shift_ceil_even
+        frame_d_low_even = int((ilo + 1) / 2 * 3 + frac_shift_even)
+        frame_d_high_even = int(round(ihi / 2 * 3)) + frac_shift_even
+        frame_low_odd = ilo + shift_ceil_odd
+        frame_high_odd = ihi + shift_ceil_odd
+        frame_d_low_odd = int((ilo + 1. / 3.) / 2 * 3 + frac_shift_odd)
+        frame_d_high_odd = int(round(ihi / 2 * 3)) + frac_shift_odd
+    else:
+        frame_low_even = ilo + shift_ceil_even
+        frame_high_even = ihi + shift_ceil_even
+        frame_d_low_even = int(ilo / 2 * 3 + frac_shift_even)
+        frame_d_high_even = int(ihi / 2 * 3 + frac_shift_even)
+        frame_low_odd = ilo + 1 + shift_ceil_odd
+        frame_high_odd = ihi + shift_ceil_odd
+        frame_d_low_odd = int((ilo + 4. / 3.) / 2 * 3 + frac_shift_odd)
+        frame_d_high_odd = int(ihi / 2 * 3 + frac_shift_odd)
+    frame_d[frame_d_low_even:frame_d_high_even:3] = frame[frame_low_even:frame_high_even:2]
+    frame_d[frame_d_low_odd:frame_d_high_odd:3] = frame[frame_low_odd:frame_high_odd:2]
 
-if ilo % 2:
-    frame_low = ilo + 1 + shift_ceil_even
-    frame_high = ihi + shift_ceil_even
-    frame_d_low = int((ilo + 1) / 2 * 3 + frac_shift_even)
-    frame_d_high = int(round(ihi / 2 * 3)) + frac_shift_even
-else:
-    frame_low = ilo + shift_ceil_even
-    frame_high = ihi + shift_ceil_even
-    frame_d_low = int(ilo / 2 * 3 + frac_shift_even)
-    frame_d_high = int(ihi / 2 * 3 + frac_shift_even)
-frame_d[frame_d_low:frame_d_high:3] = frame[frame_low:frame_high:2]
+    pass
 
-pass
+
+drizzle_shift()
+drizzle_shift_patch(-1.4, 2, 7)
