@@ -1,5 +1,8 @@
 from math import ceil
+from time import time
 
+from cv2 import resize, INTER_AREA, INTER_LINEAR, INTER_CUBIC, imshow, waitKey, destroyAllWindows, \
+    imread, IMREAD_UNCHANGED
 from numpy import arange, zeros
 
 
@@ -47,5 +50,48 @@ def drizzle_shift_patch(shift, ilo, ihi):
     pass
 
 
-drizzle_shift()
-drizzle_shift_patch(-1.4, 2, 7)
+def resize_test(image, drizzle_factor, inter, patch_size):
+    width = int(image.shape[1] * drizzle_factor)
+    height = int(image.shape[0] * drizzle_factor)
+    dim = (width, height)
+    time_before = time()
+    rep_count = 100
+    for i in range(rep_count):
+        resized = resize(image, dim, interpolation=inter)
+    exec_time = (time() - time_before) / rep_count
+    print("Time for one resize operation: " + str(exec_time) + ", method: " +
+          str(["INTER_LINEAR", "INTER_CUBIC", "INTER_AREA"][inter - 1]))
+    # imshow("Resized image", resized)
+    # waitKey(0)
+    # destroyAllWindows()
+
+    start_y = 350
+    start_x = 500
+    patch = image[start_y:start_y + patch_size, start_x:start_x + patch_size]
+    width = int(patch.shape[1] * drizzle_factor)
+    height = int(patch.shape[0] * drizzle_factor)
+    dim = (width, height)
+    rep_count_patch = int(
+        round(rep_count * image.shape[1] * image.shape[0] / (patch.shape[1] * patch.shape[0])))
+    time_before = time()
+    for i in range(rep_count_patch):
+        resized = resize(patch, dim, interpolation=inter)
+    exec_time_patched = (time() - time_before) / rep_count
+    factor = exec_time_patched/exec_time
+    print("Time for one patched resize operation: " + str(exec_time_patched) + ", factor: "
+          + str(factor) + str("\n"))
+
+
+# drizzle_shift()
+# drizzle_shift_patch(-1.4, 2, 7)
+
+img = imread('../Images/Moon_Tile-024_043939_stacked_with_blurr_pp.tif', IMREAD_UNCHANGED)
+imshow("Original image", img)
+waitKey(0)
+destroyAllWindows()
+
+drizzle_factor = 3.
+patch_size = 40
+
+for inter in [INTER_AREA, INTER_LINEAR, INTER_CUBIC]:
+    resize_test(img, drizzle_factor, inter, patch_size)
