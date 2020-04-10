@@ -26,6 +26,7 @@ import sys
 from ctypes import CDLL, byref, c_int
 from os import listdir, rename, remove
 from os.path import splitext, join
+from time import sleep
 
 import psutil
 from PyQt5 import QtCore
@@ -87,8 +88,10 @@ class Workflow(QtCore.QObject):
         try:
             if platform.system() == 'Windows':
                 mkl_rt = CDLL('mkl_rt.dll')
-            else:
+            elif platform.system() == 'Linux':
                 mkl_rt = CDLL('libmkl_rt.so')
+            else:
+                mkl_rt = CDLL('libmkl_rt.dylib')
 
             mkl_get_max_threads = mkl_rt.mkl_get_max_threads
 
@@ -102,8 +105,8 @@ class Workflow(QtCore.QObject):
                     self.attached_log_file, precede_with_timestamp=True)
         except Exception as e:
             Miscellaneous.protocol(
-                "Warning: mkl_rt.dll / libmkl_rt.so does not work (not a Windows or Linux system, "
-                "or Intel Math Kernel Library not installed?). " + str(e), self.attached_log_file,
+                "Warning: library mkl_rt / libmkl_rt not found (Intel Math Kernel Library not "
+                "installed?). Performance may be reduced." + str(e), self.attached_log_file,
                 precede_with_timestamp=True)
 
         # Create the calibration object, used for potential flat / dark corrections.
@@ -166,11 +169,16 @@ class Workflow(QtCore.QObject):
         # name).
         self.attached_log_name_new = None
 
-        # If objects are left over from previous run, delete them.
+        # Remove objects from previous job to clean up RAM.
         for obj in [self.frames, self.rank_frames, self.align_frames, self.alignment_points,
                     self.stack_frames]:
             if obj is not None:
                 del obj
+        self.frames = None
+        self.rank_frames = None
+        self.align_frames = None
+        self.alignment_points = None
+        self.stack_frames = None
 
         # Force the garbage collector to release unreferenced objects.
         gc.collect()
