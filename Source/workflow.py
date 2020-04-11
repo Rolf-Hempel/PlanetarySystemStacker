@@ -84,7 +84,8 @@ class Workflow(QtCore.QObject):
         # Switch alignment point debugging on / off.
         self.debug_AP = False
 
-        # The following code works on Windows and Linux systems only. It is not necessary, though.
+        # The following code only works if an optional library is installed. The name of the MKL
+        # library depends on the OS.
         try:
             if platform.system() == 'Windows':
                 mkl_rt = CDLL('mkl_rt.dll')
@@ -248,6 +249,9 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol(decorator_line, self.attached_log_file,
                                    precede_with_timestamp=False)
             Miscellaneous.protocol("Start processing " + self.job.name, self.attached_log_file)
+            Miscellaneous.protocol("           Software version used: " +
+                                   self.configuration.global_parameters_version,
+                                   self.attached_log_file, precede_with_timestamp=False)
             Miscellaneous.protocol(decorator_line, self.attached_log_file,
                                    precede_with_timestamp=False)
 
