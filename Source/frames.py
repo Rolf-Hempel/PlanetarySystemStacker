@@ -369,6 +369,7 @@ class VideoReader(object):
         self.bayer_option_selected = None
         self.bayer_pattern = None
         self.BGR_input = None
+        self.warn_message = None
 
     def sanity_check(self, file_path):
         """
@@ -418,6 +419,7 @@ class VideoReader(object):
                 # Create the VideoCapture object.
                 self.cap = ser_parser.SERParser(file_path, SER_16bit_shift_correction)
                 self.shift_pixels = self.cap.shift_pixels
+                self.warn_message = self.cap.warn_message
 
                 # Read the first frame.
                 self.last_frame_read = self.cap.read_frame_raw(0)
@@ -594,6 +596,7 @@ class ImageReader(object):
         self.dtype = None
         self.bayer_pattern = None
         self.shift_pixels = 0
+        self.warn_message = None
 
     def open(self, file_path_list, bayer_option_selected='Auto detect color'):
         """
@@ -735,6 +738,7 @@ class Calibration(QtCore.QObject):
 
         super(Calibration, self).__init__()
         self.configuration = configuration
+        self.warn_message = None
         self.reset_masters()
 
     def reset_masters(self):
@@ -799,6 +803,7 @@ class Calibration(QtCore.QObject):
                 frame_count, input_color, input_dtype, input_shape, shift_pixels = reader.open(master_name,
                      bayer_option_selected=self.configuration.frames_debayering_default,
                      SER_16bit_shift_correction=False)
+                self.warn_message = reader.warn_message
                 self.configuration.hidden_parameters_current_dir = str(Path(master_name).parent)
             else:
                 raise InternalError(
@@ -1124,6 +1129,7 @@ class Frames(object):
         """
 
         self.configuration = configuration
+        self.warn_message = None
         self.names = names
         self.calibration = calibration
         self.progress_signal = progress_signal
@@ -1166,6 +1172,7 @@ class Frames(object):
 
         self.number, self.color, self.dt0, self.shape, self.shift_pixels = self.reader.open(self.names,
             bayer_option_selected=self.bayer_option_selected)
+        self.warn_message = self.reader.warn_message
 
         # Look up the Bayer pattern the reader has identified.
         self.bayer_pattern = self.reader.bayer_pattern

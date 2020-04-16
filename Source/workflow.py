@@ -126,6 +126,11 @@ class Workflow(QtCore.QObject):
         try:
             self.set_main_gui_busy_signal.emit(True)
             self.calibration.create_master_dark(dark_names[0])
+            if self.calibration.warn_message is not None and \
+                    self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("Warning in creating a new master dark frame: " +
+                                       self.calibration.warn_message,
+                                       self.attached_log_file, precede_with_timestamp=True)
             self.master_dark_created_signal.emit(True)
         except Exception as e:
             if self.configuration.global_parameters_protocol_level > 0:
@@ -146,6 +151,11 @@ class Workflow(QtCore.QObject):
         try:
             self.set_main_gui_busy_signal.emit(True)
             self.calibration.create_master_flat(flat_names[0])
+            if self.calibration.warn_message is not None and \
+                    self.configuration.global_parameters_protocol_level > 0:
+                Miscellaneous.protocol("Warning in creating a new master flat frame: " +
+                                       self.calibration.warn_message,
+                                       self.attached_log_file, precede_with_timestamp=True)
             self.master_flat_created_signal.emit(True)
         except Error as e:
             if self.configuration.global_parameters_protocol_level > 0:
@@ -286,6 +296,11 @@ class Workflow(QtCore.QObject):
                                      buffer_monochrome=buffer_monochrome,
                                      buffer_gaussian=buffer_gaussian,
                                      buffer_laplacian=buffer_laplacian)
+                if self.frames.warn_message is not None and \
+                    self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol(
+                        "Warning in opening SER file: " + self.frames.warn_message,
+                        self.attached_log_file, precede_with_timestamp=True)
                 if self.configuration.global_parameters_protocol_level > 1:
                     Miscellaneous.protocol(
                         "           Number of frames: " + str(self.frames.number) +

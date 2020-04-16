@@ -47,7 +47,7 @@ class SERParser(object):
         """
         super().__init__()
 
-        self.sanity_check(ser_file)
+        self.warn_message = self.sanity_check(ser_file)
 
         self.fid = self.open_file(ser_file)
 
@@ -81,6 +81,7 @@ class SERParser(object):
                      or 100 <= self.header['ColorID'] <= 101
 
     def sanity_check(self, ser_file):
+        warn_message = None
         if not os.path.isfile(ser_file):
             raise IOError("File does not exist")
         elif os.stat(ser_file).st_size == 0:
@@ -88,9 +89,9 @@ class SERParser(object):
         else:
             with open(ser_file, 'rb') as fid:
                 HEADER = fid.read(14).decode()
-            if HEADER != 'LUCAM-RECORDER' and HEADER != 'GenikaAstro\x00\x00\x00':
-                raise IOError(
-                    "File does not conform to SER format, first 14 characters of header are: '" + HEADER + "'")
+            if HEADER != 'LUCAM-RECORDER':
+                warn_message = "File does not conform to SER format, first 14 characters of header are: '" + HEADER + "'"
+        return warn_message
 
     def open_file(self, ser_file):
         return open(ser_file, 'rb')
@@ -340,9 +341,14 @@ if __name__ == "__main__":
     #             r'\SER_GRAYSCALED_16bit_LittleEndian_397_397.ser'
     # file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
     #             r'\SER_RGGB_16bit_LittleEndian_397_397.ser'
-    file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\Sun_LauraMS\LauraMS_AR12680_2017-09-17_T_11-44-23-0221_SolarContinuum.ser'
+    # file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\Sun_LauraMS' \
+    #               r'\LauraMS_AR12680_2017-09-17_T_11-44-23-0221_SolarContinuum.ser'
+    file_path = r'D:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Steffen-Elste\garten_1024x768-000001__16-18-36__data.ser'
 
     cap = ser_parser.SERParser(file_path)
+    if cap.warn_message is not None:
+        print (cap.warn_message)
+
     last_frame_read = cap.read_frame(3)
     frame_count = cap.frame_count
     shape = last_frame_read.shape
