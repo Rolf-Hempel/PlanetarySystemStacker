@@ -1415,7 +1415,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 event.ignore()
 
 
-if __name__ == "__main__":
+def main():
     # The following steps are required to get the program running on Linux:
     #
     # - Add "export QT_XKB_CONFIG_ROOT=/usr/share/X11/xkb" to file .bashrc.
@@ -1442,3 +1442,6 @@ if __name__ == "__main__":
         app = QtCore.QCoreApplication(argv)
         console = PssConsole()
         exit(app.exec_())
+
+if __name__ == "__main__":
+    main()
