@@ -13,9 +13,19 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/Rolf-Hempel/PlanetarySystemStacker",
     packages=setuptools.find_packages(),
+    install_requires=[
+        'mkl',
+        'matplotlib',
+        'psutil',
+        'PyQt5',
+        'scipy',
+        'astropy',
+        'scikit-image',
+        'opencv-python'
+    ],
     classifiers=[
         "Programming Language :: Python :: 3",
-        "License :: OSI Approved :: MIT License",
+        "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: OS Independent",
     ],
     python_requires='>=3.5',
