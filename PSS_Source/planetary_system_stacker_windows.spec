@@ -7,12 +7,12 @@ import astropy
 astropy_path, = astropy.__path__
 
 a = Analysis(['planetary_system_stacker.py'],
-             pathex=['D:\\SW-Development\\Python\\PlanetarySystemStacker\\Source'],
+             pathex=['D:\\SW-Development\\Python\\PlanetarySystemStacker\\PSS_Source'],
              binaries=[('C:\Python35\Lib\site-packages\opencv_ffmpeg342_64.dll', '.'),
-              ('D:\SW-Development\Python\PlanetarySystemStacker\Source\Binaries\Api-ms-win-core-xstate-l2-1-0.dll', '.'),
-              ('D:\SW-Development\Python\PlanetarySystemStacker\Source\Binaries\Api-ms-win-crt-private-l1-1-0.dll', '.'),
+              ('D:\SW-Development\Python\PlanetarySystemStacker\PSS_Source\Binaries\Api-ms-win-core-xstate-l2-1-0.dll', '.'),
+              ('D:\SW-Development\Python\PlanetarySystemStacker\PSS_Source\Binaries\Api-ms-win-crt-private-l1-1-0.dll', '.'),
               ('C:\Windows\System32\downlevel\API-MS-Win-Eventing-Provider-L1-1-0.dll', '.'),
-              ('D:\SW-Development\Python\PlanetarySystemStacker\Source\Binaries\\api-ms-win-downlevel-shlwapi-l1-1-0.dll', '.')],
+              ('D:\SW-Development\Python\PlanetarySystemStacker\PSS_Source\Binaries\\api-ms-win-downlevel-shlwapi-l1-1-0.dll', '.')],
              datas=[( 'D:\\SW-Development\\Python\\PlanetarySystemStacker\\Documentation\\Icon\\PSS-Icon-64.ico', '.' ),
              (astropy_path, 'astropy')],
              hiddenimports=['pywt._extensions._cwt', 'scipy._lib.messagestream', 'shelve', 'csv'],

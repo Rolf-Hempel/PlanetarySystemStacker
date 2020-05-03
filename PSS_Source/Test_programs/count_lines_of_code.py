@@ -36,5 +36,5 @@ def countlines(start, lines=0, header=True, begin_start=None):
 
     return lines
 
-directory = r'D:\SW-Development\Python\PlanetarySystemStacker\Source'
+directory = r'D:\SW-Development\Python\PlanetarySystemStacker\PSS_Source'
 lines = countlines(directory)
