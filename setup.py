@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="PlanetarySystemStacker-Rolf-Hempel", # Replace with your own username
-    version="0.8.0",
+    version="0.8.1",
     author="Rolf Hempel",
     author_email="rolf6419@gmx.de",
     description="PlanetarySystemStacker",
@@ -31,7 +31,7 @@ setuptools.setup(
     python_requires='>=3.5',
     entry_points={
         "console_scripts": [
-        "PlanetarySystemStacker=PlanetarySystemStacker.planetary_system_stacker:main",
+        "PlanetarySystemStacker=PSS_Source.planetary_system_stacker:main",
         ]
     },
 )
