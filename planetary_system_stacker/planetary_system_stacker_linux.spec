@@ -7,11 +7,11 @@ import astropy
 astropy_path, = astropy.__path__
 
 a = Analysis(['planetary_system_stacker.py'],
-             pathex=['/home/rolf/Pycharm-Projects/PlanetarySystemStacker/PSS_Source'],
+             pathex=['/home/rolf/Pycharm-Projects/PlanetarySystemStacker/planetary_system_stacker'],
              binaries=[],
              datas=[('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/Documentation/Icon/PSS-Icon-64.jpg', '.' ),
              ('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/Documentation/PlanetarySystemStacker_User-Guide.pdf', '.' ),
-             ('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/PSS_Source/Videos/*', 'Videos' ),
+             ('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/planetary_system_stacker/Videos/*', 'Videos' ),
              (astropy_path, 'astropy')],
              hiddenimports=['pywt._extensions._cwt', 'scipy._lib.messagestream', 'shelve', 'csv'],  # The last two required by astropy
              hookspath=[],

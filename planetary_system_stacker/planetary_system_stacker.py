@@ -23,6 +23,11 @@ https://stackoverflow.com/questions/35508711/how-to-enable-pan-and-zoom-in-a-qgr
 
 """
 
+# The following statement is necessary so that the dependent PSS modules are found when installed
+# from PyPI under site_packages.
+import sys, os
+sys.path.insert(0, os.path.dirname(__file__))
+
 import getpass
 import platform
 from os import remove

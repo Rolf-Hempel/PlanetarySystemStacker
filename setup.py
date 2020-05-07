@@ -4,8 +4,8 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="PlanetarySystemStacker-Rolf-Hempel", # Replace with your own username
-    version="0.8.1",
+    name="planetary-system-stacker-Rolf-Hempel", # Replace with your own username
+    version="0.8.0b1",
     author="Rolf Hempel",
     author_email="rolf6419@gmx.de",
     description="PlanetarySystemStacker",
@@ -25,13 +25,14 @@ setuptools.setup(
     ],
     classifiers=[
         "Programming Language :: Python :: 3",
+        "Development Status :: 4 - Beta",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.5',
+    python_requires='>=3.5, <=3.6>',
     entry_points={
         "console_scripts": [
-        "PlanetarySystemStacker=PSS_Source.planetary_system_stacker:main",
+        "PlanetarySystemStacker=planetary_system_stacker.planetary_system_stacker:main",
         ]
     },
 )
