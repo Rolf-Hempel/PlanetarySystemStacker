@@ -4,7 +4,7 @@ with open("README.md", "r") as fh:
     long_description = fh.read()
 
 setuptools.setup(
-    name="planetary-system-stacker-Rolf-Hempel", # Replace with your own username
+    name="planetary-system-stacker",
     version="0.8.0b1",
     author="Rolf Hempel",
     author_email="rolf6419@gmx.de",
@@ -23,6 +23,7 @@ setuptools.setup(
         'scikit-image',
         'opencv-python'
     ],
+    include_package_data=True,
     classifiers=[
         "Programming Language :: Python :: 3",
         "Development Status :: 4 - Beta",
