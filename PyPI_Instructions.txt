@@ -1,0 +1,16 @@
+Build the package:
+------------------
+
+python3 setup.py sdist bdist_wheel
+
+
+Upload the package to PyPI:
+---------------------------
+
+python3 -m twine upload --repository testpypi dist/*
+
+
+Install the package:
+--------------------
+
+pip3.6 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.0b2
