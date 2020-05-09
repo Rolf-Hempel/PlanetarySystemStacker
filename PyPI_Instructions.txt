@@ -14,3 +14,6 @@ Install the package:
 --------------------
 
 pip3.6 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.0b2
+
+
+AFter installation on Windows: Add "<Python3.6>\Library\bin" to the system variable "path". Otherwise the mkl dlls will not be found.
