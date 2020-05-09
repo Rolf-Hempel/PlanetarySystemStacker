@@ -26,7 +26,6 @@ import sys
 from ctypes import CDLL, byref, c_int
 from os import listdir, rename, remove
 from os.path import splitext, join
-from time import sleep
 
 import psutil
 from PyQt5 import QtCore
