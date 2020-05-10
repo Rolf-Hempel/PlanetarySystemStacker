@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="planetary-system-stacker",
-    version="0.8.0b2",
+    version="0.8.0b4",
     author="Rolf Hempel",
     author_email="rolf6419@gmx.de",
     description="PlanetarySystemStacker",
@@ -30,7 +30,7 @@ setuptools.setup(
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.5, <3.7>',
+    python_requires='>=3.5, <3.7',
     entry_points={
         "console_scripts": [
         "PlanetarySystemStacker=planetary_system_stacker.planetary_system_stacker:main",
