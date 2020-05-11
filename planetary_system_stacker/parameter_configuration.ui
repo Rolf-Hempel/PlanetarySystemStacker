@@ -55,7 +55,7 @@
    <item row="0" column="0" colspan="4">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>1</number>
+      <number>0</number>
      </property>
      <widget class="QWidget" name="tab_workflow">
       <attribute name="title">
@@ -265,7 +265,7 @@ rather than in a separate job</string>
        <item row="7" column="2" colspan="2">
         <widget class="QCheckBox" name="nfs_checkBox">
          <property name="text">
-          <string>Nunber of frames to be stacked</string>
+          <string>Number of frames to be stacked</string>
          </property>
         </widget>
        </item>

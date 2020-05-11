@@ -2,11 +2,13 @@
 
 # Form implementation generated from reading ui file 'parameter_configuration.ui'
 #
-# Created by: PyQt5 UI code generator 5.11.2
+# Created by: PyQt5 UI code generator 5.13.0
 #
 # WARNING! All changes made in this file will be lost!
 
+
 from PyQt5 import QtCore, QtGui, QtWidgets
+
 
 class Ui_ConfigurationDialog(object):
     def setupUi(self, ConfigurationDialog):
@@ -395,7 +397,7 @@ class Ui_ConfigurationDialog(object):
         self.GridLayout.setColumnStretch(0, 5)
 
         self.retranslateUi(ConfigurationDialog)
-        self.tabWidget.setCurrentIndex(1)
+        self.tabWidget.setCurrentIndex(0)
         self.afm_comboBox.setCurrentIndex(-1)
         self.apsw_slider_value.valueChanged['int'].connect(self.apsw_label_display.setNum)
         self.aphbw_slider_value.valueChanged['int'].connect(self.aphbw_label_display.setNum)
@@ -426,7 +428,7 @@ class Ui_ConfigurationDialog(object):
         self.gppl_label_parameter.setText(_translate("ConfigurationDialog", "Protocol detail level"))
         self.ipfn_checkBox.setToolTip(_translate("ConfigurationDialog", "The user can choose which parameter values are encoded in the name of the stacking output file name."))
         self.ipfn_checkBox.setText(_translate("ConfigurationDialog", "Include parameters in output file name"))
-        self.nfs_checkBox.setText(_translate("ConfigurationDialog", "Nunber of frames to be stacked"))
+        self.nfs_checkBox.setText(_translate("ConfigurationDialog", "Number of frames to be stacked"))
         self.pfs_checkBox.setText(_translate("ConfigurationDialog", "Percent of frames to be stacked"))
         self.apbs_checkBox.setText(_translate("ConfigurationDialog", "Alignment point box size (pixels)"))
         self.nap_checkBox.setText(_translate("ConfigurationDialog", "Number of alignment points"))
@@ -484,4 +486,3 @@ class Ui_ConfigurationDialog(object):
 "to be stacked"))
         self.apfp_label_display.setText(_translate("ConfigurationDialog", "TextLabel"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_stacking), _translate("ConfigurationDialog", "Stacking Parameters"))
-
