@@ -24,3 +24,12 @@ More information on creating PyPI projects can be found here: https://packaging.
 And a tutorial on the subject: https://packaging.python.org/tutorials/packaging-projects/
 
 Information on how to make the package OS-dependent: https://stackoverflow.com/questions/6469508/is-it-possible-to-express-a-platform-specific-dependency-in-setup-py-without-bui
+
+List of compatibility tags for build distributions: https://www.python.org/dev/peps/pep-0425/
+
+Info on how to encode the OS target into the wheel name: https://stackoverflow.com/questions/35112511/pip-setup-py-bdist-wheel-no-longer-builds-forced-non-pure-wheels/36886459#36886459
+
+In particular, to build wheels for Windows (addtitionally to the Linux tar file), one has to enter:
+	python setup.py sdist
+	python3 setup.py bdist_wheel --plat-name win32
+	python3 setup.py bdist_wheel --plat-name win_amd64
