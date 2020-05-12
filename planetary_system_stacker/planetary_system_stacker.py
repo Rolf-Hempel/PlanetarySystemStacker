@@ -1437,7 +1437,9 @@ def main():
 
     # If PSS is started without command line arguments, open the GUI.
     if len(argv) <= 1:
+        os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
         app = QtWidgets.QApplication(argv)
+        app.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
         myapp = PlanetarySystemStacker()
         myapp.show()
         exit(app.exec_())

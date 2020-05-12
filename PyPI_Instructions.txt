@@ -17,3 +17,10 @@ pip3.6 install --index-url https://test.pypi.org/simple/ --extra-index-url https
 
 
 AFter installation on Windows: Add "<Python3.6>\Library\bin" to the system variable "path". Otherwise the mkl dlls will not be found.
+
+
+More information on creating PyPI projects can be found here: https://packaging.python.org/guides/distributing-packages-using-setuptools/
+
+And a tutorial on the subject: https://packaging.python.org/tutorials/packaging-projects/
+
+Information on how to make the package OS-dependent: https://stackoverflow.com/questions/6469508/is-it-possible-to-express-a-platform-specific-dependency-in-setup-py-without-bui
