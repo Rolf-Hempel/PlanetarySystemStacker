@@ -31,5 +31,6 @@ Info on how to encode the OS target into the wheel name: https://stackoverflow.c
 
 In particular, to build wheels for Windows (addtitionally to the Linux tar file), one has to enter:
 	python setup.py sdist
-	python3 setup.py bdist_wheel --plat-name win32
-	python3 setup.py bdist_wheel --plat-name win_amd64
+	python3 setup_windows.py bdist_wheel --plat-name win_amd64
+	python3 setup_linux.py bdist_wheel --plat-name linux_x86_64
+	python3 setup_macos.py bdist_wheel --plat-name macosx
