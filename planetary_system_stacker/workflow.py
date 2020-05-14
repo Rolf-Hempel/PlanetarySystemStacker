@@ -25,7 +25,8 @@ import platform
 import sys
 from ctypes import CDLL, byref, c_int
 from os import listdir, rename, remove
-from os.path import splitext, join
+import os
+from os.path import splitext, join, dirname
 
 import psutil
 from PyQt5 import QtCore
@@ -85,9 +86,19 @@ class Workflow(QtCore.QObject):
 
         # The following code only works if an optional library is installed. The name of the MKL
         # library depends on the OS.
+        python_dir = dirname(sys.executable)
+        print ("Path to python interprter: " + python_dir)
         try:
             if platform.system() == 'Windows':
-                mkl_rt = CDLL('mkl_rt.dll')
+                if os.path.isfile(join(python_dir, "Library", "bin", "mkl_rt.dll")):
+                    print ("Path to mkl_rt: " + join(python_dir, "Library", "bin", "mkl_rt.dll"))
+                    mkl_rt = CDLL(join(python_dir, "Library", "bin", "mkl_rt.dll"))
+                elif os.path.isfile(join(python_dir, "Lib", "site-packages", "numpy", "core", "mkl_rt.dll")):
+                    print("Path to mkl_rt: " + join(python_dir, "Lib", "site-packages", "numpy", "core", "mkl_rt.dll"))
+                    mkl_rt = CDLL(join(python_dir, "Lib", "site-packages", "numpy", "core", "mkl_rt.dll"))
+                else:
+                    print ("Path to mkl_rt: " + "mkl_rt.dll")
+                    mkl_rt = CDLL("mkl_rt.dll")
             elif platform.system() == 'Linux':
                 mkl_rt = CDLL('libmkl_rt.so')
             else:
