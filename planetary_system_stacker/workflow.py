@@ -84,40 +84,64 @@ class Workflow(QtCore.QObject):
         # Switch alignment point debugging on / off.
         self.debug_AP = False
 
-        # The following code only works if an optional library is installed. The name of the MKL
-        # library depends on the OS.
+        # Try to find the OS-dependent MKL library for multi-threading support. Depending on the
+        # system configuration, this library may be callable without specifying its absolute path.
+        # If not, try to find the library at various locations in the file system.
+        platform_name = platform.system()
         python_dir = dirname(sys.executable)
-        print ("Path to python interprter: " + python_dir)
-        try:
-            if platform.system() == 'Windows':
-                if os.path.isfile(join(python_dir, "Library", "bin", "mkl_rt.dll")):
-                    print ("Path to mkl_rt: " + join(python_dir, "Library", "bin", "mkl_rt.dll"))
-                    mkl_rt = CDLL(join(python_dir, "Library", "bin", "mkl_rt.dll"))
-                elif os.path.isfile(join(python_dir, "Lib", "site-packages", "numpy", "core", "mkl_rt.dll")):
-                    print("Path to mkl_rt: " + join(python_dir, "Lib", "site-packages", "numpy", "core", "mkl_rt.dll"))
-                    mkl_rt = CDLL(join(python_dir, "Lib", "site-packages", "numpy", "core", "mkl_rt.dll"))
-                else:
-                    print ("Path to mkl_rt: " + "mkl_rt.dll")
-                    mkl_rt = CDLL("mkl_rt.dll")
-            elif platform.system() == 'Linux':
-                mkl_rt = CDLL('libmkl_rt.so')
-            else:
-                mkl_rt = CDLL('libmkl_rt.dylib')
-
-            mkl_get_max_threads = mkl_rt.mkl_get_max_threads
-
-            def mkl_set_num_threads(cores):
-                mkl_rt.mkl_set_num_threads(byref(c_int(cores)))
-
-            mkl_set_num_threads(mkl_get_max_threads())
-            if self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.protocol(
-                    "Number of threads used by mkl: " + str(mkl_get_max_threads()),
-                    self.attached_log_file, precede_with_timestamp=True)
-        except Exception as e:
+        if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol(
-                "Warning: library mkl_rt / libmkl_rt not found (Intel Math Kernel Library not "
-                "installed?). Performance may be reduced." + str(e), self.attached_log_file,
+                "Operating system used: " + platform_name +
+                "\n           Python interpreter location: " +
+                python_dir, self.attached_log_file, precede_with_timestamp=True)
+
+        # For every OS platform create a list of potential places to look for the MKL library.
+        # Start with an empty path (i.e. no absolute path necessary). Also, set the OS-dependent
+        # name of the library.
+        if platform_name == 'Windows':
+            mkl_rt_paths = ["", join(python_dir, "Library", "bin"),
+                            join(python_dir, "Lib", "site-packages", "numpy", "core")]
+            mkl_rt_name = "mkl_rt.dll"
+        elif platform_name == 'Linux':
+            mkl_rt_paths = [""]
+            mkl_rt_name = "libmkl_rt.so"
+        else:
+            mkl_rt_paths = [""]
+            mkl_rt_name = "libmkl_rt.dylib"
+
+        # Try instantiating the library at all potential locations:
+        mkl_rt_found = False
+        for mkl_dir in mkl_rt_paths:
+            try:
+                mkl_rt = CDLL(join(mkl_dir, mkl_rt_name))
+                mkl_rt_found = True
+                break
+            except:
+                pass
+
+        # If the MKL library could be instantiated at one of the given locations, try using it to
+        # set the number of parallel threads to be used by MKL.
+        if mkl_rt_found:
+            try:
+                mkl_get_max_threads = mkl_rt.mkl_get_max_threads
+
+                def mkl_set_num_threads(cores):
+                    mkl_rt.mkl_set_num_threads(byref(c_int(cores)))
+
+                mkl_set_num_threads(mkl_get_max_threads())
+                if self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol(
+                        "           Number of threads used by mkl: " + str(mkl_get_max_threads()) +
+                        "\n", self.attached_log_file, precede_with_timestamp=False)
+            except:
+                Miscellaneous.protocol(
+                    "Warning: Setting number of threads in " + mkl_rt_name +
+                    " failed. Performance may be reduced.",
+                    self.attached_log_file, precede_with_timestamp=True)
+        else:
+            Miscellaneous.protocol(
+                "Warning: " + mkl_rt_name + " not found (Intel Math Kernel Library not "
+                "installed?). Performance may be reduced.\n", self.attached_log_file,
                 precede_with_timestamp=True)
 
         # Create the calibration object, used for potential flat / dark corrections.
