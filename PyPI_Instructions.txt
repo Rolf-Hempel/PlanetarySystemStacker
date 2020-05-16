@@ -4,7 +4,7 @@ Build the package:
 python setup.py sdist
 python3 setup_windows.py bdist_wheel --plat-name win_amd64
 python3 setup_linux.py bdist_wheel --plat-name manylinux1_x86_64
-python3 setup_macos.py bdist_wheel --plat-name macosx
+python3 setup_macos.py bdist_wheel --plat-name macosx_10_6_intel
 
 
 Upload the package to PyPI:
@@ -16,7 +16,10 @@ python3 -m twine upload --repository testpypi dist/*
 Install the package:
 --------------------
 
-pip3 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.0b2
+pip3 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.0b10
+
+or, to upgrade from an earlier version:
+pip3 install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker
 
 On Windows, the location of the MKL library is: <Python3.6>\Library\bin
 
@@ -33,3 +36,5 @@ Information on how to make the package OS-dependent: https://stackoverflow.com/q
 List of compatibility tags for build distributions: https://www.python.org/dev/peps/pep-0425/
 
 Info on how to encode the OS target into the wheel name: https://stackoverflow.com/questions/35112511/pip-setup-py-bdist-wheel-no-longer-builds-forced-non-pure-wheels/36886459#36886459
+
+Info on platform targets on MacOS: https://github.com/MacPython/wiki/wiki/Spinning-wheels

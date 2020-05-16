@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-release_tag = "0.8.0b9"
+release_tag = "0.8.0b11"
 
 setuptools.setup(
     name="planetary-system-stacker",
@@ -31,7 +31,8 @@ setuptools.setup(
         "Programming Language :: Python :: 3",
         "Development Status :: 4 - Beta",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-        "Operating System :: Microsoft :: Windows"
+        "Operating System :: OS Independent"
+        # "Operating System :: Microsoft :: Windows"
     ],
     python_requires='>=3.5, <3.7',
     entry_points={
