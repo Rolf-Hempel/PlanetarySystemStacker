@@ -161,7 +161,7 @@ class PssConsole(QtCore.QObject):
         parser.add_argument("-m", "--stab_mode", choices=["Surface", "Planet"], default="Surface",
                             help="Frame stabilization mode")
         parser.add_argument("--stab_size", type=stab_size_type, default=33,
-                            help="Stabilization patch size (% of frame)")
+                            help="Stabilization patch size (%% of frame)")
         parser.add_argument("--stab_sw", type=stab_sw_type, default=34,
                             help="Stabilization search width (pixels)")
         parser.add_argument("--rf_percent", type=rf_percent_type, default=5,

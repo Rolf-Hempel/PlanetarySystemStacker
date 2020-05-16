@@ -1424,7 +1424,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
 
 def main():
-    # The following steps are required to get the program running on Linux:
+    # The following steps was required to get the program running on old Linux versions:
     #
     # - Add "export QT_XKB_CONFIG_ROOT=/usr/share/X11/xkb" to file .bashrc.
     #
