@@ -107,7 +107,7 @@ class PssConsole(QtCore.QObject):
     signal_load_master_dark = QtCore.pyqtSignal(str)
     signal_load_master_flat = QtCore.pyqtSignal(str)
     signal_frames = QtCore.pyqtSignal(object)
-    signal_rank_frames = QtCore.pyqtSignal()
+    signal_rank_frames = QtCore.pyqtSignal(bool)
     signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
     signal_set_roi = QtCore.pyqtSignal(int, int, int, int)
     signal_set_alignment_points = QtCore.pyqtSignal()
@@ -365,8 +365,10 @@ class PssConsole(QtCore.QObject):
 
         elif self.activity == "Rank frames":
 
+            # In batch mode no frames can be dropped in the user dialog.
+            update_index_translation_table = False
             # Now start the corresponding action on the workflow thread.
-            self.signal_rank_frames.emit()
+            self.signal_rank_frames.emit(update_index_translation_table)
 
         elif self.activity == "Align frames":
 

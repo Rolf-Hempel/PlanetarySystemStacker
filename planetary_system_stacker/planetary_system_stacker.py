@@ -62,6 +62,9 @@ from shift_distribution_viewer import ShiftDistributionViewerWidget
 from workflow import Workflow
 from pss_console import PssConsole
 
+QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
+os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
+
 
 class DisplayImage(QtWidgets.QGraphicsView):
     """
@@ -1437,9 +1440,8 @@ def main():
 
     # If PSS is started without command line arguments, open the GUI.
     if len(argv) <= 1:
-        os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
         app = QtWidgets.QApplication(argv)
-        app.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
+        # app.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
         myapp = PlanetarySystemStacker()
         myapp.show()
         exit(app.exec_())
@@ -1447,7 +1449,7 @@ def main():
     # If command line arguments are passed, execute PSS without a GUI.
     else:
         app = QtCore.QCoreApplication(argv)
-        console = PssConsole()
+        PssConsole()
         exit(app.exec_())
 
 if __name__ == "__main__":
