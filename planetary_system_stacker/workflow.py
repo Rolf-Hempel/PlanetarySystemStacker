@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import gc
+import glob
 import platform
 import sys
 from ctypes import CDLL, byref, c_int
@@ -105,8 +106,9 @@ class Workflow(QtCore.QObject):
         elif platform_name == 'Linux':
             mkl_rt_paths = ["", join(expanduser("~"), ".local", "lib")]
             mkl_rt_name = "libmkl_rt.so"
-        else:
-            mkl_rt_paths = [""]
+        else:   # MacOS:
+            path_with_wildcard = '/opt/intel/compilers_and_libraries_*/mac/mkl/lib/libmkl_rt.dylib'
+            mkl_rt_paths = [""] + [dirname(path) for path in glob.glob(path_with_wildcard)]
             mkl_rt_name = "libmkl_rt.dylib"
 
         # Try instantiating the library at all potential locations:
@@ -115,6 +117,10 @@ class Workflow(QtCore.QObject):
             try:
                 mkl_rt = CDLL(join(mkl_dir, mkl_rt_name))
                 mkl_rt_found = True
+                if self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol(
+                        "           MKL library used: " + join(mkl_dir, mkl_rt_name),
+                        self.attached_log_file, precede_with_timestamp=False)
                 break
             except:
                 pass

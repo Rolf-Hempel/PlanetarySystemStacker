@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-release_tag = "0.8.0b11"
+release_tag = "0.8.0b12"
 
 setuptools.setup(
     name="planetary-system-stacker",
