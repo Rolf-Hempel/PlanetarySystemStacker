@@ -1,7 +1,10 @@
 Build the package:
 ------------------
 
-python3 setup.py sdist bdist_wheel
+python setup.py sdist
+python3 setup_windows.py bdist_wheel --plat-name win_amd64
+python3 setup_linux.py bdist_wheel --plat-name manylinux1_x86_64
+python3 setup_macos.py bdist_wheel --plat-name macosx
 
 
 Upload the package to PyPI:
@@ -13,10 +16,12 @@ python3 -m twine upload --repository testpypi dist/*
 Install the package:
 --------------------
 
-pip3.6 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.0b2
+pip3 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.0b2
 
+On Windows, the location of the MKL library is: <Python3.6>\Library\bin
 
-AFter installation on Windows: Add "<Python3.6>\Library\bin" to the system variable "path". Otherwise the mkl dlls will not be found.
+On Linux, add location of PlanetarySystemStacker to the path: PATH=~/.local/bin:$PATH
+On Linux, the location of the MKL library is: ~/.local/lib/libmkl_rt.so
 
 
 More information on creating PyPI projects can be found here: https://packaging.python.org/guides/distributing-packages-using-setuptools/
@@ -28,9 +33,3 @@ Information on how to make the package OS-dependent: https://stackoverflow.com/q
 List of compatibility tags for build distributions: https://www.python.org/dev/peps/pep-0425/
 
 Info on how to encode the OS target into the wheel name: https://stackoverflow.com/questions/35112511/pip-setup-py-bdist-wheel-no-longer-builds-forced-non-pure-wheels/36886459#36886459
-
-In particular, to build wheels for Windows (addtitionally to the Linux tar file), one has to enter:
-	python setup.py sdist
-	python3 setup_windows.py bdist_wheel --plat-name win_amd64
-	python3 setup_linux.py bdist_wheel --plat-name manylinux1_x86_64
-	python3 setup_macos.py bdist_wheel --plat-name macosx

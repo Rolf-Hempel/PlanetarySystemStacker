@@ -26,7 +26,7 @@ import sys
 from ctypes import CDLL, byref, c_int
 from os import listdir, rename, remove
 import os
-from os.path import splitext, join, dirname
+from os.path import splitext, join, dirname, expanduser
 
 import psutil
 from PyQt5 import QtCore
@@ -103,7 +103,7 @@ class Workflow(QtCore.QObject):
                             join(python_dir, "Lib", "site-packages", "numpy", "core")]
             mkl_rt_name = "mkl_rt.dll"
         elif platform_name == 'Linux':
-            mkl_rt_paths = [""]
+            mkl_rt_paths = ["", join(expanduser("~"), ".local", "lib")]
             mkl_rt_name = "libmkl_rt.so"
         else:
             mkl_rt_paths = [""]
