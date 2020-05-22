@@ -148,6 +148,13 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.frame_selector.setObjectName("frame_selector")
         self.gridLayout.addWidget(self.frame_selector, 0, 0, 2, 3)
 
+        # Group widget elements which are to be blocked during player execution in a list.
+        self.widget_elements = [self.listWidget,
+                                self.addButton,
+                                self.removeButton,
+                                self.pushButton_play,
+                                self.GroupBox_frame_sorting]
+
         # Initialize a variable for communication with the frame_player object later.
         self.run_player = False
 
@@ -157,6 +164,8 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.player_thread = QtCore.QThread()
         self.frame_player = FramePlayer(self)
         self.frame_player.moveToThread(self.player_thread)
+        self.frame_player.block_widgets_signal.connect(self.block_widgets)
+        self.frame_player.unblock_widgets_signal.connect(self.unblock_widgets)
         self.frame_player.set_photo_signal.connect(self.frame_selector.setPhoto)
         self.frame_player.set_slider_value.connect(self.slider_frames.setValue)
         self.frame_player_start_signal.connect(self.frame_player.play)
@@ -187,9 +196,34 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start selecting frames +++", self.stacked_image_log_file)
 
+    def block_widgets(self):
+        """
+        Block signals from GUI elements to avoid cross-talk, and disable them to prevent unwanted
+        user interaction.
+
+        :return: -
+        """
+
+        for element in self.widget_elements:
+            element.blockSignals(True)
+            element.setDisabled(True)
+
+    def unblock_widgets(self):
+        """
+        Unblock signals from GUI elements which were temporarily blocked during player action.
+
+        :return: -
+        """
+
+        for element in self.widget_elements:
+            element.blockSignals(False)
+            element.setDisabled(False)
+
+        self.listWidget.setFocus()
+
     def fill_list_widget(self):
         """
-        Initialize the list widget with frames, ordered as selected (by rank or chronoligical).
+        Initialize the list widget with frames, ordered as selected (by rank or chronological).
         Set the colors of each item according to its current inclusion / exclusion state.
 
         :return: -
@@ -461,6 +495,8 @@ class FramePlayer(QtCore.QObject):
     can instruct the GUI to stop the running player.
 
     """
+    block_widgets_signal = QtCore.pyqtSignal()
+    unblock_widgets_signal = QtCore.pyqtSignal()
     set_photo_signal = QtCore.pyqtSignal(int)
     set_slider_value = QtCore.pyqtSignal(int)
 
@@ -470,11 +506,6 @@ class FramePlayer(QtCore.QObject):
         # Store a reference of the frame selector widget and create a list of GUI elements. This
         # makes it easier to perform the same operation on all elements.
         self.frame_selector_widget = frame_selector_widget
-        self.frame_selector_widget_elements = [self.frame_selector_widget.listWidget,
-                                               self.frame_selector_widget.addButton,
-                                               self.frame_selector_widget.removeButton,
-                                               self.frame_selector_widget.pushButton_play,
-                                               self.frame_selector_widget.GroupBox_frame_sorting]
 
         # Set the delay time between frames.
         self.delay_between_frames = 0.1
@@ -490,9 +521,7 @@ class FramePlayer(QtCore.QObject):
 
         # Block signals from GUI elements to avoid cross-talk, and disable them to prevent unwanted
         # user interaction.
-        for element in self.frame_selector_widget_elements:
-            element.blockSignals(True)
-            element.setDisabled(True)
+        self.block_widgets_signal.emit()
 
         # Set the player running.
         self.run_player = True
@@ -534,11 +563,7 @@ class FramePlayer(QtCore.QObject):
         self.run_player = False
 
         # Re-set the GUI elements to their normal state.
-        for element in self.frame_selector_widget_elements:
-            element.blockSignals(False)
-            element.setDisabled(False)
-
-        self.frame_selector_widget.listWidget.setFocus()
+        self.unblock_widgets_signal.emit()
 
 
 if __name__ == '__main__':
