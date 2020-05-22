@@ -37,6 +37,7 @@ from exceptions import Error
 from frame_selector_gui import Ui_frame_selector
 from frame_viewer import FrameViewer
 from frames import Frames
+from rank_frames import RankFrames
 from miscellaneous import Miscellaneous
 
 
@@ -74,8 +75,7 @@ class VideoFrameSelector(FrameViewer):
         image = self.frames.frames_mono(index)
 
         super(VideoFrameSelector, self).setPhoto(image,
-                                                 overlay_exclude_mark=not self.index_included[
-                                                     index])
+                                                overlay_exclude_mark=not self.index_included[index])
 
 
 class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
@@ -84,13 +84,18 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
     qualities, and to manipulate the stack limits.
     """
 
-    def __init__(self, parent_gui, configuration, frames, stacked_image_log_file, signal_finished):
+    frame_player_start_signal = QtCore.pyqtSignal()
+
+    def __init__(self, parent_gui, configuration, frames, rank_frames, stacked_image_log_file,
+                 signal_finished):
         """
         Initialization of the widget.
 
         :param parent_gui: Parent GUI object
         :param configuration: Configuration object with parameters
         :param frames: Frames object with all video frames
+        :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
+                            1. being optimal) for all frames
         :param stacked_image_log_file: Log file to be stored with results, or None.
         :param signal_finished: Qt signal with signature (str) to trigger the next activity when
                                 the viewer exits.
@@ -106,6 +111,12 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.signal_finished = signal_finished
         self.frames = frames
         self.index_included = frames.index_included.copy()
+        self.quality_sorted_indices = rank_frames.quality_sorted_indices
+        self.rank_indices = rank_frames.rank_indices
+
+        # Start with ordering frames by quality. This can be changed by the user using a radio
+        # button.
+        self.frame_ordering = "quality"
 
         # Initialize the frame list selection.
         self.items_selected = None
@@ -119,19 +130,6 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         self.listWidget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
 
-        # Initialize the inclusion / exclusion state of frames in the frame list.
-        for i in range(frames.number_original):
-            frame_number = i + 1
-            if self.index_included[i]:
-                item = QtWidgets.QListWidgetItem("Frame %i included" % frame_number)
-                item.setBackground(self.background_included)
-                item.setForeground(self.foreground_included)
-            else:
-                item = QtWidgets.QListWidgetItem("Frame %i excluded" % frame_number)
-                item.setBackground(self.background_excluded)
-                item.setForeground(self.foreground_excluded)
-            self.listWidget.addItem(item)
-
         self.listWidget.installEventFilter(self)
         self.listWidget.itemClicked.connect(self.select_items)
         self.addButton.clicked.connect(self.use_triggered)
@@ -139,12 +137,16 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         # Be careful: Indices are counted from 0, while widget contents are counted from 1 (to make
         # it easier for the user.
-        self.frame_index = 0
+        self.quality_index = 0
+        self.frame_index = self.quality_sorted_indices[self.quality_index]
 
-        # Set up the frame viewer and put it in the upper left corner.
+        # Initialize the list widget.
+        self.fill_list_widget()
+
+        # Set up the frame selector and put it in the upper left corner.
         self.frame_selector = VideoFrameSelector(self.frames, self.index_included, self.frame_index)
-        self.frame_selector.setObjectName("framewiever")
-        self.gridLayout.addWidget(self.frame_selector, 0, 0, 1, 3)
+        self.frame_selector.setObjectName("frame_selector")
+        self.gridLayout.addWidget(self.frame_selector, 0, 0, 2, 3)
 
         # Initialize a variable for communication with the frame_player object later.
         self.run_player = False
@@ -156,12 +158,14 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.frame_player = FramePlayer(self)
         self.frame_player.moveToThread(self.player_thread)
         self.frame_player.set_photo_signal.connect(self.frame_selector.setPhoto)
+        self.frame_player_start_signal.connect(self.frame_player.play)
         self.player_thread.start()
 
         # Initialization of GUI elements
         self.slider_frames.setMinimum(1)
         self.slider_frames.setMaximum(self.frames.number)
-        self.slider_frames.setValue(self.frame_index + 1)
+        self.slider_frames.setValue(self.quality_index + 1)
+        self.radioButton_quality.setChecked(True)
 
         self.gridLayout.setColumnStretch(0, 7)
         self.gridLayout.setColumnStretch(1, 0)
@@ -175,11 +179,46 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.buttonBox.accepted.connect(self.done)
         self.buttonBox.rejected.connect(self.reject)
         self.slider_frames.valueChanged.connect(self.slider_frames_changed)
-        self.pushButton_play.clicked.connect(self.frame_player.play)
+        self.pushButton_play.clicked.connect(self.pushbutton_play_clicked)
         self.pushButton_stop.clicked.connect(self.pushbutton_stop_clicked)
+        self.radioButton_quality.toggled.connect(self.radiobutton_quality_changed)
 
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol("+++ Start selecting frames +++", self.stacked_image_log_file)
+
+    def fill_list_widget(self):
+        """
+        Initialize the list widget with frames, ordered as selected (by rank or chronoligical).
+        Set the colors of each item according to its current inclusion / exclusion state.
+
+        :return: -
+        """
+
+        # Initialize the inclusion / exclusion state of frames in the frame list.
+        self.listWidget.clear()
+        for i in range(frames.number_original):
+            if self.frame_ordering == "quality":
+                frame_number = self.quality_sorted_indices[i]
+            else:
+                frame_number = i
+
+            if self.index_included[frame_number]:
+                item = QtWidgets.QListWidgetItem("Frame %i included" % (frame_number + 1))
+                item.setBackground(self.background_included)
+                item.setForeground(self.foreground_included)
+            else:
+                item = QtWidgets.QListWidgetItem("Frame %i excluded" % (frame_number + 1))
+                item.setBackground(self.background_excluded)
+                item.setForeground(self.foreground_excluded)
+            self.listWidget.addItem(item)
+
+        # Set the list widget to the current position.
+        if self.frame_ordering == "quality":
+            self.listWidget.setCurrentRow(self.quality_index,
+                                          QtCore.QItemSelectionModel.SelectCurrent)
+        else:
+            self.listWidget.setCurrentRow(self.frame_index,
+                                          QtCore.QItemSelectionModel.SelectCurrent)
 
     def select_items(self):
         """
@@ -188,13 +227,25 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         :return: -
         """
-        self.items_selected = self.listWidget.selectedItems()
-        self.indices_selected = [self.listWidget.row(item) for item in self.items_selected]
-        self.frame_index = self.indices_selected[0]
 
-        # Set the slider to the current selection.
+        # Block slider signals to avoid a shortcut.
         self.slider_frames.blockSignals(True)
-        self.slider_frames.setValue(self.frame_index + 1)
+
+        self.items_selected = self.listWidget.selectedItems()
+
+        if self.frame_ordering == "quality":
+            self.indices_selected = [self.quality_sorted_indices[self.listWidget.row(item)] for item
+                                     in self.items_selected]
+            self.frame_index = self.indices_selected[0]
+            self.quality_index = self.rank_indices[self.frame_index]
+            self.slider_frames.setValue(self.quality_index + 1)
+        else:
+            self.indices_selected = [self.listWidget.row(item) for item in self.items_selected]
+            self.frame_index = self.indices_selected[0]
+            self.quality_index = self.rank_indices[self.frame_index]
+            self.slider_frames.setValue(self.frame_index + 1)
+
+        # Unblock the slider signals again.
         self.slider_frames.blockSignals(False)
 
         # Update the image in the viewer.
@@ -281,26 +332,63 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         """
 
         # Again, please note the difference between indexing and GUI displays.
-        self.frame_index = self.slider_frames.value() - 1
+        index = self.slider_frames.value() - 1
+
+        # Differentiate between frame ordering (by quality or chronologically).
+        if self.frame_ordering == "quality":
+            self.frame_index = self.quality_sorted_indices[index]
+            self.quality_index = index
+
+        else:
+            self.frame_index = index
+            self.quality_index = self.rank_indices[self.frame_index]
 
         # Adjust the frame list and select the current frame.
 
-        self.listWidget.setCurrentRow(self.frame_index, QtCore.QItemSelectionModel.SelectCurrent)
-        self.select_items()
+        self.listWidget.setCurrentRow(index, QtCore.QItemSelectionModel.SelectCurrent)
+        # self.select_items()
 
         # Update the image in the viewer.
         self.frame_selector.setPhoto(self.frame_index)
         self.listWidget.setFocus()
+
+    def radiobutton_quality_changed(self):
+        """
+        Toggle back and forth between frame ordering modes. The frame slider is updated to reflect
+        the index of the current frame in the new ordering scheme. The frame ordering in the list
+        widget is changed.
+
+        :return: -
+        """
+
+        if self.frame_ordering == "quality":
+            self.frame_ordering = "chronological"
+            self.slider_frames.setValue(self.frame_index + 1)
+        else:
+            self.frame_ordering = "quality"
+            self.slider_frames.setValue(self.quality_index + 1)
+
+        self.fill_list_widget()
+
+    def pushbutton_play_clicked(self):
+        """
+        Start the frame player if it is not running already.
+
+        :return: -
+        """
+
+        self.frame_player_start_signal.emit()
 
     def pushbutton_stop_clicked(self):
         """
         When the frame player is running, it periodically checks this variable. If it is set to
         False, the player stops.
 
-        :return:
+        :return: -
         """
 
-        self.frame_player.run_player = False
+        if self.frame_player.run_player:
+            self.frame_player.run_player = False
 
     def done(self):
         """
@@ -339,7 +427,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
             if frames_remaining != self.frames.number:
                 Miscellaneous.protocol("           " + str(
                     frames_remaining) + " frames will be used in the stacking workflow.",
-                    self.stacked_image_log_file, precede_with_timestamp=False)
+                                       self.stacked_image_log_file, precede_with_timestamp=False)
 
         # Send a completion message. The "execute_rank_frames" method is triggered on the workflow
         # thread. The signal payload is True if the status was changed for at least one frame.
@@ -382,7 +470,9 @@ class FramePlayer(QtCore.QObject):
         self.frame_selector_widget = frame_selector_widget
         self.frame_selector_widget_elements = [self.frame_selector_widget.listWidget,
                                                self.frame_selector_widget.addButton,
-                                               self.frame_selector_widget.removeButton]
+                                               self.frame_selector_widget.removeButton,
+                                               self.frame_selector_widget.pushButton_play,
+                                               self.frame_selector_widget.GroupBox_frame_sorting]
 
         # Initialize a variable used to stop the player in the GUI thread.
         self.run_player = False
@@ -402,16 +492,46 @@ class FramePlayer(QtCore.QObject):
         # Set the player running.
         self.run_player = True
 
-        while self.frame_selector_widget.frame_index < \
-                self.frame_selector_widget.frames.number_original - 1 and self.run_player:
-            if not self.frame_selector_widget.frame_selector.image_loading_busy:
-                self.frame_selector_widget.frame_index += 1
-                self.frame_selector_widget.slider_frames.setValue(
-                    self.frame_selector_widget.frame_index + 1)
-                self.set_photo_signal.emit(self.frame_selector_widget.frame_index)
-            sleep(0.1)
-            self.frame_selector_widget.update()
+        # The frames are ordered by their quality.
+        if self.frame_selector_widget.frame_ordering == "quality":
 
+            # The player stops when the end of the video is reached, or when the "run_player"
+            # variable is set to False in the GUI thread.
+            while self.frame_selector_widget.quality_index < self.frame_selector_widget.frames.number_original \
+                    - 1 and self.run_player:
+
+                if not self.frame_selector_widget.frame_selector.image_loading_busy:
+                    self.frame_selector_widget.quality_index += 1
+                    self.frame_selector_widget.frame_index = \
+                        self.frame_selector_widget.quality_sorted_indices[
+                            self.frame_selector_widget.quality_index]
+
+                    self.frame_selector_widget.slider_frames.setValue(
+                        self.frame_selector_widget.quality_index + 1)
+                    self.set_photo_signal.emit(self.frame_selector_widget.frame_index)
+
+                # Insert a short pause to keep the video from running too fast.
+                sleep(0.1)
+                self.frame_selector_widget.update()
+
+        else:
+            # The same for chronological frame ordering.
+            while self.frame_selector_widget.frame_index < self.frame_selector_widget.frames.number_original \
+                    - 1 and self.run_player:
+                if not self.frame_selector_widget.frame_selector.image_loading_busy:
+                    self.frame_selector_widget.frame_index += 1
+                    self.frame_selector_widget.quality_index = \
+                        self.frame_selector_widget.quality_sorted_indices.index(
+                            self.frame_selector_widget.frame_index)
+                    self.frame_selector_widget.slider_frames.setValue(
+                        self.frame_selector_widget.frame_index + 1)
+                    self.set_photo_signal.emit(self.frame_selector_widget.frame_index)
+
+                sleep(0.1)
+                self.frame_selector_widget.update()
+
+        # This delay is inserted to prevent the GUI from freezing.
+        sleep(0.3)
         self.run_player = False
 
         # Re-set the GUI elements to their normal state.
@@ -445,8 +565,14 @@ if __name__ == '__main__':
         print("Error: " + e.message)
         exit()
 
+    # Rank the frames by their overall local contrast.
+    rank_frames = RankFrames(frames, configuration)
+    rank_frames.frame_score()
+
+    print("Best frame index: " + str(rank_frames.frame_ranks_max_index))
+
     app = QtWidgets.QApplication(argv)
-    window = FrameSelectorWidget(None, configuration, frames, None, None)
+    window = FrameSelectorWidget(None, configuration, frames, rank_frames, None, None)
     window.setMinimumSize(800, 600)
     # window.showMaximized()
     window.show()

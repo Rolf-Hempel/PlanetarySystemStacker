@@ -16,7 +16,7 @@ python3 -m twine upload --repository testpypi dist/*
 Install the package:
 --------------------
 
-pip3 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.0b12
+pip3 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.0b13
 
 or, to upgrade from an earlier version:
 pip3 install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker

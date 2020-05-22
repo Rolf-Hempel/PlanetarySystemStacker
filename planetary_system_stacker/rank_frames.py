@@ -111,6 +111,13 @@ class RankFrames(object):
         # Sort the frame indices in descending order of quality.
         self.quality_sorted_indices = sorted(range(len(self.frame_ranks)), key=self.frame_ranks.__getitem__, reverse=True)
 
+        # Compute the inverse index list: For each frame the rank_index is the corresponding index
+        # in the sorted frame_ranks list.
+        self.rank_indices = [self.quality_sorted_indices.index(index) for index in range(self.number)]
+        # self.rank_indices = [0] * self.number
+        # for i in range(self.number):
+        #     self.rank_indices[self.quality_sorted_indices[i]] = i
+
         # Set the index of the best frame, and normalize all quality values.
         self.frame_ranks_max_index = self.quality_sorted_indices[0]
         self.frame_ranks_max_value = self.frame_ranks[self.frame_ranks_max_index]

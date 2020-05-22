@@ -23,7 +23,17 @@
    <enum>QFrame::Sunken</enum>
   </property>
   <layout class="QGridLayout" name="gridLayout" columnstretch="7,0,0,0,3">
-   <item row="1" column="2">
+   <item row="2" column="3" colspan="2">
+    <widget class="QDialogButtonBox" name="buttonBox">
+     <property name="toolTip">
+      <string>Exit the viewer. Press 'OK' to save the selection, or 'cancel' to discard changes.</string>
+     </property>
+     <property name="standardButtons">
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="2">
     <widget class="QPushButton" name="pushButton_play">
      <property name="toolTip">
       <string>Start a frame display video.</string>
@@ -33,13 +43,30 @@
      </property>
     </widget>
    </item>
-   <item row="1" column="1">
+   <item row="2" column="1">
     <widget class="QPushButton" name="pushButton_stop">
      <property name="toolTip">
       <string>Stop the frame display video.</string>
      </property>
      <property name="text">
       <string>Stop</string>
+     </property>
+    </widget>
+   </item>
+   <item row="2" column="0">
+    <widget class="QSlider" name="slider_frames">
+     <property name="toolTip">
+      <string>Use the slider to select the frame to be displayed. As an alternative,
+you can select the frame in the 'Selecct / deselect frames' list.</string>
+     </property>
+     <property name="maximum">
+      <number>1000</number>
+     </property>
+     <property name="pageStep">
+      <number>1</number>
+     </property>
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>
@@ -81,31 +108,33 @@
      </item>
     </layout>
    </item>
-   <item row="1" column="0">
-    <widget class="QSlider" name="slider_frames">
-     <property name="toolTip">
-      <string>Use the slider to select the frame to be displayed. As an alternative,
-you can select the frame in the 'Selecct / deselect frames' list.</string>
+   <item row="1" column="4">
+    <widget class="QGroupBox" name="GroupBox_frame_sorting">
+     <property name="title">
+      <string>Frame sorting</string>
      </property>
-     <property name="maximum">
-      <number>1000</number>
-     </property>
-     <property name="pageStep">
-      <number>1</number>
-     </property>
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
-   <item row="1" column="3" colspan="2">
-    <widget class="QDialogButtonBox" name="buttonBox">
-     <property name="toolTip">
-      <string>Exit the viewer. Press 'OK' to save the selection, or 'cancel' to discard changes.</string>
-     </property>
-     <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
-     </property>
+     <layout class="QHBoxLayout" name="horizontalLayout_2">
+      <item>
+       <widget class="QRadioButton" name="radioButton_quality">
+        <property name="toolTip">
+         <string>Frames are ordered by their overall sharpness.</string>
+        </property>
+        <property name="text">
+         <string>By quality</string>
+        </property>
+       </widget>
+      </item>
+      <item>
+       <widget class="QRadioButton" name="radioButton_chronological">
+        <property name="toolTip">
+         <string>Frames are ordered chronologically.</string>
+        </property>
+        <property name="text">
+         <string>Chronological</string>
+        </property>
+       </widget>
+      </item>
+     </layout>
     </widget>
    </item>
   </layout>
