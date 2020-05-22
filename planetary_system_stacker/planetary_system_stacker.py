@@ -152,7 +152,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     signal_load_master_dark = QtCore.pyqtSignal(str)
     signal_load_master_flat = QtCore.pyqtSignal(str)
     signal_frames = QtCore.pyqtSignal(object)
-    signal_rank_frames = QtCore.pyqtSignal(bool)
+    signal_rank_frames = QtCore.pyqtSignal()
+    signal_select_frames = QtCore.pyqtSignal(bool)
     signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
     signal_set_roi = QtCore.pyqtSignal(int, int, int, int)
     signal_set_alignment_points = QtCore.pyqtSignal()
@@ -257,6 +258,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.signal_load_master_flat.connect(self.workflow.calibration.load_master_flat)
         self.signal_frames.connect(self.workflow.execute_frames)
         self.signal_rank_frames.connect(self.workflow.execute_rank_frames)
+        self.signal_select_frames.connect(self.workflow.execute_update_index_translation_table)
         self.signal_align_frames.connect(self.workflow.execute_align_frames)
         self.signal_set_roi.connect(self.workflow.execute_set_roi)
         self.signal_set_alignment_points.connect(self.workflow.execute_set_alignment_points)
@@ -734,6 +736,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         self.work_next_task("Next job")
 
+    @QtCore.pyqtSlot(str)
     def work_next_task(self, next_activity):
         """
         This is the central place where all activities are scheduled. Depending on the
@@ -767,12 +770,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.busy = True
 
         elif self.activity == "Rank frames":
+            if not self.automatic:
+                pass
 
+            self.signal_rank_frames.emit()
+            self.busy = True
+
+        elif self.activity == "Select frames":
             # If the dialog to mark frames to be excluded from stacking was requested, open the
             # dialog now.
             if not self.automatic and self.configuration.frames_add_selection_dialog:
-                fsw = FrameSelectorWidget(self, self.configuration, self.workflow.frames,
-                                          self.workflow.attached_log_file, self.signal_rank_frames)
+                fsw = FrameSelectorWidget(self, self.configuration, self.workflow.frames, self.workflow.rank_frames,
+                                          self.workflow.attached_log_file, self.signal_select_frames)
 
                 self.display_widget(fsw)
                 fsw.listWidget.setFocus()
@@ -780,11 +789,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                       "red")
 
             else:
-                # Now start the corresponding action on the workflow thread. No index translation
-                # table change is necessary because the selection dialog was not executed.
-                self.signal_rank_frames.emit(False)
-
-            self.busy = True
+                # The dialog to exclude frames is not to be called. The index translation table
+                # does not need to be updated.
+                self.signal_select_frames.emit(False)
 
         elif self.activity == "Align frames":
 

@@ -1601,14 +1601,13 @@ class Frames(object):
         :return: -
         """
 
-        index_reduced = 0
+        self.index_translation = []
         for index in range(self.number_original):
             if self.index_included[index]:
-                self.index_translation[index_reduced] = index
-                index_reduced += 1
+                self.index_translation.append(index)
 
         # Set the number of frames which will take part in the processing workflow.
-        self.number = index_reduced
+        self.number = len(self.index_translation)
 
     def reset_alignment_point_lists(self):
         """

@@ -453,13 +453,8 @@ class Workflow(QtCore.QObject):
                 self.postproc_input_image = self.postproc_input_image.astype(uint16) * 256
             self.work_next_task_signal.emit("Postprocessing")
 
-    @QtCore.pyqtSlot(bool)
-    def execute_rank_frames(self, update_index_translation_table):
-
-        # If in the frame selection dialog the status of at least one frame was changed, update
-        # the index translation table.
-        if update_index_translation_table:
-            self.frames.update_index_translation()
+    @QtCore.pyqtSlot()
+    def execute_rank_frames(self):
 
         self.set_status_bar_processing_phase("ranking frames")
         # Rank the frames by their overall local contrast.
@@ -486,6 +481,16 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol(
                 "           Index of best frame: " + str(self.rank_frames.frame_ranks_max_index + 1),
                 self.attached_log_file, precede_with_timestamp=False)
+
+        self.work_next_task_signal.emit("Select frames")
+
+    @QtCore.pyqtSlot(bool)
+    def execute_update_index_translation_table(self, update_index_translation_table):
+        # If in the frame selection dialog the status of at least one frame was changed, update
+        # the index translation table.
+        if update_index_translation_table:
+            self.frames.update_index_translation()
+            self.rank_frames.update_index_translation(self.frames.index_translation)
 
         self.work_next_task_signal.emit("Align frames")
 

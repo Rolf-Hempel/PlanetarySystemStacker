@@ -55,8 +55,10 @@ class RankFrames(object):
         self.shape = frames.shape
         self.configuration = configuration
         self.frames = frames
+        self.frame_ranks_original = []
+        self.frame_ranks = None
         self.quality_sorted_indices = None
-        self.frame_ranks = []
+        self.rank_indices = None
         self.frame_ranks_max_index = None
         self.frame_ranks_max_value = None
         self.progress_signal = progress_signal
@@ -87,11 +89,11 @@ class RankFrames(object):
                     self.progress_signal.emit("Rank all frames",
                                               int(round(10*frame_index / self.number) * 10))
                 if self.configuration.frames_normalization:
-                    self.frame_ranks.append(
+                    self.frame_ranks_original.append(
                         method(frame, self.configuration.rank_frames_pixel_stride) /
                         self.frames.average_brightness(frame_index))
                 else:
-                    self.frame_ranks.append(
+                    self.frame_ranks_original.append(
                         method(frame, self.configuration.rank_frames_pixel_stride))
         else:
             for frame_index in range(self.frames.number):
@@ -101,22 +103,56 @@ class RankFrames(object):
                     self.progress_signal.emit("Rank all frames",
                                               int(round(10*frame_index / self.number) * 10))
                 if self.configuration.frames_normalization:
-                    self.frame_ranks.append(meanStdDev(frame)[1][0][0] /
+                    self.frame_ranks_original.append(meanStdDev(frame)[1][0][0] /
                         self.frames.average_brightness(frame_index))
                 else:
-                    self.frame_ranks.append(meanStdDev(frame)[1][0][0])
+                    self.frame_ranks_original.append(meanStdDev(frame)[1][0][0])
 
-        if self.progress_signal is not None:
-            self.progress_signal.emit("Rank all frames", 100)
+        self.frame_ranks = self.frame_ranks_original
+
         # Sort the frame indices in descending order of quality.
-        self.quality_sorted_indices = sorted(range(len(self.frame_ranks)), key=self.frame_ranks.__getitem__, reverse=True)
+        self.quality_sorted_indices = sorted(range(self.number),
+                                             key=self.frame_ranks.__getitem__, reverse=True)
 
         # Compute the inverse index list: For each frame the rank_index is the corresponding index
         # in the sorted frame_ranks list.
-        self.rank_indices = [self.quality_sorted_indices.index(index) for index in range(self.number)]
-        # self.rank_indices = [0] * self.number
-        # for i in range(self.number):
-        #     self.rank_indices[self.quality_sorted_indices[i]] = i
+        self.rank_indices = [self.quality_sorted_indices.index(index) for index in
+                             range(self.number)]
+
+        if self.progress_signal is not None:
+            self.progress_signal.emit("Rank all frames", 100)
+
+        # Set the index of the best frame, and normalize all quality values.
+        self.frame_ranks_max_index = self.quality_sorted_indices[0]
+        self.frame_ranks_max_value = self.frame_ranks[self.frame_ranks_max_index]
+        self.frame_ranks /= self.frame_ranks_max_value
+
+    def update_index_translation(self, index_translation):
+        """
+        After frames have been marked to be excluded from the further workflow, update the ranking
+        tables, based on the index translation list from the frames module.
+
+        :param index_translation: List with indices. For each index in the reduced list of frames
+                                  it gives the corresponding index in the original frame list.
+        :return: -
+        """
+
+        # Set the number of ranks to the number of included frames.
+        self.number = len(index_translation)
+
+        self.frame_ranks = [self.frame_ranks_original[index] for index in index_translation]
+
+        # Sort the frame indices in descending order of quality.
+        self.quality_sorted_indices = sorted(range(self.number),
+                                             key=self.frame_ranks.__getitem__, reverse=True)
+
+        # Compute the inverse index list: For each frame the rank_index is the corresponding index
+        # in the sorted frame_ranks list.
+        self.rank_indices = [self.quality_sorted_indices.index(index) for index in
+                             range(self.number)]
+
+        if self.progress_signal is not None:
+            self.progress_signal.emit("Rank all frames", 100)
 
         # Set the index of the best frame, and normalize all quality values.
         self.frame_ranks_max_index = self.quality_sorted_indices[0]

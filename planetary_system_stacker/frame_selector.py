@@ -231,7 +231,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         # Initialize the inclusion / exclusion state of frames in the frame list.
         self.listWidget.clear()
-        for i in range(frames.number_original):
+        for i in range(self.frames.number_original):
             if self.frame_ordering == "quality":
                 frame_number = self.quality_sorted_indices[i]
             else:
@@ -482,7 +482,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         # Send a completion message.
         if self.parent_gui is not None:
-            self.signal_finished.emit(self.signal_payload)
+            self.signal_finished.emit(False)
 
         # Close the Window.
         self.close()
