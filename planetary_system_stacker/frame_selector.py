@@ -474,6 +474,10 @@ class FramePlayer(QtCore.QObject):
                                                self.frame_selector_widget.pushButton_play,
                                                self.frame_selector_widget.GroupBox_frame_sorting]
 
+        # Set the delay times between frames and before GUI element re-activation.
+        self.delay_between_frames = 0.1
+        self.delay_before_gui_reactivation = 0.3
+
         # Initialize a variable used to stop the player in the GUI thread.
         self.run_player = False
 
@@ -511,8 +515,8 @@ class FramePlayer(QtCore.QObject):
                     self.set_photo_signal.emit(self.frame_selector_widget.frame_index)
 
                 # Insert a short pause to keep the video from running too fast.
-                sleep(0.1)
-                self.frame_selector_widget.update()
+                sleep(self.delay_between_frames)
+                # self.frame_selector_widget.update()
 
         else:
             # The same for chronological frame ordering.
@@ -527,11 +531,11 @@ class FramePlayer(QtCore.QObject):
                         self.frame_selector_widget.frame_index + 1)
                     self.set_photo_signal.emit(self.frame_selector_widget.frame_index)
 
-                sleep(0.1)
-                self.frame_selector_widget.update()
+                sleep(self.delay_between_frames)
+                # self.frame_selector_widget.update()
 
         # This delay is inserted to prevent the GUI from freezing.
-        sleep(0.3)
+        sleep(self.delay_before_gui_reactivation)
         self.run_player = False
 
         # Re-set the GUI elements to their normal state.
