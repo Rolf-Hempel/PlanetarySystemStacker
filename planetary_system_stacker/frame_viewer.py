@@ -428,6 +428,8 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
     qualities, and to manipulate the stack limits.
     """
 
+    frame_player_start_signal = QtCore.pyqtSignal()
+
     def __init__(self, parent_gui, configuration, frames, rank_frames, align_frames,
                  stacked_image_log_file, signal_finished, signal_payload):
         """
@@ -468,6 +470,11 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.frame_viewer.setObjectName("framewiever")
         self.grid_layout.addWidget(self.frame_viewer, 0, 0, 4, 3)
 
+        self.widget_elements = [self.spinBox_chronological,
+                                self.spinBox_quality,
+                                self.slider_frames,
+                                self.pushButton_play]
+
         # Initialize variables. The values for "alignment_point_frame_number" and
         # "alignment_points_frame_percent" are held as copies in this object. Only if the user
         # presses "OK" at the end, the values are copied back into the configuration object.
@@ -493,7 +500,11 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.player_thread = QtCore.QThread()
         self.frame_player = FramePlayer(self)
         self.frame_player.moveToThread(self.player_thread)
+        self.frame_player.block_widgets_signal.connect(self.block_widgets)
+        self.frame_player.unblock_widgets_signal.connect(self.unblock_widgets)
         self.frame_player.set_photo_signal.connect(self.frame_viewer.setPhoto)
+        self.frame_player.set_slider_value.connect(self.slider_frames.setValue)
+        self.frame_player_start_signal.connect(self.frame_player.play)
         self.player_thread.start()
 
         # Initialization of GUI elements
@@ -538,12 +549,35 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.spinBox_quality.valueChanged.connect(self.spinbox_quality_changed)
         self.pushButton_set_stacking_limit.clicked.connect(
             self.pushbutton_set_stacking_limit_clicked)
-        self.pushButton_play.clicked.connect(self.frame_player.play)
+        self.pushButton_play.clicked.connect(self.pushbutton_play_clicked)
         self.pushButton_stop.clicked.connect(self.pushbutton_stop_clicked)
 
         # Initialize the Matplotlib widget contents.
         self.matplotlib_widget.renew_plot(self.quality_index, self.frame_ordering,
                                           self.alignment_points_frame_number)
+
+    @QtCore.pyqtSlot()
+    def block_widgets(self):
+        """
+        Block signals from GUI elements to avoid cross-talk, and disable them to prevent unwanted
+        user interaction.
+
+        :return: -
+        """
+
+        for element in self.widget_elements:
+            element.setDisabled(True)
+
+    @QtCore.pyqtSlot()
+    def unblock_widgets(self):
+        """
+        Unblock signals from GUI elements which were temporarily blocked during player action.
+
+        :return: -
+        """
+
+        for element in self.widget_elements:
+            element.setDisabled(False)
 
     def slider_frames_changed(self):
         """
@@ -687,6 +721,16 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
         self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
 
+    @QtCore.pyqtSlot()
+    def pushbutton_play_clicked(self):
+        """
+        Start the frame player if it is not running already.
+
+        :return: -
+        """
+
+        self.frame_player_start_signal.emit()
+
     def pushbutton_stop_clicked(self):
         """
         When the frame player is running, it periodically checks this variable. If it is set to
@@ -753,22 +797,25 @@ class FramePlayer(QtCore.QObject):
     can instruct the GUI to stop the running player.
 
     """
+
+    block_widgets_signal = QtCore.pyqtSignal()
+    unblock_widgets_signal = QtCore.pyqtSignal()
     set_photo_signal = QtCore.pyqtSignal(int)
+    set_slider_value = QtCore.pyqtSignal(int)
 
     def __init__(self, frame_viewer_widget):
         super(FramePlayer, self).__init__()
 
-        # Store a reference of the frame viewer widget and create a list of GUI elements. This makes
-        # it easier to perform the same operation on all elements.
+        # Store a reference of the frame viewer widget.
         self.frame_viewer_widget = frame_viewer_widget
-        self.frame_viewer_widget_elements = [self.frame_viewer_widget.spinBox_chronological,
-                                             self.frame_viewer_widget.spinBox_quality,
-                                             self.frame_viewer_widget.slider_frames,
-                                             self.frame_viewer_widget.pushButton_play]
+
+        # Set the delay time between frames.
+        self.delay_between_frames = 0.1
 
         # Initialize a variable used to stop the player in the GUI thread.
         self.run_player = False
 
+    @QtCore.pyqtSlot()
     def play(self):
         """
         Start the player.
@@ -777,9 +824,7 @@ class FramePlayer(QtCore.QObject):
 
         # Block signals from GUI elements to avoid cross-talk, and disable them to prevent unwanted
         # user interaction.
-        for element in self.frame_viewer_widget_elements:
-            element.blockSignals(True)
-            element.setDisabled(True)
+        self.block_widgets_signal.emit()
 
         # Set the plaer running.
         self.run_player = True
@@ -797,19 +842,12 @@ class FramePlayer(QtCore.QObject):
                     self.frame_viewer_widget.frame_index = \
                     self.frame_viewer_widget.rank_frames.quality_sorted_indices[
                         self.frame_viewer_widget.quality_index]
-                    self.frame_viewer_widget.spinBox_chronological.setValue(
-                        self.frame_viewer_widget.frame_index + 1)
-                    self.frame_viewer_widget.spinBox_quality.setValue(
-                        self.frame_viewer_widget.quality_index + 1)
-                    self.frame_viewer_widget.slider_frames.setValue(
-                        self.frame_viewer_widget.quality_index + 1)
+                    self.set_slider_value.emit(self.frame_viewer_widget.quality_index + 1)
                     self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
-                    self.frame_viewer_widget.matplotlib_widget.plot_dot(
-                        self.frame_viewer_widget.quality_index)
 
                 # Insert a short pause to keep the video from running too fast.
-                sleep(0.1)
-                self.frame_viewer_widget.update()
+                sleep(self.delay_between_frames)
+
         else:
             # The same for chronological frame ordering.
             while self.frame_viewer_widget.frame_index < self.frame_viewer_widget.frames.number \
@@ -819,24 +857,14 @@ class FramePlayer(QtCore.QObject):
                     self.frame_viewer_widget.quality_index = \
                         self.frame_viewer_widget.rank_frames.quality_sorted_indices.index(
                         self.frame_viewer_widget.frame_index)
-                    self.frame_viewer_widget.spinBox_chronological.setValue(
-                        self.frame_viewer_widget.frame_index + 1)
-                    self.frame_viewer_widget.spinBox_quality.setValue(
-                        self.frame_viewer_widget.quality_index + 1)
-                    self.frame_viewer_widget.slider_frames.setValue(
-                        self.frame_viewer_widget.frame_index + 1)
+                    self.set_slider_value.emit(self.frame_viewer_widget.frame_index + 1)
                     self.set_photo_signal.emit(self.frame_viewer_widget.frame_index)
-                    self.frame_viewer_widget.matplotlib_widget.plot_dot(
-                        self.frame_viewer_widget.frame_index)
-                sleep(0.1)
-                self.frame_viewer_widget.update()
+                sleep(self.delay_between_frames)
 
         self.run_player = False
 
         # Re-set the GUI elements to their normal state.
-        for element in self.frame_viewer_widget_elements:
-            element.blockSignals(False)
-            element.setDisabled(False)
+        self.unblock_widgets_signal.emit()
 
 
 if __name__ == '__main__':

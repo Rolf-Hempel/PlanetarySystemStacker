@@ -149,6 +149,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         # Group widget elements which are to be blocked during player execution in a list.
         self.widget_elements = [self.listWidget,
+                                self.slider_frames,
                                 self.addButton,
                                 self.removeButton,
                                 self.pushButton_play,
@@ -204,7 +205,6 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         """
 
         for element in self.widget_elements:
-            element.blockSignals(True)
             element.setDisabled(True)
 
     def unblock_widgets(self):
@@ -215,7 +215,6 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         """
 
         for element in self.widget_elements:
-            element.blockSignals(False)
             element.setDisabled(False)
 
         self.listWidget.setFocus()
