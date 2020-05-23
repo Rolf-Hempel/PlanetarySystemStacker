@@ -790,8 +790,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
                 self.display_widget(fsw)
                 fsw.listWidget.setFocus()
-                self.write_status_bar("Select / de-select frames to be used for stacking.",
-                                      "red")
 
             else:
                 # The dialog to exclude frames is not to be called. Update index translation
@@ -1222,7 +1220,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                         self.ui.menuEdit, self.ui.menuCalibrate], False)
             self.activate_gui_elements([self.ui.pushButton_pause], True)
             if self.job_index < self.job_number:
-                if self.activity == 'Select stack size':
+                if self.activity == 'Select frames':
+                    self.write_status_bar("Select / de-select frames to be used for stacking.",
+                                          "red")
+                elif self.activity == 'Select stack size':
                     self.write_status_bar("Select the number / percentage of frames to be stacked.",
                                           "red")
                 elif self.activity == 'Rank frames':
