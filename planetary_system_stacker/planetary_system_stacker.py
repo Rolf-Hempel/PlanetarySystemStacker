@@ -785,8 +785,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                     self.workflow.frames.reset_index_translation()
                     self.workflow.rank_frames.reset_index_translation()
 
-                fsw = FrameSelectorWidget(self, self.configuration, self.workflow.frames, self.workflow.rank_frames,
-                                          self.workflow.attached_log_file, self.signal_select_frames)
+                fsw = FrameSelectorWidget(self, self.configuration, self.workflow.frames,
+                                          self.workflow.rank_frames,
+                                          self.workflow.attached_log_file,
+                                          self.signal_select_frames)
 
                 self.display_widget(fsw)
                 fsw.listWidget.setFocus()
