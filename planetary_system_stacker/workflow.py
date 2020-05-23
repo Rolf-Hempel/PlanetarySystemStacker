@@ -487,13 +487,16 @@ class Workflow(QtCore.QObject):
 
         self.work_next_task_signal.emit("Select frames")
 
-    @QtCore.pyqtSlot(bool)
-    def execute_set_index_translation_table(self, set_index_translation_table):
+    @QtCore.pyqtSlot()
+    def execute_set_index_translation_table(self):
         # If in the frame selection dialog the status of at least one frame was changed, update
         # the index translation table.
-        if set_index_translation_table:
+        if not all(self.frames.index_included):
             self.frames.set_index_translation()
             self.rank_frames.set_index_translation(self.frames.index_translation)
+        else:
+            self.frames.reset_index_translation()
+            self.rank_frames.reset_index_translation()
 
         self.work_next_task_signal.emit("Align frames")
 

@@ -153,7 +153,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
     signal_load_master_flat = QtCore.pyqtSignal(str)
     signal_frames = QtCore.pyqtSignal(object)
     signal_rank_frames = QtCore.pyqtSignal()
-    signal_select_frames = QtCore.pyqtSignal(bool)
+    signal_select_frames = QtCore.pyqtSignal()
     signal_align_frames = QtCore.pyqtSignal(int, int, int, int)
     signal_set_roi = QtCore.pyqtSignal(int, int, int, int)
     signal_set_alignment_points = QtCore.pyqtSignal()
@@ -693,10 +693,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.job_index -= 1
 
         # Restart from the specified task within the current job.
-        if task in ['Read frames', 'Rank frames', 'Align frames', 'Select stack size', 'Set ROI',
-                    'Set alignment points', 'Compute frame qualities',
-                    'Stack frames', 'Save stacked image', 'Postprocessing',
-                    'Save postprocessed image']:
+        if task in ['Read frames', 'Rank frames', 'Select frames', 'Align frames',
+                    'Select stack size', 'Set ROI', 'Set alignment points',
+                    'Compute frame qualities', 'Stack frames', 'Save stacked image',
+                    'Postprocessing', 'Save postprocessed image']:
             # Make sure to remove any active interaction widget.
             self.display_widget(None, display=False)
             self.work_next_task(task)
@@ -780,6 +780,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             # If the dialog to mark frames to be excluded from stacking was requested, open the
             # dialog now.
             if not self.automatic and self.configuration.frames_add_selection_dialog:
+                # Reset frames index translation, if active.
+                if self.workflow.frames.index_translation_active:
+                    self.workflow.frames.reset_index_translation()
+                    self.workflow.rank_frames.reset_index_translation()
+
                 fsw = FrameSelectorWidget(self, self.configuration, self.workflow.frames, self.workflow.rank_frames,
                                           self.workflow.attached_log_file, self.signal_select_frames)
 
@@ -789,9 +794,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                       "red")
 
             else:
-                # The dialog to exclude frames is not to be called. The index translation table
-                # does not need to be updated.
-                self.signal_select_frames.emit(False)
+                # The dialog to exclude frames is not to be called. Update index translation
+                # directly if required.
+                self.signal_select_frames.emit()
 
         elif self.activity == "Align frames":
 
@@ -1117,34 +1122,39 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.ui.comboBox_back.addItems(['Read frames'])
         elif self.activity == "Rank frames":
             self.ui.comboBox_back.addItems(['Read frames', 'Rank frames'])
+        elif self.activity == "Select frames":
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames'])
         elif self.activity == "Align frames":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                            'Align frames'])
         elif self.activity == "Select stack size":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                            'Select stack size'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                            'Align frames', 'Select stack size'])
         elif self.activity == "Set ROI":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                            'Select stack size', 'Set ROI'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                            'Align frames', 'Select stack size', 'Set ROI'])
         elif self.activity == "Set alignment points":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                            'Select stack size', 'Set ROI', 'Set alignment points'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                            'Align frames', 'Select stack size', 'Set ROI',
+                                            'Set alignment points'])
         elif self.activity == "Compute frame qualities":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                            'Select stack size', 'Set ROI', 'Set alignment points',
-                                            'Compute frame qualities'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                            'Align frames', 'Select stack size', 'Set ROI',
+                                            'Set alignment points', 'Compute frame qualities'])
         elif self.activity == "Stack frames":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                            'Select stack size', 'Set ROI', 'Set alignment points',
-                                            'Compute frame qualities', 'Stack frames'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                            'Align frames', 'Select stack size', 'Set ROI',
+                                            'Set alignment points', 'Compute frame qualities',
+                                            'Stack frames'])
         elif self.activity == "Save stacked image":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                            'Select stack size', 'Set ROI', 'Set alignment points',
-                                            'Compute frame qualities', 'Stack frames',
-                                            'Save stacked image'])
+            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                            'Align frames', 'Select stack size', 'Set ROI',
+                                            'Set alignment points', 'Compute frame qualities',
+                                            'Stack frames', 'Save stacked image'])
         elif self.activity == "Postprocessing":
             if self.workflow.activity == 'stacking':
-                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                                'Select stack size', 'Set ROI',
+                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                                'Align frames', 'Select stack size', 'Set ROI',
                                                 'Set alignment points',
                                                 'Compute frame qualities', 'Stack frames',
                                                 'Save stacked image', 'Postprocessing'])
@@ -1152,8 +1162,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.ui.comboBox_back.addItems(['Postprocessing'])
         elif self.activity == "Save postprocessed image":
             if self.workflow.activity == 'stacking':
-                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                                'Select stack size', 'Set ROI',
+                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                                'Align frames', 'Select stack size', 'Set ROI',
                                                 'Set alignment points',
                                                 'Compute frame qualities', 'Stack frames',
                                                 'Save stacked image', 'Postprocessing',
@@ -1162,8 +1172,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
         elif self.activity == "Next job":
             if self.workflow.activity == 'stacking':
-                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Align frames',
-                                                'Select stack size', 'Set ROI',
+                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
+                                                'Align frames', 'Select stack size', 'Set ROI',
                                                 'Set alignment points',
                                                 'Compute frame qualities', 'Stack frames',
                                                 'Save stacked image'])

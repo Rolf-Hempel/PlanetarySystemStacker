@@ -97,8 +97,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
                             1. being optimal) for all frames
         :param stacked_image_log_file: Log file to be stored with results, or None.
-        :param signal_finished: Qt signal with signature (str) to trigger the next activity when
-                                the viewer exits.
+        :param signal_finished: Qt signal to trigger the next activity when the viewer exits.
         """
 
         super(FrameSelectorWidget, self).__init__(parent_gui)
@@ -468,7 +467,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         # thread. The signal payload is True if the status was changed for at least one frame.
         # In this case, the index translation table is updated before the frame ranking starts.
         if self.parent_gui is not None:
-            self.signal_finished.emit(bool(indices_included) or bool(indices_excluded))
+            self.signal_finished.emit()
 
         # Close the Window.
         self.close()
@@ -482,7 +481,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
         # Send a completion message.
         if self.parent_gui is not None:
-            self.signal_finished.emit(False)
+            self.signal_finished.emit()
 
         # Close the Window.
         self.close()

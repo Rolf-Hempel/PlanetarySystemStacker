@@ -51,18 +51,27 @@ class RankFrames(object):
                                 percent (int).
         """
 
-        self.number = frames.number
+
         self.shape = frames.shape
         self.configuration = configuration
         self.frames = frames
+
+        self.number_original = frames.number
         self.frame_ranks_original = []
+        self.quality_sorted_indices_original = None
+        self.rank_indices_original = None
+        self.frame_ranks_max_index_original = None
+        self.frame_ranks_max_value_original = None
+
+        self.number = None
         self.frame_ranks = None
         self.quality_sorted_indices = None
         self.rank_indices = None
         self.frame_ranks_max_index = None
         self.frame_ranks_max_value = None
+
         self.progress_signal = progress_signal
-        self.signal_step_size = max(int(self.number / 10), 1)
+        self.signal_step_size = max(int(self.number_original / 10), 1)
 
     def frame_score(self):
         """
@@ -81,13 +90,17 @@ class RankFrames(object):
             raise NotSupportedError("Ranking method " + self.configuration.rank_frames_method +
                                     " not supported")
 
+        # Reset frames index translation, if active.
+        if self.frames.index_translation_active:
+            self.frames.reset_index_translation()
+
         # For all frames compute the quality with the selected method.
         if method != Miscellaneous.local_contrast_laplace:
-            for frame_index in range(self.frames.number):
+            for frame_index in range(self.number_original):
                 frame = self.frames.frames_mono_blurred(frame_index)
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
-                                              int(round(10*frame_index / self.number) * 10))
+                                              int(round(10*frame_index / self.number_original) * 10))
                 if self.configuration.frames_normalization:
                     self.frame_ranks_original.append(
                         method(frame, self.configuration.rank_frames_pixel_stride) /
@@ -96,12 +109,12 @@ class RankFrames(object):
                     self.frame_ranks_original.append(
                         method(frame, self.configuration.rank_frames_pixel_stride))
         else:
-            for frame_index in range(self.frames.number):
+            for frame_index in range(self.number_original):
                 frame = self.frames.frames_mono_blurred_laplacian(frame_index)
                 # self.frame_ranks.append(mean((frame - frame.mean())**2))
                 if self.progress_signal is not None and frame_index % self.signal_step_size == 1:
                     self.progress_signal.emit("Rank all frames",
-                                              int(round(10*frame_index / self.number) * 10))
+                                              int(round(10*frame_index / self.number_original) * 10))
                 if self.configuration.frames_normalization:
                     self.frame_ranks_original.append(meanStdDev(frame)[1][0][0] /
                         self.frames.average_brightness(frame_index))
@@ -109,13 +122,13 @@ class RankFrames(object):
                     self.frame_ranks_original.append(meanStdDev(frame)[1][0][0])
 
         # Sort the frame indices in descending order of quality.
-        self.quality_sorted_indices_original = sorted(range(self.number),
+        self.quality_sorted_indices_original = sorted(range(self.number_original),
                                              key=self.frame_ranks_original.__getitem__, reverse=True)
 
         # Compute the inverse index list: For each frame the rank_index is the corresponding index
         # in the sorted frame_ranks list.
         self.rank_indices_original = [self.quality_sorted_indices_original.index(index) for index in
-                             range(self.number)]
+                             range(self.number_original)]
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank all frames", 100)
@@ -127,6 +140,7 @@ class RankFrames(object):
 
         # Keep the original ranking data and prepare for index translation. The translation can be
         # reset later, and the original ranking be re-established.
+        self.number = self.number_original
         self.frame_ranks = self.frame_ranks_original
         self.quality_sorted_indices = self.quality_sorted_indices_original
         self.rank_indices = self.rank_indices_original
@@ -172,6 +186,7 @@ class RankFrames(object):
         :return: -
         """
 
+        self.number = self.number_original
         self.frame_ranks = self.frame_ranks_original
         self.quality_sorted_indices = self.quality_sorted_indices_original
         self.rank_indices = self.rank_indices_original
