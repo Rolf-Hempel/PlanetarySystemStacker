@@ -1159,6 +1159,9 @@ class Frames(object):
         # Initialize the list of original frames.
         self.frames_original = None
 
+        # Initialize index translation flag.
+        self.index_translation_active = False
+
         # Compute the scaling value for Laplacian computation.
         self.alpha = 1. / 256.
 
@@ -1288,22 +1291,18 @@ class Frames(object):
         # Return the total buffer space required.
         return (buffer_for_all_images + buffer_additional_workspace) / 1e9
 
-    def frames(self, index, index_translation=True):
+    def frames(self, index):
         """
         Read or look up the original frame object with a given index.
 
         :param index: Frame index
-        :param index_translation: If True, translate the parameter index according to the index
-                                  translation table (used to exclude a subset of indices in the
-                                  stacking workflow). If False, "index" refers to the original
-                                  list of image frames.
         :return: Frame with index "index".
         """
 
         # print ("Accessing frame " + str(index))
 
         # Check if the requested index is within bounds. Translate index, if necessary.
-        if index_translation:
+        if self.index_translation_active:
             if not 0 <= index < self.number:
                 raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
             index_original = self.index_translation[index]
@@ -1337,7 +1336,7 @@ class Frames(object):
             # If original frames are not buffered, initialize an empty frame list, so frames can be
             # read later in non-consecutive order.
             else:
-                self.frames_original = [None] *self.number_original
+                self.frames_original = [None] * self.number_original
 
         # The original frames are buffered. Just return the frame.
         if self.buffer_original:
@@ -1361,20 +1360,16 @@ class Frames(object):
 
             return frame
 
-    def frames_mono(self, index, index_translation=True):
+    def frames_mono(self, index):
         """
         Look up or compute the monochrome version of the frame object with a given index.
 
         :param index: Frame index
-        :param index_translation: If True, translate the parameter index according to the index
-                                  translation table (used to exclude a subset of indices in the
-                                  stacking workflow). If False, "index" refers to the original
-                                  list of image frames.
         :return: Monochrome frame with index "index".
         """
 
         # Check if the requested index is within bounds. Translate index, if necessary.
-        if index_translation:
+        if self.index_translation_active:
             if not 0 <= index < self.number:
                 raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
             index_original = self.index_translation[index]
@@ -1397,7 +1392,7 @@ class Frames(object):
         else:
 
             # Get the original frame. If it is not cached, this involves I/O.
-            frame_original = self.frames(index_original, index_translation=False)
+            frame_original = self.frames(index)
 
             # If frames are in color mode produce a B/W version.
             if self.color:
@@ -1449,20 +1444,16 @@ class Frames(object):
 
             return frame_mono
 
-    def frames_mono_blurred(self, index, index_translation=True):
+    def frames_mono_blurred(self, index):
         """
         Look up a Gaussian-blurred frame object with a given index.
 
         :param index: Frame index
-        :param index_translation: If True, translate the parameter index according to the index
-                                  translation table (used to exclude a subset of indices in the
-                                  stacking workflow). If False, "index" refers to the original
-                                  list of image frames.
         :return: Gaussian-blurred frame with index "index".
         """
 
         # Check if the requested index is within bounds. Translate index, if necessary.
-        if index_translation:
+        if self.index_translation_active:
             if not 0 <= index < self.number:
                 raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
             index_original = self.index_translation[index]
@@ -1485,7 +1476,7 @@ class Frames(object):
         else:
 
             # Get the monochrome frame. If it is not cached, this involves I/O.
-            frame_mono = self.frames_mono(index_original, index_translation=False)
+            frame_mono = self.frames_mono(index)
 
             # If the mono image is 8bit, interpolate it to 16bit.
             if frame_mono.dtype == uint8:
@@ -1507,20 +1498,16 @@ class Frames(object):
 
             return frame_monochrome_blurred
 
-    def frames_mono_blurred_laplacian(self, index, index_translation=True):
+    def frames_mono_blurred_laplacian(self, index):
         """
         Look up a Laplacian-of-Gaussian of a frame object with a given index.
 
         :param index: Frame index
-        :param index_translation: If True, translate the parameter index according to the index
-                                  translation table (used to exclude a subset of indices in the
-                                  stacking workflow). If False, "index" refers to the original
-                                  list of image frames.
         :return: LoG of a frame with index "index".
         """
 
         # Check if the requested index is within bounds. Translate index, if necessary.
-        if index_translation:
+        if self.index_translation_active:
             if not 0 <= index < self.number:
                 raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
             index_original = self.index_translation[index]
@@ -1542,7 +1529,7 @@ class Frames(object):
         else:
 
             # Get the monochrome frame. If it is not cached, this involves I/O.
-            frame_monochrome_blurred = self.frames_mono_blurred(index_original, index_translation=False)
+            frame_monochrome_blurred = self.frames_mono_blurred(index)
 
             # Compute a version of the frame with Gaussian blur added.
             frame_monochrome_laplacian = convertScaleAbs(Laplacian(
@@ -1561,20 +1548,16 @@ class Frames(object):
 
             return frame_monochrome_laplacian
 
-    def average_brightness(self, index, index_translation=True):
+    def average_brightness(self, index):
         """
         Look up the average brightness of a frame with given index.
 
         :param index: Frame index
-        :param index_translation: If True, translate the parameter index according to the index
-                                  translation table (used to exclude a subset of indices in the
-                                  stacking workflow). If False, "index" refers to the original
-                                  list of image frames.
         :return: average brightness of the requested frame
         """
 
         # Check if the requested index is within bounds. Translate index, if necessary.
-        if index_translation:
+        if self.index_translation_active:
             if not 0 <= index < self.number:
                 raise ArgumentError("Translated frame index " + str(index) + " is out of bounds")
             index_original = self.index_translation[index]
@@ -1590,9 +1573,9 @@ class Frames(object):
             raise InternalError("Accessing average frame brightness before computing it, frame: " +
                                 str(index_original))
 
-    def update_index_translation(self):
+    def set_index_translation(self):
         """
-        Update the index translation table. The list "self.index_included" for every original frame
+        Set the index translation table. The list "self.index_included" for every original frame
         index specifies if the frame is included in the processing workflow (True) or not (False).
         Based on this list, a translation table "self.index_translation" is constructed. For the
         reduced set of frames which take part in the processing workflow it contains the original
@@ -1608,6 +1591,22 @@ class Frames(object):
 
         # Set the number of frames which will take part in the processing workflow.
         self.number = len(self.index_translation)
+
+        # Set the index translation flag, so that in future frame lookups the translation table
+        # will be used.
+        self.index_translation_active = True
+
+    def reset_index_translation(self):
+        """
+        Reset the index translation table, and de-activate index translation. Keep the list of
+        included / excluded frames, so that it can be the start point for another index translation.
+
+        :return: -
+        """
+
+        self.number = self.number_original
+        self.index_translation = None
+        self.index_translation_active = False
 
     def reset_alignment_point_lists(self):
         """

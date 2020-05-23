@@ -108,26 +108,32 @@ class RankFrames(object):
                 else:
                     self.frame_ranks_original.append(meanStdDev(frame)[1][0][0])
 
-        self.frame_ranks = self.frame_ranks_original
-
         # Sort the frame indices in descending order of quality.
-        self.quality_sorted_indices = sorted(range(self.number),
-                                             key=self.frame_ranks.__getitem__, reverse=True)
+        self.quality_sorted_indices_original = sorted(range(self.number),
+                                             key=self.frame_ranks_original.__getitem__, reverse=True)
 
         # Compute the inverse index list: For each frame the rank_index is the corresponding index
         # in the sorted frame_ranks list.
-        self.rank_indices = [self.quality_sorted_indices.index(index) for index in
+        self.rank_indices_original = [self.quality_sorted_indices_original.index(index) for index in
                              range(self.number)]
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Rank all frames", 100)
 
         # Set the index of the best frame, and normalize all quality values.
-        self.frame_ranks_max_index = self.quality_sorted_indices[0]
-        self.frame_ranks_max_value = self.frame_ranks[self.frame_ranks_max_index]
-        self.frame_ranks /= self.frame_ranks_max_value
+        self.frame_ranks_max_index_original = self.quality_sorted_indices_original[0]
+        self.frame_ranks_max_value_original = self.frame_ranks_original[self.frame_ranks_max_index_original]
+        self.frame_ranks_original /= self.frame_ranks_max_value_original
 
-    def update_index_translation(self, index_translation):
+        # Keep the original ranking data and prepare for index translation. The translation can be
+        # reset later, and the original ranking be re-established.
+        self.frame_ranks = self.frame_ranks_original
+        self.quality_sorted_indices = self.quality_sorted_indices_original
+        self.rank_indices = self.rank_indices_original
+        self.frame_ranks_max_index = self.frame_ranks_max_index_original
+        self.frame_ranks_max_value = self.frame_ranks_max_value_original
+
+    def set_index_translation(self, index_translation):
         """
         After frames have been marked to be excluded from the further workflow, update the ranking
         tables, based on the index translation list from the frames module.
@@ -158,6 +164,19 @@ class RankFrames(object):
         self.frame_ranks_max_index = self.quality_sorted_indices[0]
         self.frame_ranks_max_value = self.frame_ranks[self.frame_ranks_max_index]
         self.frame_ranks /= self.frame_ranks_max_value
+
+    def reset_index_translation(self):
+        """
+        De-activate index translation and re-establish the original frame ranking data.
+
+        :return: -
+        """
+
+        self.frame_ranks = self.frame_ranks_original
+        self.quality_sorted_indices = self.quality_sorted_indices_original
+        self.rank_indices = self.rank_indices_original
+        self.frame_ranks_max_index = self.frame_ranks_max_index_original
+        self.frame_ranks_max_value = self.frame_ranks_max_value_original
 
 
 if __name__ == "__main__":

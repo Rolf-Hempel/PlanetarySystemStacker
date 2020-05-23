@@ -456,6 +456,9 @@ class Workflow(QtCore.QObject):
     @QtCore.pyqtSlot()
     def execute_rank_frames(self):
 
+        # Reset the frame index translation.
+        self.frames.reset_index_translation()
+
         self.set_status_bar_processing_phase("ranking frames")
         # Rank the frames by their overall local contrast.
         if self.configuration.global_parameters_protocol_level > 0:
@@ -485,12 +488,12 @@ class Workflow(QtCore.QObject):
         self.work_next_task_signal.emit("Select frames")
 
     @QtCore.pyqtSlot(bool)
-    def execute_update_index_translation_table(self, update_index_translation_table):
+    def execute_set_index_translation_table(self, set_index_translation_table):
         # If in the frame selection dialog the status of at least one frame was changed, update
         # the index translation table.
-        if update_index_translation_table:
-            self.frames.update_index_translation()
-            self.rank_frames.update_index_translation(self.frames.index_translation)
+        if set_index_translation_table:
+            self.frames.set_index_translation()
+            self.rank_frames.set_index_translation(self.frames.index_translation)
 
         self.work_next_task_signal.emit("Align frames")
 

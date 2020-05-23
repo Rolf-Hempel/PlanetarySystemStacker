@@ -258,7 +258,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.signal_load_master_flat.connect(self.workflow.calibration.load_master_flat)
         self.signal_frames.connect(self.workflow.execute_frames)
         self.signal_rank_frames.connect(self.workflow.execute_rank_frames)
-        self.signal_select_frames.connect(self.workflow.execute_update_index_translation_table)
+        self.signal_select_frames.connect(self.workflow.execute_set_index_translation_table)
         self.signal_align_frames.connect(self.workflow.execute_align_frames)
         self.signal_set_roi.connect(self.workflow.execute_set_roi)
         self.signal_set_alignment_points.connect(self.workflow.execute_set_alignment_points)
