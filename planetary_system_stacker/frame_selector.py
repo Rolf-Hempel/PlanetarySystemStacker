@@ -198,8 +198,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
     def block_widgets(self):
         """
-        Block signals from GUI elements to avoid cross-talk, and disable them to prevent unwanted
-        user interaction.
+        Disable GUI elements to prevent unwanted user interaction while the frame player is running.
 
         :return: -
         """
@@ -209,7 +208,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
 
     def unblock_widgets(self):
         """
-        Unblock signals from GUI elements which were temporarily blocked during player action.
+        Enable GUI elements which were temporarily blocked when the player stops.
 
         :return: -
         """
