@@ -1113,74 +1113,46 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
+        standard_activities = ['Read frames', 'Rank frames', 'Select frames', 'Align frames',
+                               'Select stack size', 'Set ROI', 'Set alignment points',
+                               'Compute frame qualities', 'Stack frames', 'Save stacked image',
+                               'Postprocessing', 'Save postprocessed image']
+
+        # Stacking jobs start with 'Read frames', postprocessing jobs with 'Postprocessing'
+        if self.workflow.activity == 'stacking':
+            start_index = standard_activities.index('Read frames')
+            if self.configuration.global_parameters_include_postprocessing:
+                stop_index = standard_activities.index('Save postprocessed image')
+            else:
+                stop_index = standard_activities.index('Save stacked image')
+        elif self.workflow.activity == 'postproc':
+            start_index = standard_activities.index('Postprocessing')
+            stop_index = standard_activities.index('Save postprocessed image')
+        else:
+            start_index = None
+            stop_index = None
+
+        # If the optional frame selection dialog is not activated, remove the activity from the list.
+        if not self.configuration.frames_add_selection_dialog:
+            standard_activities.remove('Select frames')
+
         self.ui.comboBox_back.currentTextChanged.disconnect(self.go_back)
         self.ui.comboBox_back.clear()
         self.ui.comboBox_back.addItem('Go back to:')
+
+        # From second job on, add the option to go back to the previous one.
         if self.job_index > 0 and self.job_number > 1:
             self.ui.comboBox_back.addItem('Previous job')
-        if self.activity == "Read frames":
-            self.ui.comboBox_back.addItems(['Read frames'])
-        elif self.activity == "Rank frames":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames'])
-        elif self.activity == "Select frames":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames'])
-        elif self.activity == "Align frames":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                            'Align frames'])
-        elif self.activity == "Select stack size":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                            'Align frames', 'Select stack size'])
-        elif self.activity == "Set ROI":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                            'Align frames', 'Select stack size', 'Set ROI'])
-        elif self.activity == "Set alignment points":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                            'Align frames', 'Select stack size', 'Set ROI',
-                                            'Set alignment points'])
-        elif self.activity == "Compute frame qualities":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                            'Align frames', 'Select stack size', 'Set ROI',
-                                            'Set alignment points', 'Compute frame qualities'])
-        elif self.activity == "Stack frames":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                            'Align frames', 'Select stack size', 'Set ROI',
-                                            'Set alignment points', 'Compute frame qualities',
-                                            'Stack frames'])
-        elif self.activity == "Save stacked image":
-            self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                            'Align frames', 'Select stack size', 'Set ROI',
-                                            'Set alignment points', 'Compute frame qualities',
-                                            'Stack frames', 'Save stacked image'])
-        elif self.activity == "Postprocessing":
-            if self.workflow.activity == 'stacking':
-                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                                'Align frames', 'Select stack size', 'Set ROI',
-                                                'Set alignment points',
-                                                'Compute frame qualities', 'Stack frames',
-                                                'Save stacked image', 'Postprocessing'])
-            # This is to be added for both job types.
-            self.ui.comboBox_back.addItems(['Postprocessing'])
-        elif self.activity == "Save postprocessed image":
-            if self.workflow.activity == 'stacking':
-                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                                'Align frames', 'Select stack size', 'Set ROI',
-                                                'Set alignment points',
-                                                'Compute frame qualities', 'Stack frames',
-                                                'Save stacked image', 'Postprocessing',
-                                                'Save postprocessed image'])
-            # This is to be added for both job types.
-            self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
+
+        # Add all activities up to the current one to the combobox.
+        if self.activity in standard_activities:
+            self.ui.comboBox_back.addItems(
+                standard_activities[start_index:standard_activities.index(self.activity)+1])
+
+        # At the end of a job, execution can resume all activities of the finished job.
         elif self.activity == "Next job":
-            if self.workflow.activity == 'stacking':
-                self.ui.comboBox_back.addItems(['Read frames', 'Rank frames', 'Select frames',
-                                                'Align frames', 'Select stack size', 'Set ROI',
-                                                'Set alignment points',
-                                                'Compute frame qualities', 'Stack frames',
-                                                'Save stacked image'])
-                if self.workflow.configuration.global_parameters_include_postprocessing:
-                    self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
-            else:
-                self.ui.comboBox_back.addItems(['Postprocessing', 'Save postprocessed image'])
+            self.ui.comboBox_back.addItems(standard_activities[start_index:stop_index+1])
+
         self.ui.comboBox_back.setCurrentIndex(0)
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
 
