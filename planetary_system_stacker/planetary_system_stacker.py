@@ -1147,11 +1147,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Add all activities up to the current one to the combobox.
         if self.activity in standard_activities:
             self.ui.comboBox_back.addItems(
-                standard_activities[start_index:standard_activities.index(self.activity)+1])
+                standard_activities[start_index:standard_activities.index(self.activity) + 1])
 
         # At the end of a job, execution can resume all activities of the finished job.
         elif self.activity == "Next job":
-            self.ui.comboBox_back.addItems(standard_activities[start_index:stop_index+1])
+            self.ui.comboBox_back.addItems(standard_activities[start_index:stop_index + 1])
 
         self.ui.comboBox_back.setCurrentIndex(0)
         self.ui.comboBox_back.currentTextChanged.connect(self.go_back)
@@ -1184,7 +1184,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             # the interaction, the status line shows the "busy" status, and the workflow is
             # suspended. By pressing "Go back to:", however, the user can restart from a previous
             # task.
-            if self.activity in ['Align frames', 'Select stack size', 'Set ROI',
+            if self.activity in ['Align frames', 'Select frames', 'Select stack size', 'Set ROI',
                                      'Set alignment points']:
                 self.activate_gui_elements([self.ui.comboBox_back], True)
             else:
