@@ -127,10 +127,6 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.background_excluded = QtGui.QColor(120, 120, 120)
         self.foreground_excluded = QtGui.QColor(255, 255, 255)
 
-        self.listWidget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-
-        self.listWidget.installEventFilter(self)
-        self.listWidget.itemClicked.connect(self.select_items)
         self.addButton.clicked.connect(self.use_triggered)
         self.removeButton.clicked.connect(self.not_use_triggered)
 
@@ -139,13 +135,17 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         self.quality_index = 0
         self.frame_index = self.quality_sorted_indices[self.quality_index]
 
-        # Initialize the list widget.
-        self.fill_list_widget()
-
         # Set up the frame selector and put it in the upper left corner.
         self.frame_selector = VideoFrameSelector(self.frames, self.index_included, self.frame_index)
         self.frame_selector.setObjectName("frame_selector")
         self.gridLayout.addWidget(self.frame_selector, 0, 0, 2, 3)
+
+        # Initialize the list widget.
+        self.fill_list_widget()
+        self.listWidget.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.listWidget.installEventFilter(self)
+        self.listWidget.itemClicked.connect(self.select_items)
+        self.listWidget.currentRowChanged.connect(self.synchronize_slider)
 
         # Group widget elements which are to be blocked during player execution in a list.
         self.widget_elements = [self.listWidget,
@@ -203,6 +203,9 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         :return: -
         """
 
+        # De-select all items in the listWidget when the player starts.
+        self.listWidget.clearSelection()
+
         for element in self.widget_elements:
             element.setDisabled(True)
 
@@ -255,14 +258,12 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
     def select_items(self):
         """
         If a list item or a range of items is selected, store the items and corresponding indices.
-        Set the frame slider to the first selected item and display it.
+        Synchronize the frame slider and frame viewer with the the current list position.
 
         :return: -
         """
 
-        # Block slider signals to avoid a shortcut.
-        self.slider_frames.blockSignals(True)
-
+        self.listWidget.currentItem().setSelected(True)
         self.items_selected = self.listWidget.selectedItems()
 
         if self.frame_ordering == "quality":
@@ -270,10 +271,30 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
                                      in self.items_selected]
             self.frame_index = self.indices_selected[0]
             self.quality_index = self.rank_indices[self.frame_index]
-            self.slider_frames.setValue(self.quality_index + 1)
         else:
             self.indices_selected = [self.listWidget.row(item) for item in self.items_selected]
             self.frame_index = self.indices_selected[0]
+            self.quality_index = self.rank_indices[self.frame_index]
+
+        self.synchronize_slider()
+
+    def synchronize_slider(self):
+        """
+        Set the frame slider to the value currently selected in the listWidget. Update the photo
+        displayed in the viewer.
+
+        :return: -
+        """
+
+        # Block slider signals to avoid a shortcut.
+        self.slider_frames.blockSignals(True)
+
+        if self.frame_ordering == "quality":
+            self.quality_index = self.listWidget.currentRow()
+            self.frame_index = self.quality_sorted_indices[self.quality_index]
+            self.slider_frames.setValue(self.quality_index + 1)
+        else:
+            self.frame_index = self.listWidget.currentRow()
             self.quality_index = self.rank_indices[self.frame_index]
             self.slider_frames.setValue(self.frame_index + 1)
 
@@ -317,6 +338,8 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
                 elif event.key() == Qt.Key_Escape:
                     self.items_selected = []
                     self.indices_selected = []
+                    self.listWidget.clearSelection()
+
         return super(FrameSelectorWidget, self).eventFilter(source, event)
 
     def use_triggered(self):
@@ -329,6 +352,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         :return: -
         """
 
+        self.select_items()
         if self.items_selected:
             for index, item in enumerate(self.items_selected):
                 index_selected = self.indices_selected[index]
@@ -345,6 +369,7 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         :return: -
         """
 
+        self.select_items()
         if self.items_selected:
             for index, item in enumerate(self.items_selected):
                 index_selected = self.indices_selected[index]
@@ -378,7 +403,6 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         # Adjust the frame list and select the current frame.
 
         self.listWidget.setCurrentRow(index, QtCore.QItemSelectionModel.SelectCurrent)
-        # self.select_items()
 
         # Update the image in the viewer.
         self.frame_selector.setPhoto(self.frame_index)
@@ -393,6 +417,10 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         :return: -
         """
 
+        # Block listWidget signals. Otherwise, changes to the widget triggered by changing the
+        # slider would cause trouble.
+        self.listWidget.blockSignals(True)
+
         if self.frame_ordering == "quality":
             self.frame_ordering = "chronological"
             self.slider_frames.setValue(self.frame_index + 1)
@@ -401,6 +429,9 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
             self.slider_frames.setValue(self.quality_index + 1)
 
         self.fill_list_widget()
+
+        # Unblock listWidget signals again.
+        self.listWidget.blockSignals(False)
 
     def pushbutton_play_clicked(self):
         """
