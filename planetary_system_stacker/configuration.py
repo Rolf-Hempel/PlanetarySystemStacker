@@ -862,15 +862,20 @@ class PostprocVersion(object):
 
     def remove_postproc_layer(self, layer_index):
         """
-        Remove a postprocessing layer from this version.
+        Remove a postprocessing layer from this version. If there is only one layer, do not delete
+        it, but reset it to standard values instead. This makes sure a version always has at least
+        one layer.
 
         :param layer_index: Index of the layer to be removed.
         :return: -
         """
 
-        if 0 <= layer_index < self.number_layers:
-            self.layers = self.layers[:layer_index] + self.layers[layer_index + 1:]
-            self.number_layers -= 1
+        if self.number_layers == 1:
+            self.layers = [PostprocLayer("Multilevel unsharp masking", 1., 0, False)]
+        else:
+            if 0 <= layer_index < self.number_layers:
+                self.layers = self.layers[:layer_index] + self.layers[layer_index + 1:]
+                self.number_layers -= 1
 
 
 class PostprocLayer(object):
