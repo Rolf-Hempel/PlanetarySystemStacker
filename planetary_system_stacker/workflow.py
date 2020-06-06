@@ -541,9 +541,14 @@ class Workflow(QtCore.QObject):
             if auto_execution or self.configuration.align_frames_automation:
 
                 self.my_timer.create_no_check('Select optimal alignment patch')
-                (y_low_opt, y_high_opt, x_low_opt,
-                 x_high_opt) = self.align_frames.compute_alignment_rect(
-                    self.configuration.align_frames_rectangle_scale_factor)
+                try:
+                    (y_low_opt, y_high_opt, x_low_opt,
+                     x_high_opt) = self.align_frames.compute_alignment_rect(
+                        self.configuration.align_frames_rectangle_scale_factor)
+                except (ArgumentError) as e:
+                    self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
+                    self.my_timer.stop('Select optimal alignment patch')
+                    return
                 self.my_timer.stop('Select optimal alignment patch')
                 if self.configuration.global_parameters_protocol_level > 1:
                     Miscellaneous.protocol(

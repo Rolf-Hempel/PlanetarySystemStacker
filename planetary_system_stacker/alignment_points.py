@@ -100,24 +100,31 @@ class AlignmentPoints(object):
         :param even: If True, compute locations for even row indices. Otherwise, for odd ones.
         :return: List of alignment point coordinates in the given direction
         """
+        # Initialize list of locations.
+        locations = []
 
-        # The number of interior alignment boxes in general is not an integer. Round to the next
-        # higher number.
-        num_interior_odd = int(ceil((num_pixels - 2 * min_boundary_distance) / step_size))
-        # Because alignment points are arranged in a staggered grid, in even rows there is one point
-        # more.
-        num_interior_even = num_interior_odd + 1
+        # If the frame size is too small for the AP size chosen, no AP locations can be computed.
+        # In this case an empty list is returned.
+        try:
+            # The number of interior alignment boxes in general is not an integer. Round to the next
+            # higher number.
+            num_interior_odd = int(ceil((num_pixels - 2 * min_boundary_distance) / step_size))
+            # Because alignment points are arranged in a staggered grid, in even rows there is one point
+            # more.
+            num_interior_even = num_interior_odd + 1
 
-        # The precise distance between alignment points will differ slightly from the specified
-        # step_size. Compute the exact distance. Integer locations will be rounded later.
-        distance_corrected = (num_pixels - 2 * min_boundary_distance) / num_interior_odd
+            # The precise distance between alignment points will differ slightly from the specified
+            # step_size. Compute the exact distance. Integer locations will be rounded later.
+            distance_corrected = (num_pixels - 2 * min_boundary_distance) / num_interior_odd
 
-        # Compute the AP locations, separately for even and odd rows.
-        if even:
-            locations = [int(min_boundary_distance + i * distance_corrected) for i in range(num_interior_even)]
-        else:
-            locations = [int(min_boundary_distance + 0.5 * distance_corrected +
-                             i * distance_corrected) for i in range(num_interior_odd)]
+            # Compute the AP locations, separately for even and odd rows.
+            if even:
+                locations = [int(min_boundary_distance + i * distance_corrected) for i in range(num_interior_even)]
+            else:
+                locations = [int(min_boundary_distance + 0.5 * distance_corrected +
+                                 i * distance_corrected) for i in range(num_interior_odd)]
+        except:
+            pass
         return locations
 
     def create_ap_grid(self):
@@ -147,6 +154,12 @@ class AlignmentPoints(object):
         # value (0 < value < 256)
         contrast_threshold = self.configuration.alignment_points_contrast_threshold * 256
 
+        # Reset the alignment point list, and initialize counters for APs which are dropped because
+        # they do not satisfy the brightness or structure condition.
+        self.alignment_points = []
+        self.alignment_points_dropped_dim = 0
+        self.alignment_points_dropped_structure = 0
+
         # Compute the minimum distance of an AP from the boundary.
         min_boundary_distance = max(half_box_width + search_width, half_patch_width)
 
@@ -158,11 +171,9 @@ class AlignmentPoints(object):
         ap_locations_x_odd = self.ap_locations(self.num_pixels_x, min_boundary_distance,
                                                step_size, False)
 
-        # Reset the alignment point list, and initialize counters for APs which are dropped because
-        # they do not satisfy the brightness or structure condition.
-        self.alignment_points = []
-        self.alignment_points_dropped_dim = 0
-        self.alignment_points_dropped_structure = 0
+        # If no AP coordinates fit into the frame, no APs are created.
+        if not ap_locations_y or not ap_locations_x_even or not ap_locations_x_odd:
+            return
 
         # Compute the minimum distance of an AP center from the frame boundary.
         min_boundary_distance = max(

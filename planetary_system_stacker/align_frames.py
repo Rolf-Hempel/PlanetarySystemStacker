@@ -130,16 +130,19 @@ class AlignFrames(object):
             x_low += rect_x_2
             x_high += rect_x_2
 
-        # Sort lists by quality.
-        arq, arb = zip(*sorted(zip(self.alignment_rect_qualities, self.alignment_rect_bounds),
-                               reverse=True))
-        self.alignment_rect_qualities = list(arq)
-        self.alignment_rect_bounds = list(arb)
+        try:
+            # Sort lists by quality.
+            arq, arb = zip(*sorted(zip(self.alignment_rect_qualities, self.alignment_rect_bounds),
+                                   reverse=True))
+            self.alignment_rect_qualities = list(arq)
+            self.alignment_rect_bounds = list(arb)
 
-        # Set the optimal coordinates and return them as a tuple.
-        (self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt) = \
-            self.alignment_rect_bounds[0]
-        return self.alignment_rect_bounds[0]
+            # Set the optimal coordinates and return them as a tuple.
+            (self.y_low_opt, self.y_high_opt, self.x_low_opt, self.x_high_opt) = \
+                self.alignment_rect_bounds[0]
+            return self.alignment_rect_bounds[0]
+        except:
+            raise ArgumentError("The frame is too small for alignment parameters chosen")
 
     def select_alignment_rect(self, index):
         """
