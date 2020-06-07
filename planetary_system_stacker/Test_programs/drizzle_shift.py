@@ -93,25 +93,33 @@ def show_image(window_name, image, fullscreen=False):
 
 
 def subpixel_shifted_frame(frame, subpixel_shift_y, subpixel_shift_x):
-    extension_factor = 10
-    width = int(frame.shape[1] * extension_factor)
-    height = int(frame.shape[0] * extension_factor)
+    interpolation_method = INTER_CUBIC
+    undersampling_factor = 0.25
+    interpol_factor = 10
+    width = int(frame.shape[1] * interpol_factor)
+    height = int(frame.shape[0] * interpol_factor)
     dim = (width, height)
-    frame_extended = resize(frame, dim, interpolation=INTER_CUBIC)
-    shift_y = int(round(subpixel_shift_y * extension_factor))
-    shift_x = int(round(subpixel_shift_x * extension_factor))
-    border_y_original = ceil(abs(subpixel_shift_y))
-    border_x_original = ceil(abs(subpixel_shift_x))
-    border_y = border_y_original * extension_factor
-    border_x = border_x_original * extension_factor
+    frame_extended = resize(frame, dim, interpolation=interpolation_method)
+    print("shape original: " + str(frame.shape) + ", shape extended: " + str(
+        frame_extended.shape))
+    shift_factor = interpol_factor / undersampling_factor
+    shift_y = int(round(subpixel_shift_y * shift_factor))
+    shift_x = int(round(subpixel_shift_x * shift_factor))
+    border_y = abs(shift_y)
+    border_x = abs(shift_x)
 
-    dim_resized = (frame.shape[1] - 2 * border_x_original, frame.shape[0] - 2 * border_y_original)
-    frame_resized = frame[border_y_original:frame.shape[0] - border_y_original,
-                    border_x_original:frame.shape[1] - border_x_original]
-    frame_shifted = resize(
-        frame_extended[border_y + shift_y:frame_extended.shape[0] - border_y + shift_y,
-        border_x + shift_x:frame_extended.shape[1] - border_x + shift_x], dim_resized,
-        interpolation=INTER_CUBIC)
+    frame_cropped_original = frame_extended[border_y:frame_extended.shape[0] - border_y,
+                             border_x:frame_extended.shape[1] - border_x]
+    frame_cropped_shifted = frame_extended[border_y + shift_y:frame_extended.shape[0] - border_y + shift_y,
+                            border_x + shift_x:frame_extended.shape[1] - border_x + shift_x]
+
+    width = int(round(frame_cropped_original.shape[1] / shift_factor))
+    height = int(round(frame_cropped_original.shape[0] / shift_factor))
+    dim = (width, height)
+
+    frame_resized = resize(frame_cropped_original, dim, interpolation=interpolation_method)
+    frame_shifted = resize(frame_cropped_shifted, dim, interpolation=interpolation_method)
+
     print("shape resized: " + str(frame_resized.shape) + ", shape shifted: " + str(
         frame_shifted.shape))
     return frame_resized, frame_shifted
@@ -129,13 +137,10 @@ show_image("Original image", img, fullscreen=True)
 # for inter in [INTER_AREA, INTER_LINEAR, INTER_CUBIC]:
 #     resize_test(img, drizzle_factor, inter, patch_size)
 
-undersampling_factor = 0.25
-image_undersampled = resize(img, None, fx=undersampling_factor, fy=undersampling_factor,
-                            interpolation=INTER_CUBIC)
-show_image("Undersampled image", image_undersampled, fullscreen=True)
-
-spx_shifty = 5.4
+spx_shifty = 5.3
 spx_shiftx = -3.3
-img_resized, img_shifted = subpixel_shifted_frame(image_undersampled, spx_shifty, spx_shiftx)
-show_image("Image resized", img_resized, fullscreen=True)
-show_image("Image shifted", img_shifted, fullscreen=True)
+
+img_resized, img_shifted = subpixel_shifted_frame(img, spx_shifty, spx_shiftx)
+for i in range(10):
+    show_image("Image resized", img_resized, fullscreen=True)
+    show_image("Image shifted", img_shifted, fullscreen=True)
