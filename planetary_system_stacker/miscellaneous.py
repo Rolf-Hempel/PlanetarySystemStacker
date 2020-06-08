@@ -339,8 +339,8 @@ class Miscellaneous(object):
                     # correction is within the 3x3 box, it is trusted (and used).
                     y_corr, x_corr = Miscellaneous.sub_pixel_solve(surroundings)
                     if abs(y_corr) <= 1. and abs(x_corr) <= 1.:
-                        shift_y_local_second_phase += y_corr
-                        shift_x_local_second_phase += x_corr
+                        shift_y_local_second_phase -= y_corr
+                        shift_x_local_second_phase -= x_corr
                 except:
                     # print ("Subpixel solve not successful")
                     pass

@@ -1,10 +1,12 @@
 from math import ceil
 from time import time
 
-from cv2 import resize, INTER_AREA, INTER_LINEAR, INTER_CUBIC, imshow, waitKey, destroyAllWindows, \
-    imread, IMREAD_UNCHANGED, IMREAD_GRAYSCALE, namedWindow, setWindowProperty, WND_PROP_FULLSCREEN, \
-    WINDOW_FULLSCREEN
-from numpy import arange, zeros
+from cv2 import resize, INTER_CUBIC, imshow, waitKey, destroyAllWindows, \
+    imread, IMREAD_GRAYSCALE, namedWindow, setWindowProperty, WND_PROP_FULLSCREEN, \
+    WINDOW_FULLSCREEN, GaussianBlur
+from numpy import arange, zeros, float32
+
+from miscellaneous import Miscellaneous
 
 
 def drizzle_shift():
@@ -110,7 +112,8 @@ def subpixel_shifted_frame(frame, subpixel_shift_y, subpixel_shift_x):
 
     frame_cropped_original = frame_extended[border_y:frame_extended.shape[0] - border_y,
                              border_x:frame_extended.shape[1] - border_x]
-    frame_cropped_shifted = frame_extended[border_y + shift_y:frame_extended.shape[0] - border_y + shift_y,
+    frame_cropped_shifted = frame_extended[
+                            border_y + shift_y:frame_extended.shape[0] - border_y + shift_y,
                             border_x + shift_x:frame_extended.shape[1] - border_x + shift_x]
 
     width = int(round(frame_cropped_original.shape[1] / shift_factor))
@@ -129,7 +132,7 @@ def subpixel_shifted_frame(frame, subpixel_shift_y, subpixel_shift_x):
 # drizzle_shift_patch(-1.4, 2, 7)
 
 img = imread('../Images/Moon_Tile-024_043939_stacked_with_blurr_pp.tif', IMREAD_GRAYSCALE)
-show_image("Original image", img, fullscreen=True)
+# show_image("Original image", img, fullscreen=True)
 
 # drizzle_factor = 3.
 # patch_size = 40
@@ -137,10 +140,46 @@ show_image("Original image", img, fullscreen=True)
 # for inter in [INTER_AREA, INTER_LINEAR, INTER_CUBIC]:
 #     resize_test(img, drizzle_factor, inter, patch_size)
 
-spx_shifty = 5.3
-spx_shiftx = -3.3
+spx_shifty = 5.2
+spx_shiftx = 3.5
 
 img_resized, img_shifted = subpixel_shifted_frame(img, spx_shifty, spx_shiftx)
-for i in range(10):
-    show_image("Image resized", img_resized, fullscreen=True)
-    show_image("Image shifted", img_shifted, fullscreen=True)
+# for i in range(10):
+#     show_image("Image resized", img_resized, fullscreen=True)
+#     show_image("Image shifted", img_shifted, fullscreen=True)
+
+gauss_width_reference = 15
+gauss_width_frame = 19
+reference_frame_blurred_intermediate = GaussianBlur(img_resized,
+                                                    (gauss_width_reference, gauss_width_reference),
+                                                    0).astype(float32)
+reference_frame_blurred = GaussianBlur(reference_frame_blurred_intermediate,
+                                       (gauss_width_reference, gauss_width_reference), 0).astype(
+                                        float32)
+frame_blurred = GaussianBlur(img_shifted, (gauss_width_frame, gauss_width_frame), 0)
+
+y_ap = 170
+x_ap = 200
+half_box_width = 24
+y_low = y_ap - half_box_width
+y_high = y_ap + half_box_width
+x_low = x_ap - half_box_width
+x_high = x_ap + half_box_width
+reference_box_second_phase = reference_frame_blurred[y_low: y_high, x_low: x_high]
+reference_box_first_phase = reference_box_second_phase[::2, ::2]
+
+search_width = 10
+shift_y_local_first_phase, shift_x_local_first_phase, success_first_phase, \
+shift_y_local_second_phase, shift_x_local_second_phase, success_second_phase = \
+    Miscellaneous.multilevel_correlation(reference_box_first_phase, frame_blurred,
+                                         gauss_width_frame,
+                                         reference_box_second_phase, y_low, y_high, x_low, x_high,
+                                         search_width,
+                                         weight_matrix_first_phase=None, subpixel_solve=True)
+
+print("Shift in y, first phase: " + str(shift_y_local_first_phase) + ", second phase: " + str(
+    shift_y_local_second_phase) + ", total: " + str(
+    shift_y_local_first_phase + shift_y_local_second_phase))
+print("Shift in x, first phase: " + str(shift_x_local_first_phase) + ", second phase: " + str(
+    shift_x_local_second_phase) + ", total: " + str(
+    shift_x_local_first_phase + shift_x_local_second_phase))
