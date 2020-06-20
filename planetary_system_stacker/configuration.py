@@ -20,10 +20,11 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
+import sys
 from configparser import ConfigParser
-from os.path import expanduser, join, isfile
-from os.path import splitext
 from copy import deepcopy
+from os.path import expanduser, join, isfile, dirname
+from os.path import splitext
 
 from exceptions import IncompatibleVersionsError
 
@@ -72,7 +73,7 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_height = 800
         self.hidden_parameters_main_window_maximized = False
         # self.global_parameters_version = "PlanetarySystemStacker"
-        self.global_parameters_version = "PlanetarySystemStacker 0.8.1"
+        self.global_parameters_version = "PlanetarySystemStacker 0.8.3"
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = False
         self.global_parameters_store_protocol_with_result = False
@@ -162,11 +163,22 @@ class ConfigurationParameters(object):
 class Configuration(object):
     def __init__(self):
         # self.global_parameters_version = "PlanetarySystemStacker"
-        self.global_parameters_version = "PlanetarySystemStacker 0.8.1"
+        self.global_parameters_version = "PlanetarySystemStacker 0.8.3"
 
         # Set fixed parameters which are hidden from the user. Hidden parameters which are
         # changeable are stored in the configuration object.
-        self.window_icon = 'PSS-Icon-64.ico'
+
+        # Look for PSS icon in several places:
+        python_dir = dirname(sys.executable)
+        icon_locations = [join('Icons', 'PSS-Icon-64.png'),
+                          join(python_dir, "Lib", "site-packages", 'planetary_system_stacker',
+                                'Icons', 'PSS-Icon-64.png')]
+
+        self.window_icon = None
+        for location in icon_locations:
+            if isfile(location):
+                self.window_icon = location
+                break
 
         self.frames_mono_channel = 'green'
         self.frames_color_difference_threshold = 0
