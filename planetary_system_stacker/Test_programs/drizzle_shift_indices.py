@@ -1,6 +1,8 @@
 from math import ceil
 from numpy import ndarray, zeros
 
+from miscellaneous import Miscellaneous
+
 
 def compute_bounds(x_low, x_high, drizzle_factor, shift):
     """
@@ -115,6 +117,29 @@ def compute_bounds_2d(y_low, y_high, x_low, x_high, shift_y, shift_x, drizzle_fa
 
     return (y_low_from, y_high_from, x_low_from, x_high_from, y_offset, x_offset)
 
+def equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor):
+    dim_y, dim_x = patch.shape
+    holes = []
+    for y_offset in range(drizzle_factor):
+        for x_offset in range(drizzle_factor):
+            if offset_counters[y_offset, x_offset]:
+                normalization_factor = stack_size/offset_counters[y_offset, x_offset]
+                patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] *= normalization_factor
+            else:
+                holes.append((y_offset, x_offset))
+    for (y_offset, x_offset) in holes:
+        patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] = 0.
+        for radius in range(1, drizzle_factor):
+            n_success = 0
+            for (y, x) in Miscellaneous.circle_around(y_offset, x_offset, radius):
+                if 0<=y<drizzle_factor and 0<=x<drizzle_factor and (y, x) not in holes:
+                    patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] += patch[y:dim_y:drizzle_factor, x:dim_x:drizzle_factor]
+                    n_success += 1
+            if n_success:
+                patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] *= 1./n_success
+                break
+
+
 def test_index_computations():
     # Set parameters and example shift value.
     drizzle_factor = 3
@@ -182,9 +207,34 @@ def test_remap_rigid_drizzled():
 
     print ("patch: " + str(patch))
 
+def test_equalize_ap_patch():
+    drizzle_factor = 3
+    y_dim = 3
+    x_dim = 4
+    y_dim_patch = y_dim*drizzle_factor
+    x_dim_patch = x_dim*drizzle_factor
+    patch = zeros(shape=(y_dim_patch, x_dim_patch), dtype=float)
+    offset_counters = zeros(shape=(drizzle_factor, drizzle_factor), dtype=int)
+    offset_counters[0, 0] = 1
+    offset_counters[0, 1] = 2
+    offset_counters[1, 0] = 1
+    stack_size = offset_counters.sum()
+    for y_offset in range(drizzle_factor):
+        for x_offset in range(drizzle_factor):
+            counter = offset_counters[y_offset, x_offset]
+            if counter:
+                for y in range(y_offset, y_dim_patch, drizzle_factor):
+                    for x in range(x_offset, x_dim_patch, drizzle_factor):
+                        patch[y, x] = counter * (1000*y + x)
+                        # patch[y, x] = counter
+
+    print("patch before equalization: " + str(patch))
+    equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor)
+    print("patch after equalization: " + str(patch))
 
 
 # Main program: Control the test to be performed.
 # test_index_computations()
 # test_index_computations_2d()
-test_remap_rigid_drizzled()
+# test_remap_rigid_drizzled()
+test_equalize_ap_patch()
