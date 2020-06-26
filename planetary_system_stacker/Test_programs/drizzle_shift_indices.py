@@ -1,4 +1,5 @@
 from math import ceil
+
 from numpy import ndarray, zeros
 
 from miscellaneous import Miscellaneous
@@ -49,6 +50,7 @@ def compute_bounds(x_low, x_high, drizzle_factor, shift):
     xd_high_to = drizzle_factor * x_high_from - shift_d
 
     return (x_low_from, x_high_from, xd_low_to, xd_high_to, x_offset)
+
 
 def compute_bounds_2d(y_low, y_high, x_low, x_high, shift_y, shift_x, drizzle_factor):
     """
@@ -117,6 +119,7 @@ def compute_bounds_2d(y_low, y_high, x_low, x_high, shift_y, shift_x, drizzle_fa
 
     return (y_low_from, y_high_from, x_low_from, x_high_from, y_offset, x_offset)
 
+
 def equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor):
     """
     During drizzling the AP patch gets different numbers of frame contributions at different
@@ -147,8 +150,9 @@ def equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor):
     for y_offset in range(drizzle_factor):
         for x_offset in range(drizzle_factor):
             if offset_counters[y_offset, x_offset]:
-                normalization_factor = stack_size/offset_counters[y_offset, x_offset]
-                patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] *= normalization_factor
+                normalization_factor = stack_size / offset_counters[y_offset, x_offset]
+                patch[y_offset:dim_y:drizzle_factor,
+                x_offset:dim_x:drizzle_factor] *= normalization_factor
             # For locations with zero contributions (holes) remember the location.
             else:
                 holes.append((y_offset, x_offset))
@@ -164,15 +168,17 @@ def equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor):
         for radius in range(1, drizzle_factor):
             n_success = 0
             for (y, x) in Miscellaneous.circle_around(y_offset, x_offset, radius):
-                if 0<=y<drizzle_factor and 0<=x<drizzle_factor and (y, x) not in holes:
+                if 0 <= y < drizzle_factor and 0 <= x < drizzle_factor and (y, x) not in holes:
                     # A non-zero entry is found, add its contribution to the buffer.
-                    patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] += patch[y:dim_y:drizzle_factor, x:dim_x:drizzle_factor]
+                    patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] += \
+                        patch[y:dim_y:drizzle_factor, x:dim_x:drizzle_factor]
                     n_success += 1
 
             # There was at least one non-zero contribution on the circle with this radius. Normalize
             # the buffer with the number of contributions and continue with the next hole.
             if n_success:
-                patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] *= 1./n_success
+                patch[y_offset:dim_y:drizzle_factor,
+                x_offset:dim_x:drizzle_factor] *= 1. / n_success
                 break
 
     # Return the number of holes in the drizzle pattern.
@@ -196,6 +202,7 @@ def test_index_computations():
         x_high_from) + "\nxd_low_to: " + str(xd_low_to) + ", xd_high_to: " + str(
         xd_high_to) + "\nx_offset: " + str(x_offset))
 
+
 def test_index_computations_2d():
     # Set parameters and example shift value.
     drizzle_factor = 3
@@ -215,6 +222,7 @@ def test_index_computations_2d():
         y_high_from) + "\ny_offset: " + str(y_offset) + "\nx_low_from: " + str(
         x_low_from) + ", x_high_from: " + str(x_high_from) + "\nx_offset: " + str(x_offset))
 
+
 def test_remap_rigid_drizzled():
     drizzle_factor = 3
     y_dim = 20
@@ -224,8 +232,8 @@ def test_remap_rigid_drizzled():
     frame = ndarray(shape=(y_dim, x_dim), dtype=int)
     for y in range(y_dim):
         for x in range(x_dim):
-            frame[y, x] = 1000*y + x
-    patch = zeros((y_dim_patch*drizzle_factor, x_dim_patch*drizzle_factor), dtype=int)
+            frame[y, x] = 1000 * y + x
+    patch = zeros((y_dim_patch * drizzle_factor, x_dim_patch * drizzle_factor), dtype=int)
 
     y_low = 10
     y_high = y_low + y_dim_patch
@@ -244,14 +252,15 @@ def test_remap_rigid_drizzled():
     patch[y_offset::drizzle_factor, x_offset::drizzle_factor] = \
         frame[y_low_from:y_high_from, x_low_from:x_high_from]
 
-    print ("patch: " + str(patch))
+    print("patch: " + str(patch))
+
 
 def test_equalize_ap_patch():
     drizzle_factor = 3
     y_dim = 3
     x_dim = 4
-    y_dim_patch = y_dim*drizzle_factor
-    x_dim_patch = x_dim*drizzle_factor
+    y_dim_patch = y_dim * drizzle_factor
+    x_dim_patch = x_dim * drizzle_factor
     patch = zeros(shape=(y_dim_patch, x_dim_patch), dtype=float)
     offset_counters = zeros(shape=(drizzle_factor, drizzle_factor), dtype=int)
     offset_counters[0, 0] = 1
@@ -265,13 +274,13 @@ def test_equalize_ap_patch():
             if counter:
                 for y in range(y_offset, y_dim_patch, drizzle_factor):
                     for x in range(x_offset, x_dim_patch, drizzle_factor):
-                        patch[y, x] = counter * (1000*y + x)
+                        patch[y, x] = counter * (1000 * y + x)
                         # patch[y, x] = counter
 
     print("patch before equalization: \n" + str(patch))
     len_holes = equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor)
     print("patch after equalization: \n" + str(patch))
-    print ("Number of holes in drizzle pattern: " + str(len_holes))
+    print("Number of holes in drizzle pattern: " + str(len_holes))
 
 
 # Main program: Control the test to be performed.
