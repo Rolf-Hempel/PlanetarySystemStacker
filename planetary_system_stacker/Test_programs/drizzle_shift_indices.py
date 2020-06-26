@@ -49,7 +49,7 @@ def compute_bounds(x_low, x_high, drizzle_factor, shift):
     xd_low_to = drizzle_factor * x_low_from - shift_d
     xd_high_to = drizzle_factor * x_high_from - shift_d
 
-    return (x_low_from, x_high_from, xd_low_to, xd_high_to, x_offset)
+    return x_low_from, x_high_from, xd_low_to, xd_high_to, x_offset
 
 
 def compute_bounds_2d(y_low, y_high, x_low, x_high, shift_y, shift_x, drizzle_factor):
@@ -117,7 +117,7 @@ def compute_bounds_2d(y_low, y_high, x_low, x_high, shift_y, shift_x, drizzle_fa
         x_high_from = x_high + shift_ceil
         x_offset = int(drizzle_factor * shift_ceil - shift_d_x)
 
-    return (y_low_from, y_high_from, x_low_from, x_high_from, y_offset, x_offset)
+    return y_low_from, y_high_from, x_low_from, x_high_from, y_offset, x_offset
 
 
 def equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor):
