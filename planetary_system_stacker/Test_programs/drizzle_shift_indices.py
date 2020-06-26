@@ -118,26 +118,65 @@ def compute_bounds_2d(y_low, y_high, x_low, x_high, shift_y, shift_x, drizzle_fa
     return (y_low_from, y_high_from, x_low_from, x_high_from, y_offset, x_offset)
 
 def equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor):
+    """
+    During drizzling the AP patch gets different numbers of frame contributions at different
+    positions in the drizzling pattern, depending on the distribution of sup-pixel shift values.
+    The array "offset_counters" contains these numbers, with the sum of all those numbers being the
+    total stack size.
+
+    Scale all patch entries with "total stack size" / "offset counter". The result are uniform
+    patch entries which look as if there had been "total stack size" contributions in all drizzle
+    pattern locations.
+
+    Special care has to be taken at locations where not a single frame contributed (called "holes").
+    Here insert the average of patch values at all drizzle positions over a circle with minimum
+    radius containing at least one non-zero contribution.
+
+    :param patch: AP buffer after stacking with drizzling.
+    :param offset_counters: Integer array, size drizzle_factor x drizzle_factor, with contribution
+                            counts at all drizzle locations.
+    :param stack_size: Overall number of frames stacked
+    :param drizzle_factor: Factor by which the number of pixels is multiplied in each direction.
+    :return: Number of drizzle locations without frame contributions.
+    """
+
     dim_y, dim_x = patch.shape
     holes = []
+
+    # First normalize the patch locations with non-zero contributions.
     for y_offset in range(drizzle_factor):
         for x_offset in range(drizzle_factor):
             if offset_counters[y_offset, x_offset]:
                 normalization_factor = stack_size/offset_counters[y_offset, x_offset]
                 patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] *= normalization_factor
+            # For locations with zero contributions (holes) remember the location.
             else:
                 holes.append((y_offset, x_offset))
+
+    # Now fill the holes with interpolated values from locations close by.
     for (y_offset, x_offset) in holes:
+
+        # Initialize the buffer locations witz zeros.
         patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] = 0.
+
+        # Look for the circle with smallest radius around the hole with at least one non-zero
+        # contribution.
         for radius in range(1, drizzle_factor):
             n_success = 0
             for (y, x) in Miscellaneous.circle_around(y_offset, x_offset, radius):
                 if 0<=y<drizzle_factor and 0<=x<drizzle_factor and (y, x) not in holes:
+                    # A non-zero entry is found, add its contribution to the buffer.
                     patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] += patch[y:dim_y:drizzle_factor, x:dim_x:drizzle_factor]
                     n_success += 1
+
+            # There was at least one non-zero contribution on the circle with this radius. Normalize
+            # the buffer with the number of contributions and continue with the next hole.
             if n_success:
                 patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] *= 1./n_success
                 break
+
+    # Return the number of holes in the drizzle pattern.
+    return len(holes)
 
 
 def test_index_computations():
@@ -218,6 +257,7 @@ def test_equalize_ap_patch():
     offset_counters[0, 0] = 1
     offset_counters[0, 1] = 2
     offset_counters[1, 0] = 1
+    offset_counters[2, 2] = 3
     stack_size = offset_counters.sum()
     for y_offset in range(drizzle_factor):
         for x_offset in range(drizzle_factor):
@@ -228,9 +268,10 @@ def test_equalize_ap_patch():
                         patch[y, x] = counter * (1000*y + x)
                         # patch[y, x] = counter
 
-    print("patch before equalization: " + str(patch))
-    equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor)
-    print("patch after equalization: " + str(patch))
+    print("patch before equalization: \n" + str(patch))
+    len_holes = equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor)
+    print("patch after equalization: \n" + str(patch))
+    print ("Number of holes in drizzle pattern: " + str(len_holes))
 
 
 # Main program: Control the test to be performed.
