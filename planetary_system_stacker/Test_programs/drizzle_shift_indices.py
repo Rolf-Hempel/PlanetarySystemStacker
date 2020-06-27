@@ -119,6 +119,65 @@ def compute_bounds_2d(y_low, y_high, x_low, x_high, shift_y, shift_x, drizzle_fa
 
     return y_low_from, y_high_from, x_low_from, x_high_from, y_offset, x_offset
 
+def remap_rigid_drizzled(frame, buffer, offset_counters, shift_y, shift_x, y_low, y_high, x_low,
+                         x_high, drizzle_factor):
+    """
+    The alignment point patch is taken from the given frame with a constant shift in x and y
+    directions. The shifted patch is then added to the given alignment point buffer.
+
+    Please note that all indices related to the frame, and all input arguments in particular, are
+    in non-drizzled coordinates. The size of the buffer, on the other side, is extended by the
+    drizzling factor "drizzle_factor". To enable sub-pixel accuracy, shift values are input as
+    non-integer floats.
+
+    :param frame: frame to be stacked
+    :param buffer: Stacking buffer of the corresponding alignment point (extended for drizzling)
+    :param offset_counters: Integer array, size drizzle_factor x drizzle_factor, with contribution
+                            counts at all drizzle locations.
+    :param shift_y: Constant shift in y direction between frame stack and current frame (float)
+    :param shift_x: Constant shift in x direction between frame stack and current frame (float)
+    :param y_low: Lower y index of the quality window on which this method operates
+    :param y_high: Upper y index of the quality window on which this method operates
+    :param x_low: Lower x index of the quality window on which this method operates
+    :param x_high: Upper x index of the quality window on which this method operates
+    :param drizzle_factor: (integer) drizzle factor, typically 2 or 3.
+    :return: -
+    """
+
+    # Compute the index bounds and offset.
+    y_low_from, y_high_from, x_low_from, x_high_from, y_offset, x_offset = \
+        compute_bounds_2d(y_low, y_high, x_low, x_high, shift_y, shift_x, drizzle_factor)
+
+    # Compute index bounds for "source" patch in current frame, and for summation buffer
+    # ("target"). Because of local warp effects, the indexing may reach beyond frame borders.
+    # In this case reduce the copy area.
+    frame_size_y = frame.shape[0]
+    y_low_target = y_offset
+    # If the shift reaches beyond the frame, reduce the copy area.
+    if y_low_from < 0:
+        y_low_target -= y_low_from*drizzle_factor
+        y_low_from = 0
+    if y_high_from > frame_size_y:
+        y_high_from = frame_size_y
+    y_high_target = y_low_target + (y_high_from - y_low_from)*drizzle_factor
+
+    # The same in x direction.
+    frame_size_x = frame.shape[1]
+    x_low_target = x_offset
+    # If the shift reaches beyond the frame, reduce the copy area.
+    if x_low_from < 0:
+        x_low_target -= x_low_from * drizzle_factor
+        x_low_from = 0
+    if x_high_from > frame_size_x:
+        x_high_from = frame_size_x
+    x_high_target = x_low_target + (x_high_from - x_low_from) * drizzle_factor
+
+    # Add the shifted frame patch to the AP buffer.
+    buffer[y_low_target:y_high_target:drizzle_factor, x_low_target:x_high_target:drizzle_factor] += \
+        frame[y_low_from:y_high_from, x_low_from:x_high_from]
+
+    # Increment the offset counter for the current drizzle position.
+    offset_counters[y_offset, x_offset] += 1
 
 def equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor):
     """
@@ -234,6 +293,7 @@ def test_remap_rigid_drizzled():
         for x in range(x_dim):
             frame[y, x] = 1000 * y + x
     patch = zeros((y_dim_patch * drizzle_factor, x_dim_patch * drizzle_factor), dtype=int)
+    offset_counters = zeros(shape=(drizzle_factor, drizzle_factor), dtype=int)
 
     y_low = 10
     y_high = y_low + y_dim_patch
@@ -249,8 +309,8 @@ def test_remap_rigid_drizzled():
         y_high_from) + "\ny_offset: " + str(y_offset) + "\nx_low_from: " + str(
         x_low_from) + ", x_high_from: " + str(x_high_from) + "\nx_offset: " + str(x_offset))
 
-    patch[y_offset::drizzle_factor, x_offset::drizzle_factor] = \
-        frame[y_low_from:y_high_from, x_low_from:x_high_from]
+    remap_rigid_drizzled(frame, patch, offset_counters, shift_y, shift_x, y_low, y_high, x_low,
+                         x_high, drizzle_factor)
 
     print("patch: " + str(patch))
 
@@ -286,5 +346,5 @@ def test_equalize_ap_patch():
 # Main program: Control the test to be performed.
 # test_index_computations()
 # test_index_computations_2d()
-# test_remap_rigid_drizzled()
-test_equalize_ap_patch()
+test_remap_rigid_drizzled()
+# test_equalize_ap_patch()
