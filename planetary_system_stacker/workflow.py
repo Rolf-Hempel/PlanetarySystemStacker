@@ -930,10 +930,15 @@ class Workflow(QtCore.QObject):
                     self.attached_log_file, precede_with_timestamp=False)
 
             if self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.print_postproc_parameters(
-                    self.configuration.postproc_data_object.versions[
-                        self.configuration.postproc_data_object.version_selected].layers,
-                    self.attached_log_file)
+                if self.configuration.postproc_data_object.version_selected:
+                    Miscellaneous.print_postproc_parameters(
+                        self.configuration.postproc_data_object.versions[
+                            self.configuration.postproc_data_object.version_selected].layers,
+                        self.attached_log_file)
+                else:
+                    Miscellaneous.protocol(
+                        "           The image was not modified in postprocessing.",
+                        self.attached_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Next job")
 

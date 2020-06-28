@@ -21,6 +21,8 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from glob import glob
+from math import ceil
+from statistics import median
 from time import sleep
 from warnings import filterwarnings
 
@@ -30,7 +32,6 @@ from numpy import int as np_int
 from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
     sqrt, uint16, clip, minimum
 from skimage import img_as_uint, img_as_ubyte
-from statistics import median
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints
@@ -507,17 +508,169 @@ class StackFrames(object):
             x_high_source = frame_size_x
         x_high_target = x_low_target + x_high_source - x_low_source
 
-        # If frames are in color, stack all three color channels using the same mapping. Add the
-        # frame contribution to the stacking buffer.
-        if self.frames.color:
-            # Add the contribution from the shifted window in this frame to the stacking buffer.
-            buffer[y_low_target:y_high_target, x_low_target:x_high_target, :] += \
-                frame[y_low_source:y_high_source, x_low_source:x_high_source, :]
+        # If frames are in color, stack all three color channels using the same mapping. Please note
+        # that in this case the buffers have a third dimension (color), while monochrome buffers
+        # are two-dimensional. Add the frame contribution to the stacking buffer.
+        buffer[y_low_target:y_high_target, x_low_target:x_high_target] += \
+            frame[y_low_source:y_high_source, x_low_source:x_high_source]
 
-        # The same for monochrome mode.
+    def remap_rigid_drizzled(self, frame, buffer, offset_counters, shift_y, shift_x, y_low, y_high,
+                             x_low, x_high, drizzle_factor):
+        """
+        The alignment point patch is taken from the given frame with a constant shift in x and y
+        directions. The shifted patch is then added to the given alignment point buffer.
+
+        Please note that all indices related to the frame, and all input arguments in particular, are
+        in non-drizzled coordinates. The size of the buffer, on the other side, is extended by the
+        drizzling factor "drizzle_factor". To enable sub-pixel accuracy, shift values are input as
+        non-integer floats.
+
+        :param frame: frame to be stacked
+        :param buffer: Stacking buffer of the corresponding alignment point (extended for drizzling)
+        :param offset_counters: Integer array, size drizzle_factor x drizzle_factor, with contribution
+                                counts at all drizzle locations.
+        :param shift_y: Constant shift in y direction between frame stack and current frame (float)
+        :param shift_x: Constant shift in x direction between frame stack and current frame (float)
+        :param y_low: Lower y index of the quality window on which this method operates
+        :param y_high: Upper y index of the quality window on which this method operates
+        :param x_low: Lower x index of the quality window on which this method operates
+        :param x_high: Upper x index of the quality window on which this method operates
+        :param drizzle_factor: (integer) drizzle factor, typically 2 or 3.
+        :return: -
+        """
+
+        # Compute integer shift in both directions in drizzled target grid closest to given shift
+        # (float).
+        shift_d_y = int(round(drizzle_factor * shift_y))
+        shift_d_x = int(round(drizzle_factor * shift_x))
+
+        # Translate into original index coordinates (not integer any more).
+        shift_rounded_y = shift_d_y / drizzle_factor
+        shift_rounded_x = shift_d_x / drizzle_factor
+
+        # If the shift stays in the original grid, the offset in the drizzled grid patch is zero.
+        if shift_rounded_y.is_integer():
+            shift_rounded_y = int(shift_rounded_y)
+            y_low_from = y_low + shift_rounded_y
+            y_high_from = y_high + shift_rounded_y
+            y_offset = 0
+
+        # Otherwise the target indices in the drizzled grid patch start at a non-zero offset.
         else:
-            buffer[y_low_target:y_high_target, x_low_target:x_high_target] += \
-                frame[y_low_source:y_high_source, x_low_source:x_high_source]
+            shift_ceil = ceil(shift_y)
+            y_low_from = y_low + shift_ceil
+            y_high_from = y_high + shift_ceil
+            y_offset = int(drizzle_factor * shift_ceil - shift_d_y)
+
+        # Do the same for the x coordinate direction.
+        if shift_rounded_x.is_integer():
+            shift_rounded_x = int(shift_rounded_x)
+            x_low_from = x_low + shift_rounded_x
+            x_high_from = x_high + shift_rounded_x
+            x_offset = 0
+
+        # Otherwise the target indices in the drizzled grid patch start at a non-zero offset.
+        else:
+            shift_ceil = ceil(shift_x)
+            x_low_from = x_low + shift_ceil
+            x_high_from = x_high + shift_ceil
+            x_offset = int(drizzle_factor * shift_ceil - shift_d_x)
+
+        # Compute index bounds for "source" patch in current frame, and for summation buffer
+        # ("target"). Because of local warp effects, the indexing may reach beyond frame borders.
+        # In this case reduce the copy area.
+        frame_size_y = frame.shape[0]
+        y_low_target = y_offset
+        # If the shift reaches beyond the frame, reduce the copy area.
+        if y_low_from < 0:
+            y_low_target -= y_low_from * drizzle_factor
+            y_low_from = 0
+        if y_high_from > frame_size_y:
+            y_high_from = frame_size_y
+        y_high_target = y_low_target + (y_high_from - y_low_from) * drizzle_factor
+
+        # The same in x direction.
+        frame_size_x = frame.shape[1]
+        x_low_target = x_offset
+        # If the shift reaches beyond the frame, reduce the copy area.
+        if x_low_from < 0:
+            x_low_target -= x_low_from * drizzle_factor
+            x_low_from = 0
+        if x_high_from > frame_size_x:
+            x_high_from = frame_size_x
+        x_high_target = x_low_target + (x_high_from - x_low_from) * drizzle_factor
+
+        # Add the shifted frame patch to the AP buffer.
+        buffer[y_low_target:y_high_target:drizzle_factor,
+        x_low_target:x_high_target:drizzle_factor] += \
+            frame[y_low_from:y_high_from, x_low_from:x_high_from]
+
+        # Increment the offset counter for the current drizzle position.
+        offset_counters[y_offset, x_offset] += 1
+
+    def equalize_ap_patch(self, patch, offset_counters, stack_size, drizzle_factor):
+        """
+        During drizzling the AP patch gets different numbers of frame contributions at different
+        positions in the drizzling pattern, depending on the distribution of sup-pixel shift values.
+        The array "offset_counters" contains these numbers, with the sum of all those numbers being the
+        total stack size.
+
+        Scale all patch entries with "total stack size" / "offset counter". The result are uniform
+        patch entries which look as if there had been "total stack size" contributions in all drizzle
+        pattern locations.
+
+        Special care has to be taken at locations where not a single frame contributed (called "holes").
+        Here insert the average of patch values at all drizzle positions over a circle with minimum
+        radius containing at least one non-zero contribution.
+
+        :param patch: AP buffer after stacking with drizzling.
+        :param offset_counters: Integer array, size drizzle_factor x drizzle_factor, with contribution
+                                counts at all drizzle locations.
+        :param stack_size: Overall number of frames stacked
+        :param drizzle_factor: Factor by which the number of pixels is multiplied in each direction.
+        :return: Number of drizzle locations without frame contributions.
+        """
+
+        dim_y, dim_x = patch.shape[:2]
+        holes = []
+
+        # First normalize the patch locations with non-zero contributions.
+        for y_offset in range(drizzle_factor):
+            for x_offset in range(drizzle_factor):
+                if offset_counters[y_offset, x_offset]:
+                    normalization_factor = stack_size / offset_counters[y_offset, x_offset]
+                    patch[y_offset:dim_y:drizzle_factor,
+                    x_offset:dim_x:drizzle_factor] *= normalization_factor
+                # For locations with zero contributions (holes) remember the location.
+                else:
+                    holes.append((y_offset, x_offset))
+
+        # Now fill the holes with interpolated values from locations close by.
+        for (y_offset, x_offset) in holes:
+
+            # Initialize the buffer locations with zeros.
+            patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] = 0.
+
+            # Look for the circle with smallest radius around the hole with at least one non-zero
+            # contribution.
+            for radius in range(1, drizzle_factor):
+                n_success = 0
+                for (y, x) in Miscellaneous.circle_around(y_offset, x_offset, radius):
+                    if 0 <= y < drizzle_factor and 0 <= x < drizzle_factor and (y, x) not in holes:
+                        # A non-zero entry is found, add its contribution to the buffer.
+                        patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] += \
+                            patch[y:dim_y:drizzle_factor, x:dim_x:drizzle_factor]
+                        n_success += 1
+
+                # There was at least one non-zero contribution on the circle with this radius. Normalize
+                # the buffer with the number of contributions and continue with the next hole.
+                if n_success:
+                    patch[y_offset:dim_y:drizzle_factor,
+                    x_offset:dim_x:drizzle_factor] *= 1. / n_success
+                    break
+
+        # Return the number of holes in the drizzle pattern.
+        return len(holes)
 
     def merge_alignment_point_buffers(self):
         """

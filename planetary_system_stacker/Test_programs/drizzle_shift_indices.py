@@ -144,9 +144,42 @@ def remap_rigid_drizzled(frame, buffer, offset_counters, shift_y, shift_x, y_low
     :return: -
     """
 
-    # Compute the index bounds and offset.
-    y_low_from, y_high_from, x_low_from, x_high_from, y_offset, x_offset = \
-        compute_bounds_2d(y_low, y_high, x_low, x_high, shift_y, shift_x, drizzle_factor)
+    # Compute integer shift in both directions in drizzled target grid closest to given shift
+    # (float).
+    shift_d_y = int(round(drizzle_factor * shift_y))
+    shift_d_x = int(round(drizzle_factor * shift_x))
+
+    # Translate into original index coordinates (not integer any more).
+    shift_rounded_y = shift_d_y / drizzle_factor
+    shift_rounded_x = shift_d_x / drizzle_factor
+
+    # If the shift stays in the original grid, the offset in the drizzled grid patch is zero.
+    if shift_rounded_y.is_integer():
+        shift_rounded_y = int(shift_rounded_y)
+        y_low_from = y_low + shift_rounded_y
+        y_high_from = y_high + shift_rounded_y
+        y_offset = 0
+
+    # Otherwise the target indices in the drizzled grid patch start at a non-zero offset.
+    else:
+        shift_ceil = ceil(shift_y)
+        y_low_from = y_low + shift_ceil
+        y_high_from = y_high + shift_ceil
+        y_offset = int(drizzle_factor * shift_ceil - shift_d_y)
+
+    # Do the same for the x coordinate direction.
+    if shift_rounded_x.is_integer():
+        shift_rounded_x = int(shift_rounded_x)
+        x_low_from = x_low + shift_rounded_x
+        x_high_from = x_high + shift_rounded_x
+        x_offset = 0
+
+    # Otherwise the target indices in the drizzled grid patch start at a non-zero offset.
+    else:
+        shift_ceil = ceil(shift_x)
+        x_low_from = x_low + shift_ceil
+        x_high_from = x_high + shift_ceil
+        x_offset = int(drizzle_factor * shift_ceil - shift_d_x)
 
     # Compute index bounds for "source" patch in current frame, and for summation buffer
     # ("target"). Because of local warp effects, the indexing may reach beyond frame borders.
@@ -202,7 +235,7 @@ def equalize_ap_patch(patch, offset_counters, stack_size, drizzle_factor):
     :return: Number of drizzle locations without frame contributions.
     """
 
-    dim_y, dim_x = patch.shape
+    dim_y, dim_x = patch.shape[:2]
     holes = []
 
     # First normalize the patch locations with non-zero contributions.
@@ -342,9 +375,24 @@ def test_equalize_ap_patch():
     print("patch after equalization: \n" + str(patch))
     print("Number of holes in drizzle pattern: " + str(len_holes))
 
+def test_numpy():
+    a = ndarray((4,5,3), dtype=int)
+    for y in range(4):
+        for x in range(5):
+            for c in range(3):
+                a[y, x, c] = y*100 + x*10 + c
+    print("a: " + str(a))
+
+    b = a[2:3, 2:5]
+    print ("b: " + str(b))
+
+    d = a[2:3, 2:5, :]
+    print("d: " + str(d))
+
 
 # Main program: Control the test to be performed.
 # test_index_computations()
 # test_index_computations_2d()
-test_remap_rigid_drizzled()
+# test_remap_rigid_drizzled()
 # test_equalize_ap_patch()
+test_numpy()
