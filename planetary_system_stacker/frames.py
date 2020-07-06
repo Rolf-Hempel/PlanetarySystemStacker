@@ -797,7 +797,7 @@ class Calibration(QtCore.QObject):
         # Case video file:
         if Path(master_name).is_file():
             extension = Path(master_name).suffix
-            if extension in ('.avi', '.mov', '.mp4', '.ser'):
+            if extension.lower() in ('.avi', '.mov', '.mp4', '.ser'):
                 reader = VideoReader(self.configuration)
                 # Switch off dynamic range correction for 16bit SER files.
                 frame_count, input_color, input_dtype, input_shape, shift_pixels = reader.open(master_name,
