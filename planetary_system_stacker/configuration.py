@@ -64,6 +64,7 @@ class ConfigurationParameters(object):
         self.alignment_points_structure_threshold = None
         self.alignment_points_brightness_threshold = None
         self.alignment_points_frame_percent = None
+        self.stack_frames_drizzle_factor_string = None
 
     def set_defaults(self):
         self.hidden_parameters_current_dir = expanduser("~")
@@ -97,6 +98,7 @@ class ConfigurationParameters(object):
         self.align_frames_average_frame_percent = 5
         self.alignment_points_search_width = 14
         self.alignment_points_frame_percent = 10
+        self.stack_frames_drizzle_factor_string = "Off"
         self.set_defaults_ap_editing()
 
     def set_defaults_ap_editing(self):
@@ -158,6 +160,8 @@ class ConfigurationParameters(object):
         self.alignment_points_brightness_threshold = \
             configuration_object.alignment_points_brightness_threshold
         self.alignment_points_frame_percent = configuration_object.alignment_points_frame_percent
+        self.stack_frames_drizzle_factor_string = \
+            configuration_object.stack_frames_drizzle_factor_string
 
 
 class Configuration(object):
@@ -338,6 +342,8 @@ class Configuration(object):
             configuration_parameters.alignment_points_brightness_threshold
         self.alignment_points_frame_percent = \
             configuration_parameters.alignment_points_frame_percent
+        self.stack_frames_drizzle_factor_string = \
+            configuration_parameters.stack_frames_drizzle_factor_string
 
     def export_to_configuration_parameters(self, configuration_parameters):
         """
@@ -403,6 +409,8 @@ class Configuration(object):
             self.alignment_points_brightness_threshold
         configuration_parameters.alignment_points_frame_percent = \
             self.alignment_points_frame_percent
+        configuration_parameters.stack_frames_drizzle_factor_string = \
+            self.stack_frames_drizzle_factor_string
 
     def get_all_parameters_from_configparser(self, conf):
         """
@@ -474,6 +482,8 @@ class Configuration(object):
         self.alignment_points_brightness_threshold = conf.getint('Alignment points',
                                                                  'brightness threshold')
         self.alignment_points_frame_percent = conf.getint('Alignment points', 'frame percent')
+
+        self.stack_frames_drizzle_factor_string = conf.get('Stack frames', 'drizzle factor string')
 
     def store_all_parameters_to_config_parser(self):
         """
@@ -556,6 +566,10 @@ class Configuration(object):
         self.set_parameter('Alignment points', 'frame percent',
                            str(self.alignment_points_frame_percent))
 
+        self.config_parser_object.add_section('Stack frames')
+        self.set_parameter('Stack frames', 'drizzle factor string',
+                           self.stack_frames_drizzle_factor_string)
+
     def set_parameter(self, section, name, value):
         """
         Assign a new value to a parameter in the configuration object. The value is not checked for
@@ -588,10 +602,25 @@ class Configuration(object):
         # of their width.
         self.alignment_points_step_size = int(
             round((self.alignment_points_half_patch_width * 4.5) / 3))
+
         # Initialze the number of frames to be stacked. It will be computed from the corresponding
         # percentage. The user, however, can override this value with a (more precise) figure
         # during the workflow.
         self.alignment_points_frame_number = None
+
+        # Set the drizzling parameters.
+        if self.stack_frames_drizzle_factor_string == "Off":
+            self.drizzle_factor = 1
+            self.drizzle_factor_is_1_5 = False
+        elif self.stack_frames_drizzle_factor_string == "1.5x":
+            self.drizzle_factor = 3
+            self.drizzle_factor_is_1_5 = True
+        elif self.stack_frames_drizzle_factor_string == "2x":
+            self.drizzle_factor = 2
+            self.drizzle_factor_is_1_5 = False
+        elif self.stack_frames_drizzle_factor_string == "3x":
+            self.drizzle_factor = 3
+            self.drizzle_factor_is_1_5 = False
 
     def write_config(self, file_name=None):
         """

@@ -394,5 +394,5 @@ def test_numpy():
 # test_index_computations()
 # test_index_computations_2d()
 # test_remap_rigid_drizzled()
-# test_equalize_ap_patch()
-test_numpy()
+test_equalize_ap_patch()
+# test_numpy()

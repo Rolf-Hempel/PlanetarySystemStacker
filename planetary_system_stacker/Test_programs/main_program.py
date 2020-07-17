@@ -213,6 +213,12 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
     print("+++ Start merging alignment patches")
     stacked_image = stack_frames.merge_alignment_point_buffers()
 
+    # If the drizzle factor is 1.5, reduce the pixel resolution of the stacked image buffer
+    # to half the size used in stacking.
+    if configuration.drizzle_factor_is_1_5:
+        print("+++ Start reducing image buffer size")
+        stack_frames.half_stacked_image_buffer_resolution()
+
     # Save the stacked image as 16bit int (color or mono).
     my_timer.create('Saving the final image')
     Frames.save_image(stacked_image_name, stacked_image, color=frames.color,

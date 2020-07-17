@@ -27,7 +27,7 @@ from time import sleep
 from warnings import filterwarnings
 
 import matplotlib.pyplot as plt
-from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize
+from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize, INTER_CUBIC
 from numpy import int as np_int
 from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
     sqrt, uint16, clip, minimum
@@ -79,30 +79,44 @@ class StackFrames(object):
         self.progress_signal = progress_signal
         self.signal_step_size = max(int(self.frames.number / 10), 1)
         self.shift_distribution = None
-        for name in ['Stacking: AP initialization', 'Stacking: Initialize background blending',
+
+        # Set a flag which indicates if drizzling is active.
+        self.drizzle = self.configuration.drizzle_factor != 1
+        self.drizzle_holes_percent = None
+
+        for name in ['Stacking: AP initialization', 'Stacking: initialize background blending',
                      'Stacking: compute AP shifts', 'Stacking: remapping and adding',
                      'Stacking: computing background', 'Stacking: merging AP buffers']:
             self.my_timer.create_no_check(name)
+        if self.drizzle:
+            self.my_timer.create_no_check('Stacking: normalize drizzled AP patches')
 
         self.my_timer.start('Stacking: AP initialization')
         # Allocate work space for image buffer and the image converted for output.
-        # [dim_y, dim_x] is the size of the intersection of all frames.
-        self.dim_y = self.align_frames.intersection_shape[0][1] - \
-                self.align_frames.intersection_shape[0][0]
-        self.dim_x = self.align_frames.intersection_shape[1][1] - \
-                self.align_frames.intersection_shape[1][0]
+        # [dim_y_drizzled, dim_x_drizzled] is the size of the intersection of all frames in drizzled
+        # coordinates.
+        self.dim_y = (self.align_frames.intersection_shape[0][1] -
+                      self.align_frames.intersection_shape[0][0])
+        self.dim_y_drizzled = self.dim_y * self.configuration.drizzle_factor
+        self.dim_x = (self.align_frames.intersection_shape[1][1] -
+                      self.align_frames.intersection_shape[1][0])
+        self.dim_x_drizzled = self.dim_x * self.configuration.drizzle_factor
         self.number_pixels = self.dim_y * self.dim_x
+        self.number_pixels_drizzled = self.dim_y_drizzled * self.dim_x_drizzled
 
-        # If the AP stacking buffers have been used already, reset them.
+        # Allocate AP stacking buffers and compute drizzled patch index bounds.
         for ap in self.alignment_points.alignment_points:
-            AlignmentPoints.initialize_ap_stacking_buffer(ap, self.frames.color)
+            AlignmentPoints.initialize_ap_stacking_buffer(ap, self.configuration.drizzle_factor,
+                                             self.frames.color)
 
         # The summation buffer needs to accommodate three color channels in the case of color
-        # images.
+        # images. The size is extended if drizzling is active.
         if self.frames.color:
-            self.stacked_image_buffer = zeros([self.dim_y, self.dim_x, 3], dtype=float32)
+            self.stacked_image_buffer = zeros([self.dim_y_drizzled, self.dim_x_drizzled, 3],
+                                              dtype=float32)
         else:
-            self.stacked_image_buffer = zeros([self.dim_y, self.dim_x], dtype=float32)
+            self.stacked_image_buffer = zeros([self.dim_y_drizzled, self.dim_x_drizzled],
+                                              dtype=float32)
 
         # If the alignment point patches do not cover the entire frame, a background image must
         # be computed and blended in. At this point it is not yet clear if this is necessary.
@@ -112,7 +126,8 @@ class StackFrames(object):
         # Allocate a buffer which for each pixel of the image accumulates the weights at each pixel.
         # This buffer is used to normalize the image buffer. It is initialized with a small value to
         # avoid divide by zero.
-        self.sum_single_frame_weights = full([self.dim_y, self.dim_x], 1.e-30, dtype=float32)
+        self.sum_single_frame_weights = full([self.dim_y_drizzled, self.dim_x_drizzled], 1.e-30,
+                                             dtype=float32)
 
         # Prepare for debugging the local de-warping: In each frame a shifted AP patch can be
         # compared to the corresponding section of the reference frame. This is visualized in a
@@ -139,33 +154,39 @@ class StackFrames(object):
         :return:
         """
 
-        self.my_timer.start('Stacking: Initialize background blending')
+        self.my_timer.start('Stacking: initialize background blending')
 
         # The stack size is the number of frames which contribute to each AP stack.
         single_stack_size_float = float(self.alignment_points.stack_size)
 
         # Add the contributions of all alignment points into a single buffer.
         for alignment_point in self.alignment_points.alignment_points:
-            patch_y_low = alignment_point['patch_y_low']
-            patch_y_high = alignment_point['patch_y_high']
-            patch_x_low = alignment_point['patch_x_low']
-            patch_x_high = alignment_point['patch_x_high']
+            patch_y_low_drizzled = alignment_point['patch_y_low_drizzled']
+            patch_y_high_drizzled = alignment_point['patch_y_high_drizzled']
+            patch_x_low_drizzled = alignment_point['patch_x_low_drizzled']
+            patch_x_high_drizzled = alignment_point['patch_x_high_drizzled']
 
             # If the patch is on the image boundary, do not ramp down the weight from the patch
             # center towards that boundary. This way it is avoided that the background image is
             # computed there and blended in with the patch.
-            extend_low_y = patch_y_low == 0
-            extend_high_y = patch_y_high == self.dim_y
-            extend_low_x = patch_x_low == 0
-            extend_high_x = patch_x_high == self.dim_x
+            extend_low_y = patch_y_low_drizzled == 0
+            extend_high_y = patch_y_high_drizzled == self.dim_y
+            extend_low_x = patch_x_low_drizzled == 0
+            extend_high_x = patch_x_high_drizzled == self.dim_x
 
             # Compute the weights used in AP blending and store them with the AP.
-            alignment_point['weights_yx'] = minimum(self.one_dim_weight(patch_y_low, patch_y_high,
-                                                alignment_point['y'], extend_low=extend_low_y,
-                                                extend_high=extend_high_y)[:, newaxis],
-                                                    self.one_dim_weight(patch_x_low, patch_x_high,
-                                                alignment_point['x'], extend_low=extend_low_x,
-                                                extend_high=extend_high_x)[newaxis, :])
+            alignment_point['weights_yx'] = minimum(self.one_dim_weight(patch_y_low_drizzled,
+                                                                        patch_y_high_drizzled,
+                                                                        alignment_point['y_drizzled'],
+                                                                        extend_low=extend_low_y,
+                                                                        extend_high=extend_high_y)[
+                                                                                    :, newaxis],
+                                                    self.one_dim_weight(patch_x_low_drizzled,
+                                                                        patch_x_high_drizzled,
+                                                                        alignment_point['x_drizzled'],
+                                                                        extend_low=extend_low_x,
+                                                                        extend_high=extend_high_x)[
+                                                                                    newaxis, :])
 
             # This is an alternative where the weights decrease more rapidly towards the corners.
             # alignment_point['weights_yx'] = self.one_dim_weight(patch_y_low, patch_y_high,
@@ -176,15 +197,16 @@ class StackFrames(object):
             #                                     extend_high=extend_high_x)
 
             # For each image buffer pixel add the weights. This is used for normalization later.
-            self.sum_single_frame_weights[patch_y_low:patch_y_high,
-            patch_x_low: patch_x_high] += single_stack_size_float * alignment_point['weights_yx']
+            self.sum_single_frame_weights[patch_y_low_drizzled:patch_y_high_drizzled,
+            patch_x_low_drizzled: patch_x_high_drizzled] += single_stack_size_float \
+                                                            * alignment_point['weights_yx']
 
         # Compute the fraction of pixels where no AP patch contributes.
         self.number_stacking_holes = count_nonzero(self.sum_single_frame_weights < 1.e-10)
 
         # If all pixels are covered by AP patches, no background image is required.
         if self.number_stacking_holes == 0:
-            self.my_timer.stop('Stacking: Initialize background blending')
+            self.my_timer.stop('Stacking: initialize background blending')
             return
 
         # If the alignment points do not cover the full frame, blend the AP contributions with
@@ -206,11 +228,8 @@ class StackFrames(object):
 
         # If the fraction is below a certain limit, it is worthwhile to compute the background
         # image only where it is needed. Construct a list with patches where the background is
-        # needed. The mask blurring has slightly changed the number of pixels where the background
-        # is needed, so the value of "fraction_stacking_holes" is not exact. The difference will be
-        # very small, though. Since the fraction is only used to decide if a complete background
-        # image should be computed, the approximate value is more than sufficient.
-        if points_where_background_used/self.number_pixels < \
+        # needed.
+        if points_where_background_used/self.number_pixels_drizzled < \
                 self.configuration.stack_frames_background_fraction:
 
             # Initialize a list of background patches.
@@ -235,8 +254,11 @@ class StackFrames(object):
                         continue
 
                     # If the patch contains pixels where the background is used, add it to the list.
-                    if count_nonzero(self.sum_single_frame_weights[patch_y_low:patch_y_high,
-                                     patch_x_low:patch_x_high] <
+                    if count_nonzero(self.sum_single_frame_weights[
+                                     patch_y_low * self.configuration.drizzle_factor:
+                                     patch_y_high * self.configuration.drizzle_factor,
+                                     patch_x_low * self.configuration.drizzle_factor:
+                                     patch_x_high * self.configuration.drizzle_factor] <
                                      self.configuration.stack_frames_background_blend_threshold *
                                      single_stack_size_float) > 0:
                         background_patch = {}
@@ -246,7 +268,7 @@ class StackFrames(object):
                         background_patch['patch_x_high'] = patch_x_high
                         self.background_patches.append(background_patch)
 
-        self.my_timer.stop('Stacking: Initialize background blending')
+        self.my_timer.stop('Stacking: initialize background blending')
 
     def stack_frames(self):
         """
@@ -260,8 +282,9 @@ class StackFrames(object):
         self.prepare_for_stack_blending()
 
         # Initialize the array for shift distribution statistics.
-        self.shift_distribution = full((self.configuration.alignment_points_search_width*2,), 0,
-                                          dtype=np_int)
+        self.shift_distribution = full((
+            self.configuration.alignment_points_search_width *
+            self.configuration.drizzle_factor * 2,), 0, dtype=np_int)
         self.shift_failure_counter = 0
 
         # If multi-level correlation AP matching is selected, prepare frame-independent data
@@ -331,11 +354,14 @@ class StackFrames(object):
                 [shift_y, shift_x], success = self.alignment_points.compute_shift_alignment_point(
                     frame_mono_blurred, frame_index, alignment_point_index,
                     de_warp=self.configuration.alignment_points_de_warp,
-                    weight_matrix_first_phase=weight_matrix_first_phase)
+                    weight_matrix_first_phase=weight_matrix_first_phase,
+                    subpixel_solve=self.drizzle)
 
-                # Increment the counter corresponding to the 2D warp shift.
+                # Increment the counter corresponding to the 2D warp shift. Increase the resolution
+                # according to the drizzle factor.
                 if success:
-                    self.shift_distribution[int(round(sqrt(shift_y**2 + shift_x**2)))] += 1
+                    self.shift_distribution[int(round(self.configuration.drizzle_factor * sqrt(
+                        shift_y ** 2 + shift_x ** 2)))] += 1
                 else:
                     self.shift_failure_counter += 1
 
@@ -343,8 +369,10 @@ class StackFrames(object):
                 # current frame and mean frame, global shift of current frame, and the local warp
                 # shift at this alignment point. The first two components are accounted for by dy,
                 # dx.
-                total_shift_y = int(round(dy - shift_y))
-                total_shift_x = int(round(dx - shift_x))
+                total_shift_y = dy - shift_y
+                total_shift_y_int = int(round(total_shift_y))
+                total_shift_x = dx - shift_x
+                total_shift_x_int = int(round(total_shift_x))
                 self.my_timer.stop('Stacking: compute AP shifts')
 
                 # In debug mode: visualize shifted patch of the first AP and compare it with the
@@ -373,13 +401,13 @@ class StackFrames(object):
                         putText(frame_stabilized, 'stabilized: ' + str(dy) + ', ' + str(dx),
                                 (5, 25), font, fontScale, fontColor, lineType)
 
-                        frame_dewarped = frame_mono_blurred[y_low+total_shift_y:y_high+total_shift_y,
-                                         x_low+total_shift_x:x_high+total_shift_x]
+                        frame_dewarped = frame_mono_blurred[y_low+total_shift_y_int:y_high+total_shift_y_int,
+                                         x_low+total_shift_x_int:x_high+total_shift_x_int]
                         frame_dewarped = resize(frame_dewarped, None,
                                                   fx=float(self.scale_factor),
                                                   fy=float(self.scale_factor))
-                        putText(frame_dewarped, 'de-warped: ' + str(shift_y) + ', ' + str(shift_x),
-                                (5, 25), font, fontScale, fontColor, lineType)
+                        putText(frame_dewarped, 'de-warped: ' + str(int(round(shift_y))) + ', ' +
+                                str(int(round(shift_x))), (5, 25), font, fontScale, fontColor, lineType)
                         # Compose the three patches into a single image and send it to the
                         # visualization window.
                         composed_image = Miscellaneous.compose_image([frame_stabilized,
@@ -395,10 +423,11 @@ class StackFrames(object):
 
                 # Add the shifted alignment point patch to the AP's stacking buffer.
                 self.my_timer.start('Stacking: remapping and adding')
-                self.remap_rigid(frame, alignment_point['stacking_buffer'],
-                                 total_shift_y, total_shift_x,
+                self.remap_rigid_drizzled(frame, alignment_point['stacking_buffer'],
+                                 alignment_point['offset_counters'], total_shift_y, total_shift_x,
                                  alignment_point['patch_y_low'], alignment_point['patch_y_high'],
-                                 alignment_point['patch_x_low'], alignment_point['patch_x_high'])
+                                 alignment_point['patch_x_low'], alignment_point['patch_x_high'],
+                                 self.configuration.drizzle_factor)
                 self.my_timer.stop('Stacking: remapping and adding')
 
             # If there are holes between AP patches, add this frame's contribution (if any) to the
@@ -410,37 +439,36 @@ class StackFrames(object):
 
                 # Treat the case that the background is computed for specific patches only.
                 if self.background_patches:
-                    if self.frames.color:
-                        for patch in self.background_patches:
-                            self.averaged_background[patch['patch_y_low']:patch['patch_y_high'],
-                                      patch['patch_x_low']:patch['patch_x_high'], :] += \
-                                frame[patch['patch_y_low'] + self.align_frames.dy[frame_index] :
-                                      patch['patch_y_high'] + self.align_frames.dy[frame_index],
-                                      patch['patch_x_low'] + self.align_frames.dx[frame_index] :
-                                      patch['patch_x_high'] + self.align_frames.dx[frame_index], :]
-                    else:
-                        for patch in self.background_patches:
-                            self.averaged_background[patch['patch_y_low']:patch['patch_y_high'],
-                                      patch['patch_x_low']:patch['patch_x_high']] += \
-                                frame[patch['patch_y_low'] + self.align_frames.dy[frame_index] :
-                                      patch['patch_y_high'] + self.align_frames.dy[frame_index],
-                                      patch['patch_x_low'] + self.align_frames.dx[frame_index] :
-                                      patch['patch_x_high'] + self.align_frames.dx[frame_index]]
+                    for patch in self.background_patches:
+                        self.averaged_background[patch['patch_y_low']:patch['patch_y_high'],
+                                  patch['patch_x_low']:patch['patch_x_high']] += \
+                            frame[patch['patch_y_low'] + self.align_frames.dy[frame_index] :
+                                  patch['patch_y_high'] + self.align_frames.dy[frame_index],
+                                  patch['patch_x_low'] + self.align_frames.dx[frame_index] :
+                                  patch['patch_x_high'] + self.align_frames.dx[frame_index]]
 
                 # The complete background image is computed.
                 else:
-                    if self.frames.color:
-                        self.averaged_background += frame[self.align_frames.dy[frame_index]:
-                                                    self.dim_y + self.align_frames.dy[frame_index],
-                                                    self.align_frames.dx[frame_index]:
-                                                    self.dim_x + self.align_frames.dx[frame_index],
-                                                    :]
-                    else:
-                        self.averaged_background += frame[self.align_frames.dy[frame_index]:
-                                                    self.dim_y + self.align_frames.dy[frame_index],
-                                                    self.align_frames.dx[frame_index]:
-                                                    self.dim_x + self.align_frames.dx[frame_index]]
+                    self.averaged_background += frame[self.align_frames.dy[frame_index]:
+                                                self.dim_y + self.align_frames.dy[frame_index],
+                                                self.align_frames.dx[frame_index]:
+                                                self.dim_x + self.align_frames.dx[frame_index]]
                 self.my_timer.stop('Stacking: computing background')
+
+        # If drizzling is active, normalize the alignment point buffers.
+        if self.drizzle:
+            self.my_timer.start('Stacking: normalize drizzled AP patches')
+            total_number_holes = 0
+            for alignment_point in self.alignment_points.alignment_points:
+                total_number_holes += self.equalize_ap_patch(alignment_point['stacking_buffer'],
+                                                             alignment_point['offset_counters'],
+                                                             self.alignment_points.stack_size,
+                                                             self.configuration.drizzle_factor)
+            # Compute the overall percentage of drizzle pattern holes in AP patches.
+            self.drizzle_holes_percent = 100. * total_number_holes / \
+                                         (len(self.alignment_points.alignment_points) * \
+                                         (self.configuration.drizzle_factor**2))
+            self.my_timer.stop('Stacking: normalize drizzled AP patches')
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Stack frames", 100)
@@ -459,9 +487,17 @@ class StackFrames(object):
         if self.debug:
             self.terminate_image_window_signal.emit()
 
-        # If a background image is being computed, divide the buffer by the number of contributions.
+        # If a background image is being computed, extend the background buffer into drizzled
+        # coordinates and normalize the buffer values.
         if self.number_stacking_holes > 0:
             self.my_timer.start('Stacking: computing background')
+            # If drizzling is active, extend the background image into drizzled coordinates.
+            if self.drizzle:
+                # Be careful: OpenCV resize expects the "width" dimension first!
+                self.averaged_background = resize(self.averaged_background,
+                                                  (self.dim_x_drizzled, self.dim_y_drizzled),
+                                                  interpolation=INTER_CUBIC)
+            # Divide the buffer by the number of contributions.
             self.averaged_background /= self.alignment_points.stack_size
             self.my_timer.stop('Stacking: computing background')
 
@@ -521,7 +557,7 @@ class StackFrames(object):
         directions. The shifted patch is then added to the given alignment point buffer.
 
         Please note that all indices related to the frame, and all input arguments in particular, are
-        in non-drizzled coordinates. The size of the buffer, on the other side, is extended by the
+        in non-drizzled coordinates. The size of the buffer, on the other hand, is extended by the
         drizzling factor "drizzle_factor". To enable sub-pixel accuracy, shift values are input as
         non-integer floats.
 
@@ -686,20 +722,20 @@ class StackFrames(object):
 
         # Add the contributions of all alignment points into a single buffer.
         for alignment_point in self.alignment_points.alignment_points:
-            patch_y_low = alignment_point['patch_y_low']
-            patch_y_high = alignment_point['patch_y_high']
-            patch_x_low = alignment_point['patch_x_low']
-            patch_x_high = alignment_point['patch_x_high']
+            patch_y_low_drizzled = alignment_point['patch_y_low_drizzled']
+            patch_y_high_drizzled = alignment_point['patch_y_high_drizzled']
+            patch_x_low_drizzled = alignment_point['patch_x_low_drizzled']
+            patch_x_high_drizzled = alignment_point['patch_x_high_drizzled']
 
             # Add the stacking buffer of the alignment point to the appropriate location of the
             # global stacking buffer.
             if self.frames.color:
-                self.stacked_image_buffer[patch_y_low:patch_y_high,
-                patch_x_low: patch_x_high, :] += alignment_point['stacking_buffer'] * \
-                                                 alignment_point['weights_yx'][:, :, newaxis]
+                self.stacked_image_buffer[patch_y_low_drizzled:patch_y_high_drizzled,
+                patch_x_low_drizzled: patch_x_high_drizzled, :] += \
+                    alignment_point['stacking_buffer'] * alignment_point['weights_yx'][:, :, newaxis]
             else:
-                self.stacked_image_buffer[patch_y_low:patch_y_high,
-                patch_x_low: patch_x_high] += alignment_point['stacking_buffer'] * \
+                self.stacked_image_buffer[patch_y_low_drizzled:patch_y_high_drizzled,
+                patch_x_low_drizzled: patch_x_high_drizzled] += alignment_point['stacking_buffer'] * \
                                               alignment_point['weights_yx']
 
         # Divide the global stacking buffer pixel-wise by the number of image contributions. Please
@@ -749,6 +785,17 @@ class StackFrames(object):
                 clip(self.stacked_image_buffer / 65535, 0., 1., out=self.stacked_image_buffer))
 
         return self.stacked_image
+
+    def half_stacked_image_buffer_resolution(self):
+        """
+        If drizzling is active with the option 1.5x, the computations are performed with the factor
+        3x. As a final step, the resolution of the stacked image buffer is halved.
+
+        :return: -
+        """
+
+        self.stacked_image_buffer = resize(self.stacked_image_buffer, None,
+                                           fx=float(0.5), fy=float(0.5))
 
     @staticmethod
     def one_dim_weight(patch_low, patch_high, box_center, extend_low=False, extend_high=False):
@@ -953,6 +1000,11 @@ if __name__ == "__main__":
 
     # Merge the stacked alignment point buffers into a single image.
     stacked_image = stack_frames.merge_alignment_point_buffers()
+
+    # If the drizzle factor is 1.5, reduce the pixel resolution of the stacked image buffer
+    # to half the size used in stacking.
+    if configuration.drizzle_factor_is_1_5:
+        stack_frames.half_stacked_image_buffer_resolution()
 
     # Save the stacked image as 16bit int (color or mono).
     Frames.save_image('Images/example_stacked.tiff', stacked_image, color=frames.color,

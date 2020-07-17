@@ -784,6 +784,13 @@ class Workflow(QtCore.QObject):
                                    self.attached_log_file, precede_with_timestamp=False)
             Miscellaneous.protocol(self.stack_frames.print_shift_table() + "\n",
                                    self.attached_log_file, precede_with_timestamp=False)
+            
+        if self.configuration.global_parameters_protocol_level > 1 and \
+            self.configuration.drizzle_factor!=1:
+            Miscellaneous.protocol(
+                "\n           Overall fraction of drizzle pattern holes: {:7.3f} %".format(
+                    self.stack_frames.drizzle_holes_percent),
+                self.attached_log_file, precede_with_timestamp=False)
 
         self.set_status_bar_processing_phase("merging AP patches")
         # Merge the stacked alignment point buffers into a single image.
@@ -800,6 +807,11 @@ class Workflow(QtCore.QObject):
             self.abort_job_signal.emit(
                 "Error in merging AP patches: " + str(e) + ", continuing with next job")
             return
+
+        # If the drizzle factor is 1.5, reduce the pixel resolution of the stacked image buffer
+        # to half the size used in stacking.
+        if self.configuration.drizzle_factor_is_1_5:
+            self.stack_frames.half_stacked_image_buffer_resolution()
 
         self.work_next_task_signal.emit("Save stacked image")
 

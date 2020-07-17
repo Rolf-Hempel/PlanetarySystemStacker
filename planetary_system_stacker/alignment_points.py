@@ -511,26 +511,41 @@ class AlignmentPoints(object):
             alignment_point['reference_box_first_phase'] =  window_second_phase[::2, ::2]
 
     @staticmethod
-    def initialize_ap_stacking_buffer(alignment_point, color):
+    def initialize_ap_stacking_buffer(alignment_point, drizzle_factor, color):
         """
-        In the stacking initialization, for each AP a stacking buffer has to be allocated.
+        In the stacking initialization, for each AP a stacking buffer has to be allocated. At the
+        same time, drizzled patch index bounds are computed.
 
         :param alignment_point: Alignment_point object
+        :param drizzle_factor: Drizzle factor (integer: 1, 2 or 3)
         :param color: True, if stacking is to be done for color frames. False for
         monochrome case.
         :return: -
         """
 
+        # Compute drizzled patch coordinates and index bounds.
+        alignment_point['y_drizzled'] = alignment_point['y'] * drizzle_factor
+        alignment_point['x_drizzled'] = alignment_point['x'] * drizzle_factor
+        alignment_point['patch_y_low_drizzled'] = alignment_point['patch_y_low'] * drizzle_factor
+        alignment_point['patch_y_high_drizzled'] = alignment_point['patch_y_high'] * drizzle_factor
+        alignment_point['patch_x_low_drizzled'] = alignment_point['patch_x_low'] * drizzle_factor
+        alignment_point['patch_x_high_drizzled'] = alignment_point['patch_x_high'] * drizzle_factor
+
         # Allocate space for the stacking buffer.
         if color:
             alignment_point['stacking_buffer'] = zeros(
-                [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
-                 alignment_point['patch_x_high'] - alignment_point['patch_x_low'], 3],
+                [alignment_point['patch_y_high_drizzled'] - alignment_point['patch_y_low_drizzled'],
+                 alignment_point['patch_x_high_drizzled'] - alignment_point['patch_x_low_drizzled'],
+                 3],
                 dtype=float32)
         else:
             alignment_point['stacking_buffer'] = zeros(
-                [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
-                 alignment_point['patch_x_high'] - alignment_point['patch_x_low']], dtype=float32)
+                [alignment_point['patch_y_high_drizzled'] - alignment_point['patch_y_low_drizzled'],
+                 alignment_point['patch_x_high_drizzled'] - alignment_point[
+                     'patch_x_low_drizzled']], dtype=float32)
+
+        # Allocate offset counter array for drizzling.
+        alignment_point['offset_counters'] = zeros(shape=(drizzle_factor, drizzle_factor), dtype=int)
 
     def find_alignment_points(self, y_low, y_high, x_low, x_high):
         """
