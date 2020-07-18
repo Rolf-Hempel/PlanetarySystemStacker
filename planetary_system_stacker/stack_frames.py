@@ -696,7 +696,7 @@ class StackFrames(object):
         # for y_offset in range(drizzle_factor):
         #     for x_offset in range(drizzle_factor):
         #         if offset_counters[y_offset, x_offset]:
-        #             patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] *= average_brightness[y_offset, x_offset]
+        #             patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] /= average_brightness[y_offset, x_offset]
 
         # Now fill the holes with interpolated values from locations close by.
         for (y_offset, x_offset) in holes:
