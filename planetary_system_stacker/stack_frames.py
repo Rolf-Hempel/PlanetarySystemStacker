@@ -29,8 +29,9 @@ from warnings import filterwarnings
 import matplotlib.pyplot as plt
 from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize, INTER_CUBIC
 from numpy import int as np_int
+from numpy import ma as np_ma
 from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
-    sqrt, uint16, clip, minimum
+    sqrt, uint16, clip, minimum, mean
 from skimage import img_as_uint, img_as_ubyte
 
 from align_frames import AlignFrames
@@ -464,6 +465,10 @@ class StackFrames(object):
                                                              alignment_point['offset_counters'],
                                                              self.alignment_points.stack_size,
                                                              self.configuration.drizzle_factor)
+                # plt.imshow(alignment_point['stacking_buffer']/self.alignment_points.stack_size, cmap='gray', vmin=0, vmax=255)
+                # plt.imshow(alignment_point['stacking_buffer'] / self.alignment_points.stack_size, cmap='gray')
+                # plt.show()
+
             # Compute the overall percentage of drizzle pattern holes in AP patches.
             self.drizzle_holes_percent = 100. * total_number_holes / \
                                          (len(self.alignment_points.alignment_points) * \
@@ -669,6 +674,7 @@ class StackFrames(object):
 
         dim_y, dim_x = patch.shape[:2]
         holes = []
+        # average_brightness = zeros((drizzle_factor, drizzle_factor), dtype=float)
 
         # First normalize the patch locations with non-zero contributions.
         for y_offset in range(drizzle_factor):
@@ -676,10 +682,21 @@ class StackFrames(object):
                 if offset_counters[y_offset, x_offset]:
                     normalization_factor = stack_size / offset_counters[y_offset, x_offset]
                     patch[y_offset:dim_y:drizzle_factor,
-                    x_offset:dim_x:drizzle_factor] *= normalization_factor
+                        x_offset:dim_x:drizzle_factor] *= normalization_factor
+                    # average_brightness[y_offset, x_offset] = mean(
+                    #     patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor])
                 # For locations with zero contributions (holes) remember the location.
                 else:
                     holes.append((y_offset, x_offset))
+
+        # # normalize the patch between all non-zero drizzle positions.
+        # nonzero_entries = np_ma.masked_where(average_brightness == 0, average_brightness)
+        # median_value = np_ma.median(nonzero_entries) + 1.e-30
+        # average_brightness /= median_value
+        # for y_offset in range(drizzle_factor):
+        #     for x_offset in range(drizzle_factor):
+        #         if offset_counters[y_offset, x_offset]:
+        #             patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] *= average_brightness[y_offset, x_offset]
 
         # Now fill the holes with interpolated values from locations close by.
         for (y_offset, x_offset) in holes:
@@ -902,7 +919,7 @@ if __name__ == "__main__":
 
     my_timer.create('Read all frames')
     try:
-        frames = Frames(configuration, names, type=type)
+        frames = Frames(configuration, names, type=type, bayer_option_selected="Grayscale")
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Error as e:
@@ -982,10 +999,10 @@ if __name__ == "__main__":
           ", number of dropped aps (dim): " + str(alignment_points.alignment_points_dropped_dim) +
           ", number of dropped aps (structure): " + str(
           alignment_points.alignment_points_dropped_structure))
-    color_image = alignment_points.show_alignment_points(average)
 
-    plt.imshow(color_image)
-    plt.show()
+    # color_image = alignment_points.show_alignment_points(average)
+    # plt.imshow(color_image)
+    # plt.show()
 
     # For each alignment point rank frames by their quality.
     my_timer.create('Rank frames at alignment points')

@@ -1637,40 +1637,8 @@ class Frames(object):
         :return: -
         """
 
-        if avoid_overwriting:
-            # If a file or directory with the given name already exists, append the word "_file".
-            if Path(filename).is_dir():
-                while True:
-                    filename += '_file'
-                    if not Path(filename).exists():
-                        break
-                filename += '.jpg'
-            # If it is a file, try to append "_copy.tiff" to its basename. If it still exists, repeat.
-            elif Path(filename).is_file():
-                suffix = Path(filename).suffix
-                while True:
-                    p = Path(filename)
-                    filename = Path.joinpath(p.parents[0], p.stem + '_copy' + suffix)
-                    if not Path(filename).exists():
-                        break
-            else:
-                # If the file name is new and has no suffix, add ".tiff".
-                suffix = Path(filename).suffix
-                if not suffix:
-                    filename += '.tiff'
-
-        elif Path(filename).suffix == '.png' or Path(filename).suffix == '.tiff':
-            # Don't care if a file with the given name exists. Overwrite it if necessary.
-            if path.exists(filename):
-                remove(filename)
-            # Write the image to the file. Before writing, convert the internal RGB representation into
-            # the BGR representation assumed by OpenCV.
-            if color:
-                imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
-            else:
-                imwrite(str(filename), image)
-
-        elif Path(filename).suffix == '.fits':
+        # Handle the special case of .fits files first.
+        if Path(filename).suffix == '.fits':
             # Flip image horizontally to preserve orientation
             image = flip(image, 0)
             if color:
@@ -1679,8 +1647,52 @@ class Frames(object):
             hdu.header['CREATOR'] = header
             hdu.writeto(filename, overwrite=True)
 
+        # Not a .fits file, the name can either point to a file or a directory, or be new.
         else:
-            raise TypeError("Attempt to write image format other than 'tiff' or 'fits'")
+            if Path(filename).is_dir():
+                # If a directory with the given name already exists, append the word "_file".
+                filename += '_file'
+                if avoid_overwriting:
+                    while True:
+                        if not Path(filename + '.png').exists():
+                            break
+                        filename += '_file'
+                    filename += '.png'
+                else:
+                    filename += '.png'
+                    if Path(filename).is_file():
+                        remove(filename)
+
+            # It is a file.
+            elif Path(filename).is_file():
+                # If overwriting is to be avoided, try to append "_copy" to its basename.
+                # If it still exists, repeat.
+                if avoid_overwriting:
+                    suffix = Path(filename).suffix
+                    while True:
+                        p = Path(filename)
+                        filename = Path.joinpath(p.parents[0], p.stem + '_copy' + suffix)
+                        if not Path(filename).exists():
+                            break
+                # File may be overwritten. Delete it first.
+                else:
+                    remove(filename)
+
+            # It is a new name. If it does not have a file suffix, add the default '.png'.
+            else:
+                # If the file name is new and has no suffix, add ".png".
+                if not Path(filename).suffix:
+                    filename += '.png'
+
+            if Path(filename).suffix not in ['.tiff', '.png']:
+                raise TypeError("Attempt to write image format other than '.tiff' or '.png'")
+
+            # Write the image to the file. Before writing, convert the internal RGB representation
+            # into the BGR representation assumed by OpenCV.
+            if color:
+                imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
+            else:
+                imwrite(str(filename), image)
 
     @staticmethod
     def read_image(filename):
