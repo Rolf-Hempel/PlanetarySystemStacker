@@ -784,13 +784,6 @@ class Workflow(QtCore.QObject):
                                    self.attached_log_file, precede_with_timestamp=False)
             Miscellaneous.protocol(self.stack_frames.print_shift_table() + "\n",
                                    self.attached_log_file, precede_with_timestamp=False)
-            
-        if self.configuration.global_parameters_protocol_level > 1 and \
-            self.configuration.drizzle_factor!=1:
-            Miscellaneous.protocol(
-                "\n           Overall fraction of drizzle pattern holes: {:7.3f} %".format(
-                    self.stack_frames.drizzle_holes_percent),
-                self.attached_log_file, precede_with_timestamp=False)
 
         self.set_status_bar_processing_phase("merging AP patches")
         # Merge the stacked alignment point buffers into a single image.

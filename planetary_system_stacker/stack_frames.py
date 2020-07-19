@@ -27,7 +27,7 @@ from time import sleep
 from warnings import filterwarnings
 
 import matplotlib.pyplot as plt
-from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize, INTER_CUBIC
+from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize, INTER_CUBIC, INTER_LINEAR
 from numpy import int as np_int
 from numpy import ma as np_ma
 from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
@@ -83,14 +83,11 @@ class StackFrames(object):
 
         # Set a flag which indicates if drizzling is active.
         self.drizzle = self.configuration.drizzle_factor != 1
-        self.drizzle_holes_percent = None
 
         for name in ['Stacking: AP initialization', 'Stacking: initialize background blending',
                      'Stacking: compute AP shifts', 'Stacking: remapping and adding',
                      'Stacking: computing background', 'Stacking: merging AP buffers']:
             self.my_timer.create_no_check(name)
-        if self.drizzle:
-            self.my_timer.create_no_check('Stacking: normalize drizzled AP patches')
 
         self.my_timer.start('Stacking: AP initialization')
         # Allocate work space for image buffer and the image converted for output.
@@ -111,13 +108,20 @@ class StackFrames(object):
                                              self.frames.color)
 
         # The summation buffer needs to accommodate three color channels in the case of color
-        # images. The size is extended if drizzling is active.
+        # images. The size is extended if drizzling is active. In this case also allocate a buffer
+        # where the interpolated frames are stored.
         if self.frames.color:
             self.stacked_image_buffer = zeros([self.dim_y_drizzled, self.dim_x_drizzled, 3],
                                               dtype=float32)
+            if self.drizzle:
+                self.frame_drizzled = zeros([self.dim_y_drizzled, self.dim_x_drizzled, 3],
+                                                  dtype=float32)
         else:
             self.stacked_image_buffer = zeros([self.dim_y_drizzled, self.dim_x_drizzled],
                                               dtype=float32)
+            if self.drizzle:
+                self.frame_drizzled = zeros([self.dim_y_drizzled, self.dim_x_drizzled],
+                                                  dtype=float32)
 
         # If the alignment point patches do not cover the entire frame, a background image must
         # be computed and blended in. At this point it is not yet clear if this is necessary.
@@ -171,9 +175,9 @@ class StackFrames(object):
             # center towards that boundary. This way it is avoided that the background image is
             # computed there and blended in with the patch.
             extend_low_y = patch_y_low_drizzled == 0
-            extend_high_y = patch_y_high_drizzled == self.dim_y
+            extend_high_y = patch_y_high_drizzled == self.dim_y_drizzled
             extend_low_x = patch_x_low_drizzled == 0
-            extend_high_x = patch_x_high_drizzled == self.dim_x
+            extend_high_x = patch_x_high_drizzled == self.dim_x_drizzled
 
             # Compute the weights used in AP blending and store them with the AP.
             alignment_point['weights_yx'] = minimum(self.one_dim_weight(patch_y_low_drizzled,
@@ -335,6 +339,14 @@ class StackFrames(object):
             else:
                 frame = self.frames.frames(frame_index)
 
+            # Change the current frame into float32. If drizzle is active, also interpolate values.
+            if self.drizzle:
+                self.frame_drizzled = resize(frame.astype(float32),
+                                             (frame.shape[1]*self.configuration.drizzle_factor, frame.shape[0]*self.configuration.drizzle_factor),
+                                             interpolation=INTER_LINEAR)
+            else:
+                self.frame_drizzled = frame.astype(float32)
+
             frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
 
             # After every "signal_step_size"th frame, send a progress signal to the main GUI.
@@ -358,28 +370,32 @@ class StackFrames(object):
                     weight_matrix_first_phase=weight_matrix_first_phase,
                     subpixel_solve=self.drizzle)
 
-                # Increment the counter corresponding to the 2D warp shift. Increase the resolution
-                # according to the drizzle factor.
-                if success:
-                    self.shift_distribution[int(round(self.configuration.drizzle_factor * sqrt(
-                        shift_y ** 2 + shift_x ** 2)))] += 1
-                else:
-                    self.shift_failure_counter += 1
-
                 # The total shift consists of three components: different coordinate origins for
                 # current frame and mean frame, global shift of current frame, and the local warp
                 # shift at this alignment point. The first two components are accounted for by dy,
-                # dx.
-                total_shift_y = dy - shift_y
-                total_shift_y_int = int(round(total_shift_y))
-                total_shift_x = dx - shift_x
-                total_shift_x_int = int(round(total_shift_x))
+                # dx. If drizzle is active, translate shifts into drizzled pixel distances.
+                shift_y_drizzled = int(round(shift_y * self.configuration.drizzle_factor))
+                shift_x_drizzled = int(round(shift_x * self.configuration.drizzle_factor))
+                total_shift_y_drizzled = dy * self.configuration.drizzle_factor - shift_y_drizzled
+                total_shift_x_drizzled = dx * self.configuration.drizzle_factor - shift_x_drizzled
+
+                # Increment the counter corresponding to the 2D warp shift. Increase the resolution
+                # according to the drizzle factor.
+                if success:
+                    self.shift_distribution[int(round(sqrt(shift_y_drizzled ** 2 + shift_x_drizzled ** 2)))] += 1
+                else:
+                    self.shift_failure_counter += 1
+
                 self.my_timer.stop('Stacking: compute AP shifts')
 
                 # In debug mode: visualize shifted patch of the first AP and compare it with the
                 # corresponding patch of the reference frame.
                 if self.debug and not alignment_point_index:
                     frame_mono_blurred = self.frames.frames_mono_blurred(frame_index)
+                    total_shift_y = dy - shift_y
+                    total_shift_y_int = int(round(total_shift_y))
+                    total_shift_x = dx - shift_x
+                    total_shift_x_int = int(round(total_shift_x))
                     y_low = alignment_point['patch_y_low']
                     y_high = alignment_point['patch_y_high']
                     x_low = alignment_point['patch_x_low']
@@ -424,11 +440,12 @@ class StackFrames(object):
 
                 # Add the shifted alignment point patch to the AP's stacking buffer.
                 self.my_timer.start('Stacking: remapping and adding')
-                self.remap_rigid_drizzled(frame, alignment_point['stacking_buffer'],
-                                 alignment_point['offset_counters'], total_shift_y, total_shift_x,
-                                 alignment_point['patch_y_low'], alignment_point['patch_y_high'],
-                                 alignment_point['patch_x_low'], alignment_point['patch_x_high'],
-                                 self.configuration.drizzle_factor)
+                self.remap_rigid(self.frame_drizzled, alignment_point['stacking_buffer'],
+                                 total_shift_y_drizzled, total_shift_x_drizzled,
+                                 alignment_point['patch_y_low_drizzled'],
+                                 alignment_point['patch_y_high_drizzled'],
+                                 alignment_point['patch_x_low_drizzled'],
+                                 alignment_point['patch_x_high_drizzled'])
                 self.my_timer.stop('Stacking: remapping and adding')
 
             # If there are holes between AP patches, add this frame's contribution (if any) to the
@@ -443,37 +460,13 @@ class StackFrames(object):
                     for patch in self.background_patches:
                         self.averaged_background[patch['patch_y_low']:patch['patch_y_high'],
                                   patch['patch_x_low']:patch['patch_x_high']] += \
-                            frame[patch['patch_y_low'] + self.align_frames.dy[frame_index] :
-                                  patch['patch_y_high'] + self.align_frames.dy[frame_index],
-                                  patch['patch_x_low'] + self.align_frames.dx[frame_index] :
-                                  patch['patch_x_high'] + self.align_frames.dx[frame_index]]
+                            frame[patch['patch_y_low'] + dy : patch['patch_y_high'] + dy,
+                                  patch['patch_x_low'] + dx : patch['patch_x_high'] + dx]
 
                 # The complete background image is computed.
                 else:
-                    self.averaged_background += frame[self.align_frames.dy[frame_index]:
-                                                self.dim_y + self.align_frames.dy[frame_index],
-                                                self.align_frames.dx[frame_index]:
-                                                self.dim_x + self.align_frames.dx[frame_index]]
+                    self.averaged_background += frame[dy:self.dim_y + dy, dx:self.dim_x + dx]
                 self.my_timer.stop('Stacking: computing background')
-
-        # If drizzling is active, normalize the alignment point buffers.
-        if self.drizzle:
-            self.my_timer.start('Stacking: normalize drizzled AP patches')
-            total_number_holes = 0
-            for alignment_point in self.alignment_points.alignment_points:
-                total_number_holes += self.equalize_ap_patch(alignment_point['stacking_buffer'],
-                                                             alignment_point['offset_counters'],
-                                                             self.alignment_points.stack_size,
-                                                             self.configuration.drizzle_factor)
-                # plt.imshow(alignment_point['stacking_buffer']/self.alignment_points.stack_size, cmap='gray', vmin=0, vmax=255)
-                # plt.imshow(alignment_point['stacking_buffer'] / self.alignment_points.stack_size, cmap='gray')
-                # plt.show()
-
-            # Compute the overall percentage of drizzle pattern holes in AP patches.
-            self.drizzle_holes_percent = 100. * total_number_holes / \
-                                         (len(self.alignment_points.alignment_points) * \
-                                         (self.configuration.drizzle_factor**2))
-            self.my_timer.stop('Stacking: normalize drizzled AP patches')
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Stack frames", 100)
@@ -554,176 +547,6 @@ class StackFrames(object):
         # are two-dimensional. Add the frame contribution to the stacking buffer.
         buffer[y_low_target:y_high_target, x_low_target:x_high_target] += \
             frame[y_low_source:y_high_source, x_low_source:x_high_source]
-
-    def remap_rigid_drizzled(self, frame, buffer, offset_counters, shift_y, shift_x, y_low, y_high,
-                             x_low, x_high, drizzle_factor):
-        """
-        The alignment point patch is taken from the given frame with a constant shift in x and y
-        directions. The shifted patch is then added to the given alignment point buffer.
-
-        Please note that all indices related to the frame, and all input arguments in particular, are
-        in non-drizzled coordinates. The size of the buffer, on the other hand, is extended by the
-        drizzling factor "drizzle_factor". To enable sub-pixel accuracy, shift values are input as
-        non-integer floats.
-
-        :param frame: frame to be stacked
-        :param buffer: Stacking buffer of the corresponding alignment point (extended for drizzling)
-        :param offset_counters: Integer array, size drizzle_factor x drizzle_factor, with contribution
-                                counts at all drizzle locations.
-        :param shift_y: Constant shift in y direction between frame stack and current frame (float)
-        :param shift_x: Constant shift in x direction between frame stack and current frame (float)
-        :param y_low: Lower y index of the quality window on which this method operates
-        :param y_high: Upper y index of the quality window on which this method operates
-        :param x_low: Lower x index of the quality window on which this method operates
-        :param x_high: Upper x index of the quality window on which this method operates
-        :param drizzle_factor: (integer) drizzle factor, typically 2 or 3.
-        :return: -
-        """
-
-        # Compute integer shift in both directions in drizzled target grid closest to given shift
-        # (float).
-        shift_d_y = int(round(drizzle_factor * shift_y))
-        shift_d_x = int(round(drizzle_factor * shift_x))
-
-        # Translate into original index coordinates (not integer any more).
-        shift_rounded_y = shift_d_y / drizzle_factor
-        shift_rounded_x = shift_d_x / drizzle_factor
-
-        # If the shift stays in the original grid, the offset in the drizzled grid patch is zero.
-        if shift_rounded_y.is_integer():
-            shift_rounded_y = int(shift_rounded_y)
-            y_low_from = y_low + shift_rounded_y
-            y_high_from = y_high + shift_rounded_y
-            y_offset = 0
-
-        # Otherwise the target indices in the drizzled grid patch start at a non-zero offset.
-        else:
-            shift_ceil = ceil(shift_y)
-            y_low_from = y_low + shift_ceil
-            y_high_from = y_high + shift_ceil
-            y_offset = int(drizzle_factor * shift_ceil - shift_d_y)
-
-        # Do the same for the x coordinate direction.
-        if shift_rounded_x.is_integer():
-            shift_rounded_x = int(shift_rounded_x)
-            x_low_from = x_low + shift_rounded_x
-            x_high_from = x_high + shift_rounded_x
-            x_offset = 0
-
-        # Otherwise the target indices in the drizzled grid patch start at a non-zero offset.
-        else:
-            shift_ceil = ceil(shift_x)
-            x_low_from = x_low + shift_ceil
-            x_high_from = x_high + shift_ceil
-            x_offset = int(drizzle_factor * shift_ceil - shift_d_x)
-
-        # Compute index bounds for "source" patch in current frame, and for summation buffer
-        # ("target"). Because of local warp effects, the indexing may reach beyond frame borders.
-        # In this case reduce the copy area.
-        frame_size_y = frame.shape[0]
-        y_low_target = y_offset
-        # If the shift reaches beyond the frame, reduce the copy area.
-        if y_low_from < 0:
-            y_low_target -= y_low_from * drizzle_factor
-            y_low_from = 0
-        if y_high_from > frame_size_y:
-            y_high_from = frame_size_y
-        y_high_target = y_low_target + (y_high_from - y_low_from) * drizzle_factor
-
-        # The same in x direction.
-        frame_size_x = frame.shape[1]
-        x_low_target = x_offset
-        # If the shift reaches beyond the frame, reduce the copy area.
-        if x_low_from < 0:
-            x_low_target -= x_low_from * drizzle_factor
-            x_low_from = 0
-        if x_high_from > frame_size_x:
-            x_high_from = frame_size_x
-        x_high_target = x_low_target + (x_high_from - x_low_from) * drizzle_factor
-
-        # Add the shifted frame patch to the AP buffer.
-        buffer[y_low_target:y_high_target:drizzle_factor,
-        x_low_target:x_high_target:drizzle_factor] += \
-            frame[y_low_from:y_high_from, x_low_from:x_high_from]
-
-        # Increment the offset counter for the current drizzle position.
-        offset_counters[y_offset, x_offset] += 1
-
-    def equalize_ap_patch(self, patch, offset_counters, stack_size, drizzle_factor):
-        """
-        During drizzling the AP patch gets different numbers of frame contributions at different
-        positions in the drizzling pattern, depending on the distribution of sup-pixel shift values.
-        The array "offset_counters" contains these numbers, with the sum of all those numbers being the
-        total stack size.
-
-        Scale all patch entries with "total stack size" / "offset counter". The result are uniform
-        patch entries which look as if there had been "total stack size" contributions in all drizzle
-        pattern locations.
-
-        Special care has to be taken at locations where not a single frame contributed (called "holes").
-        Here insert the average of patch values at all drizzle positions over a circle with minimum
-        radius containing at least one non-zero contribution.
-
-        :param patch: AP buffer after stacking with drizzling.
-        :param offset_counters: Integer array, size drizzle_factor x drizzle_factor, with contribution
-                                counts at all drizzle locations.
-        :param stack_size: Overall number of frames stacked
-        :param drizzle_factor: Factor by which the number of pixels is multiplied in each direction.
-        :return: Number of drizzle locations without frame contributions.
-        """
-
-        dim_y, dim_x = patch.shape[:2]
-        holes = []
-        # average_brightness = zeros((drizzle_factor, drizzle_factor), dtype=float)
-
-        # First normalize the patch locations with non-zero contributions.
-        for y_offset in range(drizzle_factor):
-            for x_offset in range(drizzle_factor):
-                if offset_counters[y_offset, x_offset]:
-                    normalization_factor = stack_size / offset_counters[y_offset, x_offset]
-                    patch[y_offset:dim_y:drizzle_factor,
-                        x_offset:dim_x:drizzle_factor] *= normalization_factor
-                    # average_brightness[y_offset, x_offset] = mean(
-                    #     patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor])
-                # For locations with zero contributions (holes) remember the location.
-                else:
-                    holes.append((y_offset, x_offset))
-
-        # # normalize the patch between all non-zero drizzle positions.
-        # nonzero_entries = np_ma.masked_where(average_brightness == 0, average_brightness)
-        # median_value = np_ma.median(nonzero_entries) + 1.e-30
-        # average_brightness /= median_value
-        # for y_offset in range(drizzle_factor):
-        #     for x_offset in range(drizzle_factor):
-        #         if offset_counters[y_offset, x_offset]:
-        #             patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] /= average_brightness[y_offset, x_offset]
-
-        # Now fill the holes with interpolated values from locations close by.
-        for (y_offset, x_offset) in holes:
-
-            # Initialize the buffer locations with zeros.
-            patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] = 0.
-
-            # Look for the circle with smallest radius around the hole with at least one non-zero
-            # contribution.
-            for radius in range(1, drizzle_factor):
-                n_success = 0
-                for (y, x) in Miscellaneous.circle_around(y_offset, x_offset, radius):
-                    if 0 <= y < drizzle_factor and 0 <= x < drizzle_factor and (y, x) not in holes:
-                        # A non-zero entry is found, add its contribution to the buffer.
-                        patch[y_offset:dim_y:drizzle_factor, x_offset:dim_x:drizzle_factor] += \
-                            patch[y:dim_y:drizzle_factor, x:dim_x:drizzle_factor]
-                        n_success += 1
-
-                # There was at least one non-zero contribution on the circle with this radius. Normalize
-                # the buffer with the number of contributions and continue with the next hole.
-                if n_success:
-                    patch[y_offset:dim_y:drizzle_factor,
-                    x_offset:dim_x:drizzle_factor] *= 1. / n_success
-                    break
-
-        # Return the number of holes in the drizzle pattern.
-        return len(holes)
 
     def merge_alignment_point_buffers(self):
         """
@@ -811,7 +634,7 @@ class StackFrames(object):
         :return: -
         """
 
-        self.stacked_image_buffer = resize(self.stacked_image_buffer, None,
+        self.stacked_image = resize(self.stacked_image, None,
                                            fx=float(0.5), fy=float(0.5))
 
     @staticmethod
@@ -908,7 +731,7 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
         # names = glob.glob('Images/Example-3*.jpg')
     else:
-        names = 'Videos/short_video.avi'
+        names = 'Videos/another_short_video.avi'
     print(names)
 
     my_timer.create('Execution over all')
@@ -984,6 +807,8 @@ if __name__ == "__main__":
         align_frames.average_frame_number) + " frames.")
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()
+
+    # align_frames.set_roi(100, 700, 200, 700)
 
     # Initialize the AlignmentPoints object. This includes the computation of the average frame
     # against which the alignment point shifts are measured.

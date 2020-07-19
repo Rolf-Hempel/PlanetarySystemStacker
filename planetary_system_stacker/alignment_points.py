@@ -544,9 +544,6 @@ class AlignmentPoints(object):
                  alignment_point['patch_x_high_drizzled'] - alignment_point[
                      'patch_x_low_drizzled']], dtype=float32)
 
-        # Allocate offset counter array for drizzling.
-        alignment_point['offset_counters'] = zeros(shape=(drizzle_factor, drizzle_factor), dtype=int)
-
     def find_alignment_points(self, y_low, y_high, x_low, x_high):
         """
         Find all alignment points the centers of which are within given (y, x) bounds.
