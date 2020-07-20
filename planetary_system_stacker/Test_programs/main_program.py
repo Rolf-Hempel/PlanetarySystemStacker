@@ -73,7 +73,7 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
 
     # The name of the alignment point visualization file is derived from the input video name or
     # the input directory name.
-    ap_image_name = input_name + ".aps.jpg"
+    ap_image_name = input_name + ".aps.tiff"
 
     print("\n" +
           "*************************************************************************************\n"
@@ -251,10 +251,10 @@ if __name__ == "__main__":
     show_results = True
     input_type = 'video'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
-    input_directory = 'E:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
+    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
     # input_type = 'image'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
-    automatic_ap_creation = True
+    automatic_ap_creation = False
     roi = None
     # roi = (400, 700, 300, 800)
     ####################################### Specify test case end ##################################
