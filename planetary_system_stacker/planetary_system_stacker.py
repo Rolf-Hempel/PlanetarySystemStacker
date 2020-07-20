@@ -1120,6 +1120,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Stacking jobs start with 'Read frames', postprocessing jobs with 'Postprocessing'
         if self.workflow.activity == 'stacking':
+            # If the optional frame selection dialog is not activated, remove the activity from the list.
+            if not self.configuration.frames_add_selection_dialog:
+                standard_activities.remove('Select frames')
             start_index = standard_activities.index('Read frames')
             if self.configuration.global_parameters_include_postprocessing:
                 stop_index = standard_activities.index('Save postprocessed image')
@@ -1131,10 +1134,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         else:
             start_index = None
             stop_index = None
-
-        # If the optional frame selection dialog is not activated, remove the activity from the list.
-        if not self.configuration.frames_add_selection_dialog:
-            standard_activities.remove('Select frames')
 
         self.ui.comboBox_back.currentTextChanged.disconnect(self.go_back)
         self.ui.comboBox_back.clear()
