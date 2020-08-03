@@ -1819,12 +1819,13 @@ if __name__ == "__main__":
     else:
         # names = 'Videos/another_short_video.avi'
         # names = 'Videos/Moon_Tile-024_043939.avi'
-        names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
-                r'\SER_RGGB_16bit_LittleEndian_397_397.ser'
+        # names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
+        #         r'\SER_RGGB_16bit_LittleEndian_397_397.ser'
         # names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
         #         r'\SER_GRAYSCALED_16bit_LittleEndian_397_397.ser'
         # names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
         #         r'\SER_GRAYSCALED_12bit_BigEndian_352_400.ser'
+        names = r'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C.ser'
         # name_flats = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Flat.avi'
         # name_darks = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Dark.avi'
 
@@ -1898,7 +1899,7 @@ if __name__ == "__main__":
           " total: {2:7.3f} (seconds)".format(initialization_time, total_access_time,
                                               initialization_time + total_access_time))
 
-    frame = frames.frames(3)
+    frame = frames.frames(1776)
     print("Image type: " + str(frame.dtype))
 
     # Check the OpenCV BGR and Matplotlibs RGB color orders
@@ -1908,3 +1909,5 @@ if __name__ == "__main__":
     else:
         plt.imshow(frame, cmap='gray')
     plt.show()
+
+    Frames.save_image('frame_1776.png', frame, color=True)
