@@ -28,6 +28,10 @@ from os.path import splitext
 
 from exceptions import IncompatibleVersionsError
 
+# Set the current software version.
+PSS_Version = "PlanetarySystemStacker 0.8.4"
+# PSS_Version = "PlanetarySystemStacker"
+
 
 class ConfigurationParameters(object):
     def __init__(self):
@@ -73,8 +77,7 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_width = 1200
         self.hidden_parameters_main_window_height = 800
         self.hidden_parameters_main_window_maximized = False
-        # self.global_parameters_version = "PlanetarySystemStacker"
-        self.global_parameters_version = "PlanetarySystemStacker 0.8.3"
+        self.global_parameters_version = PSS_Version
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = False
         self.global_parameters_store_protocol_with_result = False
@@ -167,7 +170,7 @@ class ConfigurationParameters(object):
 class Configuration(object):
     def __init__(self):
         # self.global_parameters_version = "PlanetarySystemStacker"
-        self.global_parameters_version = "PlanetarySystemStacker 0.8.3"
+        self.global_parameters_version = PSS_Version
 
         # Set fixed parameters which are hidden from the user. Hidden parameters which are
         # changeable are stored in the configuration object.
