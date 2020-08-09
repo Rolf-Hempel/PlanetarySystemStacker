@@ -135,6 +135,12 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.parent_gui = parent_gui
         self.configuration = self.parent_gui.configuration
 
+        # De-activate main gui menu entries while the job editor is active. They will be
+        # re-activated upon leaving the editor with "OK" or "Cancel".
+        self.parent_gui.activate_gui_elements(
+            [self.parent_gui.ui.menuFile, self.parent_gui.ui.menuEdit,
+             self.parent_gui.ui.menuCalibrate], False)
+
         # Set the window icon to the PSS icon.
         self.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
 
@@ -360,7 +366,11 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.parent_gui.job_number = len(self.jobs)
         self.parent_gui.job_index = 0
         self.parent_gui.activity = "Read frames"
-        self.parent_gui.activate_gui_elements([self.parent_gui.ui.box_automatic], True)
+
+        # Re-activate the main GUI menus, and activate the "Automatic" checkbox.
+        self.parent_gui.activate_gui_elements(
+            [self.parent_gui.ui.menuFile, self.parent_gui.ui.menuEdit,
+             self.parent_gui.ui.menuCalibrate, self.parent_gui.ui.box_automatic], True)
         self.parent_gui.update_status()
         self.close()
 
@@ -370,6 +380,10 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         :return: -
         """
 
+        # Re-activate the main GUI menus.
+        self.parent_gui.activate_gui_elements(
+            [self.parent_gui.ui.menuFile, self.parent_gui.ui.menuEdit,
+             self.parent_gui.ui.menuCalibrate], True)
         self.close()
 
     def closeEvent(self, event):
