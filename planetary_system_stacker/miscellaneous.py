@@ -1247,6 +1247,11 @@ class Miscellaneous(object):
             parameters = parameters + [
                 ["Normalization black cut-off", str(configuration.frames_normalization_threshold)]]
 
+        # If drizzling is active, add the factor.
+        if configuration.stack_frames_drizzle_factor_string != "Off":
+            parameters = parameters + [
+                ["Drizzle factor in stacking", str(configuration.stack_frames_drizzle_factor_string)]]
+
         output_string = "\n           Stacking parameters:                                         | Value             |\n" \
                         "           ----------------------------------------------------------------------------------" \
                         "\n          "

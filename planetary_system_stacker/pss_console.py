@@ -186,6 +186,8 @@ class PssConsole(QtCore.QObject):
                             help="Normalize frame brightness")
         parser.add_argument("--normalize_bco", type=normalize_bco_type, default=15,
                             help="Normalization black cut-off")
+        parser.add_argument("--drizzle", choices=["Off", "1.5x", "2x", "3x"], default="Off",
+                            help="Drizzle factor (Off, 1.5x, 2x, 3x)")
 
         arguments = parser.parse_args()
         # self.print_arguments(arguments)
@@ -225,6 +227,7 @@ class PssConsole(QtCore.QObject):
 
         self.configuration.frames_normalization = arguments.normalize_bright
         self.configuration.frames_normalization_threshold = arguments.normalize_bco
+        self.configuration.stack_frames_drizzle_factor_string = arguments.drizzle
 
         # Re-compute derived parameters after the configuration was changed.
         self.configuration.set_derived_parameters()
