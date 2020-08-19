@@ -370,10 +370,10 @@ class PssConsole(QtCore.QObject):
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit(update_index_translation_table)
 
-        elif self.activity == "Align frames":
+        elif self.activity == "Select frames":
 
-            # If all index bounds are set to zero, the stabilization patch is computed
-            # automatically by the workflow thread.
+            # The dialog to exclude frames is not to be called. Go to frames alignment
+            # immediately.
             self.signal_align_frames.emit(0, 0, 0, 0)
 
         elif self.activity == "Select stack size":

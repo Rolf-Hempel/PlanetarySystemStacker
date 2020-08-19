@@ -101,6 +101,7 @@ class Job(object):
                     "Unsupported file type '" + extension + "' specified for job")
         elif path.is_dir():
             self.type = 'image'
+            self.bayer_option_selected = 'Auto detect color'
         else:
             raise InternalError("Cannot decide if input file is video or image directory")
 
