@@ -51,7 +51,7 @@ class StackFrames(object):
 
     """
 
-    def __init__(self, configuration, frames, align_frames, alignment_points, my_timer,
+    def __init__(self, configuration, frames, rank_frames, align_frames, alignment_points, my_timer,
                  progress_signal=None, debug=False, create_image_window_signal=None,
                  update_image_window_signal=None, terminate_image_window_signal=None):
         """
@@ -61,6 +61,8 @@ class StackFrames(object):
 
         :param configuration: Configuration object with parameters
         :param frames: Frames object with all video frames
+        :param rank_frames: RankFrames object with global quality ranks (between 0. and 1.,
+                            1. being optimal) for all frames
         :param align_frames: AlignFrames object with global shift information for all frames
         :param alignment_points: AlignmentPoints object with information of all alignment points
         :param my_timer: Timer object for accumulating times spent in specific code sections
@@ -74,6 +76,7 @@ class StackFrames(object):
 
         self.configuration = configuration
         self.frames = frames
+        self.rank_frames = rank_frames
         self.align_frames = align_frames
         self.alignment_points = alignment_points
         self.my_timer = my_timer
@@ -451,7 +454,7 @@ class StackFrames(object):
             # If there are holes between AP patches, add this frame's contribution (if any) to the
             # averaged background image.
             if self.number_stacking_holes > 0 and \
-                    frame_index in self.align_frames.quality_sorted_indices[
+                    frame_index in self.rank_frames.quality_sorted_indices[
                         :self.alignment_points.stack_size]:
                 self.my_timer.start('Stacking: computing background')
 
@@ -835,7 +838,7 @@ if __name__ == "__main__":
     my_timer.stop('Rank frames at alignment points')
 
     # Allocate StackFrames object.
-    stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, my_timer)
+    stack_frames = StackFrames(configuration, frames, rank_frames, align_frames, alignment_points, my_timer)
 
     # Stack all frames.
     stack_frames.stack_frames()

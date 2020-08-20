@@ -29,7 +29,7 @@ from cv2 import meanStdDev
 from configuration import Configuration
 from frames import Frames
 from miscellaneous import Miscellaneous
-from exceptions import NotSupportedError, Error
+from exceptions import ArgumentError, NotSupportedError, Error
 
 
 class RankFrames(object):
@@ -193,6 +193,42 @@ class RankFrames(object):
         self.frame_ranks_max_index = self.frame_ranks_max_index_original
         self.frame_ranks_max_value = self.frame_ranks_max_value_original
 
+    def find_best_frames(self, number_frames, region_size):
+        """
+        Find the indices of the best "number_frames" frames under the condition that all indices
+        are within an interval of size "region_size".
+
+        :param number_frames: Number of best frames the indices of which are to be found.
+        :param region_size: Maximal width of index interval.
+        :return: List of frame indices.
+        """
+
+        # Check input arguments for validity.
+        if number_frames > region_size:
+            raise ArgumentError("Attempt to find " + str(number_frames) + " good frames in "
+                                "an index interval of size " + str(region_size))
+        elif region_size > self.number:
+            raise ArgumentError("Size of best frames region " + str(region_size) + " larger "
+                                "than the total number of frames " + str(self.number))
+
+        best_indices = []
+        rank_sum_opt = 0.
+
+        # Construct a sliding window on the full index range. For each window position find the
+        # best "number_frames" frames. Find the window and the best frame set within with the
+        # highest overall score.
+        for start_index in range(self.number - region_size + 1):
+            end_index = start_index + region_size
+            best_indices_in_range = sorted(range(start_index, end_index),
+                                                      key=self.frame_ranks.__getitem__,
+                                                      reverse=True)[:number_frames]
+            rank_sum = sum([self.frame_ranks[i] for i in best_indices_in_range])
+            if rank_sum > rank_sum_opt:
+                rank_sum_opt = rank_sum
+                best_indices = best_indices_in_range
+
+        return best_indices
+
 
 if __name__ == "__main__":
 
@@ -205,7 +241,8 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Example-3*.jpg')
         names = glob('Images/Mond_*.jpg')
     else:
-        names = 'Videos/short_video.avi'
+        names = 'Videos/another_short_video.avi'
+        # names = "E:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939.avi"
         # names = 'Videos/Moon_Tile-024_043939.avi'
     print(names)
 
@@ -230,11 +267,10 @@ if __name__ == "__main__":
     # for rank, index in enumerate(rank_frames.quality_sorted_indices):
     #     frame_quality = rank_frames.frame_ranks[index]
     #     print("Rank: " + str(rank) + ", Frame no. " + str(index) + ", quality: " + str(frame_quality))
-    for index, frame_quality in enumerate(rank_frames.frame_ranks):
-        rank = rank_frames.quality_sorted_indices.index(index)
-        print("Frame no. " + str(index) + ", Rank: " + str(rank) + ", quality: " +
-              str(frame_quality))
-    print('Elapsed time in ranking frames: {}'.format(end - start))
+    # for index, frame_quality in enumerate(rank_frames.frame_ranks):
+    #     rank = rank_frames.quality_sorted_indices.index(index)
+    #     print("Frame no. " + str(index) + ", Rank: " + str(rank) + ", quality: " +
+    #           str(frame_quality))
 
     print("")
     num_frames = len(rank_frames.frame_ranks)
@@ -276,3 +312,11 @@ if __name__ == "__main__":
     plt.grid(True)
 
     plt.show()
+
+    number = 3
+    window = 5
+    start = time()
+    best_indices = rank_frames.find_best_frames(number, window)
+    end = time()
+    print ("\nIndices of best frames in window of size " + str(window) + " found in " +
+           str(end - start) + " seconds: " + str(best_indices))

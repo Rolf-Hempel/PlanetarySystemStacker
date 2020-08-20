@@ -203,7 +203,7 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
     my_timer.stop('Rank frames at alignment points')
 
     # Allocate StackFrames object.
-    stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, my_timer)
+    stack_frames = StackFrames(configuration, frames, rank_frames, align_frames, alignment_points, my_timer)
 
     # Stack all frames.
     print("+++ Start stacking frames")

@@ -204,6 +204,8 @@ class Configuration(object):
         self.align_frames_min_stabilization_patch_fraction = 0.2
         self.align_frames_max_stabilization_patch_fraction = 0.7
         self.align_frames_max_search_width = 150
+        self.align_frames_fast_changing_object = False
+        self.align_frames_best_frames_window_extension = 2
 
         self.alignment_points_min_half_box_width = 10
         self.alignment_points_contrast_threshold = 0

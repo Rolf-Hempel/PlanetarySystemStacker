@@ -57,6 +57,7 @@ class AlignFrames(object):
         """
 
         self.frames = frames
+        self.rank_frames = rank_frames
         self.shape = frames.shape
         self.alignment_rect_qualities = None
         self.alignment_rect_bounds = None
@@ -68,8 +69,6 @@ class AlignFrames(object):
         self.configuration = configuration
         self.progress_signal = progress_signal
         self.signal_step_size = max(int(self.frames.number / 10), 1)
-        self.quality_sorted_indices = rank_frames.quality_sorted_indices
-        self.frame_ranks_max_index = rank_frames.frame_ranks_max_index
         self.x_low_opt = self.x_high_opt = self.y_low_opt = self.y_high_opt = None
         self.dy = self.dx = None
         self.y_low_opt = self.y_high_opt = self.x_low_opt = self.x_high_opt = None
@@ -107,7 +106,7 @@ class AlignFrames(object):
 
         # Compute for all locations in the frame the "quality measure" and store the location
         # and quality measure in above lists.
-        best_frame_mono_blurred = self.frames.frames_mono_blurred(self.frame_ranks_max_index)
+        best_frame_mono_blurred = self.frames.frames_mono_blurred(self.rank_frames.frame_ranks_max_index)
         x_low = border_width
         x_high = x_low + rect_x
         while x_high <= dim_x - border_width:
@@ -201,7 +200,7 @@ class AlignFrames(object):
                 # MultiLevelCorrelation uses two reference windows with different resolution. Also,
                 # please note that the data type is float32 in this case.
                 reference_frame = self.frames.frames_mono_blurred(
-                    self.frame_ranks_max_index).astype(float32)
+                    self.rank_frames.frame_ranks_max_index).astype(float32)
                 self.reference_window = reference_frame[self.y_low_opt:self.y_high_opt,
                                         self.x_low_opt:self.x_high_opt]
                 # For the first phase a box with half the resolution is constructed.
@@ -209,7 +208,7 @@ class AlignFrames(object):
             else:
                 # For all other methods, the reference window is of type int32.
                 reference_frame = self.frames.frames_mono_blurred(
-                    self.frame_ranks_max_index).astype(int32)
+                    self.rank_frames.frame_ranks_max_index).astype(int32)
                 self.reference_window = reference_frame[
                                         self.y_low_opt:self.y_high_opt,
                                         self.x_low_opt:self.x_high_opt]
@@ -219,7 +218,7 @@ class AlignFrames(object):
         elif self.configuration.align_frames_mode == "Planet":
             # For "Planetary" mode compute the center of gravity for the reference image.
             cog_reference_y, cog_reference_x = AlignFrames.center_of_gravity(
-                self.frames.frames_mono_blurred(self.frame_ranks_max_index))
+                self.frames.frames_mono_blurred(self.rank_frames.frame_ranks_max_index))
 
         else:
             raise NotSupportedError(
@@ -234,10 +233,10 @@ class AlignFrames(object):
         number_processed = 1
 
         # Loop over all frames. Begin with the sharpest (reference) frame
-        for idx in chain(reversed(range(self.frame_ranks_max_index + 1)),
-                         range(self.frame_ranks_max_index, self.frames.number)):
+        for idx in chain(reversed(range(self.rank_frames.frame_ranks_max_index + 1)),
+                         range(self.rank_frames.frame_ranks_max_index, self.frames.number)):
 
-            if idx == self.frame_ranks_max_index:
+            if idx == self.rank_frames.frame_ranks_max_index:
                 # For the sharpest frame the displacement is 0 because it is used as the reference.
                 self.frame_shifts[idx] = [0, 0]
                 # Initialize two variables which keep the shift values of the previous step as
@@ -478,29 +477,41 @@ class AlignFrames(object):
             self.average_frame_number = max(
                 ceil(self.frames.number * self.configuration.align_frames_average_frame_percent / 100.), 1)
 
-        shifts = [self.frame_shifts[i] for i in self.quality_sorted_indices[:self.average_frame_number]]
+        # If the object is changing fast (Jupiter, Sun), restrict interval from which frames are
+        # taken for computing the reference frame.
+        if self.configuration.align_frames_fast_changing_object:
+            window_size = min(
+                self.average_frame_number *
+                self.configuration.align_frames_best_frames_window_extension,
+                self.frames.number)
+            average_frame_indices = self.rank_frames.find_best_frames(self.average_frame_number,
+                                                                      window_size)
+        else:
+            average_frame_indices = self.rank_frames.quality_sorted_indices[:self.average_frame_number]
 
         # Create an empty numpy buffer. The first and second dimensions are the y and x
         # coordinates. For color frames add a third dimension. Add all frames to the buffer.
         if color:
             self.mean_frame = zeros([self.intersection_shape[0][1] - self.intersection_shape[0][0],
                  self.intersection_shape[1][1] - self.intersection_shape[1][0], 3], dtype=float32)
-            for idx in range(self.average_frame_number):
-                self.mean_frame += self.frames.frames(self.quality_sorted_indices[idx]) \
-                    [self.intersection_shape[0][0] - shifts[idx][0]:
-                    self.intersection_shape[0][1] - shifts[idx][0],
-                    self.intersection_shape[1][0] - shifts[idx][1]:
-                    self.intersection_shape[1][1] - shifts[idx][1], :]
+            for frame_index in average_frame_indices:
+                shift = self.frame_shifts[frame_index]
+                self.mean_frame += self.frames.frames(frame_index) \
+                    [self.intersection_shape[0][0] - shift[0]:
+                    self.intersection_shape[0][1] - shift[0],
+                    self.intersection_shape[1][0] - shift[1]:
+                    self.intersection_shape[1][1] - shift[1], :]
         else:
             self.mean_frame = zeros([self.intersection_shape[0][1] - self.intersection_shape[0][0],
                                      self.intersection_shape[1][1] - self.intersection_shape[1][0]],
                                      dtype=float32)
-            for idx in range(self.average_frame_number):
-                self.mean_frame += self.frames.frames_mono(self.quality_sorted_indices[idx]) \
-                    [self.intersection_shape[0][0] - shifts[idx][0]:
-                    self.intersection_shape[0][1] - shifts[idx][0],
-                    self.intersection_shape[1][0] - shifts[idx][1]:
-                    self.intersection_shape[1][1] - shifts[idx][1]]
+            for frame_index in average_frame_indices:
+                shift = self.frame_shifts[frame_index]
+                self.mean_frame += self.frames.frames_mono(frame_index) \
+                    [self.intersection_shape[0][0] - shift[0]:
+                    self.intersection_shape[0][1] - shift[0],
+                    self.intersection_shape[1][0] - shift[1]:
+                    self.intersection_shape[1][1] - shift[1]]
 
         # Compute the mean frame by dividing by the number of frames, and convert values to 16bit.
         if self.frames.dt0 == uint8:
@@ -674,7 +685,7 @@ if __name__ == "__main__":
 
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
             x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
-        frame = frames.frames_mono_blurred(align_frames.frame_ranks_max_index).copy()
+        frame = frames.frames_mono_blurred(rank_frames.frame_ranks_max_index).copy()
         frame[y_low_opt, x_low_opt:x_high_opt] = frame[y_high_opt - 1, x_low_opt:x_high_opt] = 255
         frame[y_low_opt:y_high_opt, x_low_opt] = frame[y_low_opt:y_high_opt, x_high_opt - 1] = 255
         plt.imshow(frame, cmap='Greys_r')
