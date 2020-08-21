@@ -21,15 +21,17 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from glob import glob
+from statistics import mean
 from time import time
-from numpy import array, full
+
 import matplotlib.pyplot as plt
 from cv2 import meanStdDev
+from numpy import array, full
 
 from configuration import Configuration
+from exceptions import ArgumentError, NotSupportedError, Error
 from frames import Frames
 from miscellaneous import Miscellaneous
-from exceptions import ArgumentError, NotSupportedError, Error
 
 
 class RankFrames(object):
@@ -200,7 +202,11 @@ class RankFrames(object):
 
         :param number_frames: Number of best frames the indices of which are to be found.
         :param region_size: Maximal width of index interval.
-        :return: List of frame indices.
+        :return: (List of frame indices, quality loss, time line position) with:
+                List of frame indices: Indices of frames participating in mean frame computation.
+                quality loss: Loss in average frame quality due to range restriction (%).
+                time line position: Position of the average frame index relative to the total
+                                    duration of the video.
         """
 
         # Check input arguments for validity.
@@ -220,14 +226,24 @@ class RankFrames(object):
         for start_index in range(self.number - region_size + 1):
             end_index = start_index + region_size
             best_indices_in_range = sorted(range(start_index, end_index),
-                                                      key=self.frame_ranks.__getitem__,
-                                                      reverse=True)[:number_frames]
+                                           key=self.frame_ranks.__getitem__, reverse=True)[
+                                    :number_frames]
             rank_sum = sum([self.frame_ranks[i] for i in best_indices_in_range])
             if rank_sum > rank_sum_opt:
                 rank_sum_opt = rank_sum
                 best_indices = best_indices_in_range
 
-        return best_indices
+        # Compare the average frame quality with the optimal choice if no time restrictions were
+        # present.
+        rank_sum_global = sum(
+            [self.frame_ranks[i] for i in self.quality_sorted_indices[:number_frames]])
+        quality_loss_percent = round(100. * (rank_sum_global - rank_sum_opt) / rank_sum_global, 1)
+
+        # For the frames included in mean frame computation compute the average position on the
+        # video time line.
+        cog_mean_frame = round(100 * mean(best_indices) / self.number, 1)
+
+        return best_indices, quality_loss_percent, cog_mean_frame
 
 
 if __name__ == "__main__":
@@ -316,7 +332,10 @@ if __name__ == "__main__":
     number = 3
     window = 5
     start = time()
-    best_indices = rank_frames.find_best_frames(number, window)
+    best_indices, quality_loss_percent, cog_mean_frame = rank_frames.find_best_frames(number, window)
     end = time()
     print ("\nIndices of best frames in window of size " + str(window) + " found in " +
-           str(end - start) + " seconds: " + str(best_indices))
+           str(end - start) + " seconds: " + str(best_indices) +
+           "\nQuality loss as compared to unrestricted selection: " +
+           str(quality_loss_percent) + "%\nPosition of mean frame in video time line: " +
+           str(cog_mean_frame) + "%")

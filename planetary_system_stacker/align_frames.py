@@ -66,6 +66,8 @@ class AlignFrames(object):
         self.intersection_shape_original = None
         self.mean_frame = None
         self.mean_frame_original = None
+        self.quality_loss_percent = None
+        self.cog_mean_frame = None
         self.configuration = configuration
         self.progress_signal = progress_signal
         self.signal_step_size = max(int(self.frames.number / 10), 1)
@@ -484,8 +486,8 @@ class AlignFrames(object):
                 self.average_frame_number *
                 self.configuration.align_frames_best_frames_window_extension,
                 self.frames.number)
-            average_frame_indices = self.rank_frames.find_best_frames(self.average_frame_number,
-                                                                      window_size)
+            average_frame_indices, self.quality_loss_percent, self.cog_mean_frame = \
+                self.rank_frames.find_best_frames(self.average_frame_number, window_size)
         else:
             average_frame_indices = self.rank_frames.quality_sorted_indices[:self.average_frame_number]
 
@@ -519,7 +521,7 @@ class AlignFrames(object):
         elif self.frames.dt0 == uint16:
             scaling = 1. / self.average_frame_number
         else:
-            raise NotSupportedError("Attempt to compute the average frame from images with type"
+            raise NotSupportedError("Attempt to compute the reference frame from images with type"
                                     " neither uint8 nor uint16")
 
         self.mean_frame = (self.mean_frame*scaling).astype(int32)

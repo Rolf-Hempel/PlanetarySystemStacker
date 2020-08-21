@@ -806,7 +806,7 @@ if __name__ == "__main__":
     my_timer.create('Compute reference frame')
     average = align_frames.average_frame()
     my_timer.stop('Compute reference frame')
-    print("Average frame computed from the best " + str(
+    print("Reference frame computed from the best " + str(
         align_frames.average_frame_number) + " frames.")
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()

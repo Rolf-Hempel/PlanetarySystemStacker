@@ -140,16 +140,16 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
           + str(align_frames.intersection_shape[1][1]))
 
     # Compute the average frame.
-    print("+++ Start computing average frame")
+    print("+++ Start computing reference frame")
     my_timer.create('Compute reference frame')
     average = align_frames.average_frame()
     my_timer.stop('Compute reference frame')
-    print("Average frame computed from the best " + str(
+    print("Reference frame computed from the best " + str(
         align_frames.average_frame_number) + " frames.")
 
     # If the ROI is to be set to a smaller size than the whole intersection, do so.
     if roi:
-        print("+++ Start setting ROI and computing new average frame")
+        print("+++ Start setting ROI and computing new reference frame")
         my_timer.create('Setting ROI and new reference')
         average_roi = align_frames.set_roi(roi[0], roi[1], roi[2], roi[3])
         my_timer.stop('Setting ROI and new reference')

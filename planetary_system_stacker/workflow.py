@@ -669,16 +669,28 @@ class Workflow(QtCore.QObject):
 
         # Compute the average frame.
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start computing the average frame +++",
+            Miscellaneous.protocol("+++ Start computing the reference frame +++",
                                    self.attached_log_file)
         self.my_timer.create_no_check('Compute reference frame')
         self.align_frames.average_frame()
         self.my_timer.stop('Compute reference frame')
         if self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol(
-                "           The average frame was computed using the best " + str(
-                    self.align_frames.average_frame_number) + " frames.", self.attached_log_file,
-                precede_with_timestamp=False)
+            if self.configuration.align_frames_fast_changing_object:
+                Miscellaneous.protocol(
+                    "           The reference frame was computed using the best " + str(
+                        self.align_frames.average_frame_number) + " frames within a window of " +
+                    str(self.align_frames.average_frame_number *
+                        self.configuration.align_frames_best_frames_window_extension) +
+                    " frames.\n           Quality loss of reference frame due to time restriction: " +
+                    str(self.align_frames.quality_loss_percent) +
+                    "%\n           Position of reference frame in video time line: " +
+                    str(self.align_frames.cog_mean_frame) + "%",
+                    self.attached_log_file, precede_with_timestamp=False)
+            else:
+                Miscellaneous.protocol(
+                    "           The reference frame was computed using the best " + str(
+                        self.align_frames.average_frame_number) + " frames.",
+                    self.attached_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Select stack size")
 
@@ -687,7 +699,7 @@ class Workflow(QtCore.QObject):
 
         self.set_status_bar_processing_phase("setting the ROI")
         if self.configuration.global_parameters_protocol_level > 0 and y_min != 0 or y_max != 0:
-            Miscellaneous.protocol("+++ Start setting a ROI and computing a new average frame +++",
+            Miscellaneous.protocol("+++ Start setting a ROI and computing a new reference frame +++",
                                    self.attached_log_file)
         self.my_timer.create_no_check('Setting ROI and new reference')
         self.align_frames.set_roi(y_min, y_max, x_min, x_max)
