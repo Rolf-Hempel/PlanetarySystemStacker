@@ -78,6 +78,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.afsw_slider_value.valueChanged['int'].connect(self.afsw_changed)
         self.afafp_slider_value.valueChanged['int'].connect(self.afafp_changed)
         self.efs_checkBox.stateChanged.connect(self.efs_changed)
+        self.fco_checkBox.stateChanged.connect(self.fco_changed)
         self.gpwptf_checkBox.stateChanged.connect(self.gpwptf_changed)
         self.gpspwr_checkBox.stateChanged.connect(self.gpspwr_changed)
         self.gppl_spinBox.valueChanged['int'].connect(self.gppl_changed)
@@ -135,6 +136,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.afafp_slider_value.setValue(self.config_copy.align_frames_average_frame_percent)
         self.afafp_label_display.setText(str(self.config_copy.align_frames_average_frame_percent))
         self.efs_checkBox.setChecked(self.config_copy.frames_add_selection_dialog)
+        self.fco_checkBox.setChecked(self.config_copy.align_frames_fast_changing_object)
         self.gpwptf_checkBox.setChecked(self.config_copy.global_parameters_write_protocol_to_file)
         self.gpspwr_checkBox.setChecked(
             self.config_copy.global_parameters_store_protocol_with_result)
@@ -253,6 +255,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
     def efs_changed(self, state):
         self.config_copy.frames_add_selection_dialog = (state == QtCore.Qt.Checked)
+
+    def fco_changed(self, state):
+        self.config_copy.align_frames_fast_changing_object = (state == QtCore.Qt.Checked)
 
     def gpwptf_changed(self, state):
         self.config_copy.global_parameters_write_protocol_to_file = (state == QtCore.Qt.Checked)
@@ -430,6 +435,13 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.configuration.frames_add_selection_dialog = \
                 self.config_copy.frames_add_selection_dialog
             self.configuration.configuration_changed = True
+
+        if self.config_copy.align_frames_fast_changing_object != \
+                self.configuration.align_frames_fast_changing_object:
+            self.configuration.align_frames_fast_changing_object = \
+                self.config_copy.align_frames_fast_changing_object
+            self.configuration.configuration_changed = True
+            go_back_to_activities.append('Align frames')
 
         if self.config_copy.global_parameters_store_protocol_with_result != \
                 self.configuration.global_parameters_store_protocol_with_result:

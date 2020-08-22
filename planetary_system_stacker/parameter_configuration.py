@@ -220,6 +220,9 @@ class Ui_ConfigurationDialog(object):
         self.afm_comboBox.setMaxVisibleItems(2)
         self.afm_comboBox.setObjectName("afm_comboBox")
         self.gridLayout_2.addWidget(self.afm_comboBox, 6, 2, 1, 2)
+        self.fco_checkBox = QtWidgets.QCheckBox(self.tab_frames)
+        self.fco_checkBox.setObjectName("fco_checkBox")
+        self.gridLayout_2.addWidget(self.fco_checkBox, 13, 2, 1, 4)
         self.gridLayout_2.setColumnStretch(0, 3)
         self.gridLayout_2.setColumnStretch(1, 1)
         self.gridLayout_2.setColumnStretch(2, 2)
@@ -467,6 +470,8 @@ class Ui_ConfigurationDialog(object):
         self.fgw_label_parameter.setText(_translate("ConfigurationDialog", "Noise level (add Gaussian blur)"))
         self.efs_checkBox.setToolTip(_translate("ConfigurationDialog", "Include a dialog where the user can select frames which should not be used in the stacking workflow."))
         self.efs_checkBox.setText(_translate("ConfigurationDialog", "Dialog to exclude frames from stacking"))
+        self.fco_checkBox.setToolTip(_translate("ConfigurationDialog", "The time span from which frames are taken for computing the reference frame is restricted to avoid blur."))
+        self.fco_checkBox.setText(_translate("ConfigurationDialog", "Object is changing fast (e.g. Jupiter, Sun)"))
         self.tabWidget.setTabText(self.tabWidget.indexOf(self.tab_frames), _translate("ConfigurationDialog", "Frame-related Parameters"))
         self.apst_label_parameter.setToolTip(_translate("ConfigurationDialog", "In the automatic construction of alignment point grids, points are discarded if there is too little local structure.\n"
 "Higher values result in more points to be discarded. If the value is too low, unreliable alignment points are included."))

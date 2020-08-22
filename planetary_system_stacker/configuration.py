@@ -58,6 +58,7 @@ class ConfigurationParameters(object):
         self.frames_normalization = None
         self.frames_normalization_threshold = None
         self.frames_add_selection_dialog = None
+        self.align_frames_fast_changing_object = None
         self.align_frames_mode = None
         self.align_frames_automation = None
         self.align_frames_rectangle_scale_factor = None
@@ -94,6 +95,7 @@ class ConfigurationParameters(object):
         self.frames_normalization = True
         self.frames_normalization_threshold = 15
         self.frames_add_selection_dialog = False
+        self.align_frames_fast_changing_object = True
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
         self.align_frames_rectangle_scale_factor = 3.
@@ -149,6 +151,8 @@ class ConfigurationParameters(object):
         self.frames_normalization = configuration_object.frames_normalization
         self.frames_normalization_threshold = configuration_object.frames_normalization_threshold
         self.frames_add_selection_dialog = configuration_object.frames_add_selection_dialog
+        self.align_frames_fast_changing_object = \
+            configuration_object.align_frames_fast_changing_object
         self.align_frames_mode = configuration_object.align_frames_mode
         self.align_frames_automation = configuration_object.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -204,7 +208,6 @@ class Configuration(object):
         self.align_frames_min_stabilization_patch_fraction = 0.2
         self.align_frames_max_stabilization_patch_fraction = 0.7
         self.align_frames_max_search_width = 150
-        self.align_frames_fast_changing_object = True
         self.align_frames_best_frames_window_extension = 2
 
         self.alignment_points_min_half_box_width = 10
@@ -331,6 +334,8 @@ class Configuration(object):
             configuration_parameters.frames_normalization_threshold
         self.frames_add_selection_dialog = \
             configuration_parameters.frames_add_selection_dialog
+        self.align_frames_fast_changing_object = \
+            configuration_parameters.align_frames_fast_changing_object
         self.align_frames_mode = configuration_parameters.align_frames_mode
         self.align_frames_automation = configuration_parameters.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -397,6 +402,8 @@ class Configuration(object):
         configuration_parameters.frames_normalization_threshold = self.frames_normalization_threshold
         configuration_parameters.frames_add_selection_dialog = self.frames_add_selection_dialog
 
+        configuration_parameters.align_frames_fast_changing_object = \
+            self.align_frames_fast_changing_object
         configuration_parameters.align_frames_mode = self.align_frames_mode
         configuration_parameters.align_frames_automation = self.align_frames_automation
         configuration_parameters.align_frames_rectangle_scale_factor = \
@@ -471,6 +478,8 @@ class Configuration(object):
         self.frames_normalization_threshold = conf.getint('Frames', 'normalization threshold')
         self.frames_add_selection_dialog = conf.getboolean('Frames', 'add selection dialog')
 
+        self.align_frames_fast_changing_object = conf.getboolean('Align frames',
+                                                                 'fast changing object')
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
         self.align_frames_rectangle_scale_factor = conf.getfloat('Align frames',
@@ -550,6 +559,8 @@ class Configuration(object):
         self.set_parameter('Frames', 'add selection dialog', str(self.frames_add_selection_dialog))
 
         self.config_parser_object.add_section('Align frames')
+        self.set_parameter('Align frames', 'fast changing object',
+                           str(self.align_frames_fast_changing_object))
         self.set_parameter('Align frames', 'mode', self.align_frames_mode)
         self.set_parameter('Align frames', 'automation', str(self.align_frames_automation))
         self.set_parameter('Align frames', 'rectangle scale factor',

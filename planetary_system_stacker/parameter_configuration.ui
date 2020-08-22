@@ -626,6 +626,16 @@ Gaussian blur can help finding the global optimum. Try higher values for noisy i
          </property>
         </widget>
        </item>
+       <item row="13" column="2" colspan="4">
+        <widget class="QCheckBox" name="fco_checkBox">
+         <property name="toolTip">
+          <string>The time span from which frames are taken for computing the reference frame is restricted to avoid blur.</string>
+         </property>
+         <property name="text">
+          <string>Object is changing fast (e.g. Jupiter, Sun)</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
      <widget class="QWidget" name="tab_alignment">

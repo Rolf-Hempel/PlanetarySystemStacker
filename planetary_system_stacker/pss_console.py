@@ -166,6 +166,8 @@ class PssConsole(QtCore.QObject):
                             help="Stabilization search width (pixels)")
         parser.add_argument("--rf_percent", type=rf_percent_type, default=5,
                             help="Percentage of best frames for reference frame computation")
+        parser.add_argument("--fast_changing_object", action="store_true",
+                            help="The object is changing fast during video time span (e.g. Jupiter")
         parser.add_argument("-d", "--dark", help="Image file for dark frame correction")
         parser.add_argument("-f", "--flat", help="Image file for flat frame correction")
 
@@ -215,6 +217,7 @@ class PssConsole(QtCore.QObject):
         self.configuration.align_frames_rectangle_scale_factor = 100. / arguments.stab_size
         self.configuration.align_frames_search_width = arguments.stab_sw
         self.configuration.align_frames_average_frame_percent = arguments.rf_percent
+        self.configuration.align_frames_fast_changing_object = arguments.fast_changing_object
 
         self.configuration.alignment_points_half_box_width = int(
             round(arguments.align_box_width / 2))

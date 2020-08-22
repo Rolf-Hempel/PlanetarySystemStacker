@@ -1228,6 +1228,8 @@ class Miscellaneous(object):
         # Continue with general parameters.
         parameters = parameters + [["Percentage of best frames for reference frame computation",
                                     str(configuration.align_frames_average_frame_percent)],
+                                   ["Object is changing fast (e.g. Jupiter, Sun)",
+                                    str(configuration.align_frames_fast_changing_object)],
                                    ["Alignment box width (pixels)",
                                     str(2 * configuration.alignment_points_half_box_width)],
                                    ["Max. alignment search width (pixels)",
