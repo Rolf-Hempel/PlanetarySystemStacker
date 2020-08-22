@@ -25,8 +25,8 @@ from itertools import chain
 
 import matplotlib.pyplot as plt
 from math import ceil
-from numpy import float32, zeros, empty, int32, uint8, uint16
-from cv2 import imwrite, moments, threshold, THRESH_BINARY
+from numpy import float32, zeros, empty, int32, uint8, uint16, clip, histogram
+from cv2 import imwrite, moments, threshold, THRESH_BINARY, Laplacian, CV_32F
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError, Error
@@ -430,9 +430,12 @@ class AlignFrames(object):
         """
 
         # Convert the grayscale image to binary image, where all pixels
-        # brighter than the half the maximum image brightness are set to 1,
+        # brighter than half the maximum image brightness are set to 1,
         # and all others are set to 0.
-        thresh = threshold(frame, frame.max()/2, 1, THRESH_BINARY)[1]
+        # thresh = threshold(frame, frame.max()/2, 1, THRESH_BINARY)[1]
+
+        brightness_threshold = int((frame.max())/2)
+        thresh = clip(frame, brightness_threshold, None)[:,:]-brightness_threshold
 
         # Calculate moments of binary image
         M = moments(thresh)
@@ -644,9 +647,10 @@ if __name__ == "__main__":
         # names = glob.glob('Images/Example-3*.jpg')
     else:
         # file = 'Moon_Tile-013_205538_short'
-        file = 'another_short_video'
+        # file = 'another_short_video'
         # file = 'Moon_Tile-024_043939'
         # file = 'Moon_Tile-013_205538'
+        file = "Venus_06_01"
         names = 'Videos/' + file + '.avi'
     print(names)
 
