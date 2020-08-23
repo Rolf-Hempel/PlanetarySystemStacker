@@ -22,11 +22,12 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 from glob import glob
 from itertools import chain
+from time import time
 
 import matplotlib.pyplot as plt
 from math import ceil
 from numpy import float32, zeros, empty, int32, uint8, uint16, clip, histogram
-from cv2 import imwrite, moments, threshold, THRESH_BINARY, Laplacian, CV_32F
+from cv2 import imwrite, moments, threshold, THRESH_BINARY, Laplacian, CV_32F, minMaxLoc
 
 from configuration import Configuration
 from exceptions import WrongOrderingError, NotSupportedError, InternalError, ArgumentError, Error
@@ -429,12 +430,21 @@ class AlignFrames(object):
         :return: Integer pixel coordinates (center_y, center_x) of center of gravity
         """
 
+        # The following is the old algorithm (up to Version 0.8.5). It does not work well for
+        # planets on a bright sky background.
+        #
         # Convert the grayscale image to binary image, where all pixels
         # brighter than half the maximum image brightness are set to 1,
         # and all others are set to 0.
         # thresh = threshold(frame, frame.max()/2, 1, THRESH_BINARY)[1]
 
-        brightness_threshold = int((frame.max())/2)
+        # This new code sets the threshold between the minimal brightness (background) and
+        # the maximal brightness (object). The hope is that this way the threshold is far away from
+        # background noise. Also, no binary image is created, but brightness variations are allowed
+        # to influence the center of gravity. This gives brighter parts of the image more weight,
+        # which results in a slightly better precision.
+        minVal, maxVal, minLoc, maxLoc = minMaxLoc(frame)
+        brightness_threshold = int((minVal+maxVal)/2)
         thresh = clip(frame, brightness_threshold, None)[:,:]-brightness_threshold
 
         # Calculate moments of binary image
