@@ -29,7 +29,7 @@ from os.path import splitext
 from exceptions import IncompatibleVersionsError
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.8.7"
+PSS_Version = "PlanetarySystemStacker 0.8.8"
 # PSS_Version = "PlanetarySystemStacker"
 
 
@@ -637,6 +637,10 @@ class Configuration(object):
         elif self.stack_frames_drizzle_factor_string == "3x":
             self.drizzle_factor = 3
             self.drizzle_factor_is_1_5 = False
+
+        self.global_parameters_parameters_in_filename = self.global_parameters_stack_number_frames \
+            or self.global_parameters_stack_percent_frames or self.global_parameters_ap_box_size \
+            or self.global_parameters_ap_number
 
     def write_config(self, file_name=None):
         """
