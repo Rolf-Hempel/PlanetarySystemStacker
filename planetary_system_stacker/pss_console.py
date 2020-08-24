@@ -205,6 +205,8 @@ class PssConsole(QtCore.QObject):
         self.configuration.global_parameters_protocol_level = arguments.protocol_detail
         self.configuration.global_parameters_buffering_level = arguments.buffering_level
         self.configuration.global_parameters_image_format = arguments.out_format
+        self.configuration.global_parameters_parameters_in_filename = arguments.name_add_f or \
+            arguments.name_add_p or arguments.name_add_apb or arguments.name_add_apn
         self.configuration.global_parameters_stack_number_frames = arguments.name_add_f
         self.configuration.global_parameters_stack_percent_frames = arguments.name_add_p
         self.configuration.global_parameters_ap_box_size = arguments.name_add_apb
