@@ -122,6 +122,8 @@ class JoblistWidget(QtWidgets.QListWidget):
         super().__init__(parent)
 
         self.setAcceptDrops(True)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls:

@@ -29,7 +29,7 @@ from os.path import splitext
 from exceptions import IncompatibleVersionsError
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.8.8"
+PSS_Version = "PlanetarySystemStacker 0.8.10"
 # PSS_Version = "PlanetarySystemStacker"
 
 
