@@ -22,11 +22,17 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 from pathlib import Path
 from copy import deepcopy
+from pathlib import Path
 
 from PyQt5 import QtWidgets, QtCore, QtGui
 
 from exceptions import InternalError
 from job_dialog import Ui_JobDialog
+
+# The following lists define the allowed file extensions for still images and videos.
+image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
+video_extensions = ['.avi', '.mov', '.mp4', '.ser']
+extensions = image_extensions + video_extensions
 
 
 class FileDialog(QtWidgets.QFileDialog):
@@ -86,9 +92,6 @@ class Job(object):
         self.bayer_option_selected = None
 
         # Set the type of the job based on the file name extension.
-        image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
-        video_extensions = ['.avi', '.mov', '.mp4', '.ser']
-
         if path.is_file():
             extension = path.suffix.lower()
             if extension in video_extensions:
@@ -104,6 +107,59 @@ class Job(object):
             self.bayer_option_selected = 'Auto detect color'
         else:
             raise InternalError("Cannot decide if input file is video or image directory")
+
+
+class JoblistWidget(QtWidgets.QListWidget):
+    """
+    This is a customized version of the standard QListWidget which accepts "drag and drop" of
+    picture files and directories. Dropped items are sent to the higher-level class as a list
+    via the signal "signal_job_entries".
+    """
+
+    signal_job_entries = QtCore.pyqtSignal(list)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.setAcceptDrops(True)
+
+    def dragEnterEvent(self, event):
+        if event.mimeData().hasUrls:
+            event.accept()
+        else:
+            event.ignore()
+
+    def dragMoveEvent(self, event):
+        if event.mimeData().hasUrls():
+            event.setDropAction(QtCore.Qt.CopyAction)
+            event.accept()
+        else:
+            event.ignore()
+
+    def dropEvent(self, event):
+        """
+        Handle a drop event if its mime type fits.
+
+        :param event: Drop event
+        :return: -
+        """
+
+        if event.mimeData().hasUrls():
+            event.setDropAction(QtCore.Qt.CopyAction)
+            event.accept()
+
+            # Construct a list with the job names received by the drop event.
+            links = []
+            for url in event.mimeData().urls():
+                # Only local files (with appropriate extensions) and directories are accepted.
+                if url.isLocalFile():
+                    file_path = Path(str(url.toLocalFile()))
+                    if file_path.is_dir() or file_path.suffix in extensions:
+                        links.append(str(url.toLocalFile()))
+            # Send the job name list to the upper-level method "get_input_names".
+            self.signal_job_entries.emit(links)
+        else:
+            event.ignore()
 
 
 class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
@@ -124,6 +180,12 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         QtWidgets.QFrame.__init__(self, parent)
         self.setupUi(self)
         self.setWindowIcon(QtGui.QIcon('../PSS-Icon-64.ico'))
+
+        # Replace the standard QListWidget with a customized version which implements
+        # "drag and drop". It sends dropped items via its signal "signal_job_entries".
+        self.job_list_widget = JoblistWidget()
+        self.gridLayout.addWidget(self.job_list_widget, 0, 0, 1, 6)
+        self.job_list_widget.signal_job_entries.connect(self.get_input_names)
 
         self.setFrameShape(QtWidgets.QFrame.Panel)
         self.setFrameShadow(QtWidgets.QFrame.Sunken)
