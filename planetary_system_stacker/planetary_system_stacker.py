@@ -413,6 +413,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             if self.widget_saved:
                 self.ui.verticalLayout_2.removeWidget(self.widget_saved)
                 self.widget_saved.close()
+                self.widget_saved.setParent(None)
             self.widget_saved = widget
             self.ui.verticalLayout_2.insertWidget(0, widget)
             self.ui.verticalLayout_2.setStretch(1, 0)
@@ -420,6 +421,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             if self.widget_saved:
                 self.ui.verticalLayout_2.removeWidget(self.widget_saved)
                 self.widget_saved.close()
+                self.widget_saved.setParent(None)
                 self.widget_saved = None
 
     def load_config_file(self):
