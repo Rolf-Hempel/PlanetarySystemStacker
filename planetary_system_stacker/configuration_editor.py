@@ -82,7 +82,13 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.gpwptf_checkBox.stateChanged.connect(self.gpwptf_changed)
         self.gpspwr_checkBox.stateChanged.connect(self.gpspwr_changed)
         self.gppl_spinBox.valueChanged['int'].connect(self.gppl_changed)
-        self.gpbl_spinBox.valueChanged['int'].connect(self.gpbl_changed)
+        self.gpbl_combobox.addItem('auto')
+        self.gpbl_combobox.addItem('0')
+        self.gpbl_combobox.addItem('1')
+        self.gpbl_combobox.addItem('2')
+        self.gpbl_combobox.addItem('3')
+        self.gpbl_combobox.addItem('4')
+        self.gpbl_combobox.activated[str].connect(self.gpbl_changed)
         self.gpif_comboBox.addItem('png')
         self.gpif_comboBox.addItem('tiff')
         self.gpif_comboBox.addItem('fits')
@@ -141,7 +147,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.gpspwr_checkBox.setChecked(
             self.config_copy.global_parameters_store_protocol_with_result)
         self.gppl_spinBox.setValue(self.config_copy.global_parameters_protocol_level)
-        self.gpbl_spinBox.setValue(self.config_copy.global_parameters_buffering_level)
+        if self.config_copy.global_parameters_buffering_level != -1:
+            self.gpbl_combobox.setCurrentIndex(self.config_copy.global_parameters_buffering_level+1)
+        else:
+            self.gpbl_combobox.setCurrentIndex(0)
         index = self.gpif_comboBox.findText(self.config_copy.global_parameters_image_format,
                                            QtCore.Qt.MatchFixedString)
         if index >= 0:
@@ -269,7 +278,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.config_copy.global_parameters_protocol_level = value
 
     def gpbl_changed(self, value):
-        self.config_copy.global_parameters_buffering_level = value
+        if value == "auto":
+            self.config_copy.global_parameters_buffering_level = -1
+        else:
+            self.config_copy.global_parameters_buffering_level = int(value)
 
     def gpif_changed(self, value):
         self.config_copy.global_parameters_image_format = value

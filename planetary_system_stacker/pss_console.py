@@ -138,8 +138,8 @@ class PssConsole(QtCore.QObject):
                             help="Store protocol with results")
         parser.add_argument("--protocol_detail", type=int, choices=[0, 1, 2], default=1,
                             help="Protocol detail level")
-        parser.add_argument("-b", "--buffering_level", type=int, choices=[0, 1, 2, 3, 4], default=2,
-                            help="Buffering level")
+        parser.add_argument("-b", "--buffering_level", choices=["auto", "0", "1", "2", "3", "4"],
+                            default="auto", help="Buffering level")
         parser.add_argument("--out_format", choices=["png", "tiff", "fits"], default="png",
                             help="Image format for output")
         parser.add_argument("--name_add_f", action="store_true",
@@ -203,7 +203,10 @@ class PssConsole(QtCore.QObject):
         # Modify the standard configuration as specified in the command line arguments.
         self.configuration.global_parameters_store_protocol_with_result = arguments.protocol
         self.configuration.global_parameters_protocol_level = arguments.protocol_detail
-        self.configuration.global_parameters_buffering_level = arguments.buffering_level
+        if arguments.buffering_level == "auto":
+            self.configuration.global_parameters_buffering_level = -1
+        else:
+            self.configuration.global_parameters_buffering_level = int(arguments.buffering_level)
         self.configuration.global_parameters_image_format = arguments.out_format
         self.configuration.global_parameters_parameters_in_filename = arguments.name_add_f or \
             arguments.name_add_p or arguments.name_add_apb or arguments.name_add_apn

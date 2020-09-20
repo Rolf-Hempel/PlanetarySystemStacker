@@ -1064,42 +1064,8 @@ class Frames(object):
 
     """
 
-    @staticmethod
-    def set_buffering(buffering_level):
-        """
-        Decide on the objects to be buffered, depending on "buffering_level" configuration
-        parameter.
-
-        :param buffering_level: Buffering level parameter as set in configuration.
-        :return: Tuple of four booleans:
-                 buffer_original: Keep all original frames in buffer.
-                 buffer_monochrome: Keep the monochrome version of  all original frames in buffer.
-                 buffer_gaussian: Keep the monochrome version with Gaussian blur added of  all
-                                  frames in buffer.
-                 buffer_laplacian: Keep the Laplacian of Gaussian (LoG) of the monochrome version of
-                                   all frames in buffer.
-        """
-
-        buffer_original = False
-        buffer_monochrome = False
-        buffer_gaussian = False
-        buffer_laplacian = False
-
-        if buffering_level > 0:
-            buffer_laplacian = True
-        if buffering_level > 1:
-            buffer_gaussian = True
-        if buffering_level > 2:
-            buffer_original = True
-        if buffering_level > 3:
-            buffer_monochrome = True
-
-        return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
-
     def __init__(self, configuration, names, type='video', bayer_option_selected="Auto detect color",
-                 calibration=None, progress_signal=None,
-                 buffer_original=True, buffer_monochrome=False, buffer_gaussian=True,
-                 buffer_laplacian=True):
+                 calibration=None, progress_signal=None, buffering_level=2):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
@@ -1115,17 +1081,7 @@ class Frames(object):
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
                                 (str, int) with the current activity (str) and the progress in
                                 percent (int).
-        :param buffer_original: If "True", read the original frame data only once, otherwise
-                                read them again if required.
-        :param buffer_monochrome: If "True", compute the monochrome image only once, otherwise
-                                  compute it again if required. This may include re-reading the
-                                  original image data.
-        :param buffer_gaussian: If "True", compute the gaussian-blurred image only once, otherwise
-                                compute it again if required. This may include re-reading the
-                                original image data.
-        :param buffer_laplacian: If "True", compute the "Laplacian of Gaussian" only once, otherwise
-                                 compute it again if required. This may include re-reading the
-                                 original image data.
+        :param buffering_level: Level of buffering for original frames and image variants.
         """
 
         self.configuration = configuration
@@ -1138,10 +1094,11 @@ class Frames(object):
         self.bayer_option_selected = bayer_option_selected
         self.shift_pixels = None
 
-        self.buffer_original = buffer_original
-        self.buffer_monochrome = buffer_monochrome
-        self.buffer_gaussian = buffer_gaussian
-        self.buffer_laplacian = buffer_laplacian
+        self.buffer_original = None
+        self.buffer_monochrome = None
+        self.buffer_gaussian = None
+        self.buffer_laplacian = None
+        self.set_buffering(buffering_level)
 
         # In non-buffered mode, the index of the image just read/computed is stored for re-use.
         self.original_available = None
@@ -1220,6 +1177,54 @@ class Frames(object):
         self.first_monochrome_index = None
         self.used_alignment_points = None
 
+    def set_buffering(self, buffering_level):
+        """
+        Set the buffering flags for original image data and its variants depending on the buffering
+        level selected.
+
+        :param buffering_level: Level of buffering for image data and variants.
+        :return: -
+        """
+
+        self.buffer_original, self.buffer_monochrome, self.buffer_gaussian, self.buffer_laplacian =\
+            Frames.decide_buffering(buffering_level)
+
+    @staticmethod
+    def decide_buffering(buffering_level):
+        """
+        Decide on the objects to be buffered, depending on "buffering_level" configuration
+        parameter. For each frame, four versions can be buffered or not:
+        buffer_original: If "True", read the original frame data only once, otherwise
+                         read them again if required.
+        buffer_monochrome: If "True", compute the monochrome image only once, otherwise
+                           compute it again if required.
+        buffer_gaussian: If "True", compute the gaussian-blurred image only once, otherwise
+                         compute it again if required.
+        buffer_laplacian: If "True", compute the "Laplacian of Gaussian" only once, otherwise
+                          compute it again if required.
+
+        :param buffering_level: Level of buffering for original frames and image variants.
+        :return: Tuple with four booleans defining for each image version if it is to be buffered or
+                 not
+
+        """
+
+        buffer_original = False
+        buffer_monochrome = False
+        buffer_gaussian = False
+        buffer_laplacian = False
+
+        if buffering_level > 0:
+            buffer_laplacian = True
+        if buffering_level > 1:
+            buffer_gaussian = True
+        if buffering_level > 2:
+            buffer_original = True
+        if buffering_level > 3:
+            buffer_monochrome = True
+
+        return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
+
     def compute_required_buffer_size(self, buffering_level):
         """
         Compute the RAM required to store original images and their derivatives, and other objects
@@ -1267,7 +1272,7 @@ class Frames(object):
 
         # Compute the buffer space per image, based on the buffering level.
         buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian = \
-            Frames.set_buffering(buffering_level)
+            Frames.decide_buffering(buffering_level)
         buffer_per_image = 0
         if buffer_original:
             buffer_per_image += image_size_bytes
@@ -1855,27 +1860,11 @@ if __name__ == "__main__":
         flat_max = np_max(calibration.inverse_master_flat_frame)
         print("Flat min: " + str(flat_min) + ", Flat max: " + str(flat_max))
 
-    # Decide on the objects to be buffered, depending on configuration parameter.
-    buffer_original = False
-    buffer_monochrome = False
-    buffer_gaussian = False
-    buffer_laplacian = False
-
-    if buffering_level > 0:
-        buffer_laplacian = True
-    if buffering_level > 1:
-        buffer_gaussian = True
-    if buffering_level > 2:
-        buffer_original = True
-    if buffering_level > 3:
-        buffer_monochrome = True
-
     start = time()
     if version == 'frames':
         try:
             frames = Frames(configuration, names, type=type, calibration=calibration,
-                            buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
-                            buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
+                            buffering_level=buffering_level)
         except Error as e:
             print("Error: " + e.message)
             exit()

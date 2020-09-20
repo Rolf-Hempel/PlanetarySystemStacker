@@ -89,9 +89,7 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
     print("+++ Start reading frames")
     my_timer.create('Read all frames')
     try:
-        frames = Frames(configuration, names, type=input_type,
-                        buffer_original=False, buffer_monochrome=False,
-                        buffer_gaussian=True, buffer_laplacian=True)
+        frames = Frames(configuration, names, type=input_type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Error as e:
