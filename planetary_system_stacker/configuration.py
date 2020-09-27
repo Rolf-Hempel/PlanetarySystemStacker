@@ -191,7 +191,7 @@ class Configuration(object):
                 self.window_icon = location
                 break
 
-        self.frames_mono_channel = 'green'
+        self.frames_mono_channel = 'panchromatic'
         self.frames_color_difference_threshold = 0
         self.frames_bayer_max_noise_diff_green = 2.
         self.frames_bayer_min_distance_from_blue = 99.5
