@@ -699,14 +699,34 @@ class AlignmentPoints(object):
 
         # Initialize the alignment point lists for all frames.
         self.frames.reset_alignment_point_lists()
-        # For each alignment point sort the computed quality ranks in descending order.
+        # For each alignment point sort the computed quality ranks in descending order. At the same
+        # time compute the sum of the quality measures of all contributing frames.
+        quality_sum_list = []
         for alignment_point_index, alignment_point in enumerate(self.alignment_points):
+            quality_sum = 0.
             # Truncate the list to the number of frames to be stacked for each alignmeent point.
-            alignment_point['best_frame_indices'] = sorted(range(len(alignment_point['frame_qualities'])),
-                                                    key=alignment_point['frame_qualities'].__getitem__, reverse=True)[:self.stack_size]
+            alignment_point['best_frame_indices'] = sorted(
+                range(len(alignment_point['frame_qualities'])),
+                key=alignment_point['frame_qualities'].__getitem__, reverse=True)[:self.stack_size]
             # Add this alignment point to the AP lists of those frames where the AP is to be used.
             for frame_index in alignment_point['best_frame_indices']:
                 self.frames.used_alignment_points[frame_index].append(alignment_point_index)
+                quality_sum += alignment_point['frame_qualities'][frame_index]
+            quality_sum_list.append(quality_sum)
+
+        # For each alignment point compute the weight based on the quality sum. A configuration
+        # parameter controls how much the quality weights influence the patch blending result.
+        min_quality_sum = min(quality_sum_list)
+        max_quality_sum = max(quality_sum_list)
+        if max_quality_sum - min_quality_sum > 1.e-15:
+            fraction = self.configuration.alignment_points_weight_fraction / \
+                       (max_quality_sum - min_quality_sum)
+        else:
+            fraction = 1.
+        base = 1. - self.configuration.alignment_points_weight_fraction
+        for alignment_point_index, alignment_point in enumerate(self.alignment_points):
+            alignment_point['quality_sum_weight'] = (quality_sum_list[alignment_point_index] -
+                min_quality_sum) * fraction + base
 
     def compute_shift_alignment_point(self, frame_mono_blurred, frame_index, alignment_point_index,
                                       de_warp=True, weight_matrix_first_phase=None,

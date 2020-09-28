@@ -215,6 +215,7 @@ class Configuration(object):
         self.alignment_points_dim_fraction_threshold = 0.6
         self.alignment_points_rank_method = "Laplace"
         self.alignment_points_rank_pixel_stride = 2
+        self.alignment_points_weight_fraction = 1.
         self.alignment_points_de_warp = True
         self.alignment_points_method = 'MultiLevelCorrelation'
         self.alignment_points_sampling_stride = 2
@@ -614,10 +615,10 @@ class Configuration(object):
         self.alignment_points_half_patch_width = int(
             round((self.alignment_points_half_box_width * 3) / 2))
 
-        # Set the AP distance per coordinate direction such that adjacent patches overlap by 1/6
-        # of their width.
+        # Set the AP distance per coordinate direction such that there is some overlap between
+        # adjacent patches.
         self.alignment_points_step_size = int(
-            round((self.alignment_points_half_patch_width * 4.5) / 3))
+            round(self.alignment_points_half_patch_width * 1.5))
 
         # Initialze the number of frames to be stacked. It will be computed from the corresponding
         # percentage. The user, however, can override this value with a (more precise) figure

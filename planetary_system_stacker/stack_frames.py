@@ -194,7 +194,8 @@ class StackFrames(object):
                                                                         alignment_point['x_drizzled'],
                                                                         extend_low=extend_low_x,
                                                                         extend_high=extend_high_x)[
-                                                                                    newaxis, :])
+                                                                                    newaxis, :]) * \
+                                            alignment_point['quality_sum_weight']
 
             # This is an alternative where the weights decrease more rapidly towards the corners.
             # alignment_point['weights_yx'] = self.one_dim_weight(patch_y_low, patch_y_high,
@@ -345,7 +346,8 @@ class StackFrames(object):
             # Change the current frame into float32. If drizzle is active, also interpolate values.
             if self.drizzle:
                 self.frame_drizzled = resize(frame.astype(float32),
-                                             (frame.shape[1]*self.configuration.drizzle_factor, frame.shape[0]*self.configuration.drizzle_factor),
+                                             (frame.shape[1]*self.configuration.drizzle_factor,
+                                              frame.shape[0]*self.configuration.drizzle_factor),
                                              interpolation=INTER_LINEAR)
             else:
                 self.frame_drizzled = frame.astype(float32)
