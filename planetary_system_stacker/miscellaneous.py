@@ -1282,7 +1282,7 @@ class Miscellaneous(object):
 
         # Extend the three table lines up to the max index.
         for index, layer in enumerate(layers):
-            output_string += " {0:3d}     |     {1:5.2f}    |    {2:5.2f}   |      {3:8s}      |" \
+            output_string += " {0:3d}     |     {1:5.2f}    |   {2:6.2f}   |      {3:8s}      |" \
                  "\n           ".format(index + 1, layer.radius, layer.amount, str(layer.luminance_only))
 
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)

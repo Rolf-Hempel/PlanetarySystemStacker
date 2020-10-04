@@ -331,6 +331,9 @@ class StackFrames(object):
             #        + str(median_brightness) + ", max: "
             #        + str(max(self.frames.frames_average_brightness)))
 
+        # Initialize widths of border areas where artifacts occur because not all patches contribute.
+        self.border_y_low = self.border_y_high = self.border_x_low = self.border_x_high = 0
+
         # Go through the list of all frames.
         for frame_index in range(self.frames.number):
 
@@ -529,7 +532,9 @@ class StackFrames(object):
         if y_low_source < 0:
             y_low_target = -y_low_source
             y_low_source = 0
+            self.border_y_low =  max(self.border_y_low, y_low_target)
         if y_high_source > frame_size_y:
+            self.border_y_high = max(self.border_y_high, y_high_source - frame_size_y)
             y_high_source = frame_size_y
         y_high_target = y_low_target + y_high_source - y_low_source
 
@@ -541,7 +546,9 @@ class StackFrames(object):
         if x_low_source < 0:
             x_low_target = -x_low_source
             x_low_source = 0
+            self.border_x_low = max(self.border_x_low, x_low_target)
         if x_high_source > frame_size_x:
+            self.border_x_high = max(self.border_x_high, x_high_source - frame_size_x)
             x_high_source = frame_size_x
         x_high_target = x_low_target + x_high_source - x_low_source
 
@@ -617,6 +624,13 @@ class StackFrames(object):
                                             foreground_weight + self.averaged_background
 
             self.my_timer.stop('Stacking: blending APs with background')
+
+        # Trim the borders of the stacked buffer such that no artifacts from incomplete stacks
+        # (caused by warp shifts) remain.
+        if self.border_y_low or self.border_y_high or self.border_x_low or self.border_x_high:
+            self.stacked_image_buffer = self.stacked_image_buffer[
+                                        self.border_y_low:self.dim_y_drizzled - self.border_y_high,
+                                        self.border_x_low:self.dim_x_drizzled - self.border_x_high]
 
         # Scale the image buffer such that entries are in the interval [0., 1.]. Then convert the
         # float image buffer to 16bit int (or 48bit in color mode).

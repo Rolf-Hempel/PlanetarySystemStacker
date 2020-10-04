@@ -832,6 +832,16 @@ class Workflow(QtCore.QObject):
                 "Error in merging AP patches: " + str(e) + ", continuing with next job")
             return
 
+        if self.stack_frames.border_y_low or self.stack_frames.border_y_high or self.stack_frames.border_x_low or self.stack_frames.border_x_high:
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol(
+                    "           Stacked image borders cropped to avoid artifacts; top: " + str(
+                        self.stack_frames.border_y_low) + ", bottom: " + str(
+                        self.stack_frames.border_y_high) + ", left: " + str(
+                        self.stack_frames.border_x_low) + ", right: " + str(
+                        self.stack_frames.border_x_high) + "\n",
+                        self.attached_log_file, precede_with_timestamp=False)
+
         # If the drizzle factor is 1.5, reduce the pixel resolution of the stacked image buffer
         # to half the size used in stacking.
         if self.configuration.drizzle_factor_is_1_5:
