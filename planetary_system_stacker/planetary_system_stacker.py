@@ -859,7 +859,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # When the editor is finished, it sends a signal (last argument) to the workflow
                 # thread with the four coordinate index bounds.
                 rpew = RectangularPatchEditorWidget(self, self.workflow.align_frames.mean_frame,
-                    "With 'crtl' and the left mouse button pressed, draw a rectangle to set the"
+                    "With 'ctrl' and the left mouse button pressed, draw a rectangle to set the"
                     " ROI, or just press 'OK' (no ROI).", self.signal_set_roi)
 
                 self.display_widget(rpew)
