@@ -497,8 +497,9 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         # Create the frame player thread and start it. The player displays frames in succession.
         # It is pushed on a different thread because otherwise the user could not stop it before it
         # finishes.
-        self.player_thread = QtCore.QThread()
         self.frame_player = FramePlayer(self)
+        self.player_thread = QtCore.QThread()
+        self.frame_player.setParent(self)
         self.frame_player.moveToThread(self.player_thread)
         self.frame_player.block_widgets_signal.connect(self.block_widgets)
         self.frame_player.unblock_widgets_signal.connect(self.unblock_widgets)
@@ -770,6 +771,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
             self.signal_finished.emit(self.signal_payload)
 
         # Close the Window.
+        self.player_thread.quit()
         plt.close()
         self.close()
 
@@ -785,6 +787,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
             self.signal_finished.emit(self.signal_payload)
 
         # Close the Window.
+        self.player_thread.quit()
         plt.close()
         self.close()
 

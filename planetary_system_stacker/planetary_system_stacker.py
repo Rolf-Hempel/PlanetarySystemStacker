@@ -412,6 +412,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         if display:
             if self.widget_saved:
                 self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+                self.widget_saved.deleteLater()
                 self.widget_saved.close()
             self.widget_saved = widget
             self.ui.verticalLayout_2.insertWidget(0, widget)
@@ -419,6 +420,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         else:
             if self.widget_saved:
                 self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+                self.widget_saved.deleteLater()
                 self.widget_saved.close()
                 self.widget_saved = None
 
