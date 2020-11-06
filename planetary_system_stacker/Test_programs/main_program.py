@@ -73,7 +73,7 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
 
     # The name of the alignment point visualization file is derived from the input video name or
     # the input directory name.
-    ap_image_name = input_name + ".aps.jpg"
+    ap_image_name = input_name + ".aps.tiff"
 
     print("\n" +
           "*************************************************************************************\n"
@@ -89,9 +89,7 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
     print("+++ Start reading frames")
     my_timer.create('Read all frames')
     try:
-        frames = Frames(configuration, names, type=input_type,
-                        buffer_original=False, buffer_monochrome=False,
-                        buffer_gaussian=True, buffer_laplacian=True)
+        frames = Frames(configuration, names, type=input_type)
         print("Number of images read: " + str(frames.number))
         print("Image shape: " + str(frames.shape))
     except Error as e:
@@ -140,16 +138,16 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
           + str(align_frames.intersection_shape[1][1]))
 
     # Compute the average frame.
-    print("+++ Start computing average frame")
+    print("+++ Start computing reference frame")
     my_timer.create('Compute reference frame')
     average = align_frames.average_frame()
     my_timer.stop('Compute reference frame')
-    print("Average frame computed from the best " + str(
+    print("Reference frame computed from the best " + str(
         align_frames.average_frame_number) + " frames.")
 
     # If the ROI is to be set to a smaller size than the whole intersection, do so.
     if roi:
-        print("+++ Start setting ROI and computing new average frame")
+        print("+++ Start setting ROI and computing new reference frame")
         my_timer.create('Setting ROI and new reference')
         average_roi = align_frames.set_roi(roi[0], roi[1], roi[2], roi[3])
         my_timer.stop('Setting ROI and new reference')
@@ -203,7 +201,7 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
     my_timer.stop('Rank frames at alignment points')
 
     # Allocate StackFrames object.
-    stack_frames = StackFrames(configuration, frames, align_frames, alignment_points, my_timer)
+    stack_frames = StackFrames(configuration, frames, rank_frames, align_frames, alignment_points, my_timer)
 
     # Stack all frames.
     print("+++ Start stacking frames")
@@ -212,6 +210,12 @@ def workflow(input_name, input_type='video', roi=None, automatic_ap_creation=Tru
     # Merge the stacked alignment point buffers into a single image.
     print("+++ Start merging alignment patches")
     stacked_image = stack_frames.merge_alignment_point_buffers()
+
+    # If the drizzle factor is 1.5, reduce the pixel resolution of the stacked image buffer
+    # to half the size used in stacking.
+    if configuration.drizzle_factor_is_1_5:
+        print("+++ Start reducing image buffer size")
+        stack_frames.half_stacked_image_buffer_resolution()
 
     # Save the stacked image as 16bit int (color or mono).
     my_timer.create('Saving the final image')
@@ -245,10 +249,10 @@ if __name__ == "__main__":
     show_results = True
     input_type = 'video'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2018-03-24'
-    input_directory = 'E:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
+    input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Jupiter_short'
     # input_type = 'image'
     # input_directory = 'D:/SW-Development/Python/PlanetarySystemStacker/Examples/Moon_2011-04-10'
-    automatic_ap_creation = True
+    automatic_ap_creation = False
     roi = None
     # roi = (400, 700, 300, 800)
     ####################################### Specify test case end ##################################

@@ -339,8 +339,8 @@ class Miscellaneous(object):
                     # correction is within the 3x3 box, it is trusted (and used).
                     y_corr, x_corr = Miscellaneous.sub_pixel_solve(surroundings)
                     if abs(y_corr) <= 1. and abs(x_corr) <= 1.:
-                        shift_y_local_second_phase += y_corr
-                        shift_x_local_second_phase += x_corr
+                        shift_y_local_second_phase -= y_corr
+                        shift_x_local_second_phase -= x_corr
                 except:
                     # print ("Subpixel solve not successful")
                     pass
@@ -1229,6 +1229,8 @@ class Miscellaneous(object):
         # Continue with general parameters.
         parameters = parameters + [["Percentage of best frames for reference frame computation",
                                     str(configuration.align_frames_average_frame_percent)],
+                                   ["Object is changing fast (e.g. Jupiter, Sun)",
+                                    str(configuration.align_frames_fast_changing_object)],
                                    ["Alignment box width (pixels)",
                                     str(2 * configuration.alignment_points_half_box_width)],
                                    ["Max. alignment search width (pixels)",
@@ -1247,6 +1249,11 @@ class Miscellaneous(object):
         if configuration.frames_normalization:
             parameters = parameters + [
                 ["Normalization black cut-off", str(configuration.frames_normalization_threshold)]]
+
+        # If drizzling is active, add the factor.
+        if configuration.stack_frames_drizzle_factor_string != "Off":
+            parameters = parameters + [
+                ["Drizzle factor in stacking", str(configuration.stack_frames_drizzle_factor_string)]]
 
         output_string = "\n           Stacking parameters:                                         | Value             |\n" \
                         "           ----------------------------------------------------------------------------------" \
@@ -1276,7 +1283,7 @@ class Miscellaneous(object):
 
         # Extend the three table lines up to the max index.
         for index, layer in enumerate(layers):
-            output_string += " {0:3d}     |     {1:5.2f}    |    {2:5.2f}   |      {3:8s}      |" \
+            output_string += " {0:3d}     |     {1:5.2f}    |   {2:6.2f}   |      {3:8s}      |" \
                  "\n           ".format(index + 1, layer.radius, layer.amount, str(layer.luminance_only))
 
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)

@@ -916,8 +916,8 @@ if __name__ == '__main__':
     # Initialize the AlignmentPoints object.
     alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
     end = time()
-    print('Elapsed time in computing average frame: {}'.format(end - start))
-    print("Average frame computed from the best " + str(
+    print('Elapsed time in computing reference frame: {}'.format(end - start))
+    print("Reference frame computed from the best " + str(
         align_frames.average_frame_number) + " frames.")
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()

@@ -138,8 +138,8 @@ class PssConsole(QtCore.QObject):
                             help="Store protocol with results")
         parser.add_argument("--protocol_detail", type=int, choices=[0, 1, 2], default=1,
                             help="Protocol detail level")
-        parser.add_argument("-b", "--buffering_level", type=int, choices=[0, 1, 2, 3, 4], default=2,
-                            help="Buffering level")
+        parser.add_argument("-b", "--buffering_level", choices=["auto", "0", "1", "2", "3", "4"],
+                            default="auto", help="Buffering level")
         parser.add_argument("--out_format", choices=["png", "tiff", "fits"], default="png",
                             help="Image format for output")
         parser.add_argument("--name_add_f", action="store_true",
@@ -170,6 +170,8 @@ class PssConsole(QtCore.QObject):
                             help="Stabilization search width (pixels)")
         parser.add_argument("--rf_percent", type=rf_percent_type, default=5,
                             help="Percentage of best frames for reference frame computation")
+        parser.add_argument("--fast_changing_object", action="store_true",
+                            help="The object is changing fast during video time span (e.g. Jupiter")
         parser.add_argument("-d", "--dark", help="Image file for dark frame correction")
         parser.add_argument("-f", "--flat", help="Image file for flat frame correction")
 
@@ -190,6 +192,8 @@ class PssConsole(QtCore.QObject):
                             help="Normalize frame brightness")
         parser.add_argument("--normalize_bco", type=normalize_bco_type, default=15,
                             help="Normalization black cut-off")
+        parser.add_argument("--drizzle", choices=["Off", "1.5x", "2x", "3x"], default="Off",
+                            help="Drizzle factor (Off, 1.5x, 2x, 3x)")
 
         arguments = parser.parse_args()
         # self.print_arguments(arguments)
@@ -203,8 +207,13 @@ class PssConsole(QtCore.QObject):
         # Modify the standard configuration as specified in the command line arguments.
         self.configuration.global_parameters_store_protocol_with_result = arguments.protocol
         self.configuration.global_parameters_protocol_level = arguments.protocol_detail
-        self.configuration.global_parameters_buffering_level = arguments.buffering_level
+        if arguments.buffering_level == "auto":
+            self.configuration.global_parameters_buffering_level = -1
+        else:
+            self.configuration.global_parameters_buffering_level = int(arguments.buffering_level)
         self.configuration.global_parameters_image_format = arguments.out_format
+        self.configuration.global_parameters_parameters_in_filename = arguments.name_add_f or \
+            arguments.name_add_p or arguments.name_add_apb or arguments.name_add_apn
         self.configuration.global_parameters_stack_number_frames = arguments.name_add_f
         self.configuration.global_parameters_stack_percent_frames = arguments.name_add_p
         self.configuration.global_parameters_ap_box_size = arguments.name_add_apb
@@ -218,6 +227,7 @@ class PssConsole(QtCore.QObject):
         self.configuration.align_frames_rectangle_scale_factor = 100. / arguments.stab_size
         self.configuration.align_frames_search_width = arguments.stab_sw
         self.configuration.align_frames_average_frame_percent = arguments.rf_percent
+        self.configuration.align_frames_fast_changing_object = arguments.fast_changing_object
 
         self.configuration.alignment_points_half_box_width = int(
             round(arguments.align_box_width / 2))
@@ -230,6 +240,7 @@ class PssConsole(QtCore.QObject):
 
         self.configuration.frames_normalization = arguments.normalize_bright
         self.configuration.frames_normalization_threshold = arguments.normalize_bco
+        self.configuration.stack_frames_drizzle_factor_string = arguments.drizzle
 
         # Re-compute derived parameters after the configuration was changed.
         self.configuration.set_derived_parameters()
@@ -375,10 +386,10 @@ class PssConsole(QtCore.QObject):
             # Now start the corresponding action on the workflow thread.
             self.signal_rank_frames.emit(update_index_translation_table)
 
-        elif self.activity == "Align frames":
+        elif self.activity == "Select frames":
 
-            # If all index bounds are set to zero, the stabilization patch is computed
-            # automatically by the workflow thread.
+            # The dialog to exclude frames is not to be called. Go to frames alignment
+            # immediately.
             self.signal_align_frames.emit(0, 0, 0, 0)
 
         elif self.activity == "Select stack size":

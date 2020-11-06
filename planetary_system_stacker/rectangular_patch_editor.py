@@ -522,7 +522,7 @@ if __name__ == '__main__':
 
     app = QtWidgets.QApplication(argv)
     window = RectangularPatchEditorWidget(None, average[border:-border, border:-border],
-            "With 'crtl' and the left mouse button pressed, draw a rectangular patch "
+            "With 'ctrl' and the left mouse button pressed, draw a rectangular patch "
             "to be used for frame alignment. Or just press 'OK / Cancel' (automatic selection).",
             None)
     window.setMinimumSize(800, 600)

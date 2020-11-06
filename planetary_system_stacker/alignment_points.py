@@ -100,24 +100,31 @@ class AlignmentPoints(object):
         :param even: If True, compute locations for even row indices. Otherwise, for odd ones.
         :return: List of alignment point coordinates in the given direction
         """
+        # Initialize list of locations.
+        locations = []
 
-        # The number of interior alignment boxes in general is not an integer. Round to the next
-        # higher number.
-        num_interior_odd = int(ceil((num_pixels - 2 * min_boundary_distance) / step_size))
-        # Because alignment points are arranged in a staggered grid, in even rows there is one point
-        # more.
-        num_interior_even = num_interior_odd + 1
+        # If the frame size is too small for the AP size chosen, no AP locations can be computed.
+        # In this case an empty list is returned.
+        try:
+            # The number of interior alignment boxes in general is not an integer. Round to the next
+            # higher number.
+            num_interior_odd = int(ceil((num_pixels - 2 * min_boundary_distance) / step_size))
+            # Because alignment points are arranged in a staggered grid, in even rows there is one point
+            # more.
+            num_interior_even = num_interior_odd + 1
 
-        # The precise distance between alignment points will differ slightly from the specified
-        # step_size. Compute the exact distance. Integer locations will be rounded later.
-        distance_corrected = (num_pixels - 2 * min_boundary_distance) / num_interior_odd
+            # The precise distance between alignment points will differ slightly from the specified
+            # step_size. Compute the exact distance. Integer locations will be rounded later.
+            distance_corrected = (num_pixels - 2 * min_boundary_distance) / num_interior_odd
 
-        # Compute the AP locations, separately for even and odd rows.
-        if even:
-            locations = [int(min_boundary_distance + i * distance_corrected) for i in range(num_interior_even)]
-        else:
-            locations = [int(min_boundary_distance + 0.5 * distance_corrected +
-                             i * distance_corrected) for i in range(num_interior_odd)]
+            # Compute the AP locations, separately for even and odd rows.
+            if even:
+                locations = [int(min_boundary_distance + i * distance_corrected) for i in range(num_interior_even)]
+            else:
+                locations = [int(min_boundary_distance + 0.5 * distance_corrected +
+                                 i * distance_corrected) for i in range(num_interior_odd)]
+        except:
+            pass
         return locations
 
     def create_ap_grid(self):
@@ -147,6 +154,12 @@ class AlignmentPoints(object):
         # value (0 < value < 256)
         contrast_threshold = self.configuration.alignment_points_contrast_threshold * 256
 
+        # Reset the alignment point list, and initialize counters for APs which are dropped because
+        # they do not satisfy the brightness or structure condition.
+        self.alignment_points = []
+        self.alignment_points_dropped_dim = 0
+        self.alignment_points_dropped_structure = 0
+
         # Compute the minimum distance of an AP from the boundary.
         min_boundary_distance = max(half_box_width + search_width, half_patch_width)
 
@@ -158,11 +171,9 @@ class AlignmentPoints(object):
         ap_locations_x_odd = self.ap_locations(self.num_pixels_x, min_boundary_distance,
                                                step_size, False)
 
-        # Reset the alignment point list, and initialize counters for APs which are dropped because
-        # they do not satisfy the brightness or structure condition.
-        self.alignment_points = []
-        self.alignment_points_dropped_dim = 0
-        self.alignment_points_dropped_structure = 0
+        # If no AP coordinates fit into the frame, no APs are created.
+        if not ap_locations_y or not ap_locations_x_even or not ap_locations_x_odd:
+            return
 
         # Compute the minimum distance of an AP center from the frame boundary.
         min_boundary_distance = max(
@@ -500,26 +511,38 @@ class AlignmentPoints(object):
             alignment_point['reference_box_first_phase'] =  window_second_phase[::2, ::2]
 
     @staticmethod
-    def initialize_ap_stacking_buffer(alignment_point, color):
+    def initialize_ap_stacking_buffer(alignment_point, drizzle_factor, color):
         """
-        In the stacking initialization, for each AP a stacking buffer has to be allocated.
+        In the stacking initialization, for each AP a stacking buffer has to be allocated. At the
+        same time, drizzled patch index bounds are computed.
 
         :param alignment_point: Alignment_point object
+        :param drizzle_factor: Drizzle factor (integer: 1, 2 or 3)
         :param color: True, if stacking is to be done for color frames. False for
         monochrome case.
         :return: -
         """
 
+        # Compute drizzled patch coordinates and index bounds.
+        alignment_point['y_drizzled'] = alignment_point['y'] * drizzle_factor
+        alignment_point['x_drizzled'] = alignment_point['x'] * drizzle_factor
+        alignment_point['patch_y_low_drizzled'] = alignment_point['patch_y_low'] * drizzle_factor
+        alignment_point['patch_y_high_drizzled'] = alignment_point['patch_y_high'] * drizzle_factor
+        alignment_point['patch_x_low_drizzled'] = alignment_point['patch_x_low'] * drizzle_factor
+        alignment_point['patch_x_high_drizzled'] = alignment_point['patch_x_high'] * drizzle_factor
+
         # Allocate space for the stacking buffer.
         if color:
             alignment_point['stacking_buffer'] = zeros(
-                [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
-                 alignment_point['patch_x_high'] - alignment_point['patch_x_low'], 3],
+                [alignment_point['patch_y_high_drizzled'] - alignment_point['patch_y_low_drizzled'],
+                 alignment_point['patch_x_high_drizzled'] - alignment_point['patch_x_low_drizzled'],
+                 3],
                 dtype=float32)
         else:
             alignment_point['stacking_buffer'] = zeros(
-                [alignment_point['patch_y_high'] - alignment_point['patch_y_low'],
-                 alignment_point['patch_x_high'] - alignment_point['patch_x_low']], dtype=float32)
+                [alignment_point['patch_y_high_drizzled'] - alignment_point['patch_y_low_drizzled'],
+                 alignment_point['patch_x_high_drizzled'] - alignment_point[
+                     'patch_x_low_drizzled']], dtype=float32)
 
     def find_alignment_points(self, y_low, y_high, x_low, x_high):
         """
@@ -946,8 +969,8 @@ if __name__ == "__main__":
 
     alignment_points = AlignmentPoints(configuration, frames, rank_frames, align_frames)
     end = time()
-    print('Elapsed time in computing average frame: {}'.format(end - start))
-    print("Average frame computed from the best " + str(
+    print('Elapsed time in computing reference frame: {}'.format(end - start))
+    print("Reference frame computed from the best " + str(
         align_frames.average_frame_number) + " frames.")
     # plt.imshow(align_frames.mean_frame, cmap='Greys_r')
     # plt.show()

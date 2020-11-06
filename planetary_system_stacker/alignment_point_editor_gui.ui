@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>901</width>
+    <width>941</width>
     <height>629</height>
    </rect>
   </property>
@@ -329,7 +329,7 @@ values</string>
      <item>
       <widget class="QLabel" name="label_message">
        <property name="text">
-        <string>Create an AP grid, or create / modify alignment points manually (with the 'crtl' button pressed). Confirm by pressing 'OK'.</string>
+        <string>Create an AP grid, or create / modify alignment points manually (with the 'ctrl' button pressed). Confirm by pressing 'OK'.</string>
        </property>
       </widget>
      </item>

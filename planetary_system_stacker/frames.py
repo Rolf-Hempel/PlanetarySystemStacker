@@ -815,7 +815,7 @@ class Calibration(QtCore.QObject):
         # Case video file:
         if Path(master_name).is_file():
             extension = Path(master_name).suffix
-            if extension in ('.avi', '.mov', '.mp4', '.ser'):
+            if extension.lower() in ('.avi', '.mov', '.mp4', '.ser'):
                 reader = VideoReader(self.configuration)
                 # Switch off dynamic range correction for 16bit SER files.
                 frame_count, input_color, input_dtype, input_shape, shift_pixels = reader.open(master_name,
@@ -1082,42 +1082,8 @@ class Frames(object):
 
     """
 
-    @staticmethod
-    def set_buffering(buffering_level):
-        """
-        Decide on the objects to be buffered, depending on "buffering_level" configuration
-        parameter.
-
-        :param buffering_level: Buffering level parameter as set in configuration.
-        :return: Tuple of four booleans:
-                 buffer_original: Keep all original frames in buffer.
-                 buffer_monochrome: Keep the monochrome version of  all original frames in buffer.
-                 buffer_gaussian: Keep the monochrome version with Gaussian blur added of  all
-                                  frames in buffer.
-                 buffer_laplacian: Keep the Laplacian of Gaussian (LoG) of the monochrome version of
-                                   all frames in buffer.
-        """
-
-        buffer_original = False
-        buffer_monochrome = False
-        buffer_gaussian = False
-        buffer_laplacian = False
-
-        if buffering_level > 0:
-            buffer_laplacian = True
-        if buffering_level > 1:
-            buffer_gaussian = True
-        if buffering_level > 2:
-            buffer_original = True
-        if buffering_level > 3:
-            buffer_monochrome = True
-
-        return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
-
     def __init__(self, configuration, names, type='video', bayer_option_selected="Auto detect color",
-                 calibration=None, progress_signal=None,
-                 buffer_original=True, buffer_monochrome=False, buffer_gaussian=True,
-                 buffer_laplacian=True):
+                 calibration=None, progress_signal=None, buffering_level=2):
         """
         Initialize the Frame object, and read all images. Images can be stored in a video file or
         as single images in a directory.
@@ -1133,17 +1099,7 @@ class Frames(object):
         :param progress_signal: Either None (no progress signalling), or a signal with the signature
                                 (str, int) with the current activity (str) and the progress in
                                 percent (int).
-        :param buffer_original: If "True", read the original frame data only once, otherwise
-                                read them again if required.
-        :param buffer_monochrome: If "True", compute the monochrome image only once, otherwise
-                                  compute it again if required. This may include re-reading the
-                                  original image data.
-        :param buffer_gaussian: If "True", compute the gaussian-blurred image only once, otherwise
-                                compute it again if required. This may include re-reading the
-                                original image data.
-        :param buffer_laplacian: If "True", compute the "Laplacian of Gaussian" only once, otherwise
-                                 compute it again if required. This may include re-reading the
-                                 original image data.
+        :param buffering_level: Level of buffering for original frames and image variants.
         """
 
         self.configuration = configuration
@@ -1156,10 +1112,11 @@ class Frames(object):
         self.bayer_option_selected = bayer_option_selected
         self.shift_pixels = None
 
-        self.buffer_original = buffer_original
-        self.buffer_monochrome = buffer_monochrome
-        self.buffer_gaussian = buffer_gaussian
-        self.buffer_laplacian = buffer_laplacian
+        self.buffer_original = None
+        self.buffer_monochrome = None
+        self.buffer_gaussian = None
+        self.buffer_laplacian = None
+        self.set_buffering(buffering_level)
 
         # In non-buffered mode, the index of the image just read/computed is stored for re-use.
         self.original_available = None
@@ -1238,6 +1195,54 @@ class Frames(object):
         self.first_monochrome_index = None
         self.used_alignment_points = None
 
+    def set_buffering(self, buffering_level):
+        """
+        Set the buffering flags for original image data and its variants depending on the buffering
+        level selected.
+
+        :param buffering_level: Level of buffering for image data and variants.
+        :return: -
+        """
+
+        self.buffer_original, self.buffer_monochrome, self.buffer_gaussian, self.buffer_laplacian =\
+            Frames.decide_buffering(buffering_level)
+
+    @staticmethod
+    def decide_buffering(buffering_level):
+        """
+        Decide on the objects to be buffered, depending on "buffering_level" configuration
+        parameter. For each frame, four versions can be buffered or not:
+        buffer_original: If "True", read the original frame data only once, otherwise
+                         read them again if required.
+        buffer_monochrome: If "True", compute the monochrome image only once, otherwise
+                           compute it again if required.
+        buffer_gaussian: If "True", compute the gaussian-blurred image only once, otherwise
+                         compute it again if required.
+        buffer_laplacian: If "True", compute the "Laplacian of Gaussian" only once, otherwise
+                          compute it again if required.
+
+        :param buffering_level: Level of buffering for original frames and image variants.
+        :return: Tuple with four booleans defining for each image version if it is to be buffered or
+                 not
+
+        """
+
+        buffer_original = False
+        buffer_monochrome = False
+        buffer_gaussian = False
+        buffer_laplacian = False
+
+        if buffering_level > 0:
+            buffer_laplacian = True
+        if buffering_level > 1:
+            buffer_gaussian = True
+        if buffering_level > 2:
+            buffer_original = True
+        if buffering_level > 3:
+            buffer_monochrome = True
+
+        return buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian
+
     def compute_required_buffer_size(self, buffering_level):
         """
         Compute the RAM required to store original images and their derivatives, and other objects
@@ -1285,7 +1290,7 @@ class Frames(object):
 
         # Compute the buffer space per image, based on the buffering level.
         buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian = \
-            Frames.set_buffering(buffering_level)
+            Frames.decide_buffering(buffering_level)
         buffer_per_image = 0
         if buffer_original:
             buffer_per_image += image_size_bytes
@@ -1655,40 +1660,8 @@ class Frames(object):
         :return: -
         """
 
-        if avoid_overwriting:
-            # If a file or directory with the given name already exists, append the word "_file".
-            if Path(filename).is_dir():
-                while True:
-                    filename += '_file'
-                    if not Path(filename).exists():
-                        break
-                filename += '.jpg'
-            # If it is a file, try to append "_copy.tiff" to its basename. If it still exists, repeat.
-            elif Path(filename).is_file():
-                suffix = Path(filename).suffix
-                while True:
-                    p = Path(filename)
-                    filename = Path.joinpath(p.parents[0], p.stem + '_copy' + suffix)
-                    if not Path(filename).exists():
-                        break
-            else:
-                # If the file name is new and has no suffix, add ".tiff".
-                suffix = Path(filename).suffix
-                if not suffix:
-                    filename += '.tiff'
-
-        elif Path(filename).suffix == '.png' or Path(filename).suffix == '.tiff':
-            # Don't care if a file with the given name exists. Overwrite it if necessary.
-            if path.exists(filename):
-                remove(filename)
-            # Write the image to the file. Before writing, convert the internal RGB representation into
-            # the BGR representation assumed by OpenCV.
-            if color:
-                imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
-            else:
-                imwrite(str(filename), image)
-
-        elif Path(filename).suffix == '.fits':
+        # Handle the special case of .fits files first.
+        if Path(filename).suffix == '.fits':
             # Flip image horizontally to preserve orientation
             image = flip(image, 0)
             if color:
@@ -1697,8 +1670,52 @@ class Frames(object):
             hdu.header['CREATOR'] = header
             hdu.writeto(filename, overwrite=True)
 
+        # Not a .fits file, the name can either point to a file or a directory, or be new.
         else:
-            raise TypeError("Attempt to write image format other than 'tiff' or 'fits'")
+            if Path(filename).is_dir():
+                # If a directory with the given name already exists, append the word "_file".
+                filename += '_file'
+                if avoid_overwriting:
+                    while True:
+                        if not Path(filename + '.png').exists():
+                            break
+                        filename += '_file'
+                    filename += '.png'
+                else:
+                    filename += '.png'
+                    if Path(filename).is_file():
+                        remove(filename)
+
+            # It is a file.
+            elif Path(filename).is_file():
+                # If overwriting is to be avoided, try to append "_copy" to its basename.
+                # If it still exists, repeat.
+                if avoid_overwriting:
+                    suffix = Path(filename).suffix
+                    while True:
+                        p = Path(filename)
+                        filename = Path.joinpath(p.parents[0], p.stem + '_copy' + suffix)
+                        if not Path(filename).exists():
+                            break
+                # File may be overwritten. Delete it first.
+                else:
+                    remove(filename)
+
+            # It is a new name. If it does not have a file suffix, add the default '.png'.
+            else:
+                # If the file name is new and has no suffix, add ".png".
+                if not Path(filename).suffix:
+                    filename += '.png'
+
+            if Path(filename).suffix not in ['.tiff', '.png']:
+                raise TypeError("Attempt to write image format other than '.tiff' or '.png'")
+
+            # Write the image to the file. Before writing, convert the internal RGB representation
+            # into the BGR representation assumed by OpenCV.
+            if color:
+                imwrite(str(filename), cvtColor(image, COLOR_RGB2BGR))
+            else:
+                imwrite(str(filename), image)
 
     @staticmethod
     def read_image(filename):
@@ -1825,12 +1842,13 @@ if __name__ == "__main__":
     else:
         # names = 'Videos/another_short_video.avi'
         # names = 'Videos/Moon_Tile-024_043939.avi'
-        names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
-                r'\SER_RGGB_16bit_LittleEndian_397_397.ser'
+        # names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
+        #         r'\SER_RGGB_16bit_LittleEndian_397_397.ser'
         # names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
         #         r'\SER_GRAYSCALED_16bit_LittleEndian_397_397.ser'
         # names = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \
         #         r'\SER_GRAYSCALED_12bit_BigEndian_352_400.ser'
+        names = r'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C.ser'
         # name_flats = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Flat.avi'
         # name_darks = 'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Darks_and_Flats\ASI120MM-S_Dark.avi'
 
@@ -1860,27 +1878,11 @@ if __name__ == "__main__":
         flat_max = np_max(calibration.inverse_master_flat_frame)
         print("Flat min: " + str(flat_min) + ", Flat max: " + str(flat_max))
 
-    # Decide on the objects to be buffered, depending on configuration parameter.
-    buffer_original = False
-    buffer_monochrome = False
-    buffer_gaussian = False
-    buffer_laplacian = False
-
-    if buffering_level > 0:
-        buffer_laplacian = True
-    if buffering_level > 1:
-        buffer_gaussian = True
-    if buffering_level > 2:
-        buffer_original = True
-    if buffering_level > 3:
-        buffer_monochrome = True
-
     start = time()
     if version == 'frames':
         try:
             frames = Frames(configuration, names, type=type, calibration=calibration,
-                            buffer_original=buffer_original, buffer_monochrome=buffer_monochrome,
-                            buffer_gaussian=buffer_gaussian, buffer_laplacian=buffer_laplacian)
+                            buffering_level=buffering_level)
         except Error as e:
             print("Error: " + e.message)
             exit()
@@ -1904,7 +1906,7 @@ if __name__ == "__main__":
           " total: {2:7.3f} (seconds)".format(initialization_time, total_access_time,
                                               initialization_time + total_access_time))
 
-    frame = frames.frames(3)
+    frame = frames.frames(1776)
     print("Image type: " + str(frame.dtype))
 
     # Check the OpenCV BGR and Matplotlibs RGB color orders
@@ -1914,3 +1916,5 @@ if __name__ == "__main__":
     else:
         plt.imshow(frame, cmap='gray')
     plt.show()
+
+    Frames.save_image('frame_1776.png', frame, color=True)

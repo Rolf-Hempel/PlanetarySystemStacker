@@ -238,7 +238,7 @@ class Workflow(QtCore.QObject):
         self.input_name = self.job.file_name
         self.set_status_bar_processing_phase("reading frames")
 
-        # A jobs can either "stack" images or "postprocess" a single image. In the latter case,
+        # A job can either "stack" images or "postprocess" a single image. In the latter case,
         # input is a single image file.
         #
         # Images for stacking can either be extracted from a video file or a batch of single
@@ -316,26 +316,77 @@ class Workflow(QtCore.QObject):
             # Write parameters to the protocol.
             if self.configuration.global_parameters_protocol_level > 1:
                 Miscellaneous.print_stacking_parameters(self.configuration, self.attached_log_file)
-            # Decide on the objects to be buffered, depending on configuration parameter.
-            buffer_original, buffer_monochrome, buffer_gaussian, buffer_laplacian = \
-                Frames.set_buffering(self.configuration.global_parameters_buffering_level)
 
-            if self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.protocol("+++ Buffering level is " +
-                                       str(self.configuration.global_parameters_buffering_level) +
-                                       " +++", self.attached_log_file)
-            if buffer_original:
-                if self.configuration.global_parameters_protocol_level > 0:
-                    Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
             try:
+                # Look up the available RAM (without paging)
+                virtual_memory = dict(psutil.virtual_memory()._asdict())
+                available_ram = virtual_memory['available'] / 1e9
+
                 self.frames = Frames(self.configuration, names, type=self.job.type,
                                      bayer_option_selected=self.job.bayer_option_selected,
                                      calibration=self.calibration,
-                                     progress_signal=self.work_current_progress_signal,
-                                     buffer_original=buffer_original,
-                                     buffer_monochrome=buffer_monochrome,
-                                     buffer_gaussian=buffer_gaussian,
-                                     buffer_laplacian=buffer_laplacian)
+                                     progress_signal=self.work_current_progress_signal)
+
+                # If buffering is not automatic, set the buffering_level as requested by the user.
+                if self.configuration.global_parameters_buffering_level != -1:
+                    # Decide on the objects to be buffered, depending on configuration parameter.
+                    buffering_level_set = self.configuration.global_parameters_buffering_level
+                    # Compute the approximate RAM usage of this job at the selected buffering level.
+                    needed_ram = self.frames.compute_required_buffer_size(buffering_level_set)
+                else:
+                    needed_ram = None
+
+                # If buffering was set to "auto", compute the highest possible value. If the
+                # buffering level requested explicitly was too high, test if lowering the
+                # buffering level would help.
+                if self.configuration.global_parameters_buffering_level == -1 or needed_ram > available_ram:
+                    buffering_level_set = None
+                    for level in range(4, -1, -1):
+                        alternative_ram = self.frames.compute_required_buffer_size(level)
+                        if alternative_ram < available_ram:
+                            buffering_level_set = level
+                            needed_ram = alternative_ram
+                            break
+
+                    # Check if the job can be processed with the requested buffering level.
+                    message = None
+                    if buffering_level_set is None:
+                        message = "Error: Too little RAM for this job, continuing with the next one"
+
+                    # If an appropriate level other then the one set by the user was found, write it
+                    # as a recommendation to the protocol. The job is aborted anyway.
+                    elif self.configuration.global_parameters_buffering_level != -1:
+                        message = "Error: Too little RAM for chosen buffering level, recommended " \
+                                  "level: " + str(
+                            buffering_level_set) + ", continuing with next job"
+
+                    # Buffering is set to "auto" and an appropriate buffering level was found. Set
+                    # the buffering in the frames object.
+                    else:
+                        self.frames.set_buffering(buffering_level_set)
+
+                    # The job does not fit in RAM, continue with the next job.
+                    if message:
+                        self.abort_job_signal.emit(message)
+                        return
+
+                # The user has set the buffering level explicitly, and the job fits in memory. Set
+                # the buffering in the frames object.
+                else:
+                    self.frames.set_buffering(buffering_level_set)
+
+                if self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol("+++ Buffering level is " +
+                                           str(buffering_level_set) +
+                                           " +++", self.attached_log_file)
+                    Miscellaneous.protocol(
+                        "           RAM required (Gbytes): " + str(round(needed_ram, 2)) +
+                        ", available: " + str(round(available_ram, 2)), self.attached_log_file,
+                        precede_with_timestamp=False)
+
+                if self.configuration.global_parameters_protocol_level > 0:
+                    Miscellaneous.protocol("+++ Start reading frames +++", self.attached_log_file)
+
                 if self.frames.warn_message is not None and \
                     self.configuration.global_parameters_protocol_level > 0:
                     Miscellaneous.protocol(
@@ -399,39 +450,7 @@ class Workflow(QtCore.QObject):
                     "Error in opening/reading frames: " + str(e) + ", continuing with next job")
                 return
 
-            # Look up the available RAM (without paging)
-            virtual_memory = dict(psutil.virtual_memory()._asdict())
-            available_ram = virtual_memory['available'] / 1e9
 
-            # Compute the approximate RAM usage of this job at the selected buffering level.
-            needed_ram = self.frames.compute_required_buffer_size(
-                self.configuration.global_parameters_buffering_level)
-            if self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.protocol(
-                    "           RAM required (Gbytes): " + str(needed_ram) + ", available: " +
-                    str(available_ram), self.attached_log_file, precede_with_timestamp=False)
-
-            # If the required RAM is not available, test if lowering the buffering level would help.
-            if needed_ram > available_ram:
-                recommended_level = None
-                for level in range(self.configuration.global_parameters_buffering_level - 1, -1,
-                                   -1):
-                    alternative_ram = self.frames.compute_required_buffer_size(level)
-                    if alternative_ram < available_ram:
-                        recommended_level = level
-                        break
-
-                # If an appropriate level was found, write it as a recommendation to the protocol.
-                if recommended_level is not None:
-                    message = "Error: Too little RAM for chosen buffering level, recommended " \
-                              "level: " + str(
-                        recommended_level) + ", continuing with next job"
-                else:
-                    message = "Error: Too little RAM for this job, continuing with the next one"
-
-                # Continue with the next job.
-                self.abort_job_signal.emit(message)
-                return
 
             # The RAM seems to be sufficient, continue with ranking frames.
             self.work_next_task_signal.emit("Rank frames")
@@ -541,9 +560,14 @@ class Workflow(QtCore.QObject):
             if auto_execution or self.configuration.align_frames_automation:
 
                 self.my_timer.create_no_check('Select optimal alignment patch')
-                (y_low_opt, y_high_opt, x_low_opt,
-                 x_high_opt) = self.align_frames.compute_alignment_rect(
-                    self.configuration.align_frames_rectangle_scale_factor)
+                try:
+                    (y_low_opt, y_high_opt, x_low_opt,
+                     x_high_opt) = self.align_frames.compute_alignment_rect(
+                        self.configuration.align_frames_rectangle_scale_factor)
+                except (ArgumentError) as e:
+                    self.abort_job_signal.emit("Error: " + e.message + ", continuing with next job")
+                    self.my_timer.stop('Select optimal alignment patch')
+                    return
                 self.my_timer.stop('Select optimal alignment patch')
                 if self.configuration.global_parameters_protocol_level > 1:
                     Miscellaneous.protocol(
@@ -664,16 +688,28 @@ class Workflow(QtCore.QObject):
 
         # Compute the average frame.
         if self.configuration.global_parameters_protocol_level > 0:
-            Miscellaneous.protocol("+++ Start computing the average frame +++",
+            Miscellaneous.protocol("+++ Start computing the reference frame +++",
                                    self.attached_log_file)
         self.my_timer.create_no_check('Compute reference frame')
         self.align_frames.average_frame()
         self.my_timer.stop('Compute reference frame')
         if self.configuration.global_parameters_protocol_level > 1:
-            Miscellaneous.protocol(
-                "           The average frame was computed using the best " + str(
-                    self.align_frames.average_frame_number) + " frames.", self.attached_log_file,
-                precede_with_timestamp=False)
+            if self.configuration.align_frames_fast_changing_object:
+                Miscellaneous.protocol(
+                    "           The reference frame was computed using the best " + str(
+                        self.align_frames.average_frame_number) + " frames within a window of " +
+                    str(self.align_frames.average_frame_number *
+                        self.configuration.align_frames_best_frames_window_extension) +
+                    " frames.\n           Quality loss of reference frame due to time restriction: " +
+                    str(self.align_frames.quality_loss_percent) +
+                    "%\n           Position of reference frame in video time line: " +
+                    str(self.align_frames.cog_mean_frame) + "%",
+                    self.attached_log_file, precede_with_timestamp=False)
+            else:
+                Miscellaneous.protocol(
+                    "           The reference frame was computed using the best " + str(
+                        self.align_frames.average_frame_number) + " frames.",
+                    self.attached_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Select stack size")
 
@@ -682,7 +718,7 @@ class Workflow(QtCore.QObject):
 
         self.set_status_bar_processing_phase("setting the ROI")
         if self.configuration.global_parameters_protocol_level > 0 and y_min != 0 or y_max != 0:
-            Miscellaneous.protocol("+++ Start setting a ROI and computing a new average frame +++",
+            Miscellaneous.protocol("+++ Start setting a ROI and computing a new reference frame +++",
                                    self.attached_log_file)
         self.my_timer.create_no_check('Setting ROI and new reference')
         self.align_frames.set_roi(y_min, y_max, x_min, x_max)
@@ -750,8 +786,8 @@ class Workflow(QtCore.QObject):
 
         self.set_status_bar_processing_phase("stacking frames")
         # Allocate StackFrames object.
-        self.stack_frames = StackFrames(self.configuration, self.frames, self.align_frames,
-                                        self.alignment_points, self.my_timer,
+        self.stack_frames = StackFrames(self.configuration, self.frames, self.rank_frames,
+                                        self.align_frames, self.alignment_points, self.my_timer,
                                         progress_signal=self.work_current_progress_signal,
                                         debug=self.debug_AP,
                                         create_image_window_signal=self.create_image_window_signal,
@@ -795,6 +831,21 @@ class Workflow(QtCore.QObject):
             self.abort_job_signal.emit(
                 "Error in merging AP patches: " + str(e) + ", continuing with next job")
             return
+
+        if self.stack_frames.border_y_low or self.stack_frames.border_y_high or self.stack_frames.border_x_low or self.stack_frames.border_x_high:
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol(
+                    "           Stacked image borders cropped to avoid artifacts; top: " + str(
+                        self.stack_frames.border_y_low) + ", bottom: " + str(
+                        self.stack_frames.border_y_high) + ", left: " + str(
+                        self.stack_frames.border_x_low) + ", right: " + str(
+                        self.stack_frames.border_x_high) + "\n",
+                        self.attached_log_file, precede_with_timestamp=False)
+
+        # If the drizzle factor is 1.5, reduce the pixel resolution of the stacked image buffer
+        # to half the size used in stacking.
+        if self.configuration.drizzle_factor_is_1_5:
+            self.stack_frames.half_stacked_image_buffer_resolution()
 
         self.work_next_task_signal.emit("Save stacked image")
 
@@ -925,10 +976,15 @@ class Workflow(QtCore.QObject):
                     self.attached_log_file, precede_with_timestamp=False)
 
             if self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.print_postproc_parameters(
-                    self.configuration.postproc_data_object.versions[
-                        self.configuration.postproc_data_object.version_selected].layers,
-                    self.attached_log_file)
+                if self.configuration.postproc_data_object.version_selected:
+                    Miscellaneous.print_postproc_parameters(
+                        self.configuration.postproc_data_object.versions[
+                            self.configuration.postproc_data_object.version_selected].layers,
+                        self.attached_log_file)
+                else:
+                    Miscellaneous.protocol(
+                        "           The image was not modified in postprocessing.",
+                        self.attached_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Next job")
 

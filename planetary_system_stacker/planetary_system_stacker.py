@@ -412,6 +412,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         if display:
             if self.widget_saved:
                 self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+                self.widget_saved.deleteLater()
                 self.widget_saved.close()
             self.widget_saved = widget
             self.ui.verticalLayout_2.insertWidget(0, widget)
@@ -419,6 +420,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         else:
             if self.widget_saved:
                 self.ui.verticalLayout_2.removeWidget(self.widget_saved)
+                self.widget_saved.deleteLater()
                 self.widget_saved.close()
                 self.widget_saved = None
 
@@ -859,7 +861,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 # When the editor is finished, it sends a signal (last argument) to the workflow
                 # thread with the four coordinate index bounds.
                 rpew = RectangularPatchEditorWidget(self, self.workflow.align_frames.mean_frame,
-                    "With 'crtl' and the left mouse button pressed, draw a rectangle to set the"
+                    "With 'ctrl' and the left mouse button pressed, draw a rectangle to set the"
                     " ROI, or just press 'OK' (no ROI).", self.signal_set_roi)
 
                 self.display_widget(rpew)
@@ -1120,6 +1122,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
 
         # Stacking jobs start with 'Read frames', postprocessing jobs with 'Postprocessing'
         if self.workflow.activity == 'stacking':
+            # If the optional frame selection dialog is not activated, remove the activity from the list.
+            if not self.configuration.frames_add_selection_dialog:
+                standard_activities.remove('Select frames')
             start_index = standard_activities.index('Read frames')
             if self.configuration.global_parameters_include_postprocessing:
                 stop_index = standard_activities.index('Save postprocessed image')
@@ -1131,10 +1136,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         else:
             start_index = None
             stop_index = None
-
-        # If the optional frame selection dialog is not activated, remove the activity from the list.
-        if not self.configuration.frames_add_selection_dialog:
-            standard_activities.remove('Select frames')
 
         self.ui.comboBox_back.currentTextChanged.disconnect(self.go_back)
         self.ui.comboBox_back.clear()

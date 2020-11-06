@@ -20,12 +20,17 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
+import sys
 from configparser import ConfigParser
-from os.path import expanduser, join, isfile
-from os.path import splitext
 from copy import deepcopy
+from os.path import expanduser, join, isfile, dirname
+from os.path import splitext
 
 from exceptions import IncompatibleVersionsError
+
+# Set the current software version.
+PSS_Version = "PlanetarySystemStacker 0.8.13"
+# PSS_Version = "PlanetarySystemStacker"
 
 
 class ConfigurationParameters(object):
@@ -54,6 +59,7 @@ class ConfigurationParameters(object):
         self.frames_normalization = None
         self.frames_normalization_threshold = None
         self.frames_add_selection_dialog = None
+        self.align_frames_fast_changing_object = None
         self.align_frames_mode = None
         self.align_frames_automation = None
         self.align_frames_rectangle_scale_factor = None
@@ -64,6 +70,7 @@ class ConfigurationParameters(object):
         self.alignment_points_structure_threshold = None
         self.alignment_points_brightness_threshold = None
         self.alignment_points_frame_percent = None
+        self.stack_frames_drizzle_factor_string = None
 
     def set_defaults(self):
         self.hidden_parameters_current_dir = expanduser("~")
@@ -72,12 +79,11 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_width = 1200
         self.hidden_parameters_main_window_height = 800
         self.hidden_parameters_main_window_maximized = False
-        # self.global_parameters_version = "PlanetarySystemStacker"
-        self.global_parameters_version = "PlanetarySystemStacker 0.8.0"
+        self.global_parameters_version = PSS_Version
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = False
         self.global_parameters_store_protocol_with_result = False
-        self.global_parameters_buffering_level = 2
+        self.global_parameters_buffering_level = -1
         self.global_parameters_include_postprocessing = False
         self.global_parameters_image_format = "png"
         self.global_parameters_parameters_in_filename = False
@@ -91,6 +97,7 @@ class ConfigurationParameters(object):
         self.frames_normalization = True
         self.frames_normalization_threshold = 15
         self.frames_add_selection_dialog = False
+        self.align_frames_fast_changing_object = True
         self.align_frames_mode = 'Surface'
         self.align_frames_automation = True
         self.align_frames_rectangle_scale_factor = 3.
@@ -98,6 +105,7 @@ class ConfigurationParameters(object):
         self.align_frames_average_frame_percent = 5
         self.alignment_points_search_width = 14
         self.alignment_points_frame_percent = 10
+        self.stack_frames_drizzle_factor_string = "Off"
         self.set_defaults_ap_editing()
 
     def set_defaults_ap_editing(self):
@@ -146,6 +154,8 @@ class ConfigurationParameters(object):
         self.frames_normalization = configuration_object.frames_normalization
         self.frames_normalization_threshold = configuration_object.frames_normalization_threshold
         self.frames_add_selection_dialog = configuration_object.frames_add_selection_dialog
+        self.align_frames_fast_changing_object = \
+            configuration_object.align_frames_fast_changing_object
         self.align_frames_mode = configuration_object.align_frames_mode
         self.align_frames_automation = configuration_object.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -160,18 +170,31 @@ class ConfigurationParameters(object):
         self.alignment_points_brightness_threshold = \
             configuration_object.alignment_points_brightness_threshold
         self.alignment_points_frame_percent = configuration_object.alignment_points_frame_percent
+        self.stack_frames_drizzle_factor_string = \
+            configuration_object.stack_frames_drizzle_factor_string
 
 
 class Configuration(object):
     def __init__(self):
         # self.global_parameters_version = "PlanetarySystemStacker"
-        self.global_parameters_version = "PlanetarySystemStacker 0.8.0"
+        self.global_parameters_version = PSS_Version
 
         # Set fixed parameters which are hidden from the user. Hidden parameters which are
         # changeable are stored in the configuration object.
-        self.window_icon = 'PSS-Icon-64.ico'
 
-        self.frames_mono_channel = 'green'
+        # Look for PSS icon in several places:
+        python_dir = dirname(sys.executable)
+        icon_locations = [join('Icons', 'PSS-Icon-64.png'),
+                          join(python_dir, "Lib", "site-packages", 'planetary_system_stacker',
+                                'Icons', 'PSS-Icon-64.png')]
+
+        self.window_icon = None
+        for location in icon_locations:
+            if isfile(location):
+                self.window_icon = location
+                break
+
+        self.frames_mono_channel = 'panchromatic'
         self.frames_color_difference_threshold = 0
         self.frames_bayer_max_noise_diff_green = 2.
         self.frames_bayer_min_distance_from_blue = 99.5
@@ -188,6 +211,7 @@ class Configuration(object):
         self.align_frames_min_stabilization_patch_fraction = 0.2
         self.align_frames_max_stabilization_patch_fraction = 0.7
         self.align_frames_max_search_width = 150
+        self.align_frames_best_frames_window_extension = 2
 
         self.alignment_points_min_half_box_width = 10
         self.alignment_points_contrast_threshold = 0
@@ -314,6 +338,8 @@ class Configuration(object):
             configuration_parameters.frames_normalization_threshold
         self.frames_add_selection_dialog = \
             configuration_parameters.frames_add_selection_dialog
+        self.align_frames_fast_changing_object = \
+            configuration_parameters.align_frames_fast_changing_object
         self.align_frames_mode = configuration_parameters.align_frames_mode
         self.align_frames_automation = configuration_parameters.align_frames_automation
         self.align_frames_rectangle_scale_factor = \
@@ -330,6 +356,8 @@ class Configuration(object):
             configuration_parameters.alignment_points_brightness_threshold
         self.alignment_points_frame_percent = \
             configuration_parameters.alignment_points_frame_percent
+        self.stack_frames_drizzle_factor_string = \
+            configuration_parameters.stack_frames_drizzle_factor_string
 
     def export_to_configuration_parameters(self, configuration_parameters):
         """
@@ -379,6 +407,8 @@ class Configuration(object):
         configuration_parameters.frames_normalization_threshold = self.frames_normalization_threshold
         configuration_parameters.frames_add_selection_dialog = self.frames_add_selection_dialog
 
+        configuration_parameters.align_frames_fast_changing_object = \
+            self.align_frames_fast_changing_object
         configuration_parameters.align_frames_mode = self.align_frames_mode
         configuration_parameters.align_frames_automation = self.align_frames_automation
         configuration_parameters.align_frames_rectangle_scale_factor = \
@@ -396,6 +426,8 @@ class Configuration(object):
             self.alignment_points_brightness_threshold
         configuration_parameters.alignment_points_frame_percent = \
             self.alignment_points_frame_percent
+        configuration_parameters.stack_frames_drizzle_factor_string = \
+            self.stack_frames_drizzle_factor_string
 
     def get_all_parameters_from_configparser(self, conf):
         """
@@ -452,6 +484,8 @@ class Configuration(object):
         self.frames_normalization_threshold = conf.getint('Frames', 'normalization threshold')
         self.frames_add_selection_dialog = conf.getboolean('Frames', 'add selection dialog')
 
+        self.align_frames_fast_changing_object = conf.getboolean('Align frames',
+                                                                 'fast changing object')
         self.align_frames_mode = conf.get('Align frames', 'mode')
         self.align_frames_automation = conf.getboolean('Align frames', 'automation')
         self.align_frames_rectangle_scale_factor = conf.getfloat('Align frames',
@@ -468,6 +502,8 @@ class Configuration(object):
         self.alignment_points_brightness_threshold = conf.getint('Alignment points',
                                                                  'brightness threshold')
         self.alignment_points_frame_percent = conf.getint('Alignment points', 'frame percent')
+
+        self.stack_frames_drizzle_factor_string = conf.get('Stack frames', 'drizzle factor string')
 
     def store_all_parameters_to_config_parser(self):
         """
@@ -530,6 +566,8 @@ class Configuration(object):
         self.set_parameter('Frames', 'add selection dialog', str(self.frames_add_selection_dialog))
 
         self.config_parser_object.add_section('Align frames')
+        self.set_parameter('Align frames', 'fast changing object',
+                           str(self.align_frames_fast_changing_object))
         self.set_parameter('Align frames', 'mode', self.align_frames_mode)
         self.set_parameter('Align frames', 'automation', str(self.align_frames_automation))
         self.set_parameter('Align frames', 'rectangle scale factor',
@@ -550,6 +588,10 @@ class Configuration(object):
                            str(self.alignment_points_brightness_threshold))
         self.set_parameter('Alignment points', 'frame percent',
                            str(self.alignment_points_frame_percent))
+
+        self.config_parser_object.add_section('Stack frames')
+        self.set_parameter('Stack frames', 'drizzle factor string',
+                           self.stack_frames_drizzle_factor_string)
 
     def set_parameter(self, section, name, value):
         """
@@ -583,10 +625,25 @@ class Configuration(object):
         # of their width.
         self.alignment_points_step_size = int(
             round((self.alignment_points_half_patch_width * 4.5) / 3))
+
         # Initialze the number of frames to be stacked. It will be computed from the corresponding
         # percentage. The user, however, can override this value with a (more precise) figure
         # during the workflow.
         self.alignment_points_frame_number = None
+
+        # Set the drizzling parameters.
+        if self.stack_frames_drizzle_factor_string == "Off":
+            self.drizzle_factor = 1
+            self.drizzle_factor_is_1_5 = False
+        elif self.stack_frames_drizzle_factor_string == "1.5x":
+            self.drizzle_factor = 3
+            self.drizzle_factor_is_1_5 = True
+        elif self.stack_frames_drizzle_factor_string == "2x":
+            self.drizzle_factor = 2
+            self.drizzle_factor_is_1_5 = False
+        elif self.stack_frames_drizzle_factor_string == "3x":
+            self.drizzle_factor = 3
+            self.drizzle_factor_is_1_5 = False
 
     def write_config(self, file_name=None):
         """
@@ -869,15 +926,20 @@ class PostprocVersion(object):
 
     def remove_postproc_layer(self, layer_index):
         """
-        Remove a postprocessing layer from this version.
+        Remove a postprocessing layer from this version. If there is only one layer, do not delete
+        it, but reset it to standard values instead. This makes sure a version always has at least
+        one layer.
 
         :param layer_index: Index of the layer to be removed.
         :return: -
         """
 
-        if 0 <= layer_index < self.number_layers:
-            self.layers = self.layers[:layer_index] + self.layers[layer_index + 1:]
-            self.number_layers -= 1
+        if self.number_layers == 1:
+            self.layers = [PostprocLayer("Multilevel unsharp masking", 1., 0, False)]
+        else:
+            if 0 <= layer_index < self.number_layers:
+                self.layers = self.layers[:layer_index] + self.layers[layer_index + 1:]
+                self.number_layers -= 1
 
 
 class PostprocLayer(object):

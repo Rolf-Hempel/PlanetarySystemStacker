@@ -82,10 +82,17 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.afsw_slider_value.valueChanged['int'].connect(self.afsw_changed)
         self.afafp_slider_value.valueChanged['int'].connect(self.afafp_changed)
         self.efs_checkBox.stateChanged.connect(self.efs_changed)
+        self.fco_checkBox.stateChanged.connect(self.fco_changed)
         self.gpwptf_checkBox.stateChanged.connect(self.gpwptf_changed)
         self.gpspwr_checkBox.stateChanged.connect(self.gpspwr_changed)
         self.gppl_spinBox.valueChanged['int'].connect(self.gppl_changed)
-        self.gpbl_spinBox.valueChanged['int'].connect(self.gpbl_changed)
+        self.gpbl_combobox.addItem('auto')
+        self.gpbl_combobox.addItem('0')
+        self.gpbl_combobox.addItem('1')
+        self.gpbl_combobox.addItem('2')
+        self.gpbl_combobox.addItem('3')
+        self.gpbl_combobox.addItem('4')
+        self.gpbl_combobox.activated[str].connect(self.gpbl_changed)
         self.gpif_comboBox.addItem('png')
         self.gpif_comboBox.addItem('tiff')
         self.gpif_comboBox.addItem('fits')
@@ -101,6 +108,11 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.pfs_checkBox.stateChanged.connect(self.pfs_changed)
         self.apbs_checkBox.stateChanged.connect(self.apbs_changed)
         self.nap_checkBox.stateChanged.connect(self.nap_changed)
+        self.sfdfs_comboBox.addItem('Off')
+        self.sfdfs_comboBox.addItem('1.5x')
+        self.sfdfs_comboBox.addItem('2x')
+        self.sfdfs_comboBox.addItem('3x')
+        self.sfdfs_comboBox.activated[str].connect(self.sfdfs_changed)
 
         self.restore_standard_values.clicked.connect(self.restore_standard_parameters)
 
@@ -138,11 +150,15 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.afafp_slider_value.setValue(self.config_copy.align_frames_average_frame_percent)
         self.afafp_label_display.setText(str(self.config_copy.align_frames_average_frame_percent))
         self.efs_checkBox.setChecked(self.config_copy.frames_add_selection_dialog)
+        self.fco_checkBox.setChecked(self.config_copy.align_frames_fast_changing_object)
         self.gpwptf_checkBox.setChecked(self.config_copy.global_parameters_write_protocol_to_file)
         self.gpspwr_checkBox.setChecked(
             self.config_copy.global_parameters_store_protocol_with_result)
         self.gppl_spinBox.setValue(self.config_copy.global_parameters_protocol_level)
-        self.gpbl_spinBox.setValue(self.config_copy.global_parameters_buffering_level)
+        if self.config_copy.global_parameters_buffering_level != -1:
+            self.gpbl_combobox.setCurrentIndex(self.config_copy.global_parameters_buffering_level+1)
+        else:
+            self.gpbl_combobox.setCurrentIndex(0)
         index = self.gpif_comboBox.findText(self.config_copy.global_parameters_image_format,
                                            QtCore.Qt.MatchFixedString)
         if index >= 0:
@@ -169,6 +185,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fnt_slider_value.setValue(self.config_copy.frames_normalization_threshold)
         self.fnt_label_display.setText(str(self.config_copy.frames_normalization_threshold))
         self.ipfn_activate_deactivate_widgets()
+        index = self.sfdfs_comboBox.findText(self.config_copy.stack_frames_drizzle_factor_string,
+                                           QtCore.Qt.MatchFixedString)
+        if index >= 0:
+            self.sfdfs_comboBox.setCurrentIndex(index)
 
     def fgw_changed(self, value):
         """
@@ -256,6 +276,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
     def efs_changed(self, state):
         self.config_copy.frames_add_selection_dialog = (state == QtCore.Qt.Checked)
 
+    def fco_changed(self, state):
+        self.config_copy.align_frames_fast_changing_object = (state == QtCore.Qt.Checked)
+
     def gpwptf_changed(self, state):
         self.config_copy.global_parameters_write_protocol_to_file = (state == QtCore.Qt.Checked)
 
@@ -266,7 +289,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.config_copy.global_parameters_protocol_level = value
 
     def gpbl_changed(self, value):
-        self.config_copy.global_parameters_buffering_level = value
+        if value == "auto":
+            self.config_copy.global_parameters_buffering_level = -1
+        else:
+            self.config_copy.global_parameters_buffering_level = int(value)
 
     def gpif_changed(self, value):
         self.config_copy.global_parameters_image_format = value
@@ -313,6 +339,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
     def nap_changed(self, state):
         self.config_copy.global_parameters_ap_number = (state == QtCore.Qt.Checked)
+
+    def sfdfs_changed(self, value):
+        self.config_copy.stack_frames_drizzle_factor_string = value
 
     def restore_standard_parameters(self):
         """
@@ -435,6 +464,13 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                 self.config_copy.frames_add_selection_dialog
             self.configuration.configuration_changed = True
 
+        if self.config_copy.align_frames_fast_changing_object != \
+                self.configuration.align_frames_fast_changing_object:
+            self.configuration.align_frames_fast_changing_object = \
+                self.config_copy.align_frames_fast_changing_object
+            self.configuration.configuration_changed = True
+            go_back_to_activities.append('Align frames')
+
         if self.config_copy.global_parameters_store_protocol_with_result != \
                 self.configuration.global_parameters_store_protocol_with_result:
             self.configuration.global_parameters_store_protocol_with_result = \
@@ -500,6 +536,11 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.configuration.global_parameters_ap_number = \
                 self.config_copy.global_parameters_ap_number
             self.configuration.configuration_changed = True
+
+        if self.config_copy.stack_frames_drizzle_factor_string != self.configuration.stack_frames_drizzle_factor_string:
+            self.configuration.stack_frames_drizzle_factor_string = self.config_copy.stack_frames_drizzle_factor_string
+            self.configuration.configuration_changed = True
+            go_back_to_activities.append('Stack frames')
 
         # Set dependent parameters.
         self.configuration.set_derived_parameters()
