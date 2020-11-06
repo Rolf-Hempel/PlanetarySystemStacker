@@ -55,7 +55,7 @@
    <item row="0" column="0" colspan="4">
     <widget class="QTabWidget" name="tabWidget">
      <property name="currentIndex">
-      <number>0</number>
+      <number>1</number>
      </property>
      <widget class="QWidget" name="tab_workflow">
       <attribute name="title">
@@ -296,9 +296,9 @@ rather than in a separate job</string>
       <attribute name="title">
        <string>Frame-related Parameters</string>
       </attribute>
-      <layout class="QGridLayout" name="gridLayout_2" rowstretch="3,3,3,3,3,0,3,3,3,3,3,3,3,0" columnstretch="3,1,2,2,1,2,7">
-       <item row="12" column="0">
-        <spacer name="verticalSpacer_2">
+      <layout class="QGridLayout" name="gridLayout_2" rowstretch="3,3,3,3,3,0,3,3,3,3,3,3,3,0,0" columnstretch="3,1,2,2,1,2,7">
+       <item row="11" column="0">
+        <spacer name="verticalSpacer_7">
          <property name="orientation">
           <enum>Qt::Vertical</enum>
          </property>
@@ -310,98 +310,27 @@ rather than in a separate job</string>
          </property>
         </spacer>
        </item>
-       <item row="8" column="2" colspan="2">
-        <widget class="QSlider" name="afrsf_slider_value">
-         <property name="minimum">
-          <number>5</number>
+       <item row="4" column="5">
+        <widget class="QLabel" name="fgw_label_display">
+         <property name="text">
+          <string>TextLabel</string>
          </property>
-         <property name="maximum">
-          <number>80</number>
-         </property>
-         <property name="singleStep">
-          <number>5</number>
-         </property>
-         <property name="pageStep">
-          <number>5</number>
-         </property>
-         <property name="value">
-          <number>25</number>
-         </property>
-         <property name="sliderPosition">
-          <number>25</number>
-         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <spacer name="verticalSpacer_15">
          <property name="orientation">
-          <enum>Qt::Horizontal</enum>
+          <enum>Qt::Vertical</enum>
          </property>
-        </widget>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
        </item>
-       <item row="11" column="2" colspan="2">
-        <widget class="QSlider" name="afafp_slider_value">
-         <property name="minimum">
-          <number>3</number>
-         </property>
-         <property name="maximum">
-          <number>30</number>
-         </property>
-         <property name="singleStep">
-          <number>3</number>
-         </property>
-         <property name="pageStep">
-          <number>3</number>
-         </property>
-         <property name="value">
-          <number>6</number>
-         </property>
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-        </widget>
-       </item>
-       <item row="11" column="0">
-        <widget class="QLabel" name="afafp_label_parameter">
-         <property name="toolTip">
-          <string>The reference frame for the multipoint alignment is computed as the average of the best frames. This value specifies the number of frames to be used.</string>
-         </property>
-         <property name="text">
-          <string>Percentage of best frames for
-reference frame computation</string>
-         </property>
-        </widget>
-       </item>
-       <item row="8" column="0">
-        <widget class="QLabel" name="afrsf_label_parameter">
-         <property name="toolTip">
-          <string>Only for &quot;Surface&quot; mode: Size of the stabilization patch relative to the frame size.</string>
-         </property>
-         <property name="text">
-          <string>Stabilization patch size (% of frame size)</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="2" colspan="4">
-        <widget class="QComboBox" name="afm_comboBox">
-         <property name="currentText">
-          <string/>
-         </property>
-         <property name="currentIndex">
-          <number>-1</number>
-         </property>
-         <property name="maxVisibleItems">
-          <number>2</number>
-         </property>
-        </widget>
-       </item>
-       <item row="9" column="0">
-        <widget class="QLabel" name="afsw_label_parameter">
-         <property name="toolTip">
-          <string>Only for &quot;Surface&quot; mode: Maximum allowed shift of consecutive frames per coordinate direction in pixels.</string>
-         </property>
-         <property name="text">
-          <string>Stabilization search width (pixels)</string>
-         </property>
-        </widget>
-       </item>
-       <item row="9" column="2" colspan="2">
+       <item row="10" column="2" colspan="2">
         <widget class="QSlider" name="afsw_slider_value">
          <property name="minimum">
           <number>5</number>
@@ -423,175 +352,7 @@ reference frame computation</string>
          </property>
         </widget>
        </item>
-       <item row="3" column="1">
-        <spacer name="horizontalSpacer_4">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>40</width>
-           <height>25</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="3" column="5">
-        <widget class="QLabel" name="fgw_label_display">
-         <property name="text">
-          <string>TextLabel</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="4">
-        <spacer name="horizontalSpacer_5">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>36</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="1" column="2" colspan="4">
-        <widget class="QComboBox" name="fdb_comboBox"/>
-       </item>
-       <item row="7" column="0">
-        <widget class="QCheckBox" name="afa_checkBox">
-         <property name="toolTip">
-          <string>Only for &quot;Surface&quot; mode: Identify frame stabilization patch automatically.</string>
-         </property>
-         <property name="text">
-          <string>Automatic frame stabilization</string>
-         </property>
-         <property name="checked">
-          <bool>true</bool>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="6">
-        <spacer name="horizontalSpacer_6">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>271</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="1" column="0">
-        <widget class="QLabel" name="fdb_label_parameter">
-         <property name="toolTip">
-          <string>Default debayering pattern used if no other pattern is specified for the current job. This pattern is used in creating master frames as well.</string>
-         </property>
-         <property name="text">
-          <string>Debayering default</string>
-         </property>
-        </widget>
-       </item>
-       <item row="10" column="0">
-        <spacer name="verticalSpacer_7">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="11" column="5">
-        <widget class="QLabel" name="afafp_label_display">
-         <property name="text">
-          <string>TextLabel</string>
-         </property>
-        </widget>
-       </item>
-       <item row="2" column="0">
-        <spacer name="verticalSpacer_8">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="8" column="5">
-        <widget class="QLabel" name="afrsf_label_display">
-         <property name="text">
-          <string>TextLabel</string>
-         </property>
-        </widget>
-       </item>
-       <item row="6" column="0">
-        <widget class="QLabel" name="afm_label_parameter">
-         <property name="toolTip">
-          <string>All frames have to be globally aligned with each other before stacking. Two modes are supported: &quot;Surface&quot; and &quot;Planetary&quot;.
-In &quot;Surface&quot; mode (moon, sun) a patch with sufficient local contrast is used for image registration.
-In &quot;Planetary&quot; mode, the &quot;centers of gravity&quot; of all frames are registered with each other.</string>
-         </property>
-         <property name="text">
-          <string>Frame stabilization  mode</string>
-         </property>
-        </widget>
-       </item>
-       <item row="9" column="5">
-        <widget class="QLabel" name="afsw_label_display">
-         <property name="text">
-          <string>TextLabel</string>
-         </property>
-        </widget>
-       </item>
-       <item row="3" column="0">
-        <widget class="QLabel" name="fgw_label_parameter">
-         <property name="toolTip">
-          <string>In the presence of noise in the image, shift detection between frames can be misled by spurious local minima.
-Gaussian blur can help finding the global optimum. Try higher values for noisy images.</string>
-         </property>
-         <property name="text">
-          <string>Noise level (add Gaussian blur)</string>
-         </property>
-        </widget>
-       </item>
-       <item row="0" column="0">
-        <spacer name="verticalSpacer_15">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="4" column="0" rowspan="2">
-        <spacer name="verticalSpacer_6">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item row="3" column="2" colspan="2">
+       <item row="4" column="2" colspan="2">
         <widget class="QSlider" name="fgw_slider_value">
          <property name="minimum">
           <number>1</number>
@@ -616,7 +377,99 @@ Gaussian blur can help finding the global optimum. Try higher values for noisy i
          </property>
         </widget>
        </item>
-       <item row="13" column="0">
+       <item row="1" column="0">
+        <widget class="QLabel" name="fdb_label_parameter">
+         <property name="toolTip">
+          <string>Default debayering pattern used if no other pattern is specified for the current job. This pattern is used in creating master frames as well.</string>
+         </property>
+         <property name="text">
+          <string>Debayering default</string>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="2" colspan="2">
+        <widget class="QSlider" name="afrsf_slider_value">
+         <property name="minimum">
+          <number>5</number>
+         </property>
+         <property name="maximum">
+          <number>80</number>
+         </property>
+         <property name="singleStep">
+          <number>5</number>
+         </property>
+         <property name="pageStep">
+          <number>5</number>
+         </property>
+         <property name="value">
+          <number>25</number>
+         </property>
+         <property name="sliderPosition">
+          <number>25</number>
+         </property>
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="4">
+        <spacer name="horizontalSpacer_5">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>36</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="4" column="6">
+        <spacer name="horizontalSpacer_6">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>271</width>
+           <height>20</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="9" column="5">
+        <widget class="QLabel" name="afrsf_label_display">
+         <property name="text">
+          <string>TextLabel</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="0">
+        <widget class="QLabel" name="fgw_label_parameter">
+         <property name="toolTip">
+          <string>In the presence of noise in the image, shift detection between frames can be misled by spurious local minima.
+Gaussian blur can help finding the global optimum. Try higher values for noisy images.</string>
+         </property>
+         <property name="text">
+          <string>Noise level (add Gaussian blur)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="8" column="0">
+        <widget class="QCheckBox" name="afa_checkBox">
+         <property name="toolTip">
+          <string>Only for &quot;Surface&quot; mode: Identify frame stabilization patch automatically.</string>
+         </property>
+         <property name="text">
+          <string>Automatic frame stabilization</string>
+         </property>
+         <property name="checked">
+          <bool>true</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="14" column="0">
         <widget class="QCheckBox" name="efs_checkBox">
          <property name="toolTip">
           <string>Include a dialog where the user can select frames which should not be used in the stacking workflow.</string>
@@ -625,6 +478,163 @@ Gaussian blur can help finding the global optimum. Try higher values for noisy i
           <string>Dialog to exclude frames from stacking</string>
          </property>
         </widget>
+       </item>
+       <item row="7" column="2" colspan="4">
+        <widget class="QComboBox" name="afm_comboBox">
+         <property name="currentText">
+          <string/>
+         </property>
+         <property name="currentIndex">
+          <number>-1</number>
+         </property>
+         <property name="maxVisibleItems">
+          <number>2</number>
+         </property>
+        </widget>
+       </item>
+       <item row="3" column="0">
+        <spacer name="verticalSpacer_8">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="5" column="0" rowspan="2">
+        <spacer name="verticalSpacer_6">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="10" column="0">
+        <widget class="QLabel" name="afsw_label_parameter">
+         <property name="toolTip">
+          <string>Only for &quot;Surface&quot; mode: Maximum allowed shift of consecutive frames per coordinate direction in pixels.</string>
+         </property>
+         <property name="text">
+          <string>Stabilization search width (pixels)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="12" column="0">
+        <widget class="QLabel" name="afafp_label_parameter">
+         <property name="toolTip">
+          <string>The reference frame for the multipoint alignment is computed as the average of the best frames. This value specifies the number of frames to be used.</string>
+         </property>
+         <property name="text">
+          <string>Percentage of best frames for
+reference frame computation</string>
+         </property>
+        </widget>
+       </item>
+       <item row="9" column="0">
+        <widget class="QLabel" name="afrsf_label_parameter">
+         <property name="toolTip">
+          <string>Only for &quot;Surface&quot; mode: Size of the stabilization patch relative to the frame size.</string>
+         </property>
+         <property name="text">
+          <string>Stabilization patch size (% of frame size)</string>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="2" colspan="4">
+        <widget class="QComboBox" name="fdb_comboBox"/>
+       </item>
+       <item row="12" column="5">
+        <widget class="QLabel" name="afafp_label_display">
+         <property name="text">
+          <string>TextLabel</string>
+         </property>
+        </widget>
+       </item>
+       <item row="7" column="0">
+        <widget class="QLabel" name="afm_label_parameter">
+         <property name="toolTip">
+          <string>All frames have to be globally aligned with each other before stacking. Two modes are supported: &quot;Surface&quot; and &quot;Planetary&quot;.
+In &quot;Surface&quot; mode (moon, sun) a patch with sufficient local contrast is used for image registration.
+In &quot;Planetary&quot; mode, the &quot;centers of gravity&quot; of all frames are registered with each other.</string>
+         </property>
+         <property name="text">
+          <string>Frame stabilization  mode</string>
+         </property>
+        </widget>
+       </item>
+       <item row="10" column="5">
+        <widget class="QLabel" name="afsw_label_display">
+         <property name="text">
+          <string>TextLabel</string>
+         </property>
+        </widget>
+       </item>
+       <item row="4" column="1">
+        <spacer name="horizontalSpacer_4">
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>40</width>
+           <height>25</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="12" column="2" colspan="2">
+        <widget class="QSlider" name="afafp_slider_value">
+         <property name="minimum">
+          <number>3</number>
+         </property>
+         <property name="maximum">
+          <number>30</number>
+         </property>
+         <property name="singleStep">
+          <number>3</number>
+         </property>
+         <property name="pageStep">
+          <number>3</number>
+         </property>
+         <property name="value">
+          <number>6</number>
+         </property>
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+        </widget>
+       </item>
+       <item row="13" column="0">
+        <spacer name="verticalSpacer_2">
+         <property name="orientation">
+          <enum>Qt::Vertical</enum>
+         </property>
+         <property name="sizeHint" stdset="0">
+          <size>
+           <width>20</width>
+           <height>40</height>
+          </size>
+         </property>
+        </spacer>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="fdbm_label_parameter">
+         <property name="text">
+          <string>Debayering algorithm</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="2" colspan="4">
+        <widget class="QComboBox" name="fdbm_comboBox"/>
        </item>
       </layout>
      </widget>

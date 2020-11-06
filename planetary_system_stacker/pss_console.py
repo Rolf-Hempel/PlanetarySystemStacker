@@ -156,6 +156,10 @@ class PssConsole(QtCore.QObject):
                                      "Force Bayer RGGB", "Force Bayer GRBG",
                                      "Force Bayer GBRG", "Force Bayer BGGR"],
                             default="Auto detect color", help="Debayering option")
+        parser.add_argument("--debayer_method",
+                            choices=["Bilinear", "Variable Number of Gradients",
+                                     "Edge Aware"],
+                            default="Bilinear", help="Debayering method to be used")
         parser.add_argument("--noise", type=noise_type, default=7,
                             help="Noise level (add Gaussian blur)")
         parser.add_argument("-m", "--stab_mode", choices=["Surface", "Planet"], default="Surface",
@@ -207,6 +211,7 @@ class PssConsole(QtCore.QObject):
         self.configuration.global_parameters_ap_number = arguments.name_add_apn
 
         self.configuration.frames_debayering_default = arguments.debayering
+        self.configuration.frames_debayering_method = arguments.debayer_method
         self.configuration.frames_gauss_width = arguments.noise
 
         self.configuration.align_frames_mode = arguments.stab_mode
@@ -432,6 +437,7 @@ class PssConsole(QtCore.QObject):
         print("Add number of alignment points to output file name: " + str(arguments.name_add_apn))
         print("")
         print("Debayering option: " + arguments.debayering)
+        print("Debayering method: " + arguments.debayer_method)
         print("Noise level: " + str(arguments.noise))
         print("Frame stabilization mode: " + arguments.stab_mode)
         print("Stabilization patch size (% of frame): " + str(arguments.stab_size))
