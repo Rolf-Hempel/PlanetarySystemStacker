@@ -1255,13 +1255,13 @@ class Miscellaneous(object):
             parameters = parameters + [
                 ["Drizzle factor in stacking", str(configuration.stack_frames_drizzle_factor_string)]]
 
-        output_string = "\n           Stacking parameters:                                         | Value             |\n" \
-                        "           ----------------------------------------------------------------------------------" \
+        output_string = "\n           Stacking parameters:                                         | Value                        |\n" \
+                        "           ---------------------------------------------------------------------------------------------" \
                         "\n          "
 
         # Extend the output string with a line for every parameter to be printed.
         for line in parameters:
-            output_string += " {0:60s} | {1:18s}|\n          ".format(line[0], line[1])
+            output_string += " {0:60s} | {1:29s}|\n          ".format(line[0], line[1])
 
         # Write the complete table.
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)

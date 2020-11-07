@@ -355,9 +355,6 @@ rather than in a separate job</string>
          </property>
         </widget>
        </item>
-       <item row="1" column="2" colspan="2">
-        <widget class="QComboBox" name="fdb_comboBox"/>
-       </item>
        <item row="9" column="0">
         <widget class="QLabel" name="afrsf_label_parameter">
          <property name="toolTip">
@@ -639,7 +636,10 @@ In &quot;Planetary&quot; mode, the &quot;centers of gravity&quot; of all frames 
          </property>
         </widget>
        </item>
-       <item row="2" column="2" colspan="2">
+       <item row="1" column="2" colspan="4">
+        <widget class="QComboBox" name="fdb_comboBox"/>
+       </item>
+       <item row="2" column="2" colspan="4">
         <widget class="QComboBox" name="fdbm_comboBox"/>
        </item>
       </layout>
