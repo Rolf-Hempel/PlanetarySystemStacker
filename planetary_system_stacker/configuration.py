@@ -55,6 +55,7 @@ class ConfigurationParameters(object):
         self.global_parameters_ap_number = None
         self.frames_gauss_width = None
         self.frames_debayering_default = None
+        self.frames_debayering_method = None
         self.frames_normalization = None
         self.frames_normalization_threshold = None
         self.frames_add_selection_dialog = None
@@ -92,6 +93,7 @@ class ConfigurationParameters(object):
         self.global_parameters_ap_number = False
         self.frames_gauss_width = 7
         self.frames_debayering_default = 'Auto detect color'
+        self.frames_debayering_method = 'Bilinear'
         self.frames_normalization = True
         self.frames_normalization_threshold = 15
         self.frames_add_selection_dialog = False
@@ -148,6 +150,7 @@ class ConfigurationParameters(object):
             configuration_object.global_parameters_ap_number
         self.frames_gauss_width = configuration_object.frames_gauss_width
         self.frames_debayering_default = configuration_object.frames_debayering_default
+        self.frames_debayering_method = configuration_object.frames_debayering_method
         self.frames_normalization = configuration_object.frames_normalization
         self.frames_normalization_threshold = configuration_object.frames_normalization_threshold
         self.frames_add_selection_dialog = configuration_object.frames_add_selection_dialog
@@ -329,6 +332,7 @@ class Configuration(object):
             configuration_parameters.global_parameters_ap_number
         self.frames_gauss_width = configuration_parameters.frames_gauss_width
         self.frames_debayering_default = configuration_parameters.frames_debayering_default
+        self.frames_debayering_method = configuration_parameters.frames_debayering_method
         self.frames_normalization = configuration_parameters.frames_normalization
         self.frames_normalization_threshold = \
             configuration_parameters.frames_normalization_threshold
@@ -398,6 +402,7 @@ class Configuration(object):
 
         configuration_parameters.frames_gauss_width = self.frames_gauss_width
         configuration_parameters.frames_debayering_default = self.frames_debayering_default
+        configuration_parameters.frames_debayering_method = self.frames_debayering_method
         configuration_parameters.frames_normalization = self.frames_normalization
         configuration_parameters.frames_normalization_threshold = self.frames_normalization_threshold
         configuration_parameters.frames_add_selection_dialog = self.frames_add_selection_dialog
@@ -474,6 +479,7 @@ class Configuration(object):
 
         self.frames_gauss_width = conf.getint('Frames', 'gauss width')
         self.frames_debayering_default = conf.get('Frames', 'debayering default')
+        self.frames_debayering_method = conf.get('Frames', 'debayering method')
         self.frames_normalization = conf.getboolean('Frames', 'normalization')
         self.frames_normalization_threshold = conf.getint('Frames', 'normalization threshold')
         self.frames_add_selection_dialog = conf.getboolean('Frames', 'add selection dialog')
@@ -553,6 +559,7 @@ class Configuration(object):
         self.config_parser_object.add_section('Frames')
         self.set_parameter('Frames', 'gauss width', str(self.frames_gauss_width))
         self.set_parameter('Frames', 'debayering default', self.frames_debayering_default)
+        self.set_parameter('Frames', 'debayering method', self.frames_debayering_method)
         self.set_parameter('Frames', 'normalization', str(self.frames_normalization))
         self.set_parameter('Frames', 'normalization threshold',
                            str(self.frames_normalization_threshold))

@@ -32,7 +32,9 @@ from astropy.io import fits
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_RGB2GRAY, \
     COLOR_BGR2RGB, COLOR_BayerGB2BGR, COLOR_BayerBG2BGR, THRESH_TOZERO, threshold, \
     GaussianBlur, Laplacian, CV_32F, COLOR_RGB2BGR, imwrite, convertScaleAbs, CAP_PROP_POS_FRAMES, \
-    IMREAD_UNCHANGED, flip, COLOR_GRAY2RGB, COLOR_BayerRG2BGR, COLOR_BayerGR2BGR
+    IMREAD_UNCHANGED, flip, COLOR_GRAY2RGB, COLOR_BayerRG2BGR, COLOR_BayerGR2BGR, \
+    COLOR_BayerRG2BGR_VNG, COLOR_BayerGR2BGR_VNG, COLOR_BayerGB2BGR_VNG, COLOR_BayerBG2BGR_VNG, \
+    COLOR_BayerRG2BGR_EA, COLOR_BayerGR2BGR_EA, COLOR_BayerGB2BGR_EA, COLOR_BayerBG2BGR_EA
 from cv2 import mean as cv_mean
 from numpy import max as np_max
 from numpy import min as np_min
@@ -47,7 +49,7 @@ from exceptions import TypeError, ShapeError, ArgumentError, WrongOrderingError,
 from frames_old import FramesOld
 
 
-def debayer_frame(frame_in, debayer_pattern='No change', BGR_input=False):
+def debayer_frame(frame_in, debayer_pattern='No change', debayer_method='Bilinear', BGR_input=False):
     """
     Process a given input frame "frame_in", either containing one layer (B/W) or three layers
     (color) into an output frame "frame_out" as specified by the parameter "debayer_pattern".
@@ -77,13 +79,27 @@ def debayer_frame(frame_in, debayer_pattern='No change', BGR_input=False):
                       OpenCV reads color images in 'BGR' format.
     :return: frame_out: output image (see above)
     """
-
-    debayer_codes = {
-        'Force Bayer RGGB': COLOR_BayerRG2BGR,
-        'Force Bayer GRBG': COLOR_BayerGR2BGR,
-        'Force Bayer GBRG': COLOR_BayerGB2BGR,
-        'Force Bayer BGGR': COLOR_BayerBG2BGR
-    }
+    if debayer_method == 'Bilinear':
+        debayer_codes = {
+            'Force Bayer RGGB': COLOR_BayerRG2BGR,
+            'Force Bayer GRBG': COLOR_BayerGR2BGR,
+            'Force Bayer GBRG': COLOR_BayerGB2BGR,
+            'Force Bayer BGGR': COLOR_BayerBG2BGR
+        }
+    if debayer_method == 'Variable Number of Gradients':
+        debayer_codes = {
+            'Force Bayer RGGB': COLOR_BayerRG2BGR_VNG,
+            'Force Bayer GRBG': COLOR_BayerGR2BGR_VNG,
+            'Force Bayer GBRG': COLOR_BayerGB2BGR_VNG,
+            'Force Bayer BGGR': COLOR_BayerBG2BGR_VNG
+        }
+    if debayer_method == 'Edge Aware':
+        debayer_codes = {
+            'Force Bayer RGGB': COLOR_BayerRG2BGR_EA,
+            'Force Bayer GRBG': COLOR_BayerGR2BGR_EA,
+            'Force Bayer GBRG': COLOR_BayerGB2BGR_EA,
+            'Force Bayer BGGR': COLOR_BayerBG2BGR_EA
+        }
 
     type_in = frame_in.dtype
 
@@ -504,6 +520,7 @@ class VideoReader(object):
         # Convert the first frame read into the desired output format and set the metadata.
         self.last_frame_read = debayer_frame(self.last_frame_read,
                                              debayer_pattern=self.bayer_pattern,
+                                             debayer_method=self.configuration.frames_debayering_method,
                                              BGR_input=self.BGR_input)
         self.shape = self.last_frame_read.shape
         self.color = (len(self.shape) == 3)
@@ -556,6 +573,7 @@ class VideoReader(object):
         # Convert the frame read into the desired output format.
         self.last_frame_read = debayer_frame(self.last_frame_read,
                                              debayer_pattern=self.bayer_pattern,
+                                             debayer_method=self.configuration.frames_debayering_method,
                                              BGR_input=self.BGR_input)
 
         return self.last_frame_read

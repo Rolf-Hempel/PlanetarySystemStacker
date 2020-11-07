@@ -1213,6 +1213,7 @@ class Miscellaneous(object):
 
         # Compile all parameters and their values to be printed.
         parameters = [["Debayering default", configuration.frames_debayering_default],
+                      ["Debayering method", configuration.frames_debayering_method],
                       ["Noise level (add Gaussian blur)", str(configuration.frames_gauss_width)],
                       ["Frame stabilization mode", configuration.align_frames_mode]]
 

@@ -68,6 +68,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fdb_comboBox.addItem('Force Bayer GBRG')
         self.fdb_comboBox.addItem('Force Bayer BGGR')
         self.fdb_comboBox.activated[str].connect(self.fdb_changed)
+        self.fdbm_comboBox.addItem('Bilinear')
+        self.fdbm_comboBox.addItem('Variable Number of Gradients')
+        self.fdbm_comboBox.addItem('Edge Aware')
+        self.fdbm_comboBox.activated[str].connect(self.fdbm_changed)
         self.fn_checkBox.stateChanged.connect(self.fn_changed)
         self.fnt_slider_value.valueChanged['int'].connect(self.fnt_changed)
         self.afm_comboBox.addItem('Surface')
@@ -127,6 +131,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                                            QtCore.Qt.MatchFixedString)
         if index >= 0:
             self.fdb_comboBox.setCurrentIndex(index)
+        index = self.fdbm_comboBox.findText(self.config_copy.frames_debayering_method,
+                                            QtCore.Qt.MatchFixedString)
+        if index >= 0:
+            self.fdbm_comboBox.setCurrentIndex(index)
         index = self.afm_comboBox.findText(self.config_copy.align_frames_mode,
                                            QtCore.Qt.MatchFixedString)
         if index >= 0:
@@ -198,6 +206,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
     def fdb_changed(self, value):
         self.config_copy.frames_debayering_default = value
+
+    def fdbm_changed(self, value):
+        self.config_copy.frames_debayering_method = value
 
     def afm_changed(self, value):
         self.config_copy.align_frames_mode = value
@@ -427,6 +438,11 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
         if self.config_copy.frames_debayering_default != self.configuration.frames_debayering_default:
             self.configuration.frames_debayering_default = self.config_copy.frames_debayering_default
+            self.configuration.configuration_changed = True
+            go_back_to_activities.append('Read frames')
+
+        if self.config_copy.frames_debayering_method != self.configuration.frames_debayering_method:
+            self.configuration.frames_debayering_method = self.config_copy.frames_debayering_method
             self.configuration.configuration_changed = True
             go_back_to_activities.append('Read frames')
 
