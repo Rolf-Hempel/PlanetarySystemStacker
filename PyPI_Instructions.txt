@@ -1,0 +1,47 @@
+Build the package:
+------------------
+python3 setup.py sdist
+python3 setup_windows.py bdist_wheel --plat-name win_amd64
+python3 setup_linux.py bdist_wheel --plat-name manylinux1_x86_64
+python3 setup_linux.py bdist_wheel --plat-name linux_armv7l
+python3 setup_macos.py bdist_wheel --plat-name macosx_10_6_intel
+
+
+Upload the package to PyPI:
+---------------------------
+python3 -m twine upload dist/*
+
+
+Or, to upload it to the PyPI test server:
+-----------------------------------------
+python3 -m twine upload --repository testpypi dist/*
+
+
+Install the package:
+--------------------
+pip3 install planetary-system-stacker==0.8.13
+or, to upgrade from an earlier version:
+pip3 install --upgrade planetary-system-stacker
+
+Or, to install / upgrade the package from the test server:
+------------------------------------------------
+pip3 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.13
+pip3 install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker
+
+On Windows, the location of the MKL library is: <Python3.6>\Library\bin
+
+On Linux, add location of PlanetarySystemStacker to the path: PATH=~/.local/bin:$PATH
+On Linux, the location of the MKL library is: ~/.local/lib/libmkl_rt.so
+
+
+More information on creating PyPI projects can be found here: https://packaging.python.org/guides/distributing-packages-using-setuptools/
+
+And a tutorial on the subject: https://packaging.python.org/tutorials/packaging-projects/
+
+Information on how to make the package OS-dependent: https://stackoverflow.com/questions/6469508/is-it-possible-to-express-a-platform-specific-dependency-in-setup-py-without-bui
+
+List of compatibility tags for build distributions: https://www.python.org/dev/peps/pep-0425/
+
+Info on how to encode the OS target into the wheel name: https://stackoverflow.com/questions/35112511/pip-setup-py-bdist-wheel-no-longer-builds-forced-non-pure-wheels/36886459#36886459
+
+Info on platform targets on MacOS: https://github.com/MacPython/wiki/wiki/Spinning-wheels
