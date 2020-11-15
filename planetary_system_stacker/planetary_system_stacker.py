@@ -36,6 +36,7 @@ from sys import exit, argv
 
 import cv2
 import matplotlib
+matplotlib.use('Agg')
 import numpy as np
 import psutil
 from PyQt5 import QtWidgets, QtCore, QtGui
