@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from cv2 import VideoCapture, cvtColor, COLOR_RGB2GRAY
 from numpy import uint8, uint16

@@ -23,6 +23,8 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from glob import glob
 from time import time
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from math import ceil
 from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, int32, uint16

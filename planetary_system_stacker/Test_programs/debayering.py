@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from cv2 import cvtColor, COLOR_RGB2GRAY, COLOR_BGR2RGB, imread, IMREAD_UNCHANGED
 from numpy import ndarray

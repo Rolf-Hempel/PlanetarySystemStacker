@@ -29,6 +29,8 @@ from glob import glob
 from sys import argv, exit
 from time import time, sleep
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from PyQt5 import QtCore, QtGui, QtWidgets
 from cv2 import NORM_MINMAX, normalize, cvtColor, COLOR_GRAY2RGB, circle, line

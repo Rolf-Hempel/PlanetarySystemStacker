@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from cv2 import VideoCapture, VideoWriter_fourcc, VideoWriter
 from numpy import full, zeros, uint8, clip

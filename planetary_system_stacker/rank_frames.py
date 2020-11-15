@@ -24,6 +24,8 @@ from glob import glob
 from statistics import mean
 from time import time
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from cv2 import meanStdDev
 from numpy import array, full

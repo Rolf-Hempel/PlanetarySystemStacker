@@ -12,6 +12,8 @@ import cv2
 import time
 import numpy as np
 from scipy import ndimage
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # https://docs.opencv.org/3.1.0/dd/d49/tutorial_py_contour_features.html

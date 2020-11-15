@@ -333,6 +333,8 @@ class SERParser(object):
 if __name__ == "__main__":
 
     import ser_parser
+    import matplotlib
+    matplotlib.use('Agg')
     import matplotlib.pyplot as plt
 
     # file_path = r'E:\SW-Development\Python\PlanetarySystemStacker\Examples\SER_Chris-Garry' \

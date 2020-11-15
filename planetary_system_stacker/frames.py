@@ -1910,6 +1910,8 @@ if __name__ == "__main__":
     print("Image type: " + str(frame.dtype))
 
     # Check the OpenCV BGR and Matplotlibs RGB color orders
+    import matplotlib
+    matplotlib.use('Agg')
     import matplotlib.pyplot as plt
     if frames.color:
         plt.imshow(frame)

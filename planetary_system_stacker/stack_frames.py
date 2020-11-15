@@ -26,6 +26,8 @@ from statistics import median
 from time import sleep
 from warnings import filterwarnings
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize, INTER_CUBIC, INTER_LINEAR
 from numpy import int as np_int
