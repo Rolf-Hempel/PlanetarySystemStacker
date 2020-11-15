@@ -28,6 +28,8 @@ import platform
 import traceback
 from ctypes import CDLL
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from skimage import img_as_ubyte
 from PyQt5 import QtWidgets

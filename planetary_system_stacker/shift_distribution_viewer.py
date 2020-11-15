@@ -22,6 +22,8 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 from numpy import arange
 from PyQt5 import QtWidgets
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure

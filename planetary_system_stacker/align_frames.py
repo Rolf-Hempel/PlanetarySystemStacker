@@ -24,6 +24,8 @@ from glob import glob
 from itertools import chain
 from time import time
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from math import ceil
 from numpy import float32, zeros, empty, int32, uint8, uint16, clip, histogram
