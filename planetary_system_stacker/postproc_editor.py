@@ -626,11 +626,11 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         """
 
         :param configuration: Configuration object with parameters.
-        :param image_original: Image file (16bit Tiff) holding the input for postprocessing.
+        :param image_original: Original image (16bit) holding the input for postprocessing.
         :param name_original: Path name of the original image.
         :param set_status_bar_callback: Call-back function to update the main GUI's status bar.
         :param signal_save_postprocessed_image: Signal to be issued when the postprocessing
-                                                widget closes.
+                                                widget closes. None if no signal is to be issued.
         """
 
         super(PostprocEditorWidget, self).__init__()
@@ -661,7 +661,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.max_layers = 4
         for layer in range(self.max_layers):
             sharpening_layer_widget = SharpeningLayerWidget(layer, self.remove_layer)
-            self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
+            # self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
             self.gridLayout.addWidget(sharpening_layer_widget, layer + 1, 1, 1, 1)
             self.sharpening_layer_widgets.append(sharpening_layer_widget)
 
@@ -737,9 +737,10 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
             # This version has already at least one layer. Initialize the radius parameter of the
             # new layer to 1.5 times the radius of the previous one.
-            if num_layers_current > 0:
+            if num_layers_current:
                 previous_layer = version_selected.layers[num_layers_current - 1]
-                new_layer = PostprocLayer(previous_layer.postproc_method, 1.5 * previous_layer.radius, 0,
+                new_layer = PostprocLayer(previous_layer.postproc_method,
+                                          round(1.5 * previous_layer.radius, 1), 0,
                                           previous_layer.luminance_only)
 
             # This is the first layer for this image version. Start with standard parameters.
@@ -779,8 +780,9 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # Terminate the image processor thread.
         self.image_processor.stop()
         self.configuration.write_config()
-        self.signal_save_postprocessed_image.emit(self.postproc_data_object.versions[
-            self.postproc_data_object.version_selected].image)
+        if self.signal_save_postprocessed_image:
+            self.signal_save_postprocessed_image.emit(self.postproc_data_object.versions[
+                self.postproc_data_object.version_selected].image)
         self.close()
 
     def reject(self):
@@ -792,7 +794,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         """
 
         self.image_processor.stop()
-        self.signal_save_postprocessed_image.emit(None)
+        if self.signal_save_postprocessed_image:
+            self.signal_save_postprocessed_image.emit(None)
         self.close()
 
 
