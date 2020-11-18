@@ -653,15 +653,20 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # Start the frame viewer.
         self.frame_viewer = FrameViewer()
         self.frame_viewer.setObjectName("framewiever")
-        self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
+        self.gridLayout.addWidget(self.frame_viewer, 0, 0, 3, 1)
 
         # Initialize list of sharpening layer widgets, and set the maximal number of layers.
         self.sharpening_layer_widgets = []
-        self.max_layers = 4
+        self.max_layers = self.configuration.postproc_max_layers
+
+        # Initialize a vertical spacer used to fill the lower part of the sharpening widget scroll
+        # area.
+        self.spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum,
+                                            QtWidgets.QSizePolicy.Expanding)
 
         # Create the version manager and pass it the "select_version" callback function.
         self.version_manager_widget = VersionManagerWidget(self.configuration, self.select_version)
-        self.gridLayout.addWidget(self.version_manager_widget, 6, 1, 1, 1)
+        self.gridLayout.addWidget(self.version_manager_widget, 2, 1, 1, 1)
 
         # The "set_photo_signal" from the VersionManagerWidget is not passed to the image viewer
         # directly. (The image viewer does not accept signals.) Instead, it calls the "select_image"
@@ -688,20 +693,24 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         version_selected = self.postproc_data_object.versions[version_index]
 
-        # Remove all existing layer widgets.
+        # Remove all existing layer widgets and the lower vertical spacer.
         if self.sharpening_layer_widgets:
             for layer_widget in self.sharpening_layer_widgets:
-                self.gridLayout.removeWidget(layer_widget)
+                self.verticalLayout.removeWidget(layer_widget)
                 layer_widget.deleteLater()
                 del layer_widget
         self.sharpening_layer_widgets = []
+        self.verticalLayout.removeItem(self.spacerItem)
 
         # Create new layer widgets values for all active layers.
         for layer_index, layer in enumerate(version_selected.layers):
             sharpening_layer_widget = SharpeningLayerWidget(layer_index, self.remove_layer)
             sharpening_layer_widget.set_values(layer)
-            self.gridLayout.addWidget(sharpening_layer_widget, layer_index + 1, 1, 1, 1)
+            self.verticalLayout.addWidget(sharpening_layer_widget)
             self.sharpening_layer_widgets.append(sharpening_layer_widget)
+
+        # At the end of the scroll area, add a vertical spacer.
+        self.verticalLayout.addItem(self.spacerItem)
 
         # Load the current image into the image viewer.
         self.select_image(version_index)

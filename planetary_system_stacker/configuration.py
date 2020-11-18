@@ -230,6 +230,7 @@ class Configuration(object):
         self.stack_frames_background_patch_size = 100
 
         self.postproc_suffix = "_gpp"
+        self.postproc_max_layers = 10
         self.postproc_blinking_period = 1.
         self.postproc_idle_loop_time = 0.2
 
