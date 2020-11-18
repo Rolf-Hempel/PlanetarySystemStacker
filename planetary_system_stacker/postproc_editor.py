@@ -655,15 +655,9 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.frame_viewer.setObjectName("framewiever")
         self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
 
-        # Create four widgets to control the parameters of individual sharpening layers. Widgets
-        # corresponding to inactive layers will be de-activated.
+        # Initialize list of sharpening layer widgets, and set the maximal number of layers.
         self.sharpening_layer_widgets = []
         self.max_layers = 4
-        for layer in range(self.max_layers):
-            sharpening_layer_widget = SharpeningLayerWidget(layer, self.remove_layer)
-            # self.gridLayout.addWidget(self.frame_viewer, 0, 0, 7, 1)
-            self.gridLayout.addWidget(sharpening_layer_widget, layer + 1, 1, 1, 1)
-            self.sharpening_layer_widgets.append(sharpening_layer_widget)
 
         # Create the version manager and pass it the "select_version" callback function.
         self.version_manager_widget = VersionManagerWidget(self.configuration, self.select_version)
@@ -694,12 +688,20 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         version_selected = self.postproc_data_object.versions[version_index]
 
-        # Set the layer widgets values for all active layers. Hide the inactive layer widgets.
+        # Remove all existing layer widgets.
+        if self.sharpening_layer_widgets:
+            for layer_widget in self.sharpening_layer_widgets:
+                self.gridLayout.removeWidget(layer_widget)
+                layer_widget.deleteLater()
+                del layer_widget
+        self.sharpening_layer_widgets = []
+
+        # Create new layer widgets values for all active layers.
         for layer_index, layer in enumerate(version_selected.layers):
-            self.sharpening_layer_widgets[layer_index].set_values(layer)
-            self.sharpening_layer_widgets[layer_index].setHidden(False)
-        for layer_index in range(version_selected.number_layers, self.max_layers):
-            self.sharpening_layer_widgets[layer_index].setHidden(True)
+            sharpening_layer_widget = SharpeningLayerWidget(layer_index, self.remove_layer)
+            sharpening_layer_widget.set_values(layer)
+            self.gridLayout.addWidget(sharpening_layer_widget, layer_index + 1, 1, 1, 1)
+            self.sharpening_layer_widgets.append(sharpening_layer_widget)
 
         # Load the current image into the image viewer.
         self.select_image(version_index)
