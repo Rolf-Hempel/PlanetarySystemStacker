@@ -39,8 +39,8 @@ from version_manager_widget import Ui_version_manager_widget
 
 class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
     """
-    GUI widget to manipulate the parameters of a sharpening layer. Four instances are created, so
-    up to four sharpening layers can be defined.
+    GUI widget to manipulate the parameters of a sharpening layer. An arbitrary number of sharpening
+    layers can be defined (up to a maximum set as configuration parameter).
     """
 
     def __init__(self, layer_index, remove_layer_callback, parent=None):
@@ -451,7 +451,7 @@ class BlinkComparator(QtCore.QThread):
 
 class ImageProcessor(QtCore.QThread):
     """
-    This class implements the asynchroneous computation of new image versions.
+    This class implements the asynchronous computation of new image versions.
     """
 
     # The set_photo_signal tells the image viewer which image it should show.
@@ -618,7 +618,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
     """
     This widget implements a frame viewer together with control elements to control the
     postprocessing. Several postprocessing versions can be created and managed, each one using
-    up to four sharpening layers. A blink comparator allows comparing any two versions.
+    a variable number of sharpening layers. A blink comparator allows comparing any two versions.
     """
 
     def __init__(self, configuration, image_original, name_original, set_status_bar_callback,
@@ -684,7 +684,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
     def select_version(self, version_index):
         """
-        Select a new current version and update all layer widgets.
+        Select a new current version and update the scroll area with all layer widgets.
 
         :param version_index: Index of the version selected in version list of the central data
                               object.
@@ -702,7 +702,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.sharpening_layer_widgets = []
         self.verticalLayout.removeItem(self.spacerItem)
 
-        # Create new layer widgets values for all active layers.
+        # Create new layer widgets for all active layers and put them into the scroll area.
         for layer_index, layer in enumerate(version_selected.layers):
             sharpening_layer_widget = SharpeningLayerWidget(layer_index, self.remove_layer)
             sharpening_layer_widget.set_values(layer)
