@@ -646,7 +646,12 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.buttonBox.rejected.connect(self.reject)
         self.pushButton_add_layer.clicked.connect(self.add_layer)
 
-        self.label_message.setText("Create sharp image versions using up to four correction layers."
+        # Initialize list of sharpening layer widgets, and set the maximal number of layers.
+        self.sharpening_layer_widgets = []
+        self.max_layers = self.configuration.postproc_max_layers
+
+        self.label_message.setText("Create sharp image versions using up to "
+                                   + str(self.max_layers) + " correction layers."
                                    " Adjust layer parameters as required.")
         self.label_message.setStyleSheet('color: red')
 
@@ -654,10 +659,6 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.frame_viewer = FrameViewer()
         self.frame_viewer.setObjectName("framewiever")
         self.gridLayout.addWidget(self.frame_viewer, 0, 0, 3, 1)
-
-        # Initialize list of sharpening layer widgets, and set the maximal number of layers.
-        self.sharpening_layer_widgets = []
-        self.max_layers = self.configuration.postproc_max_layers
 
         # Initialize a vertical spacer used to fill the lower part of the sharpening widget scroll
         # area.
