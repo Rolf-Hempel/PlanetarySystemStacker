@@ -282,6 +282,9 @@ class Configuration(object):
             # Set current configuration parameters to the new values.
             self.import_from_configuration_parameters(configuration_parameters)
 
+            # Create and initialize the central data object for postprocessing.
+            self.postproc_data_object = PostprocDataObject(self.postproc_suffix)
+
         # Compute parameters which are derived from other parameters.
         self.set_derived_parameters()
 

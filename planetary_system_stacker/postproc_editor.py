@@ -845,7 +845,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
     def add_layer(self):
         """
         This method is called when the "Add postprocessing layer" button is pressed. Add a layer
-        (up to a maximum of four) to the currently selected postprocessing version.
+        to the currently selected postprocessing version.
 
         :return:-
         """
@@ -873,7 +873,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
             # This is the first layer for this image version. Start with standard parameters.
             else:
-                new_layer = PostprocLayer("Multilevel unsharp masking", 1., 0, False)
+                new_layer = PostprocLayer("Multilevel unsharp masking", 1., 0, 0., 20, 0., False)
             version_selected.add_postproc_layer(new_layer)
 
             # Update all layer widgets.
