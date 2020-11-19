@@ -25,7 +25,7 @@ from sys import argv, stdout
 from time import sleep
 
 from PyQt5 import QtWidgets, QtCore
-from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, BORDER_DEFAULT
+from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT
 from math import sqrt
 from numpy import uint16, float32
 
@@ -142,6 +142,14 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         return integer / 100.
 
     @staticmethod
+    def bi_range_to_integer(bi_range):
+        return bi_range
+
+    @staticmethod
+    def integer_to_bi_range(integer):
+        return integer
+
+    @staticmethod
     def denoise_to_integer(denoise):
         return round(denoise * 100)
 
@@ -238,7 +246,7 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         :return: -
         """
 
-        self.layer.bi_range = self.horizontalSlider_bi_range.value()
+        self.layer.bi_range = self.integer_to_bi_range(self.horizontalSlider_bi_range.value())
         self.lineEdit_bi_range.blockSignals(True)
         self.lineEdit_bi_range.setText(str(self.layer.bi_range))
         self.lineEdit_bi_range.blockSignals(False)
@@ -253,7 +261,7 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         try:
             self.layer.bi_range = max(0, min(int(round(self.lineEdit_bi_range.text())), 100))
             self.horizontalSlider_bi_fraction.blockSignals(True)
-            self.horizontalSlider_bi_fraction.setValue(self.layer.bi_range)
+            self.horizontalSlider_bi_fraction.setValue(self.bi_range_to_integer(self.layer.bi_range))
             self.horizontalSlider_bi_fraction.blockSignals(False)
         except:
             pass
@@ -711,8 +719,18 @@ class ImageProcessor(QtCore.QThread):
         image_layer_components = []
         previous_blurred_image = input_image.astype(float32)
         for layer in layers:
-            image_blurred = GaussianBlur(previous_blurred_image, (0, 0), layer.radius/3.,
-                                         borderType=BORDER_DEFAULT)
+            if layer.bi_fraction == 1.:
+                image_blurred = bilateralFilter(previous_blurred_image, 0, layer.bi_range * 256.,
+                                                layer.radius/3., borderType=BORDER_DEFAULT)
+            elif layer.bi_fraction == 0.:
+                image_blurred = GaussianBlur(previous_blurred_image, (0, 0), layer.radius/3.,
+                                             borderType=BORDER_DEFAULT)
+            else:
+                image_blurred = bilateralFilter(previous_blurred_image, 0, layer.bi_range * 256.,
+                                                layer.radius / 3.,
+                                                borderType=BORDER_DEFAULT) * layer.bi_fraction + \
+                                GaussianBlur(previous_blurred_image, (0, 0), layer.radius / 3.,
+                                             borderType=BORDER_DEFAULT) * (1. - layer.bi_fraction)
             image_layer_components.append(previous_blurred_image - image_blurred)
             previous_blurred_image = image_blurred
 
