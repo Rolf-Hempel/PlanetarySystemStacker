@@ -711,7 +711,8 @@ class PostprocDataObject(object):
         # Create a first processed version with initial parameters for Gaussian radius. The amount
         # of sharpening is initialized to zero.
         initial_version = self.add_postproc_version()
-        initial_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 0, False))
+        initial_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 0, 0.,
+                                                         20, 0., False))
 
         # Initialize the pointer to the currently selected version to 0 (input image).
         # "version_compared" is used by the blink comparator later on. The blink comparator is
@@ -838,6 +839,9 @@ class PostprocDataObject(object):
                 config_parser_object.set(section_name, 'postprocessing method', layer.postproc_method)
                 config_parser_object.set(section_name, 'radius', str(layer.radius))
                 config_parser_object.set(section_name, 'amount', str(layer.amount))
+                config_parser_object.set(section_name, 'bilateral fraction', str(layer.bi_fraction))
+                config_parser_object.set(section_name, 'bilateral range', str(layer.bi_range))
+                config_parser_object.set(section_name, 'denoise', str(layer.denoise))
                 config_parser_object.set(section_name, 'luminance only', str(layer.luminance_only))
 
     def load_config(self, config_parser_object):
@@ -881,8 +885,12 @@ class PostprocDataObject(object):
                 method = config_parser_object.get(section, 'postprocessing method')
                 radius = config_parser_object.getfloat(section, 'radius')
                 amount = config_parser_object.getfloat(section, 'amount')
+                bi_fraction = config_parser_object.getfloat(section, 'bilateral fraction')
+                bi_range = config_parser_object.getfloat(section, 'bilateral range')
+                denoise = config_parser_object.getfloat(section, 'denoise')
                 luminance_only = config_parser_object.getboolean(section, 'luminance only')
-                new_version.add_postproc_layer(PostprocLayer(method, radius, amount, luminance_only))
+                new_version.add_postproc_layer(PostprocLayer(method, radius, amount, bi_fraction,
+                                                             bi_range, denoise, luminance_only))
 
         # Set the selected version again, because it may have been changed by reading versions.
         self.version_selected = config_parser_object.getint('PostprocessingInfo',
@@ -936,7 +944,7 @@ class PostprocVersion(object):
         """
 
         if self.number_layers == 1:
-            self.layers = [PostprocLayer("Multilevel unsharp masking", 1., 0, False)]
+            self.layers = [PostprocLayer("Multilevel unsharp masking", 1., 0, 0., 20, 0., False)]
         else:
             if 0 <= layer_index < self.number_layers:
                 self.layers = self.layers[:layer_index] + self.layers[layer_index + 1:]
@@ -948,7 +956,7 @@ class PostprocLayer(object):
     Instances of this class hold the parameters which define a postprocessing layer.
     """
 
-    def __init__(self, method, radius, amount, luminance_only):
+    def __init__(self, method, radius, amount, bi_fraction, bi_range, denoise, luminance_only):
         """
         Initialize the Layer instance with values for Gaussian radius, amount of sharpening and a
         flag which indicates on which channel the sharpening is to be applied.
@@ -956,6 +964,12 @@ class PostprocLayer(object):
         :param method: Description of the sharpening method.
         :param radius: Radius (in pixels) of the Gaussian sharpening kernel.
         :param amount: Amount of sharpening for this layer.
+        :param bi_fraction: Fraction of bilateral vs. Gaussian filter
+                            (0.: only Gaussian, 1.: only bilateral).
+        :param bi_range: luminosity range parameter of bilateral filter (0 <= bi_range <= 255).
+                         Please note that for 16bit images the true range is 256 times as high.
+        :param denoise: Fraction of Gaussian blur to be applied to this layer
+                        (0.: No Gaussian blur, 1.: Full filter application).
         :param luminance_only: True, if sharpening is to be applied to the luminance channel only.
                                False, otherwise.
         """
@@ -963,4 +977,7 @@ class PostprocLayer(object):
         self.postproc_method = method
         self.radius = radius
         self.amount = amount
+        self.bi_fraction = bi_fraction
+        self.bi_range = bi_range
+        self.denoise = denoise
         self.luminance_only = luminance_only

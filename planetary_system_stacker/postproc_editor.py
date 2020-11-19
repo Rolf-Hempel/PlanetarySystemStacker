@@ -63,6 +63,14 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.lineEdit_radius.textChanged.connect(self.lineEdit_radius_changed)
         self.horizontalSlider_amount.valueChanged.connect(self.horizontalSlider_amount_changed)
         self.lineEdit_amount.textChanged.connect(self.lineEdit_amount_changed)
+        self.horizontalSlider_bi_fraction.valueChanged.connect(self.horizontalSlider_bi_fraction_changed)
+        self.lineEdit_bi_fraction.textChanged.connect(self.lineEdit_bi_fraction_changed)
+        self.horizontalSlider_bi_range.valueChanged.connect(
+            self.horizontalSlider_bi_range_changed)
+        self.lineEdit_bi_range.textChanged.connect(self.lineEdit_bi_range_changed)
+        self.horizontalSlider_denoise.valueChanged.connect(
+            self.horizontalSlider_denoise_changed)
+        self.lineEdit_denoise.textChanged.connect(self.lineEdit_denoise_changed)
         self.checkBox_luminance.stateChanged.connect(self.checkBox_luminance_toggled)
         self.pushButton_remove.clicked.connect(self.remove_layer)
 
@@ -81,6 +89,14 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.lineEdit_radius.setText(str(self.layer.radius))
         self.horizontalSlider_amount.setValue(self.amount_to_integer(self.layer.amount))
         self.lineEdit_amount.setText("{0:.2f}".format(round(self.layer.amount, 2)))
+        self.horizontalSlider_bi_fraction.setValue(
+            self.bi_fraction_to_integer(self.layer.bi_fraction))
+        self.lineEdit_bi_fraction.setText("{0:.2f}".format(round(self.layer.bi_fraction, 2)))
+        self.horizontalSlider_bi_range.setValue(self.layer.bi_range)
+        self.lineEdit_bi_range.setText(str(self.layer.bi_range))
+        self.horizontalSlider_denoise.setValue(
+            self.denoise_to_integer(self.layer.denoise))
+        self.lineEdit_denoise.setText("{0:.2f}".format(round(self.layer.denoise, 2)))
 
         # Temporarily block signals for the luminance checkbox. Otherwise the variable would be
         # switched immediately.
@@ -115,6 +131,22 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
             return 0.05*integer - 1.
         else:
             return ((integer-20)**2) / 32.
+
+    @staticmethod
+    def bi_fraction_to_integer(bi_fraction):
+        return round(bi_fraction * 100)
+
+    @staticmethod
+    def integer_to_bi_fraction(integer):
+        return integer / 100.
+
+    @staticmethod
+    def denoise_to_integer(denoise):
+        return round(denoise * 100)
+
+    @staticmethod
+    def integer_to_denoise(integer):
+        return integer / 100.
 
     def horizontalSlider_radius_changed(self):
         """
@@ -170,6 +202,88 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
             self.horizontalSlider_amount.blockSignals(False)
         except:
             pass
+
+    def horizontalSlider_bi_fraction_changed(self):
+        """
+        The same as above for the "bi_fraction" parameter.
+
+        :return: -
+        """
+
+        self.layer.bi_fraction = self.integer_to_bi_fraction(self.horizontalSlider_bi_fraction.value())
+        self.lineEdit_bi_fraction.blockSignals(True)
+        self.lineEdit_bi_fraction.setText("{0:.2f}".format(round(self.layer.bi_fraction, 2)))
+        self.lineEdit_bi_fraction.blockSignals(False)
+
+    def lineEdit_bi_fraction_changed(self):
+        """
+        The same as above for the "bi_fraction" parameter.
+
+        :return: -
+        """
+
+        try:
+            self.layer.bi_fraction = float(self.lineEdit_bi_fraction.text())
+            self.horizontalSlider_bi_fraction.blockSignals(True)
+            self.horizontalSlider_bi_fraction.setValue(self.bi_fraction_to_integer(self.layer.bi_fraction))
+            self.horizontalSlider_bi_fraction.blockSignals(False)
+        except:
+            pass
+
+    def horizontalSlider_bi_range_changed(self):
+        """
+        The same as above for the "bi_range" parameter.
+
+        :return: -
+        """
+
+        self.layer.bi_range = self.horizontalSlider_bi_range.value()
+        self.lineEdit_bi_range.blockSignals(True)
+        self.lineEdit_bi_range.setText(str(self.layer.bi_range))
+        self.lineEdit_bi_range.blockSignals(False)
+
+    def lineEdit_bi_range_changed(self):
+        """
+        The same as above for the "bi_range" parameter.
+
+        :return: -
+        """
+
+        try:
+            self.layer.bi_range = max(0, min(int(round(self.lineEdit_bi_range.text())), 100))
+            self.horizontalSlider_bi_fraction.blockSignals(True)
+            self.horizontalSlider_bi_fraction.setValue(self.layer.bi_range)
+            self.horizontalSlider_bi_fraction.blockSignals(False)
+        except:
+            pass
+
+    def horizontalSlider_denoise_changed(self):
+        """
+        The same as above for the "denoise" parameter.
+
+        :return: -
+        """
+
+        self.layer.denoise = self.integer_to_denoise(self.horizontalSlider_denoise.value())
+        self.lineEdit_denoise.blockSignals(True)
+        self.lineEdit_denoise.setText("{0:.2f}".format(round(self.layer.denoise, 2)))
+        self.lineEdit_denoise.blockSignals(False)
+
+    def lineEdit_denoise_changed(self):
+        """
+        The same as above for the "denoise" parameter.
+
+        :return: -
+        """
+
+        try:
+            self.layer.denoise = float(self.lineEdit_denoise.text())
+            self.horizontalSlider_denoise.blockSignals(True)
+            self.horizontalSlider_denoise.setValue(self.denoise_to_integer(self.layer.denoise))
+            self.horizontalSlider_denoise.blockSignals(False)
+        except:
+            pass
+
 
     def checkBox_luminance_toggled(self):
         """
@@ -753,6 +867,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
                 previous_layer = version_selected.layers[num_layers_current - 1]
                 new_layer = PostprocLayer(previous_layer.postproc_method,
                                           round(1.5 * previous_layer.radius, 1), 0,
+                                          previous_layer.bi_fraction,
+                                          previous_layer.bi_range, 0.,
                                           previous_layer.luminance_only)
 
             # This is the first layer for this image version. Start with standard parameters.
