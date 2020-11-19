@@ -25,8 +25,9 @@ from sys import argv, stdout
 from time import sleep
 
 from PyQt5 import QtWidgets, QtCore
-from cv2 import imread, cvtColor, COLOR_BGR2RGB
+from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, BORDER_DEFAULT
 from math import sqrt
+from numpy import uint16, float32
 
 from configuration import Configuration, PostprocLayer
 from frame_viewer import FrameViewer
@@ -379,7 +380,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         # If the new version was created from the original image (version 0), add an initial layer.
         if self.postproc_data_object.version_selected == 1:
-            new_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 0, False))
+            new_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 1., 0.,
+                                                         20, 0., False))
 
         # Set the image viewer to the new version, and increase the range of spinboxes to include
         # the new version.
@@ -684,6 +686,9 @@ class ImageProcessor(QtCore.QThread):
             if last_layer.postproc_method != layer_selected.postproc_method or \
                     last_layer.radius != layer_selected.radius or \
                     last_layer.amount != layer_selected.amount or \
+                    last_layer.bi_fraction != layer_selected.bi_fraction or \
+                    last_layer.bi_range != layer_selected.bi_range or \
+                    last_layer.denoise != layer_selected.denoise or \
                     last_layer.luminance_only != layer_selected.luminance_only:
                 self.last_version_layers[self.version_selected] = deepcopy(self.layers_selected)
                 return True
@@ -701,23 +706,23 @@ class ImageProcessor(QtCore.QThread):
         :return: -
         """
 
-        # Initialize the new image with the original image.
-        new_image = input_image
-
-        # Apply all sharpening layers. If the amount is positive, sharpen the image. A negative
-        # amount between -1 and 0 means that the image is to be softened with a Gaussian kernel.
-        # In this case If the sign of the amount is reversed and taken as the weight with which the
-        # softened image is mixed with the original one.
+        # Divide the input image in components corresponding to the sharpening layers. The input
+        # image is still the sum of all those components.
+        image_layer_components = []
+        previous_blurred_image = input_image.astype(float32)
         for layer in layers:
-            if layer.amount > 0.:
-                new_image = Miscellaneous.gaussian_sharpen(new_image, layer.amount, layer.radius,
-                                                           luminance_only=layer.luminance_only)
-            elif -1. <= layer.amount < 0.:
-                new_image = Miscellaneous.gaussian_blur(new_image, -layer.amount, layer.radius,
-                                                           luminance_only=layer.luminance_only)
+            image_blurred = GaussianBlur(previous_blurred_image, (0, 0), layer.radius/3.,
+                                         borderType=BORDER_DEFAULT)
+            image_layer_components.append(previous_blurred_image - image_blurred)
+            previous_blurred_image = image_blurred
 
-        # Store the result in the central data object.
-        return new_image
+        # Build the sharpened image as a weighted sum of the layer components.
+        new_image = previous_blurred_image
+        for layer, image_layer_component in zip(layers, image_layer_components):
+            new_image += image_layer_component * layer.amount
+
+        # Clip pixels out of range and convert the processed image to 16bit unsigned int.
+        return new_image.clip(min=0., max=65535.).astype(uint16)
 
     def stop(self):
         """
@@ -866,14 +871,14 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             if num_layers_current:
                 previous_layer = version_selected.layers[num_layers_current - 1]
                 new_layer = PostprocLayer(previous_layer.postproc_method,
-                                          round(1.5 * previous_layer.radius, 1), 0,
+                                          round(1.5 * previous_layer.radius, 1), 1.,
                                           previous_layer.bi_fraction,
                                           previous_layer.bi_range, 0.,
                                           previous_layer.luminance_only)
 
             # This is the first layer for this image version. Start with standard parameters.
             else:
-                new_layer = PostprocLayer("Multilevel unsharp masking", 1., 0, 0., 20, 0., False)
+                new_layer = PostprocLayer("Multilevel unsharp masking", 1., 1., 0., 20, 0., False)
             version_selected.add_postproc_layer(new_layer)
 
             # Update all layer widgets.

@@ -714,7 +714,7 @@ class PostprocDataObject(object):
         # Create a first processed version with initial parameters for Gaussian radius. The amount
         # of sharpening is initialized to zero.
         initial_version = self.add_postproc_version()
-        initial_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 0, 0.,
+        initial_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 1., 0.,
                                                          20, 0., False))
 
         # Initialize the pointer to the currently selected version to 0 (input image).
@@ -947,7 +947,7 @@ class PostprocVersion(object):
         """
 
         if self.number_layers == 1:
-            self.layers = [PostprocLayer("Multilevel unsharp masking", 1., 0, 0., 20, 0., False)]
+            self.layers = [PostprocLayer("Multilevel unsharp masking", 1., 1., 0., 20, 0., False)]
         else:
             if 0 <= layer_index < self.number_layers:
                 self.layers = self.layers[:layer_index] + self.layers[layer_index + 1:]
