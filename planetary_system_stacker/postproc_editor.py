@@ -93,7 +93,7 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.horizontalSlider_bi_fraction.setValue(
             self.bi_fraction_to_integer(self.layer.bi_fraction))
         self.lineEdit_bi_fraction.setText("{0:.2f}".format(round(self.layer.bi_fraction, 2)))
-        self.horizontalSlider_bi_range.setValue(self.layer.bi_range)
+        self.horizontalSlider_bi_range.setValue(self.bi_range_to_integer(self.layer.bi_range))
         self.lineEdit_bi_range.setText(str(self.layer.bi_range))
         self.horizontalSlider_denoise.setValue(
             self.denoise_to_integer(self.layer.denoise))
@@ -147,11 +147,24 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
 
     @staticmethod
     def bi_range_to_integer(bi_range):
-        return bi_range
+        # Below the slider value 20 (amount = 1.) the behaviour is linear, above quadratic.
+        if bi_range > 20.:
+            a = 113. / 2940.
+            b = - 241 / 147.
+            c = 900. * a
+            return (round(-b / (2. * a) + sqrt(b ** 2 / a ** 2 / 4. - (c - bi_range) / a)))
+        else:
+            return round(bi_range * 3. / 2.)
 
     @staticmethod
     def integer_to_bi_range(integer):
-        return integer
+        if integer <= 30:
+            return round(2. / 3. * integer)
+        else:
+            a = 113. / 2940.
+            b = - 241 / 147.
+            c = 900. * a
+            return round(a * integer ** 2 + b * integer + c)
 
     @staticmethod
     def denoise_to_integer(denoise):

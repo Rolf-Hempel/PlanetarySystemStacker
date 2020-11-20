@@ -218,10 +218,10 @@
       <item row="4" column="2">
        <widget class="QSlider" name="horizontalSlider_bi_range">
         <property name="maximum">
-         <number>255</number>
+         <number>100</number>
         </property>
         <property name="pageStep">
-         <number>10</number>
+         <number>1</number>
         </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>
