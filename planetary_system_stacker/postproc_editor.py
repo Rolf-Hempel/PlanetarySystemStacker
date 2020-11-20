@@ -118,20 +118,24 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
 
     @staticmethod
     def amount_to_integer(amount):
-        # If amount < 0: Apply Gaussian blur instead of sharpening. The transition between both
-        # models is at slider position 20.
-        if amount <= 0.:
-            x = 20.*amount + 20.
+        # Below the slider value 20 (amount = 1.) the behaviour is linear, above quadratic.
+        if amount > 1.:
+            a = 187. / 6400.
+            b = 0.15 - 40. * a
+            c = 400. * a - 2.
+            return (round(-b / (2. * a) + sqrt(b**2 / a**2 / 4. - (c - amount) / a)))
         else:
-            x = sqrt(32.*amount) + 20.
-        return max(0, min(int(round(x)), 100))
+            return round((amount + 2.) / 0.15)
 
     @staticmethod
     def integer_to_amount(integer):
         if integer <= 20:
-            return 0.05*integer - 1.
+            return -2. + 0.15 * integer
         else:
-            return ((integer-20)**2) / 32.
+            a = 187. / 6400.
+            b = 0.15 - 40. * a
+            c = 400. * a - 2.
+            return round(a * integer**2 + b * integer + c, 2)
 
     @staticmethod
     def bi_fraction_to_integer(bi_fraction):
@@ -259,10 +263,10 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         """
 
         try:
-            self.layer.bi_range = max(0, min(int(round(self.lineEdit_bi_range.text())), 100))
-            self.horizontalSlider_bi_fraction.blockSignals(True)
-            self.horizontalSlider_bi_fraction.setValue(self.bi_range_to_integer(self.layer.bi_range))
-            self.horizontalSlider_bi_fraction.blockSignals(False)
+            self.layer.bi_range = max(0, min(int(round(float(self.lineEdit_bi_range.text()))), 255))
+            self.horizontalSlider_bi_range.blockSignals(True)
+            self.horizontalSlider_bi_range.setValue(self.bi_range_to_integer(self.layer.bi_range))
+            self.horizontalSlider_bi_range.blockSignals(False)
         except:
             pass
 
