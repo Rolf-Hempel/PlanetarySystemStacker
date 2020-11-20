@@ -732,26 +732,41 @@ class ImageProcessor(QtCore.QThread):
         """
 
         # Divide the input image in components corresponding to the sharpening layers. The input
-        # image is still the sum of all those components.
+        # image is the sum of all image layer components.
         image_layer_components = []
+
+        # Do the computations in float32 to avoid clipping effects.
         previous_blurred_image = input_image.astype(float32)
+
         for layer in layers:
-            if layer.bi_fraction == 1.:
+
+            # Case bilateral filter only:
+            if abs(layer.bi_fraction - 1.) < 0.01:
                 image_blurred = bilateralFilter(previous_blurred_image, 0, layer.bi_range * 256.,
                                                 layer.radius/3., borderType=BORDER_DEFAULT)
-            elif layer.bi_fraction == 0.:
+            # Case Gaussian filter only:
+            elif abs(layer.bi_fraction) < 0.01:
                 image_blurred = GaussianBlur(previous_blurred_image, (0, 0), layer.radius/3.,
                                              borderType=BORDER_DEFAULT)
+            # Case mixed filters:
             else:
                 image_blurred = bilateralFilter(previous_blurred_image, 0, layer.bi_range * 256.,
                                                 layer.radius / 3.,
                                                 borderType=BORDER_DEFAULT) * layer.bi_fraction + \
                                 GaussianBlur(previous_blurred_image, (0, 0), layer.radius / 3.,
                                              borderType=BORDER_DEFAULT) * (1. - layer.bi_fraction)
-            image_layer_components.append(previous_blurred_image - image_blurred)
+
+            # Apply a Gaussian filter to this component to remove noise.
+            layer_component_before_denoise = previous_blurred_image - image_blurred
+            layer_component_blurred = GaussianBlur(layer_component_before_denoise, (0, 0),
+                                                   layer.radius / 3., borderType=BORDER_DEFAULT)
+            image_layer_components.append(
+                layer_component_blurred * layer.denoise + layer_component_before_denoise * (
+                            1. - layer.denoise))
             previous_blurred_image = image_blurred
 
-        # Build the sharpened image as a weighted sum of the layer components.
+        # Build the sharpened image as a weighted sum of the layer components. A weight > 1
+        # increases details at this level, a weight < 1 lowers their visibility.
         new_image = previous_blurred_image
         for layer, image_layer_component in zip(layers, image_layer_components):
             new_image += image_layer_component * layer.amount
