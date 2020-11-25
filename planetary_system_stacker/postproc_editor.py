@@ -43,6 +43,7 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
     GUI widget to manipulate the parameters of a sharpening layer. An arbitrary number of sharpening
     layers can be defined (up to a maximum set as configuration parameter).
     """
+    signal_toggle_luminance_other_layers = QtCore.pyqtSignal()
 
     def __init__(self, layer_index, remove_layer_callback, parent=None):
         """
@@ -313,12 +314,33 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
 
     def checkBox_luminance_toggled(self):
         """
-        The checkbox which states if the sharpening should affect the luminance channel only has
+        The checkbox which tells if the sharpening should affect the luminance channel only has
         changed its state.
 
         :return: -
         """
 
+        self.layer.luminance_only = not self.layer.luminance_only
+
+        # Signal the other layers to change the flag as well.
+        self.signal_toggle_luminance_other_layers.emit()
+
+    @QtCore.pyqtSlot()
+    def checkBox_luminance_toggled_no_signal(self):
+        """
+        The checkbox which tells if the sharpening should affect the luminance channel only has
+        changed its state. This version of the method is invoked by another layer which has changed
+        the toggle state. In this case, not only toggle the state variable, but also toggle the
+        checkbox widget (because this was not done by the user). To avoid an avalanche, do not emit
+        a signal.
+
+        :return: -
+        """
+
+        # Block the signals of this widget to avoid a feedback loop.
+        self.checkBox_luminance.blockSignals(True)
+        self.checkBox_luminance.setChecked(not self.checkBox_luminance.isChecked())
+        self.checkBox_luminance.blockSignals(False)
         self.layer.luminance_only = not self.layer.luminance_only
 
     def remove_layer(self):
@@ -878,6 +900,16 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             sharpening_layer_widget.set_values(layer)
             self.verticalLayout.addWidget(sharpening_layer_widget)
             self.sharpening_layer_widgets.append(sharpening_layer_widget)
+
+        # Connect the signal issued by a sharpening layer when the "luminance only" checkbox changes
+        # state with all other layers, so they do the same.
+        for layer_index, sharpening_layer_widget in enumerate(self.sharpening_layer_widgets):
+            toggle_luminance_signal = sharpening_layer_widget.signal_toggle_luminance_other_layers
+            for other_layer_index, other_sharpening_layer_widget in enumerate(
+                    self.sharpening_layer_widgets):
+                if layer_index != other_layer_index:
+                    toggle_luminance_signal.connect(
+                        other_sharpening_layer_widget.checkBox_luminance_toggled_no_signal)
 
         # At the end of the scroll area, add a vertical spacer.
         self.verticalLayout.addItem(self.spacerItem)
