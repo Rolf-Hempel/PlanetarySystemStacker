@@ -641,10 +641,11 @@ class ImageProcessor(QtCore.QThread):
 
         # Initialize images for all versions using the current layer data.
         self.last_version_layers = []
-        for index, version in enumerate(self.postproc_data_object.versions):
+        for version in self.postproc_data_object.versions:
+            # Initialize intermediate images for all possible layers.
+            self.reset_intermediate_images()
             self.last_version_layers.append(deepcopy(version.layers))
-            version.image = ImageProcessor.recompute_selected_version(
-                self.postproc_data_object.image_original, version.layers)
+            version.image = self.recompute_selected_version(version.layers)
 
         # Reset the status bar to its idle state.
         self.set_status_bar_signal.emit(
@@ -655,25 +656,41 @@ class ImageProcessor(QtCore.QThread):
         # viewer. As soon as this index changes, a new image is displayed.
         self.last_version_selected = -1
 
-        # Initialize the data objects holding the currently active version.
+        # Initialize the data objects holding the currently active and the previous version.
         self.version_selected = None
         self.layers_selected = None
+
 
         # Remember that a new image must be computed because the ImageProcessor is just initialized.
         self.initial_state = True
 
         self.start()
 
+    def reset_intermediate_images(self):
+        """
+        Initialize all intermediate image versions, so that they will be re-computed next time.
+
+        :return: -
+        """
+
+        self.layer_input = [None] * (configuration.postproc_max_layers + 1)
+        self.layer_gauss = [None] * (configuration.postproc_max_layers)
+        self.layer_bilateral = [None] * (configuration.postproc_max_layers)
+        self.layer_denoised = [None] * (configuration.postproc_max_layers)
+        self.layer_components = [None] * (configuration.postproc_max_layers)
+
     def run(self):
         while True:
             # To avoid chasing a moving target, copy the parameters of the currently active version
             self.version_selected = self.postproc_data_object.version_selected
-            self.layers_selected = self.postproc_data_object.versions[
-                                                self.version_selected].layers
+            self.layers_selected = deepcopy(self.postproc_data_object.versions[
+                                                self.version_selected].layers)
 
             # Compare the currently active version with the last one for which an image was
-            # computed. If there is a difference, start a new computation.
-            if self.new_computation_required() and self.version_selected:
+            # computed. If there is a difference, start a new computation. Special case
+            # self.version_selected = 0: For the original image nothing must be computed.
+            if self.new_computation_required(self.version_selected != self.last_version_selected) \
+                    and self.version_selected:
 
                 # Change the main GUI's status bar to show that a computation is going on.
                 self.set_status_bar_signal.emit(
@@ -682,8 +699,7 @@ class ImageProcessor(QtCore.QThread):
 
                 # Perform the new computation.
                 self.postproc_data_object.versions[
-                    self.version_selected].image = ImageProcessor.recompute_selected_version(
-                        self.postproc_data_object.image_original, self.layers_selected)
+                    self.version_selected].image = self.recompute_selected_version(self.layers_selected)
 
                 # Reset the status bar to its idle state.
                 self.set_status_bar_signal.emit(
@@ -703,12 +719,20 @@ class ImageProcessor(QtCore.QThread):
             else:
                 sleep(self.postproc_idle_loop_time)
 
-    def new_computation_required(self):
+    def new_computation_required(self, version_has_changed):
         """
         Decide if a new computation is required.
 
+        :param version_has_changed: True, if the version has changed, so all intermediate results
+                                    must be invalidated.
         :return: True, if the current version parameters have changed. False, otherwise.
         """
+
+        # Remove for final version!
+        self.reset_intermediate_images()
+        # If a new version is selected, reset images with intermediate results.
+        if version_has_changed:
+            self.reset_intermediate_images()
 
         # When the ImageProcessor is just initialized, a new image must be computed.
         if self.initial_state:
@@ -743,8 +767,7 @@ class ImageProcessor(QtCore.QThread):
         # No change detected.
         return False
 
-    @staticmethod
-    def recompute_selected_version(input_image, layers):
+    def recompute_selected_version(self, layers):
         """
         Do the actual computation. Starting from the original image, for each sharpening layer
         apply a Gaussian filter using the layer's parameters. Store the result in the central
@@ -753,44 +776,62 @@ class ImageProcessor(QtCore.QThread):
         :return: -
         """
 
-        # Divide the input image in components corresponding to the sharpening layers. The input
-        # image is the sum of all image layer components.
-        image_layer_components = []
+        # Check if the original image is selected (version 0). In this case nothing is to be done.
+        if not layers:
+            return self.postproc_data_object.image_original
 
         # Do the computations in float32 to avoid clipping effects.
-        previous_blurred_image = input_image.astype(float32)
+        input_image = self.postproc_data_object.image_original.astype(float32)
 
-        for layer in layers:
+        for layer_index, layer in enumerate(layers):
+            if self.layer_input[layer_index] is None:
+                if layer_index:
+                    print ("Error: no input image on layer " + str(layer_index))
+                else:
+                    self.layer_input[layer_index] = input_image
 
-            # Case bilateral filter only:
-            if abs(layer.bi_fraction - 1.) < 0.01:
-                image_blurred = bilateralFilter(previous_blurred_image, 0, layer.bi_range * 256.,
-                                                layer.radius/3., borderType=BORDER_DEFAULT)
-            # Case Gaussian filter only:
-            elif abs(layer.bi_fraction) < 0.01:
-                image_blurred = GaussianBlur(previous_blurred_image, (0, 0), layer.radius/3.,
-                                             borderType=BORDER_DEFAULT)
-            # Case mixed filters:
-            else:
-                image_blurred = bilateralFilter(previous_blurred_image, 0, layer.bi_range * 256.,
-                                                layer.radius / 3.,
-                                                borderType=BORDER_DEFAULT) * layer.bi_fraction + \
-                                GaussianBlur(previous_blurred_image, (0, 0), layer.radius / 3.,
-                                             borderType=BORDER_DEFAULT) * (1. - layer.bi_fraction)
+            # Bilateral filter is needed:
+            if abs(layer.bi_fraction) > 1.e-5:
+                # Filter must be recomputed.
+                if self.layer_bilateral[layer_index] is None:
+                    self.layer_bilateral[layer_index] = bilateralFilter(self.layer_input[layer_index],
+                        0, layer.bi_range * 256., layer.radius/3., borderType=BORDER_DEFAULT)
+            # Gaussian filter is needed:
+            if abs(layer.bi_fraction - 1.) > 1.e-5:
+                # Filter must be recomputed.
+                if self.layer_gauss[layer_index] is None:
+                    self.layer_gauss[layer_index] = GaussianBlur(self.layer_input[layer_index], (0, 0),
+                        layer.radius/3., borderType=BORDER_DEFAULT)
 
-            # Apply a Gaussian filter to this component to remove noise.
-            layer_component_before_denoise = previous_blurred_image - image_blurred
-            layer_component_blurred = GaussianBlur(layer_component_before_denoise, (0, 0),
-                                                   layer.radius / 3., borderType=BORDER_DEFAULT)
-            image_layer_components.append(
-                layer_component_blurred * layer.denoise + layer_component_before_denoise * (
-                            1. - layer.denoise))
-            previous_blurred_image = image_blurred
+            # Compute the input image for the next layer.
+            if self.layer_input[layer_index + 1] is None:
+                # Case bilateral only.
+                if abs(layer.bi_fraction - 1.) <= 1.e-5:
+                    self.layer_input[layer_index + 1] = self.layer_bilateral[layer_index]
+                # Case Gaussian only.
+                elif abs(layer.bi_fraction) <= 1.e-5:
+                    self.layer_input[layer_index + 1] = self.layer_gauss[layer_index]
+                # Mixed case.
+                else:
+                    self.layer_input[layer_index + 1] = self.layer_bilateral[layer_index] * layer.bi_fraction + \
+                                                        self.layer_gauss[layer_index] * (1. - layer.bi_fraction)
 
-        # Build the sharpened image as a weighted sum of the layer components. A weight > 1
-        # increases details at this level, a weight < 1 lowers their visibility.
-        new_image = previous_blurred_image
-        for layer, image_layer_component in zip(layers, image_layer_components):
+            # A new denoised layer component must be computed.
+            if self.layer_denoised[layer_index] is None:
+                layer_component_before_denoise = self.layer_input[layer_index] - self.layer_input[layer_index + 1]
+                # Denoising must be applied.
+                if layer.denoise > 1.e-5:
+                    self.layer_denoised[layer_index] = GaussianBlur(layer_component_before_denoise, (0, 0),
+                        layer.radius / 3., borderType=BORDER_DEFAULT) * layer.denoise + \
+                        layer_component_before_denoise * (1. - layer.denoise)
+                else:
+                    self.layer_denoised[layer_index] = layer_component_before_denoise
+
+        # Build the sharpened image as a weighted sum of the layer components. Start with the
+        # maximally blurred layer input (start image of first layer beyond active layers).
+        # A weight > 1 increases details at this level, a weight < 1 lowers their visibility.
+        new_image = self.layer_input[len(layers)]
+        for layer, image_layer_component in zip(layers, self.layer_denoised):
             new_image += image_layer_component * layer.amount
 
         # Clip pixels out of range and convert the processed image to 16bit unsigned int.
