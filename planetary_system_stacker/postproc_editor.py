@@ -633,8 +633,9 @@ class ImageProcessor(QtCore.QThread):
         """
 
         QtCore.QThread.__init__(self, parent)
-        self.postproc_data_object = configuration.postproc_data_object
-        self.postproc_idle_loop_time = configuration.postproc_idle_loop_time
+        self.configuration = configuration
+        self.postproc_data_object = self.configuration.postproc_data_object
+        self.postproc_idle_loop_time = self.configuration.postproc_idle_loop_time
 
         # Do the computations in float32 to avoid clipping effects. Also create a version for
         # "luminance only" computations.
@@ -667,7 +668,6 @@ class ImageProcessor(QtCore.QThread):
         self.version_selected = None
         self.layers_selected = None
 
-
         # Remember that a new image must be computed because the ImageProcessor is just initialized.
         self.initial_state = True
 
@@ -680,11 +680,11 @@ class ImageProcessor(QtCore.QThread):
         :return: -
         """
 
-        self.layer_input = [None] * (configuration.postproc_max_layers + 1)
-        self.layer_gauss = [None] * (configuration.postproc_max_layers)
-        self.layer_bilateral = [None] * (configuration.postproc_max_layers)
-        self.layer_denoised = [None] * (configuration.postproc_max_layers)
-        self.layer_components = [None] * (configuration.postproc_max_layers)
+        self.layer_input = [None] * (self.configuration.postproc_max_layers + 1)
+        self.layer_gauss = [None] * (self.configuration.postproc_max_layers)
+        self.layer_bilateral = [None] * (self.configuration.postproc_max_layers)
+        self.layer_denoised = [None] * (self.configuration.postproc_max_layers)
+        self.layer_components = [None] * (self.configuration.postproc_max_layers)
 
     def run(self):
         while True:
@@ -741,10 +741,11 @@ class ImageProcessor(QtCore.QThread):
         if version_has_changed:
             self.reset_intermediate_images()
 
-        # When the ImageProcessor is just initialized, a new image must be computed.
-        if self.initial_state:
-            self.initial_state = False
-            return True
+        # When the ImageProcessor is just initialized, a new image must be computed. I think this
+        # is not needed anymore.
+        # if self.initial_state:
+        #     self.initial_state = False
+        #     return True
 
         # Check if an additional version was created. Copy its layer info for later checks
         # for changes.
@@ -761,6 +762,9 @@ class ImageProcessor(QtCore.QThread):
         # For all layers check if a parameter has changed.
         for last_layer, layer_selected in zip(self.last_version_layers[self.version_selected],
                                               self.layers_selected):
+            if last_layer.amount != layer_selected.amount:
+                last_layer.amount = layer_selected.amount
+                return True
             if last_layer.postproc_method != layer_selected.postproc_method or \
                     last_layer.radius != layer_selected.radius or \
                     last_layer.amount != layer_selected.amount or \
@@ -796,10 +800,8 @@ class ImageProcessor(QtCore.QThread):
                 else:
                     if layer.luminance_only:
                         self.layer_input[layer_index] = self.input_image_hsv[:, :, 2]
-                        convert_back_to_bgr = True
                     else:
                         self.layer_input[layer_index] = self.input_image
-                        convert_back_to_bgr = False
 
             # Bilateral filter is needed:
             if abs(layer.bi_fraction) > 1.e-5:
@@ -841,13 +843,13 @@ class ImageProcessor(QtCore.QThread):
         # Build the sharpened image as a weighted sum of the layer components. Start with the
         # maximally blurred layer input (start image of first layer beyond active layers).
         # A weight > 1 increases details at this level, a weight < 1 lowers their visibility.
-        new_image = self.layer_input[len(layers)]
+        new_image = copy(self.layer_input[len(layers)])
         for layer, image_layer_component in zip(layers, self.layer_denoised):
             new_image += image_layer_component * layer.amount
 
         # In case of "luminance only", insert the new luminance channel into a copy of the original
         # image and change back to BGR.
-        if convert_back_to_bgr:
+        if layers[0].luminance_only:
             new_image_bgr = copy(self.input_image_hsv)
             new_image_bgr[:, :, 2] = new_image
             new_image = cvtColor(new_image_bgr, COLOR_HSV2BGR)
