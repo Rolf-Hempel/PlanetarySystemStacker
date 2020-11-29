@@ -20,16 +20,18 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-from copy import deepcopy
+from copy import copy, deepcopy
 from sys import argv, stdout
 from time import sleep
 
 from PyQt5 import QtWidgets, QtCore
-from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT
+from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT,\
+    COLOR_BGR2HSV, COLOR_HSV2BGR
 from math import sqrt
 from numpy import uint16, float32
 
 from configuration import Configuration, PostprocLayer
+from exceptions import InternalError
 from frame_viewer import FrameViewer
 from frames import Frames
 from miscellaneous import Miscellaneous
@@ -634,6 +636,11 @@ class ImageProcessor(QtCore.QThread):
         self.postproc_data_object = configuration.postproc_data_object
         self.postproc_idle_loop_time = configuration.postproc_idle_loop_time
 
+        # Do the computations in float32 to avoid clipping effects. Also create a version for
+        # "luminance only" computations.
+        self.input_image = self.postproc_data_object.image_original.astype(float32)
+        self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
+
         # Change the main GUI's status bar to show that a computation is going on.
         self.set_status_bar_signal.emit(
             "Processing " + self.postproc_data_object.file_name_original +
@@ -780,15 +787,19 @@ class ImageProcessor(QtCore.QThread):
         if not layers:
             return self.postproc_data_object.image_original
 
-        # Do the computations in float32 to avoid clipping effects.
-        input_image = self.postproc_data_object.image_original.astype(float32)
-
         for layer_index, layer in enumerate(layers):
             if self.layer_input[layer_index] is None:
+                # For layers > 0, the layer_input must have been computed on the previous layer.
                 if layer_index:
-                    print ("Error: no input image on layer " + str(layer_index))
+                    raise InternalError("Layer input image is None for layer > 0")
+                # On layer 0, the original image is taken as layer input.
                 else:
-                    self.layer_input[layer_index] = input_image
+                    if layer.luminance_only:
+                        self.layer_input[layer_index] = self.input_image_hsv[:, :, 2]
+                        convert_back_to_bgr = True
+                    else:
+                        self.layer_input[layer_index] = self.input_image
+                        convert_back_to_bgr = False
 
             # Bilateral filter is needed:
             if abs(layer.bi_fraction) > 1.e-5:
@@ -833,6 +844,13 @@ class ImageProcessor(QtCore.QThread):
         new_image = self.layer_input[len(layers)]
         for layer, image_layer_component in zip(layers, self.layer_denoised):
             new_image += image_layer_component * layer.amount
+
+        # In case of "luminance only", insert the new luminance channel into a copy of the original
+        # image and change back to BGR.
+        if convert_back_to_bgr:
+            new_image_bgr = copy(self.input_image_hsv)
+            new_image_bgr[:, :, 2] = new_image
+            new_image = cvtColor(new_image_bgr, COLOR_HSV2BGR)
 
         # Clip pixels out of range and convert the processed image to 16bit unsigned int.
         return new_image.clip(min=0., max=65535.).astype(uint16)
