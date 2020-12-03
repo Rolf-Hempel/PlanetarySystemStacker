@@ -939,16 +939,11 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol("+++ Start postprocessing +++", self.attached_log_file)
         self.my_timer.create_no_check('Conputing image postprocessing')
 
-        # Initialize the new image with the original image.
-        self.postprocessed_image = self.postproc_input_image
-
         # Apply all sharpening layers of the postprocessing version selected last time.
         version_index = self.configuration.postproc_data_object.version_selected
         postproc_layers = self.configuration.postproc_data_object.versions[version_index].layers
-        for layer in postproc_layers:
-            self.postprocessed_image = Miscellaneous.gaussian_sharpen(self.postprocessed_image,
-                                                                      layer.amount, layer.radius,
-                                                                      luminance_only=layer.luminance_only)
+        self.postprocessed_image = Miscellaneous.post_process(self.postproc_input_image,
+                                                                postproc_layers)
         self.my_timer.stop('Conputing image postprocessing')
 
         self.work_next_task_signal.emit("Save postprocessed image")

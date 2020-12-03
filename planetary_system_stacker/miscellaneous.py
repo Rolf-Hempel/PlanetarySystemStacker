@@ -27,7 +27,7 @@ from time import time
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
     putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev,\
-    resize, matchTemplate, minMaxLoc, TM_CCORR_NORMED
+    resize, matchTemplate, minMaxLoc, TM_CCORR_NORMED, bilateralFilter
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
     empty, argmin, stack, sin, uint8, float32, uint16, full
@@ -988,6 +988,86 @@ class Miscellaneous(object):
                         lineType)
             out.write(rgb_frame)
         out.release()
+
+    @staticmethod
+    def post_process(image, layers):
+        """
+        Apply all postprocessing layers to the input image "image". If the image is in color mode,
+        the postprocessing is computed either in BGR mode or on the luminance channel only. All
+        computations are performed in 32bit floating point mode.
+
+        :param image: Input image, either BGR or Grayscale (16bit uint).
+        :param layers: postprocessing layers with all parameters.
+        :return: Processed image in the same 16bit uint format as the input image.
+        """
+
+        # Check if the original image is selected (version 0). In this case nothing is to be done.
+        if not layers:
+            return image
+
+        # Convert the image to 32bit floating point format.
+        input_image = image.astype(float32)
+
+        # If the luminance channel is to be processed only, extract the luminance channel.
+        if layers[0].luminance_only:
+            input_image_hsv = cvtColor(input_image, COLOR_BGR2HSV)
+            layer_input = input_image_hsv[:, :, 2]
+        else:
+            layer_input = input_image
+
+        # Go through all layers and apply the sharpening filters.
+        for layer_index, layer in enumerate(layers):
+
+            # Bilateral filter is needed:
+            if abs(layer.bi_fraction) > 1.e-5:
+                layer_bilateral = bilateralFilter(layer_input, 0, layer.bi_range * 256.,
+                                                  layer.radius / 3., borderType=BORDER_DEFAULT)
+            # Gaussian filter is needed:
+            if abs(layer.bi_fraction - 1.) > 1.e-5:
+                layer_gauss = GaussianBlur(layer_input, (0, 0), layer.radius / 3.,
+                                           borderType=BORDER_DEFAULT)
+
+            # Compute the input for the next layer. First case: bilateral only.
+            if abs(layer.bi_fraction - 1.) <= 1.e-5:
+                next_layer_input = layer_bilateral
+            # Case Gaussian only.
+            elif abs(layer.bi_fraction) <= 1.e-5:
+                next_layer_input = layer_gauss
+            # Mixed case.
+            else:
+                next_layer_input = layer_bilateral * layer.bi_fraction + \
+                                   layer_gauss * (1. - layer.bi_fraction)
+
+            layer_component_before_denoise = layer_input - next_layer_input
+
+            # If denoising is chosen for this layer, apply a Gaussian filter.
+            if layer.denoise > 1.e-5:
+                layer_component = GaussianBlur(layer_component_before_denoise, (0, 0),
+                    layer.radius / 3., borderType=BORDER_DEFAULT) * layer.denoise + \
+                    layer_component_before_denoise * (1. - layer.denoise)
+            else:
+                layer_component = layer_component_before_denoise
+
+            # Accumulate the contributions from all layers. On the first layer initialize the
+            # summation buffer.
+            if layer_index:
+                components_accumulated += layer_component * layer.amount
+            else:
+                components_accumulated = layer_component * layer.amount
+
+            layer_input = next_layer_input
+
+        # After all layers are accumulated, finally add the maximally blurred image.
+        components_accumulated += next_layer_input
+
+        # Reduce the value range so that they fit into 16bit uint, and convert to uint16. In case
+        # the luminance channel was processed only, insert the processed luminance channel into the
+        # HSV representation of the original image, and convert back to BGR.
+        if layers[0].luminance_only:
+            input_image_hsv[:, :, 2] = components_accumulated
+            return cvtColor(input_image_hsv.clip(min=0., max=65535.), COLOR_HSV2BGR).astype(uint16)
+        else:
+            return components_accumulated.clip(min=0., max=65535.).astype(uint16)
 
     @staticmethod
     def gaussian_sharpen(input_image, amount, radius, luminance_only=False):
