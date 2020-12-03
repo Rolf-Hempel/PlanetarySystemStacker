@@ -684,7 +684,6 @@ class ImageProcessor(QtCore.QThread):
         self.layer_gauss = [None] * (self.configuration.postproc_max_layers)
         self.layer_bilateral = [None] * (self.configuration.postproc_max_layers)
         self.layer_denoised = [None] * (self.configuration.postproc_max_layers)
-        self.layer_components = [None] * (self.configuration.postproc_max_layers)
 
     def run(self):
         while True:
@@ -728,55 +727,93 @@ class ImageProcessor(QtCore.QThread):
 
     def new_computation_required(self, version_has_changed):
         """
-        Decide if a new computation is required.
+        Decide if a new computation is required. Invalidate only those intermediate image
+        components which are affected by the parameter change. This results in a substantial
+        performance improvement.
 
         :param version_has_changed: True, if the version has changed, so all intermediate results
                                     must be invalidated.
         :return: True, if the current version parameters have changed. False, otherwise.
         """
 
-        # Remove for final version!
-        self.reset_intermediate_images()
+        # Initialize the flag which remembers if a change was found. Do not return on the first
+        # detection in order to invalidate all affected intermediate results.
+        change_detected = False
+        
         # If a new version is selected, reset images with intermediate results.
         if version_has_changed:
             self.reset_intermediate_images()
-
-        # When the ImageProcessor is just initialized, a new image must be computed. I think this
-        # is not needed anymore.
-        # if self.initial_state:
-        #     self.initial_state = False
-        #     return True
+            change_detected = True
 
         # Check if an additional version was created. Copy its layer info for later checks
-        # for changes.
+        # for changes. The intermediate results are reset already because the version number must
+        # have changed.
         if self.version_selected >= len(self.last_version_layers):
             self.last_version_layers.append(deepcopy(self.postproc_data_object.versions[
                                                          self.version_selected].layers))
-            return True
+            return change_detected
 
         # If the selected version is already known, check if the number of layers has changed.
         if len(self.last_version_layers[self.version_selected]) != len(self.layers_selected):
             self.last_version_layers[self.version_selected] = deepcopy(self.layers_selected)
-            return True
+            self.reset_intermediate_images()
+            change_detected = True
+            return change_detected
 
-        # For all layers check if a parameter has changed.
-        for last_layer, layer_selected in zip(self.last_version_layers[self.version_selected],
-                                              self.layers_selected):
-            if last_layer.amount != layer_selected.amount:
-                last_layer.amount = layer_selected.amount
-                return True
-            if last_layer.postproc_method != layer_selected.postproc_method or \
-                    last_layer.radius != layer_selected.radius or \
-                    last_layer.amount != layer_selected.amount or \
-                    last_layer.bi_fraction != layer_selected.bi_fraction or \
-                    last_layer.bi_range != layer_selected.bi_range or \
-                    last_layer.denoise != layer_selected.denoise or \
-                    last_layer.luminance_only != layer_selected.luminance_only:
-                self.last_version_layers[self.version_selected] = deepcopy(self.layers_selected)
-                return True
+        # Check if the "luminance only" parameter has changed. In this case all layers are
+        # invalidated completely. Remember that the "luminance only" parameter is the same on all
+        # layers for any given version, and that for version 0 (original image) no layers are
+        # defined (and therefore there is no parameter "luminance_only").
+        if self.version_selected and \
+                self.last_version_layers[self.version_selected][0].luminance_only != \
+                self.layers_selected[0].luminance_only:
+            self.reset_intermediate_images()
+            change_detected = True
 
-        # No change detected.
-        return False
+        # The version is the same as before, it has the same number of layers, and the luminance
+        # parameter has not changed. Now go through all layers and invalidate those intermediate
+        # results individually which need to be recomputed.
+        else:
+            for layer_index, (last_layer, layer_selected) in enumerate(
+                    zip(self.last_version_layers[self.version_selected], self.layers_selected)):
+                # The "amount" parameter has changed. No intermediate results need to be invalidated
+                # because the layer's contribution to the image is computed by multiplying the
+                # denoised component with the amount parameter.
+                if last_layer.amount != layer_selected.amount:
+                    last_layer.amount = layer_selected.amount
+                    change_detected = True
+
+                # If the radius has changed, all filters at this level and the input for the next
+                # level have to be recomputed.
+                if  last_layer.radius != layer_selected.radius:
+                    self.layer_gauss[layer_index] = self.layer_bilateral[layer_index] = \
+                        self.layer_denoised[layer_index] = self.layer_input[layer_index + 1] = None
+                    change_detected = True
+
+                # If the bi_fraction has changed, the input for the next layer and the denoised
+                # component on this layer must be recomputed.
+                if last_layer.bi_fraction != layer_selected.bi_fraction:
+                    self.layer_denoised[layer_index] = self.layer_input[layer_index + 1] = None
+                    change_detected = True
+
+                # If the bi_range parameter has changed, the bilateral filter is invalidated.
+                if last_layer.bi_range != layer_selected.bi_range:
+                    self.layer_bilateral[layer_index] = None
+                    change_detected = True
+                    # If the bi_fraction parameter is not zero, the change propagates to the
+                    # denoised component and the input for the next level.
+                    if abs(layer_selected.bi_fraction) > 1.e-5:
+                        self.layer_denoised[layer_index] = self.layer_input[layer_index + 1] = None
+
+                # If the denoise parameter has changed, the denoised component for this layer is
+                # invalidated.
+                if last_layer.denoise != layer_selected.denoise:
+                    self.layer_denoised[layer_index] = None
+                    change_detected = True
+
+        # Remember the current parameter settings to compare with new paraemters next time.
+        self.last_version_layers[self.version_selected] = deepcopy(self.layers_selected)
+        return change_detected
 
     def recompute_selected_version(self, layers):
         """
