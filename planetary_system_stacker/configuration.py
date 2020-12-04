@@ -29,7 +29,7 @@ from os.path import splitext
 from exceptions import IncompatibleVersionsError
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.8.14"
+PSS_Version = "PlanetarySystemStacker 0.8.15"
 # PSS_Version = "PlanetarySystemStacker"
 
 
@@ -231,6 +231,7 @@ class Configuration(object):
 
         self.postproc_suffix = "_gpp"
         self.postproc_max_layers = 10
+        self.postproc_bi_range_standard = 13
         self.postproc_blinking_period = 1.
         self.postproc_idle_loop_time = 0.2
 
@@ -715,7 +716,7 @@ class PostprocDataObject(object):
         # of sharpening is initialized to zero.
         initial_version = self.add_postproc_version()
         initial_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 1., 0.,
-                                                         20, 0., False))
+                                                         13, 0., False))
 
         # Initialize the pointer to the currently selected version to 0 (input image).
         # "version_compared" is used by the blink comparator later on. The blink comparator is

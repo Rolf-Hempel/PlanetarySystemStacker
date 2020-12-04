@@ -21,6 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from copy import copy, deepcopy
+from pathlib import Path
 from sys import argv, stdout
 from time import sleep
 
@@ -379,6 +380,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
 
         QtWidgets.QWidget.__init__(self, parent)
         self.setupUi(self)
+        self.configuration = configuration
         self.pss_version = configuration.global_parameters_version
         self.postproc_data_object = configuration.postproc_data_object
         self.postproc_blinking_period = configuration.postproc_blinking_period
@@ -432,7 +434,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         # If the new version was created from the original image (version 0), add an initial layer.
         if self.postproc_data_object.version_selected == 1:
             new_version.add_postproc_layer(PostprocLayer("Multilevel unsharp masking", 1., 1., 0.,
-                                                         20, 0., False))
+                                    self.configuration.postproc_bi_range_standard, 0., False))
 
         # Set the image viewer to the new version, and increase the range of spinboxes to include
         # the new version.
@@ -639,6 +641,9 @@ class ImageProcessor(QtCore.QThread):
         self.postproc_data_object = self.configuration.postproc_data_object
         self.postproc_idle_loop_time = self.configuration.postproc_idle_loop_time
 
+        # Extract the file name from its path.
+        self.file_name = Path(self.postproc_data_object.file_name_original).name
+
         # Do the computations in float32 to avoid clipping effects. If the input image is color,
         # also create a version for "luminance only" computations.
         self.input_image = self.postproc_data_object.image_original.astype(float32)
@@ -647,8 +652,7 @@ class ImageProcessor(QtCore.QThread):
             self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
 
         # Change the main GUI's status bar to show that a computation is going on.
-        self.set_status_bar_signal.emit(
-            "Processing " + self.postproc_data_object.file_name_original +
+        self.set_status_bar_signal.emit("Processing " + self.file_name +
             ", busy computing a new postprocessing image.", "black")
 
         # Initialize images for all versions using the current layer data.
@@ -660,8 +664,7 @@ class ImageProcessor(QtCore.QThread):
             version.image = self.recompute_selected_version(version.layers)
 
         # Reset the status bar to its idle state.
-        self.set_status_bar_signal.emit(
-                "Processing " + self.postproc_data_object.file_name_original + ", postprocessing.",
+        self.set_status_bar_signal.emit("Processing " + self.file_name + ", postprocessing.",
                 "black")
 
         # Remember the last version (and the corresponding layer parameters) shown in the image
@@ -703,8 +706,7 @@ class ImageProcessor(QtCore.QThread):
                     and self.version_selected:
 
                 # Change the main GUI's status bar to show that a computation is going on.
-                self.set_status_bar_signal.emit(
-                    "Processing " + self.postproc_data_object.file_name_original +
+                self.set_status_bar_signal.emit("Processing " + self.file_name +
                     ", busy computing a new postprocessing image.", "black")
 
                 # Perform the new computation.
@@ -712,8 +714,7 @@ class ImageProcessor(QtCore.QThread):
                     self.version_selected].image = self.recompute_selected_version(self.layers_selected)
 
                 # Reset the status bar to its idle state.
-                self.set_status_bar_signal.emit(
-                    "Processing " + self.postproc_data_object.file_name_original +
+                self.set_status_bar_signal.emit("Processing " + self.file_name +
                     ", postprocessing.", "black")
 
                 # Show the new image in the image viewer, and remember its parameters.
