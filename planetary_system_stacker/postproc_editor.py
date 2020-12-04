@@ -150,24 +150,26 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
 
     @staticmethod
     def bi_range_to_integer(bi_range):
-        # Below the slider value 20 (amount = 1.) the behaviour is linear, above quadratic.
-        if bi_range > 20.:
-            a = 113. / 2940.
-            b = - 241 / 147.
-            c = 900. * a
-            return (round(-b / (2. * a) + sqrt(b ** 2 / a ** 2 / 4. - (c - bi_range) / a)))
+        # Below the slider value 50 (bi_range = 13.) the behaviour is linear, above quadratic.
+        if bi_range > 13.:
+            c = 0.009022222222222221
+            g = 35.59113300492611
+            h = -1233.2712514256596
+            return round(g + sqrt(h + bi_range / c))
         else:
-            return round(bi_range * 3. / 2.)
+            b = 0.26
+            return round(bi_range / b)
 
     @staticmethod
     def integer_to_bi_range(integer):
-        if integer <= 30:
-            return round(2. / 3. * integer)
+        if integer <= 50:
+            b = 0.26
+            return round(b * integer, 1)
         else:
-            a = 113. / 2940.
-            b = - 241 / 147.
-            c = 900. * a
-            return round(a * integer ** 2 + b * integer + c)
+            c = 0.009022222222222221
+            e = -0.6422222222222221
+            f = 22.555555555555554
+            return round(c * integer ** 2 + e * integer + f, 1)
 
     @staticmethod
     def denoise_to_integer(denoise):

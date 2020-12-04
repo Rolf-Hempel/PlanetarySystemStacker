@@ -230,10 +230,10 @@
          <string>Set the brigthness range parameter of the bilateral filter</string>
         </property>
         <property name="maximum">
-         <number>100</number>
+         <number>200</number>
         </property>
         <property name="pageStep">
-         <number>1</number>
+         <number>2</number>
         </property>
         <property name="orientation">
          <enum>Qt::Horizontal</enum>

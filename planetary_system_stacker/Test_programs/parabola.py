@@ -1,21 +1,35 @@
 from math import sqrt
 
-# a = 187. / 6400.
-# b = 0.15 - 40. * a
-# c = 400. * a - 2.
+x0 = 0.
+x1 = 50.
+x2 = 200.
 
-# a = 230./8000.
-# b = (5.-400.*a)/20.
-# c = 0
+y0 = 0.
+y1 = 13.
+y2 = 255.
 
-a = 113. / 2940.
-b = - 241 / 147.
-c = 900. * a
+b = (y1 - y0) / (x1 - x0)
+c = (y2 - y1 - b * (x2 - x1)) / (x1 ** 2 + x2 ** 2 - 2 * x1 * x2)
+f = c * x1 ** 2 - b * x1 + y1
+e = b - 2. * c * x1
+g = -e / (2. * c)
+h = g ** 2 - f / c
 
-integer = 100.
-y = round(a * integer**2 + b * integer + c)
-print (str(y))
+print("b = " + str(b))
+print("c = " + str(c))
+print("e = " + str(e))
+print("f = " + str(f))
+print("g = " + str(g))
+print("h = " + str(h))
 
-bi_range = 255.
-y = round(-b / (2. * a) + sqrt(b ** 2 / a ** 2 / 4. - (c - bi_range) / a))
-print (str(y))
+x = 200
+
+print ("\nx: " + str(x))
+if x < x1:
+    y = y0 + b * (x - x0)
+else:
+    y = round(c * x ** 2 + e * x + f, 1)
+print("y: " + str(y))
+
+x = round(g + sqrt(h + y / c))
+print ("x: " + str(x))
