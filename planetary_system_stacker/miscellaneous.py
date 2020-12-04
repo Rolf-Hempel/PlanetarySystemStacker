@@ -1357,14 +1357,14 @@ class Miscellaneous(object):
         """
 
         output_string = "\n           Postprocessing method: " + layers[0].postproc_method + "\n\n" + \
-                        "           Layer    |    Radius    |   Amount   |   Luminance only   |\n" \
-                        "           -----------------------------------------------------------" \
+                        "           Layer    |    Radius    |   Amount   |   Bi fraction (%)   |   Bi range   |   Denoise (%)   |   Luminance only   |\n" \
+                        "           ------------------------------------------------------------------------------------------------------------------" \
                         "\n           "
 
         # Extend the three table lines up to the max index.
         for index, layer in enumerate(layers):
-            output_string += " {0:3d}     |     {1:5.2f}    |   {2:6.2f}   |      {3:8s}      |" \
-                 "\n           ".format(index + 1, layer.radius, layer.amount, str(layer.luminance_only))
+            output_string += " {0:3d}     |     {1:5.2f}    |   {2:6.2f}   |         {3:4.0f}        |    {4:5.1f}     |       {5:4.0f}      |       {6:8s}     |" \
+                 "\n           ".format(index + 1, layer.radius, layer.amount, layer.bi_fraction*100., layer.bi_range, layer.denoise*100., str(layer.luminance_only))
 
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
 
