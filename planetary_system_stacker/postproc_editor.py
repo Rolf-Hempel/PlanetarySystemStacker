@@ -637,10 +637,12 @@ class ImageProcessor(QtCore.QThread):
         self.postproc_data_object = self.configuration.postproc_data_object
         self.postproc_idle_loop_time = self.configuration.postproc_idle_loop_time
 
-        # Do the computations in float32 to avoid clipping effects. Also create a version for
-        # "luminance only" computations.
+        # Do the computations in float32 to avoid clipping effects. If the input image is color,
+        # also create a version for "luminance only" computations.
         self.input_image = self.postproc_data_object.image_original.astype(float32)
-        self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
+        self.color = len(self.input_image.shape) == 3
+        if self.color:
+            self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
 
         # Change the main GUI's status bar to show that a computation is going on.
         self.set_status_bar_signal.emit(
@@ -760,11 +762,11 @@ class ImageProcessor(QtCore.QThread):
             change_detected = True
             return change_detected
 
-        # Check if the "luminance only" parameter has changed. In this case all layers are
-        # invalidated completely. Remember that the "luminance only" parameter is the same on all
-        # layers for any given version, and that for version 0 (original image) no layers are
-        # defined (and therefore there is no parameter "luminance_only").
-        if self.version_selected and \
+        # For color images, check if the "luminance only" parameter has changed. In this case all
+        # layers are invalidated completely. Remember that the "luminance only" parameter is the
+        # same on all layers for any given version, and that for version 0 (original image) no
+        # layers are defined (and therefore there is no parameter "luminance_only").
+        if self.color and self.version_selected and \
                 self.last_version_layers[self.version_selected][0].luminance_only != \
                 self.layers_selected[0].luminance_only:
             self.reset_intermediate_images()
@@ -835,7 +837,8 @@ class ImageProcessor(QtCore.QThread):
                     raise InternalError("Layer input image is None for layer > 0")
                 # On layer 0, the original image is taken as layer input.
                 else:
-                    if layer.luminance_only:
+                    # For color input and luminance_only: extract the luminance channel.
+                    if self.color and layer.luminance_only:
                         self.layer_input[layer_index] = self.input_image_hsv[:, :, 2]
                     else:
                         self.layer_input[layer_index] = self.input_image
@@ -886,7 +889,7 @@ class ImageProcessor(QtCore.QThread):
 
         # In case of "luminance only", insert the new luminance channel into a copy of the original
         # image and change back to BGR.
-        if layers[0].luminance_only:
+        if self.color and layers[0].luminance_only:
             new_image_bgr = copy(self.input_image_hsv)
             new_image_bgr[:, :, 2] = new_image
             new_image = cvtColor(new_image_bgr, COLOR_HSV2BGR)
