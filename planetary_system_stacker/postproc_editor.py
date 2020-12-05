@@ -659,9 +659,13 @@ class ImageProcessor(QtCore.QThread):
         self.last_version_layers = []
         for version in self.postproc_data_object.versions:
             # Initialize intermediate images for all possible layers.
-            self.reset_intermediate_images()
             self.last_version_layers.append(deepcopy(version.layers))
-            version.image = self.recompute_selected_version(version.layers)
+            version.image = Miscellaneous.post_process(self.input_image, version.layers)
+
+        # Initialize lists for intermediate results (to speed up image updates). The efficient
+        # reuse of intermediate results is only possible if there is enough RAM.
+        self.reset_intermediate_images()
+        self.ram_sufficient = True
 
         # Reset the status bar to its idle state.
         self.set_status_bar_signal.emit("Processing " + self.file_name + ", postprocessing.",
@@ -709,9 +713,22 @@ class ImageProcessor(QtCore.QThread):
                 self.set_status_bar_signal.emit("Processing " + self.file_name +
                     ", busy computing a new postprocessing image.", "black")
 
-                # Perform the new computation.
-                self.postproc_data_object.versions[
-                    self.version_selected].image = self.recompute_selected_version(self.layers_selected)
+                # Perform the new computation. Try to store intermediate results. If it fails
+                # because there is not enough RAM, switch to direct computation.
+                if self.ram_sufficient:
+                    try:
+                        self.postproc_data_object.versions[
+                            self.version_selected].image = self.recompute_selected_version(
+                                                            self.layers_selected)
+                    except:
+                        self.ram_sufficient = False
+                        self.postproc_data_object.versions[
+                            self.version_selected].image = Miscellaneous.post_process(
+                                                            self.input_image, self.layers_selected)
+                else:
+                    self.postproc_data_object.versions[
+                        self.version_selected].image = Miscellaneous.post_process(
+                        self.input_image, self.layers_selected)
 
                 # Reset the status bar to its idle state.
                 self.set_status_bar_signal.emit("Processing " + self.file_name +

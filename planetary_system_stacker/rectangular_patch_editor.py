@@ -111,6 +111,10 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                                                               self.remember_rp.y_high,
                                                               self.remember_rp.x_low,
                                                               self.remember_rp.x_high)
+                # If the rectangle is void, set all coordinates to zero.
+                else:
+                    self.photo_editor.set_selection_rectangle(0, 0, 0, 0)
+
 
 
     def mouseMoveEvent(self, event):

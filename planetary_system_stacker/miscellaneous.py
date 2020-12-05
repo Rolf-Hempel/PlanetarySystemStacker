@@ -1003,7 +1003,7 @@ class Miscellaneous(object):
 
         # Check if the original image is selected (version 0). In this case nothing is to be done.
         if not layers:
-            return image
+            return image.astype(uint16)
 
         # Convert the image to 32bit floating point format.
         input_image = image.astype(float32)
