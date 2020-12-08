@@ -847,6 +847,18 @@ class Miscellaneous(object):
         if len(input_image.shape) != 3:
             return input_image
 
+        # If all shifts are zero, nothing is to be done except interpolation / reduction.
+        if not (shift_red[0] or shift_red[1] or shift_blue[0] or shift_blue[1]):
+            # If the factors for interpolation and reduction are the same, nothing is to be done.
+            if not (interpolate_input - reduce_output) or not reduce_output:
+                return input_image
+            # Simple resizing. reduce_output is not zero (see above)!
+            else:
+                scale_factor = float(interpolate_input) / float(reduce_output)
+                return resize(input_image, (round(input_image.shape[1] * scale_factor),
+                                round(input_image.shape[0] * scale_factor)),
+                                interpolation=INTER_CUBIC)
+
         # If interpolation is requested, resize the input image and multiply the shift values.
         if interpolate_input != 1:
             dim_y = input_image.shape[0] * interpolate_input
@@ -933,9 +945,9 @@ class Miscellaneous(object):
 
         # If output size reduction is specified, resize the intermediate image.
         if reduce_output != 1:
-            output_image = resize(output_image_interp, (round(input_image.shape[1] / reduce_output),
-                                                        round(
-                                                            input_image.shape[0] / reduce_output)),
+            output_image = resize(output_image_interp,
+                                  (round(output_image_interp.shape[1] / reduce_output),
+                                   round(output_image_interp.shape[0] / reduce_output)),
                                   interpolation=INTER_CUBIC)
         else:
             output_image = output_image_interp
@@ -943,7 +955,7 @@ class Miscellaneous(object):
         return output_image
 
     @staticmethod
-    def measure_shift(image, channel_id, reference_id, max_shift, blur_strength=None):
+    def measure_rgb_shift(image, channel_id, reference_id, max_shift, blur_strength=None):
         """
         Measure the shift between two color channels of a three-color RGB image. Before measuring
         the shift with cross correlation, a Gaussian blur can be applied to both channels to reduce
