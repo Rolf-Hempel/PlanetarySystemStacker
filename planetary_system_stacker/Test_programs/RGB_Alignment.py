@@ -79,8 +79,15 @@ def test_auto_rgbg_align(input_file_name, interpolation_factor, blur_strength):
     destroyAllWindows()
 
     max_shift = 5
-    corrected_image = Miscellaneous.auto_rgb_align(shifted_image, max_shift,
-                            interpolation_factor=interpolation_factor, blur_strenght=blur_strength)
+    corrected_image, shift_red, shift_blue = Miscellaneous.auto_rgb_align(shifted_image, max_shift,
+        interpolation_factor=interpolation_factor, blur_strenght=blur_strength)
+
+    print("Corrections applied:")
+    print("Red channel shift: (" + str(round(shift_red[0], 1)) + ", " +
+          str(round(shift_red[1], 1)) + ")")
+    print("Blue channel shift: (" + str(round(shift_blue[0], 1)) + ", " +
+          str(round(shift_blue[1], 1)) + ")")
+
     imshow('RGB-aligned image', cvtColor(corrected_image, COLOR_RGB2BGR))
     waitKey()
     destroyAllWindows()
@@ -91,9 +98,9 @@ input_file_name_shifted = "D:\SW-Development\Python\PlanetarySystemStacker\Examp
 
 interpolation_factor = 2
 reduction_factor = 1
-blur_strength = None
-shift_red = (4.3, -3.2)
-shift_blue = (-2.8, 1.1)
+blur_strength = 7
+shift_red = (1.3, -3.2)
+shift_blue = (-1.8, 1.1)
 
 # test_detailed(input_file_name, shift_red, shift_blue, interpolation_factor, reduction_factor)
 create_shifted_image(input_file_name, shift_red, shift_blue, interpolation_factor)

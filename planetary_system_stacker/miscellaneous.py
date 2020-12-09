@@ -833,8 +833,16 @@ class Miscellaneous(object):
         :param max_shift: Maximal displacement between channels.
         :param interpolation_factor: Scaling factor for subpixel measurements.
         :param blur_strenght: Optional blur strength, must be an uneven integer > 0.
-        :return: The corrected image with the same datatype as the input image. Please note that the
-                 size may be reduced because of channel mismatch at the borders.
+        :return: (corrected_image, correction_red, correction_blue) with:
+                 corrected_image: The corrected image with the same datatype as the input image.
+                                  Please note that the size may be reduced because of channel
+                                  mismatch at the borders.
+                 correction_red:  Tuple (shift_y, shift_x) with coordinate shifts in y and x
+                                  applied to the red channel of input_image to produce the
+                                  corrected_image.
+                 correction_blue: Tuple (shift_y, shift_x) with coordinate shifts in y and x
+                                  applied to the blue channel of input_image to produce the
+                                  corrected_image.
         """
 
         # Immediately return for monochrome input.
@@ -862,8 +870,9 @@ class Miscellaneous(object):
 
         # Reverse the shift measured in the input image.
         return Miscellaneous.shift_colors(input_interpolated, (-shift_red[0], -shift_red[1]),
-                                          (-shift_blue[0], -shift_blue[1]),
-                                          reduce_output=interpolation_factor)
+               (-shift_blue[0], -shift_blue[1]), reduce_output=interpolation_factor), \
+               (-shift_red[0]/interpolation_factor, -shift_red[1]/interpolation_factor), \
+               (-shift_blue[0]/interpolation_factor, -shift_blue[1]/interpolation_factor)
 
 
     @staticmethod
