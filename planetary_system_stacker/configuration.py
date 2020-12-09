@@ -752,7 +752,7 @@ class PostprocDataObject(object):
 
         :param file_name_original: Postprocessing input file name (e.g. result from stacking)
         :param postproc_suffix: Additional suffix to be inserted before file extension.
-        :param image_format: Image format, either 'tiff' or 'fits'.
+        :param image_format: Image format, either 'png', 'tiff' or 'fits'.
         :return: Name of postprocessing result.
         """
 

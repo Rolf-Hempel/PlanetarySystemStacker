@@ -820,6 +820,53 @@ class Miscellaneous(object):
         return [dy-search_width, dx-search_width], dev_table[dy, dx]
 
     @staticmethod
+    def auto_rgb_align(input_image, max_shift, interpolation_factor=1, blur_strenght=None):
+        """
+        Align the three color channels of an RGB image automatically. For sub-pixel resolution the
+        image can be interpolated before the shift is measured. Optionally, a Gaussian blur can be
+        added to suppress noise.
+
+        If no matching shift can be found within the range given by "max_shift", an Exception of
+        type Error is thrown.
+
+        :param input_image: Three-channel RGB image.
+        :param max_shift: Maximal displacement between channels.
+        :param interpolation_factor: Scaling factor for subpixel measurements.
+        :param blur_strenght: Optional blur strength, must be an uneven integer > 0.
+        :return: The corrected image with the same datatype as the input image. Please note that the
+                 size may be reduced because of channel mismatch at the borders.
+        """
+
+        # Immediately return for monochrome input.
+        if len(input_image.shape) != 3:
+            return input_image
+
+        # If subpixel resolution is asked for, interpolate the input image first.
+        if interpolation_factor != 1:
+            input_interpolated = Miscellaneous.shift_colors(input_image, (0, 0), (0, 0),
+                                                            interpolate_input=interpolation_factor)
+        else:
+            input_interpolated = input_image
+
+        # Measure the shifts of the red and blue channels, respectively, with respect to the green
+        # channel.
+        channel_green = 1
+        channel_red = 0
+        shift_red = Miscellaneous.measure_rgb_shift(input_interpolated, channel_red,
+                                                    channel_green, max_shift * interpolation_factor,
+                                                    blur_strength=blur_strenght)
+        channel_blue = 2
+        shift_blue = Miscellaneous.measure_rgb_shift(input_interpolated, channel_blue,
+                                                     channel_green, max_shift*interpolation_factor,
+                                                     blur_strength=blur_strenght)
+
+        # Reverse the shift measured in the input image.
+        return Miscellaneous.shift_colors(input_interpolated, (-shift_red[0], -shift_red[1]),
+                                          (-shift_blue[0], -shift_blue[1]),
+                                          reduce_output=interpolation_factor)
+
+
+    @staticmethod
     def shift_colors(input_image, shift_red, shift_blue, interpolate_input=1, reduce_output=1):
         """
         Shift the red and blue channel of a color image in y and x direction, and leave the green
