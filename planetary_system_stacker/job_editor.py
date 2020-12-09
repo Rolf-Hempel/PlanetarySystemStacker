@@ -20,7 +20,6 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-from pathlib import Path
 from copy import deepcopy
 from pathlib import Path
 
@@ -274,9 +273,12 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         if input_names:
             for input_name in input_names:
                 if input_name not in [job.name for job in self.jobs]:
-                    new_job = Job(input_name)
-                    new_job.bayer_option_selected = self.configuration.frames_debayering_default
-                    self.jobs.append(new_job)
+                    try:
+                        new_job = Job(input_name)
+                        new_job.bayer_option_selected = self.configuration.frames_debayering_default
+                        self.jobs.append(new_job)
+                    except:
+                        pass
 
             # Save the current directory location. The next dialog will open at this position.
             self.configuration.hidden_parameters_current_dir = str(Path(input_names[0]).parents[0])
