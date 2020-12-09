@@ -82,6 +82,11 @@ def test_auto_rgbg_align(input_file_name, interpolation_factor, blur_strength):
     corrected_image, shift_red, shift_blue = Miscellaneous.auto_rgb_align(shifted_image, max_shift,
         interpolation_factor=interpolation_factor, blur_strenght=blur_strength)
 
+    output_file_name = splitext(input_file_name)[0] + '_corrected.png'
+    Frames.save_image(output_file_name, corrected_image,
+                      color=(len(corrected_image.shape) == 3), avoid_overwriting=False,
+                      header="PlanetarySystemStacker")
+
     print("Corrections applied:")
     print("Red channel shift: (" + str(round(shift_red[0], 1)) + ", " +
           str(round(shift_red[1], 1)) + ")")
@@ -92,11 +97,13 @@ def test_auto_rgbg_align(input_file_name, interpolation_factor, blur_strength):
     waitKey()
     destroyAllWindows()
 
-# input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_gpp.png"
-input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48.png"
-input_file_name_shifted = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_rgb-shifted.png"
+input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_gpp.png"
+input_file_name_shifted = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_gpp_rgb-shifted.png"
 
-interpolation_factor = 2
+# input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48.png"
+# input_file_name_shifted = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_rgb-shifted.png"
+
+interpolation_factor = 4
 reduction_factor = 1
 blur_strength = 7
 shift_red = (1.3, -3.2)
