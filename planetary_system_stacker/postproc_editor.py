@@ -970,7 +970,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # Start the frame viewer.
         self.frame_viewer = FrameViewer()
         self.frame_viewer.setObjectName("framewiever")
-        self.gridLayout.addWidget(self.frame_viewer, 0, 0, 3, 1)
+        self.gridLayout.addWidget(self.frame_viewer, 0, 0, 2, 1)
 
         # Initialize a vertical spacer used to fill the lower part of the sharpening widget scroll
         # area.
@@ -979,7 +979,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         # Create the version manager and pass it the "select_version" callback function.
         self.version_manager_widget = VersionManagerWidget(self.configuration, self.select_version)
-        self.gridLayout.addWidget(self.version_manager_widget, 2, 1, 1, 1)
+        self.gridLayout.addWidget(self.version_manager_widget, 1, 1, 1, 1)
 
         # The "set_photo_signal" from the VersionManagerWidget is not passed to the image viewer
         # directly. (The image viewer does not accept signals.) Instead, it calls the "select_image"
