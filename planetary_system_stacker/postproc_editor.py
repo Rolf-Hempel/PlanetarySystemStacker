@@ -1107,10 +1107,6 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         """
         Set the current channel shifts in the RGB alignment GUI tab.
 
-        :param shift_red: Tuple (shift_y, shift_x) with shifts in y and x direction for the red
-                          channel.
-        :param shift_blue: Tuple (shift_y, shift_x) with shifts in y and x direction for the red
-                           channel.
         :return: -
         """
 
@@ -1215,6 +1211,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # Load the current image into the image viewer.
         self.select_image(version_index)
 
+        # Display the current RGB shifts for the selected version.
         self.display_shifts()
 
     def select_image(self, version_index):
