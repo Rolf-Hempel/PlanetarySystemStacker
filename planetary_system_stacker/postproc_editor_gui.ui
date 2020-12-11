@@ -248,7 +248,7 @@ Gaussian blur can help finding the global optimum. Try higher values for noisy i
               </property>
               <property name="minimumSize">
                <size>
-                <width>120</width>
+                <width>90</width>
                 <height>0</height>
                </size>
               </property>

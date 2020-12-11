@@ -958,6 +958,23 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.buttonBox.rejected.connect(self.reject)
         self.pushButton_add_layer.clicked.connect(self.add_layer)
 
+        self.comboBox_resolution.addItem('     1 Pixel ')
+        self.comboBox_resolution.addItem('   0.5 Pixels')
+        self.comboBox_resolution.addItem('  0.25 Pixels')
+        self.fgw_slider_value.valueChanged['int'].connect(self.fgw_changed)
+        self.comboBox_resolution.currentIndexChanged.connect(self.rgb_resolution_changed)
+        self.checkBox_automatic.stateChanged.connect(self.rgb_automatic_changed)
+        self.pushButton_red_reset.clicked.connect(self.prreset_clicked)
+        self.pushButton_red_up.clicked.connect(self.pru_clicked)
+        self.pushButton_red_down.clicked.connect(self.prd_clicked)
+        self.pushButton_red_left.clicked.connect(self.prl_clicked)
+        self.pushButton_red_right.clicked.connect(self.prr_clicked)
+        self.pushButton_blue_reset.clicked.connect(self.pbreset_clicked)
+        self.pushButton_blue_up.clicked.connect(self.pbu_clicked)
+        self.pushButton_blue_down.clicked.connect(self.pbd_clicked)
+        self.pushButton_blue_left.clicked.connect(self.pbl_clicked)
+        self.pushButton_blue_right.clicked.connect(self.pbr_clicked)
+
         # Initialize list of sharpening layer widgets, and set the maximal number of layers.
         self.sharpening_layer_widgets = []
         self.max_layers = self.configuration.postproc_max_layers
@@ -995,9 +1012,163 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.image_processor.set_photo_signal.connect(self.select_image)
         self.image_processor.set_status_bar_signal.connect(set_status_bar_callback)
 
+    def fgw_changed(self, value):
+        """
+        When the widget changes its value, update the corresponding entry for the current version.
+        Please note that for some parameters the representations differ.
+
+        The methods following this one do the same for all other configuration parameters.
+
+        :param value: New value sent by widget
+        :return: -
+        """
+
+        gauss_width = 2 * value - 1
+        self.postproc_data_object.versions[self.postproc_data_object.version_selected].rgb_gauss_width = gauss_width
+        self.fgw_label_display.setText(str(gauss_width))
+
+    def rgb_resolution_changed(self, value):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        version.rgb_resolution_index = value
+
+        # Round the shift values according to the new resolution.
+        factor = [1., 2., 4.][value]
+        factor_incremented = [1.01, 2.01, 4.01][value]
+        version.shift_red = (round(version.shift_red[0] * factor_incremented) / factor ,
+                             round(version.shift_red[1] * factor_incremented) / factor)
+        version.shift_blue = (round(version.shift_blue[0] * factor_incremented) / factor,
+                              round(version.shift_blue[1] * factor_incremented) / factor)
+        self.display_shifts()
+
+
+    def rgb_automatic_changed(self, state):
+        self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].rgb_automatic = (state == QtCore.Qt.Checked)
+
+    def prreset_clicked(self):
+        self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].shift_red = (0., 0.)
+        self.display_shifts()
+
+    def pru_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.shift_red = (version.shift_red[0] - increment, version.shift_red[1])
+        self.display_shifts()
+
+    def prd_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.shift_red = (version.shift_red[0] + increment, version.shift_red[1])
+        self.display_shifts()
+
+    def prl_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.shift_red = (version.shift_red[0], version.shift_red[1] - increment)
+        self.display_shifts()
+
+    def prr_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.shift_red = (version.shift_red[0], version.shift_red[1] + increment)
+        self.display_shifts()
+
+    def pbreset_clicked(self):
+        self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].shift_blue = (0., 0.)
+        self.display_shifts()
+
+    def pbu_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.shift_blue = (version.shift_blue[0] - increment, version.shift_blue[1])
+        self.display_shifts()
+
+    def pbd_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.shift_blue = (version.shift_blue[0] + increment, version.shift_blue[1])
+        self.display_shifts()
+
+    def pbl_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.shift_blue = (version.shift_blue[0], version.shift_blue[1] - increment)
+        self.display_shifts()
+
+    def pbr_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.shift_blue = (version.shift_blue[0], version.shift_blue[1] + increment)
+        self.display_shifts()
+
+    def display_shifts(self):
+        """
+        Set the current channel shifts in the RGB alignment GUI tab.
+
+        :param shift_red: Tuple (shift_y, shift_x) with shifts in y and x direction for the red
+                          channel.
+        :param shift_blue: Tuple (shift_y, shift_x) with shifts in y and x direction for the red
+                           channel.
+        :return: -
+        """
+
+        format_string = ["{0:2.0f}", "{0:4.1f}", "{0:5.2f}"][self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].rgb_resolution_index]
+
+        # Red channel shifts:
+        shift_red = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].shift_red
+
+        if abs(shift_red[0]) < 0.05:
+            self.label_red_down.setText("")
+            self.label_red_up.setText("")
+        elif shift_red[0] > 0:
+            self.label_red_down.setText((format_string.format(shift_red[0])))
+            self.label_red_up.setText("")
+        else:
+            self.label_red_up.setText((format_string.format(-shift_red[0])))
+            self.label_red_down.setText("")
+
+        if abs(shift_red[1]) < 0.05:
+            self.label_red_left.setText("")
+            self.label_red_right.setText("")
+        elif shift_red[1] > 0:
+            self.label_red_right.setText((format_string.format(shift_red[1])))
+            self.label_red_left.setText("")
+        else:
+            self.label_red_left.setText((format_string.format(-shift_red[1])))
+            self.label_red_right.setText("")
+
+        # Blue channel shifts:
+        shift_blue = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].shift_blue
+
+        if abs(shift_blue[0]) < 0.05:
+            self.label_blue_down.setText("")
+            self.label_blue_up.setText("")
+        elif shift_blue[0] > 0:
+            self.label_blue_down.setText((format_string.format(shift_blue[0])))
+            self.label_blue_up.setText("")
+        else:
+            self.label_blue_up.setText((format_string.format(-shift_blue[0])))
+            self.label_blue_down.setText("")
+
+        if abs(shift_blue[1]) < 0.05:
+            self.label_blue_left.setText("")
+            self.label_blue_right.setText("")
+        elif shift_blue[1] > 0:
+            self.label_blue_right.setText((format_string.format(shift_blue[1])))
+            self.label_blue_left.setText("")
+        else:
+            self.label_blue_left.setText((format_string.format(-shift_blue[1])))
+            self.label_blue_right.setText("")
+
     def select_version(self, version_index):
         """
-        Select a new current version and update the scroll area with all layer widgets.
+        Select a new current version, update the scroll area with all layer widgets, and update the
+        parameters of the RGB alignment tab.
 
         :param version_index: Index of the version selected in version list of the central data
                               object.
@@ -1035,8 +1206,16 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # At the end of the scroll area, add a vertical spacer.
         self.verticalLayout.addItem(self.spacerItem)
 
+        # Load the parameters of this version into the RGB alignment tab.
+        self.checkBox_automatic.setChecked(version_selected.rgb_automatic)
+        self.comboBox_resolution.setCurrentIndex(version_selected.rgb_resolution_index)
+        self.fgw_slider_value.setValue(int((version_selected.rgb_gauss_width + 1) / 2))
+        self.fgw_label_display.setText(str(version_selected.rgb_gauss_width))
+
         # Load the current image into the image viewer.
         self.select_image(version_index)
+
+        self.display_shifts()
 
     def select_image(self, version_index):
         """

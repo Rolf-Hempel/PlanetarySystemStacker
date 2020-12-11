@@ -114,7 +114,7 @@ class Ui_postproc_editor(object):
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(self.comboBox_resolution.sizePolicy().hasHeightForWidth())
         self.comboBox_resolution.setSizePolicy(sizePolicy)
-        self.comboBox_resolution.setMinimumSize(QtCore.QSize(120, 0))
+        self.comboBox_resolution.setMinimumSize(QtCore.QSize(90, 0))
         self.comboBox_resolution.setObjectName("comboBox_resolution")
         self.gridLayout_2.addWidget(self.comboBox_resolution, 0, 2, 1, 1)
         spacerItem4 = QtWidgets.QSpacerItem(40, 20, QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Minimum)

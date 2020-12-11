@@ -29,7 +29,7 @@ from os.path import splitext
 from exceptions import IncompatibleVersionsError
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.8.15"
+PSS_Version = "PlanetarySystemStacker 0.8.16"
 # PSS_Version = "PlanetarySystemStacker"
 
 
@@ -832,14 +832,23 @@ class PostprocDataObject(object):
         config_parser_object.set('PostprocessingInfo', 'version selected',
                                  str(self.version_selected))
 
-        # For every version, and for all layers in each version, create a separate section.
+        # For every version create a section with RGB alignment parameters.
         for version_index, version in enumerate(self.versions):
+            section_name = "PostprocessingVersion " + str(version_index) + " RGBAlignment"
+            config_parser_object.add_section(section_name)
+            # Add the parameters of this version.
+            config_parser_object.set(section_name, 'rgb automatic', str(version.rgb_automatic))
+            config_parser_object.set(section_name, 'rgb gauss width', str(version.rgb_gauss_width))
+            config_parser_object.set(section_name, 'rgb resolution index',
+                                     str(version.rgb_resolution_index))
+
+            # For every postprocessing layer of this version, create a separate section.
             for layer_index, layer in enumerate(version.layers):
-                section_name = "PostprocessingVersion " + str(version_index) + " layer " + str(
+                section_name = "PostprocessingVersion " + str(version_index) + " Layer " + str(
                     layer_index)
                 config_parser_object.add_section(section_name)
 
-                # Add the four parameters of the layer.
+                # Add the parameters of the layer.
                 config_parser_object.set(section_name, 'postprocessing method', layer.postproc_method)
                 config_parser_object.set(section_name, 'radius', str(layer.radius))
                 config_parser_object.set(section_name, 'amount', str(layer.amount))
@@ -847,6 +856,8 @@ class PostprocDataObject(object):
                 config_parser_object.set(section_name, 'bilateral range', str(layer.bi_range))
                 config_parser_object.set(section_name, 'denoise', str(layer.denoise))
                 config_parser_object.set(section_name, 'luminance only', str(layer.luminance_only))
+
+
 
     def load_config(self, config_parser_object):
         """
@@ -878,23 +889,37 @@ class PostprocDataObject(object):
         for section in config_parser_object.sections():
             section_items = section.split()
             if section_items[0] == 'PostprocessingVersion':
-                this_version_index = section_items[1]
 
-                # A layer section with a new version index is found. Allocate a new version.
-                if this_version_index != old_version_index:
-                    new_version = self.add_postproc_version()
-                    old_version_index = this_version_index
+                # For a new version the first section contains the RGB alignment info. Create a new
+                # version and store the RGB alignment parameters with it. For the first (neutral)
+                # version 0 only RGB shift parameters are stored (no layers). In this case
+                # initialize the version list.
+                if section_items[2] == 'RGBAlignment':
+                    version_index = int(section_items[1])
+                    if version_index:
+                        new_version = self.add_postproc_version()
+                    else:
+                        self.initialize_versions()
+                        new_version = self.versions[0]
+                    new_version.rgb_automatic = config_parser_object.getboolean(section,
+                                                                                'rgb automatic')
+                    new_version.rgb_gauss_width = config_parser_object.getint(section,
+                                                                              'rgb gauss width')
+                    new_version.rgb_resolution_index = config_parser_object.getint(section,
+                                                                            'rgb resolution index')
 
-                # Read all parameters of this layer, and add a layer to the current version.
-                method = config_parser_object.get(section, 'postprocessing method')
-                radius = config_parser_object.getfloat(section, 'radius')
-                amount = config_parser_object.getfloat(section, 'amount')
-                bi_fraction = config_parser_object.getfloat(section, 'bilateral fraction')
-                bi_range = config_parser_object.getfloat(section, 'bilateral range')
-                denoise = config_parser_object.getfloat(section, 'denoise')
-                luminance_only = config_parser_object.getboolean(section, 'luminance only')
-                new_version.add_postproc_layer(PostprocLayer(method, radius, amount, bi_fraction,
-                                                             bi_range, denoise, luminance_only))
+                # A layer section is found. Store it for the current version.
+                elif section_items[2] == 'Layer':
+                    # Read all parameters of this layer, and add a layer to the current version.
+                    method = config_parser_object.get(section, 'postprocessing method')
+                    radius = config_parser_object.getfloat(section, 'radius')
+                    amount = config_parser_object.getfloat(section, 'amount')
+                    bi_fraction = config_parser_object.getfloat(section, 'bilateral fraction')
+                    bi_range = config_parser_object.getfloat(section, 'bilateral range')
+                    denoise = config_parser_object.getfloat(section, 'denoise')
+                    luminance_only = config_parser_object.getboolean(section, 'luminance only')
+                    new_version.add_postproc_layer(PostprocLayer(method, radius, amount, bi_fraction,
+                                                                 bi_range, denoise, luminance_only))
 
         # Set the selected version again, because it may have been changed by reading versions.
         self.version_selected = config_parser_object.getint('PostprocessingInfo',
@@ -916,6 +941,11 @@ class PostprocVersion(object):
         self.postproc_method = "Multilevel unsharp masking"
         self.layers = []
         self.number_layers = 0
+        self.rgb_automatic = False
+        self.rgb_gauss_width = 7
+        self.rgb_resolution_index = 1
+        self.shift_red = (0., 0.)
+        self.shift_blue = (0., 0.)
 
     def set_image(self, image):
         """
