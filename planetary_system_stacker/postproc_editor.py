@@ -958,7 +958,6 @@ class ImageProcessor(QtCore.QThread):
         # Check if the original image is selected (version 0). In this case return the (potentially
         # RGB-shifted) original iamge.
         if not layers:
-            print ("recompute_selected_version 0")
             return self.input_image.astype(uint16)
 
         for layer_index, layer in enumerate(layers):

@@ -1596,26 +1596,75 @@ class Miscellaneous(object):
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
 
     @staticmethod
-    def print_postproc_parameters(layers, logfile):
+    def print_postproc_parameters(postproc_version, logfile):
         """
         Print a table with postprocessing layer info for the selected postprocessing version.
 
-        :param layers: Object holding postprocessing parameters for all active layers.
+        :param postproc_version: Object holding postprocessing parameters for the selected version.
         :param logfile: logfile or None (no logging)
         :return: -
         """
 
-        output_string = "\n           Postprocessing method: " + layers[0].postproc_method + "\n\n" + \
-                        "           Layer    |    Radius    |   Amount   |   Bi fraction (%)   |   Bi range   |   Denoise (%)   |   Luminance only   |\n" \
-                        "           ------------------------------------------------------------------------------------------------------------------" \
-                        "\n           "
+        # Test if an RGB correction has been applied.
+        if postproc_version.shift_red != (0., 0.) or postproc_version.shift_blue != (0., 0.):
+            # Find out if the RGB correction was done automatically.
+            if postproc_version.rgb_automatic:
+                intro = "           Automatic RGB correction, "
+            else:
+                intro = "           Manual RGB correction, "
+            (shift_red_y, shift_red_x) = postproc_version.shift_red
+            (shift_blue_y, shift_blue_x) = postproc_version.shift_blue
 
-        # Extend the three table lines up to the max index.
-        for index, layer in enumerate(layers):
-            output_string += " {0:3d}     |     {1:5.2f}    |   {2:6.2f}   |         {3:4.0f}        |    {4:5.1f}     |       {5:4.0f}      |       {6:8s}     |" \
-                 "\n           ".format(index + 1, layer.radius, layer.amount, layer.bi_fraction*100., layer.bi_range, layer.denoise*100., str(layer.luminance_only))
+            n_digits = [0, 1, 2][postproc_version.rgb_resolution_index]
+            if shift_red_y >= 0.:
+                dir_red_y = " pixels down"
+            else:
+                dir_red_y = " pixels up"
+            if shift_red_x >= 0.:
+                dir_red_x = " pixels right"
+            else:
+                dir_red_x = " pixels left"
+            if shift_blue_y >= 0.:
+                dir_blue_y = " pixels down"
+            else:
+                dir_blue_y = " pixels up"
+            if shift_blue_x >= 0.:
+                dir_blue_x = " pixels right"
+            else:
+                dir_blue_x = " pixels left"
 
-        Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
+            # Special case 0 digits: In this case the number of digits must be omitted.
+            # If the round function is called with "n_digits=0", the result still has one digit
+            # after the decimal point.
+            if n_digits:
+                Miscellaneous.protocol(
+                    intro + "red channel shifted " +
+                    str(round(abs(shift_red_y), n_digits)) + dir_red_y + ", " +
+                    str(round(abs(shift_red_x), n_digits)) + dir_red_x + ", blue channel shifted " +
+                    str(round(abs(shift_blue_y), n_digits)) + dir_blue_y + ", " +
+                    str(round(abs(shift_blue_x), n_digits)) + dir_blue_x + ".",
+                    logfile, precede_with_timestamp=False)
+            else:
+                Miscellaneous.protocol(
+                    intro + "red channel shifted " +
+                    str(round(abs(shift_red_y))) + dir_red_y + ", " +
+                    str(round(abs(shift_red_x))) + dir_red_x + ", blue channel shifted " +
+                    str(round(abs(shift_blue_y))) + dir_blue_y + ", " +
+                    str(round(abs(shift_blue_x))) + dir_blue_x + ".",
+                    logfile, precede_with_timestamp=False)
+
+        if postproc_version.layers:
+            output_string = "           Postprocessing method: " + postproc_version.layers[0].postproc_method + "\n\n" + \
+                            "           Layer    |    Radius    |   Amount   |   Bi fraction (%)   |   Bi range   |   Denoise (%)   |   Luminance only   |\n" \
+                            "           ------------------------------------------------------------------------------------------------------------------" \
+                            "\n           "
+
+            # Extend the three table lines up to the max index.
+            for index, layer in enumerate(postproc_version.layers):
+                output_string += " {0:3d}     |     {1:5.2f}    |   {2:6.2f}   |         {3:4.0f}        |    {4:5.1f}     |       {5:4.0f}      |       {6:8s}     |" \
+                     "\n           ".format(index + 1, layer.radius, layer.amount, layer.bi_fraction*100., layer.bi_range, layer.denoise*100., str(layer.luminance_only))
+
+            Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
 
 
 if __name__ == "__main__":

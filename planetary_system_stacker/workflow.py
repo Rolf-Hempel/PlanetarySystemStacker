@@ -951,48 +951,12 @@ class Workflow(QtCore.QObject):
 
         # Auto-align RGB channels, if requested.
         if rgb_automatic:
-            sharpening_input, (shift_red_y, shift_red_x), (shift_blue_y, shift_blue_x) = Miscellaneous.auto_rgb_align(
+            sharpening_input, self.configuration.postproc_data_object.versions[
+                version_index].shift_red, self.configuration.postproc_data_object.versions[
+                version_index].shift_blue = Miscellaneous.auto_rgb_align(
                 self.postproc_input_image, self.configuration.postproc_max_shift,
                 interpolation_factor=[1, 2, 4][rgb_resolution_index], reduce_output=True,
                 blur_strength=rgb_gauss_width)
-            if self.configuration.global_parameters_protocol_level > 1:
-                n_digits = [0, 1, 2][rgb_resolution_index]
-                if shift_red_y >= 0.:
-                    dir_red_y = " pixels down"
-                else:
-                    dir_red_y = " pixels up"
-                if shift_red_x >= 0.:
-                    dir_red_x = " pixels right"
-                else:
-                    dir_red_x = " pixels left"
-                if shift_blue_y >= 0.:
-                    dir_blue_y = " pixels down"
-                else:
-                    dir_blue_y = " pixels up"
-                if shift_blue_x >= 0.:
-                    dir_blue_x = " pixels right"
-                else:
-                    dir_blue_x = " pixels left"
-
-                # Special case 0 digits: In this case the number of digits must be omitted.
-                # If the round function is called with "n_digits=0", the result still has one digit
-                # after the decimal point.
-                if n_digits:
-                    Miscellaneous.protocol(
-                        "           Automatic RGB correction, red channel shifted " +
-                        str(round(abs(shift_red_y), n_digits)) + dir_red_y + ", " +
-                        str(round(abs(shift_red_x), n_digits)) + dir_red_x + ", blue channel shifted " +
-                        str(round(abs(shift_blue_y), n_digits)) + dir_blue_y + ", " +
-                        str(round(abs(shift_blue_x), n_digits)) + dir_blue_x + ".",
-                        self.attached_log_file, precede_with_timestamp=False)
-                else:
-                    Miscellaneous.protocol(
-                        "           Automatic RGB correction, red channel shifted " +
-                        str(round(abs(shift_red_y))) + dir_red_y + ", " +
-                        str(round(abs(shift_red_x))) + dir_red_x + ", blue channel shifted " +
-                        str(round(abs(shift_blue_y))) + dir_blue_y + ", " +
-                        str(round(abs(shift_blue_x))) + dir_blue_x + ".",
-                        self.attached_log_file, precede_with_timestamp=False)
         else:
             sharpening_input = self.postproc_input_image
 
@@ -1008,6 +972,21 @@ class Workflow(QtCore.QObject):
         # The signal payload is None only if the editor was left with "cancel" in interactive mode.
         # In this case, skip saving the result and proceed with the next job.
         if postprocessed_image is not None:
+
+            # Print postprocessing info if sharpening layers have been applied or RGB alignment was
+            # active.
+            if self.configuration.global_parameters_protocol_level > 1:
+                version_selected = self.configuration.postproc_data_object.version_selected
+                postproc_version = self.configuration.postproc_data_object.versions[
+                    self.configuration.postproc_data_object.version_selected]
+                if version_selected or postproc_version.rgb_automatic:
+                    Miscellaneous.print_postproc_parameters(postproc_version,
+                                                            self.attached_log_file)
+                else:
+                    Miscellaneous.protocol(
+                        "           The image was not modified in postprocessing.",
+                        self.attached_log_file, precede_with_timestamp=False)
+
             self.set_status_bar_processing_phase("saving result")
             # Save the image as 16bit int (color or mono).
             if self.configuration.global_parameters_protocol_level > 0:
@@ -1023,17 +1002,6 @@ class Workflow(QtCore.QObject):
                     "           The postprocessed image was written to: " +
                     self.postprocessed_image_name,
                     self.attached_log_file, precede_with_timestamp=False)
-
-            if self.configuration.global_parameters_protocol_level > 1:
-                if self.configuration.postproc_data_object.version_selected:
-                    Miscellaneous.print_postproc_parameters(
-                        self.configuration.postproc_data_object.versions[
-                            self.configuration.postproc_data_object.version_selected].layers,
-                        self.attached_log_file)
-                else:
-                    Miscellaneous.protocol(
-                        "           The image was not modified in postprocessing.",
-                        self.attached_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Next job")
 
