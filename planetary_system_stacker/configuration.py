@@ -943,6 +943,7 @@ class PostprocVersion(object):
         self.layers = []
         self.number_layers = 0
         self.rgb_automatic = False
+        self.last_rgb_automatic = None
         self.rgb_gauss_width = 7
         self.rgb_resolution_index = 1
         self.shift_red = (0., 0.)

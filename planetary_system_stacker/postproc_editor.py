@@ -667,12 +667,12 @@ class ImageProcessor(QtCore.QThread):
 
         # Initialize images for all versions using the current layer data.
         self.last_version_layers = []
-        self.last_version_rgb_aligned = []
+        # self.last_version_rgb_aligned = [None]*self.configuration.postproc_max_versions
         for version in self.postproc_data_object.versions:
             # For every version, keep a copy of the current layer parameters for later checks for
             # changes. Also, remember if for this version RGB alignment was active.
             self.last_version_layers.append(deepcopy(version.layers))
-            self.last_version_rgb_aligned.append(version.rgb_automatic)
+            version.last_rgb_automatic = version.rgb_automatic
 
             # If automatic RGB alignment is selected for this version, compute the shifted
             # original image for this version's resolution if not yet available.
@@ -797,8 +797,10 @@ class ImageProcessor(QtCore.QThread):
 
             # If the RGB auto-alignment checkbox was changed since the last image was computed for
             # this version, invalidate all intermediate results for this version.
-            if self.rgb_automatic != self.last_version_rgb_aligned[self.version_selected]:
-                self.last_version_rgb_aligned[self.version_selected] = self.rgb_automatic
+            if self.rgb_automatic != self.postproc_data_object.versions[
+                self.version_selected].last_rgb_automatic:
+                self.postproc_data_object.versions[
+                    self.version_selected].last_rgb_automatic = self.rgb_automatic
                 self.reset_intermediate_images()
                 rgb_shift_changed = True
             else:
