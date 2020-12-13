@@ -685,7 +685,7 @@ class ImageProcessor(QtCore.QThread):
                             version.rgb_resolution_index] = Miscellaneous.auto_rgb_align(
                             self.image_original, self.configuration.postproc_max_shift,
                             interpolation_factor=[1, 2, 4][version.rgb_resolution_index],
-                            blur_strenght=version.rgb_gauss_width)
+                            blur_strength=version.rgb_gauss_width)
                         if self.color:
                             self.auto_rgb_aligned_images_original_hsv[
                                 version.rgb_resolution_index] = cvtColor(
@@ -765,7 +765,7 @@ class ImageProcessor(QtCore.QThread):
                             self.rgb_resolution_index] = Miscellaneous.auto_rgb_align(
                             self.image_original, self.configuration.postproc_max_shift,
                             interpolation_factor=[1, 2, 4][self.rgb_resolution_index],
-                            blur_strenght=self.rgb_gauss_width)
+                            blur_strength=self.rgb_gauss_width)
                         if self.color:
                             self.auto_rgb_aligned_images_original_hsv[
                                 self.rgb_resolution_index] = cvtColor(

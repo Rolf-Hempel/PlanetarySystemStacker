@@ -386,12 +386,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Only if parameters are changed later in the workflow, write a message to the protocol.
         if self.configuration.global_parameters_protocol_level > 1 and self.activity != 'Read frames':
             # If the attached logfile has been closed, re-open it.
-            if self.configuration.global_parameters_store_protocol_with_result and \
-                    self.workflow.attached_log_file.closed:
-                try:
-                    self.workflow.attached_log_file = open(self.workflow.attached_log_name, 'a')
-                except:
-                    pass
+            if self.workflow.attached_log_file is not None:
+                if self.configuration.global_parameters_store_protocol_with_result and \
+                        self.workflow.attached_log_file.closed:
+                    try:
+                        self.workflow.attached_log_file = open(self.workflow.attached_log_name, 'a')
+                    except:
+                        pass
             Miscellaneous.protocol(
                 "+++ Parameter change: all phases after '" + earliest_phase + "' are invalidated +++",
                 self.workflow.attached_log_file, precede_with_timestamp=True)
@@ -680,12 +681,13 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Get the choice of the combobox button.
         task = self.ui.comboBox_back.currentText()
         if self.configuration.global_parameters_protocol_level > 0:
-            if self.configuration.global_parameters_store_protocol_with_result and \
-                    self.workflow.attached_log_file.closed:
-                try:
-                    self.workflow.attached_log_file = open(self.workflow.attached_log_name, 'a')
-                except:
-                    pass
+            if self.workflow.attached_log_file is not None:
+                if self.configuration.global_parameters_store_protocol_with_result and \
+                        self.workflow.attached_log_file.closed:
+                    try:
+                        self.workflow.attached_log_file = open(self.workflow.attached_log_name, 'a')
+                    except:
+                        pass
             Miscellaneous.protocol("", self.workflow.attached_log_file,
                                    precede_with_timestamp=False)
             Miscellaneous.protocol("+++ Repeating from task: " + task + " +++",

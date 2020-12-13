@@ -939,11 +939,65 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol("+++ Start postprocessing +++", self.attached_log_file)
         self.my_timer.create_no_check('Conputing image postprocessing')
 
-        # Apply all sharpening layers of the postprocessing version selected last time.
+        # Look up parameters of the last postproc version which was selected in interactive mode.
         version_index = self.configuration.postproc_data_object.version_selected
         postproc_layers = self.configuration.postproc_data_object.versions[version_index].layers
-        self.postprocessed_image = Miscellaneous.post_process(self.postproc_input_image,
-                                                                postproc_layers)
+        rgb_automatic = self.configuration.postproc_data_object.versions[
+            version_index].rgb_automatic
+        rgb_gauss_width = self.configuration.postproc_data_object.versions[
+            version_index].rgb_gauss_width
+        rgb_resolution_index = self.configuration.postproc_data_object.versions[
+            version_index].rgb_resolution_index
+
+        # Auto-align RGB channels, if requested.
+        if rgb_automatic:
+            sharpening_input, (shift_red_y, shift_red_x), (shift_blue_y, shift_blue_x) = Miscellaneous.auto_rgb_align(
+                self.postproc_input_image, self.configuration.postproc_max_shift,
+                interpolation_factor=[1, 2, 4][rgb_resolution_index], reduce_output=True,
+                blur_strength=rgb_gauss_width)
+            if self.configuration.global_parameters_protocol_level > 1:
+                n_digits = [0, 1, 2][rgb_resolution_index]
+                if shift_red_y >= 0.:
+                    dir_red_y = " pixels down"
+                else:
+                    dir_red_y = " pixels up"
+                if shift_red_x >= 0.:
+                    dir_red_x = " pixels right"
+                else:
+                    dir_red_x = " pixels left"
+                if shift_blue_y >= 0.:
+                    dir_blue_y = " pixels down"
+                else:
+                    dir_blue_y = " pixels up"
+                if shift_blue_x >= 0.:
+                    dir_blue_x = " pixels right"
+                else:
+                    dir_blue_x = " pixels left"
+
+                # Special case 0 digits: In this case the number of digits must be omitted.
+                # If the round function is called with "n_digits=0", the result still has one digit
+                # after the decimal point.
+                if n_digits:
+                    Miscellaneous.protocol(
+                        "           Automatic RGB correction, red channel shifted " +
+                        str(round(abs(shift_red_y), n_digits)) + dir_red_y + ", " +
+                        str(round(abs(shift_red_x), n_digits)) + dir_red_x + ", blue channel shifted " +
+                        str(round(abs(shift_blue_y), n_digits)) + dir_blue_y + ", " +
+                        str(round(abs(shift_blue_x), n_digits)) + dir_blue_x + ".",
+                        self.attached_log_file, precede_with_timestamp=False)
+                else:
+                    Miscellaneous.protocol(
+                        "           Automatic RGB correction, red channel shifted " +
+                        str(round(abs(shift_red_y))) + dir_red_y + ", " +
+                        str(round(abs(shift_red_x))) + dir_red_x + ", blue channel shifted " +
+                        str(round(abs(shift_blue_y))) + dir_blue_y + ", " +
+                        str(round(abs(shift_blue_x))) + dir_blue_x + ".",
+                        self.attached_log_file, precede_with_timestamp=False)
+        else:
+            sharpening_input = self.postproc_input_image
+
+        # Apply all sharpening layers of the postprocessing version selected last time.
+        self.postprocessed_image = Miscellaneous.post_process(sharpening_input, postproc_layers)
         self.my_timer.stop('Conputing image postprocessing')
 
         self.work_next_task_signal.emit("Save postprocessed image")

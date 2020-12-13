@@ -821,7 +821,7 @@ class Miscellaneous(object):
 
     @staticmethod
     def auto_rgb_align(input_image, max_shift, interpolation_factor=1, reduce_output=True,
-                       blur_strenght=None):
+                       blur_strength=None):
         """
         Align the three color channels of an RGB image automatically. For sub-pixel resolution the
         image can be interpolated before the shift is measured. Optionally, a Gaussian blur can be
@@ -837,7 +837,7 @@ class Miscellaneous(object):
                               If False, it stays at the interpolated resolution. In this case the
                               output values for correction_red and correction_blue are in terms of
                               the interpolated resolution as well.
-        :param blur_strenght: Optional blur strength, must be an uneven integer > 0.
+        :param blur_strength: Optional blur strength, must be an uneven integer > 0.
         :return: (corrected_image, correction_red, correction_blue) with:
                  corrected_image: The corrected image with the same datatype as the input image.
                                   Please note that the size may be reduced because of channel
@@ -867,11 +867,11 @@ class Miscellaneous(object):
         channel_red = 0
         shift_red = Miscellaneous.measure_rgb_shift(input_interpolated, channel_red,
                                                     channel_green, max_shift * interpolation_factor,
-                                                    blur_strength=blur_strenght)
+                                                    blur_strength=blur_strength)
         channel_blue = 2
         shift_blue = Miscellaneous.measure_rgb_shift(input_interpolated, channel_blue,
                                                      channel_green, max_shift*interpolation_factor,
-                                                     blur_strength=blur_strenght)
+                                                     blur_strength=blur_strength)
 
         # Reverse the shift measured in the input image.
         if reduce_output:
