@@ -820,7 +820,8 @@ class Miscellaneous(object):
         return [dy-search_width, dx-search_width], dev_table[dy, dx]
 
     @staticmethod
-    def auto_rgb_align(input_image, max_shift, interpolation_factor=1, blur_strenght=None):
+    def auto_rgb_align(input_image, max_shift, interpolation_factor=1, reduce_output=True,
+                       blur_strenght=None):
         """
         Align the three color channels of an RGB image automatically. For sub-pixel resolution the
         image can be interpolated before the shift is measured. Optionally, a Gaussian blur can be
@@ -831,7 +832,11 @@ class Miscellaneous(object):
 
         :param input_image: Three-channel RGB image.
         :param max_shift: Maximal displacement between channels.
-        :param interpolation_factor: Scaling factor for subpixel measurements.
+        :param interpolation_factor: Scaling factor (integer) for subpixel measurements.
+        :param reduce_output: If True, the corrected image is reduced to the input resolution.
+                              If False, it stays at the interpolated resolution. In this case the
+                              output values for correction_red and correction_blue are in terms of
+                              the interpolated resolution as well.
         :param blur_strenght: Optional blur strength, must be an uneven integer > 0.
         :return: (corrected_image, correction_red, correction_blue) with:
                  corrected_image: The corrected image with the same datatype as the input image.
@@ -869,10 +874,14 @@ class Miscellaneous(object):
                                                      blur_strength=blur_strenght)
 
         # Reverse the shift measured in the input image.
+        if reduce_output:
+            factor = interpolation_factor
+        else:
+            factor = 1
         return Miscellaneous.shift_colors(input_interpolated, (-shift_red[0], -shift_red[1]),
-               (-shift_blue[0], -shift_blue[1]), reduce_output=interpolation_factor), \
-               (-shift_red[0]/interpolation_factor, -shift_red[1]/interpolation_factor), \
-               (-shift_blue[0]/interpolation_factor, -shift_blue[1]/interpolation_factor)
+               (-shift_blue[0], -shift_blue[1]), reduce_output=factor), \
+               (-shift_red[0]/factor, -shift_red[1]/factor), \
+               (-shift_blue[0]/factor, -shift_blue[1]/factor)
 
 
     @staticmethod

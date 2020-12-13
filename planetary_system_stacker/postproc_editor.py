@@ -625,6 +625,9 @@ class ImageProcessor(QtCore.QThread):
 
     # The set_photo_signal tells the image viewer which image it should show.
     set_photo_signal = QtCore.pyqtSignal(int)
+    # The set_shift_display_signal tells the PostprocEditorWidget to update the display of RGB
+    # shift values.
+    set_shift_display_signal = QtCore.pyqtSignal()
     # The set_status_bar_signal triggers the display of a (colored) message in the main GUI's
     # status bar.
     set_status_bar_signal = QtCore.pyqtSignal(str, str)
@@ -646,21 +649,62 @@ class ImageProcessor(QtCore.QThread):
 
         # Do the computations in float32 to avoid clipping effects. If the input image is color,
         # also create a version for "luminance only" computations.
-        self.input_image = self.postproc_data_object.image_original.astype(float32)
-        self.color = len(self.input_image.shape) == 3
+        self.image_original = self.postproc_data_object.image_original.astype(float32)
+        self.color = len(self.image_original.shape) == 3
         if self.color:
-            self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
+            self.image_original_hsv = cvtColor(self.image_original, COLOR_BGR2HSV)
+
+        # Initialize list of auto-rgb-aligned input images for all resolution levels.
+        self.auto_rgb_aligned_images_original = [None, None, None]
+        if self.color:
+            self.auto_rgb_aligned_images_original_hsv = [None, None, None]
+        self.auto_rgb_shifts_red = [None, None, None]
+        self.auto_rgb_shifts_blue = [None, None, None]
 
         # Change the main GUI's status bar to show that a computation is going on.
-        self.set_status_bar_signal.emit("Processing " + self.file_name +
-            ", busy computing a new postprocessing image.", "black")
+        self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+            ", busy computing initial images for all versions.", "black")
 
         # Initialize images for all versions using the current layer data.
         self.last_version_layers = []
+        self.last_version_rgb_aligned = []
         for version in self.postproc_data_object.versions:
-            # Initialize intermediate images for all possible layers.
+            # For every version, keep a copy of the current layer parameters for later checks for
+            # changes. Also, remember if for this version RGB alignment was active.
             self.last_version_layers.append(deepcopy(version.layers))
-            version.image = Miscellaneous.post_process(self.input_image, version.layers)
+            self.last_version_rgb_aligned.append(version.rgb_automatic)
+
+            # If automatic RGB alignment is selected for this version, compute the shifted
+            # original image for this version's resolution if not yet available.
+            if version.rgb_automatic:
+                if self.auto_rgb_aligned_images_original[version.rgb_resolution_index] is None:
+                    try:
+                        self.auto_rgb_aligned_images_original[version.rgb_resolution_index], \
+                        self.auto_rgb_shifts_red[version.rgb_resolution_index], \
+                        self.auto_rgb_shifts_blue[
+                            version.rgb_resolution_index] = Miscellaneous.auto_rgb_align(
+                            self.image_original, self.configuration.postproc_max_shift,
+                            interpolation_factor=[1, 2, 4][version.rgb_resolution_index],
+                            blur_strenght=version.rgb_gauss_width)
+                        if self.color:
+                            self.auto_rgb_aligned_images_original_hsv[
+                                version.rgb_resolution_index] = cvtColor(
+                                self.auto_rgb_aligned_images_original[version.rgb_resolution_index],
+                                COLOR_BGR2HSV)
+                    except:
+                        self.auto_rgb_aligned_images_original[
+                            version.rgb_resolution_index] = self.image_original
+                        self.auto_rgb_shifts_red[version.rgb_resolution_index] = (0., 0.)
+                        self.auto_rgb_shifts_blue[version.rgb_resolution_index] = (0., 0.)
+                        if self.color:
+                            self.auto_rgb_aligned_images_original_hsv[
+                                version.rgb_resolution_index] = self.image_original_hsv
+
+                version.image = Miscellaneous.post_process(
+                    self.auto_rgb_aligned_images_original[version.rgb_resolution_index],
+                    version.layers)
+            else:
+                version.image = Miscellaneous.post_process(self.image_original, version.layers)
 
         # Initialize lists for intermediate results (to speed up image updates). The efficient
         # reuse of intermediate results is only possible if there is enough RAM.
@@ -668,7 +712,7 @@ class ImageProcessor(QtCore.QThread):
         self.ram_sufficient = True
 
         # Reset the status bar to its idle state.
-        self.set_status_bar_signal.emit("Processing " + self.file_name + ", postprocessing.",
+        self.set_status_bar_signal.emit("Postprocessing " + self.file_name,
                 "black")
 
         # Remember the last version (and the corresponding layer parameters) shown in the image
@@ -700,18 +744,84 @@ class ImageProcessor(QtCore.QThread):
         while True:
             # To avoid chasing a moving target, copy the parameters of the currently active version
             self.version_selected = self.postproc_data_object.version_selected
-            self.layers_selected = deepcopy(self.postproc_data_object.versions[
-                                                self.version_selected].layers)
+            postproc_version = deepcopy(self.postproc_data_object.versions[self.version_selected])
+            self.layers_selected = postproc_version.layers
+            self.rgb_automatic = postproc_version.rgb_automatic
+            self.rgb_resolution_index = postproc_version.rgb_resolution_index
+            self.rgb_gauss_width = postproc_version.rgb_gauss_width
+
+            # If automatic RGB alignment is on, check if the shifted image for the current
+            # resolution has been computed already. Otherwise, compute it now.
+            if self.rgb_automatic:
+                if self.auto_rgb_aligned_images_original[
+                    self.rgb_resolution_index] is None:
+                    # Change the main GUI's status bar to show that a computation is going on.
+                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                                    ", busy computing a new image.", "black")
+                    try:
+                        self.auto_rgb_aligned_images_original[self.rgb_resolution_index], \
+                        self.auto_rgb_shifts_red[self.rgb_resolution_index], \
+                        self.auto_rgb_shifts_blue[
+                            self.rgb_resolution_index] = Miscellaneous.auto_rgb_align(
+                            self.image_original, self.configuration.postproc_max_shift,
+                            interpolation_factor=[1, 2, 4][self.rgb_resolution_index],
+                            blur_strenght=self.rgb_gauss_width)
+                        if self.color:
+                            self.auto_rgb_aligned_images_original_hsv[
+                                self.rgb_resolution_index] = cvtColor(
+                                self.auto_rgb_aligned_images_original[self.rgb_resolution_index],
+                                COLOR_BGR2HSV)
+                    except:
+                        self.auto_rgb_aligned_images_original[
+                            self.rgb_resolution_index] = self.image_original
+                        self.auto_rgb_shifts_red[self.rgb_resolution_index] = (0., 0.)
+                        self.auto_rgb_shifts_blue[self.rgb_resolution_index] = (0., 0.)
+                        if self.color:
+                            self.auto_rgb_aligned_images_original_hsv[
+                                self.rgb_resolution_index] = self.image_original_hsv
+                    # Reset the status bar to its idle state.
+                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
+
+                self.input_image = self.auto_rgb_aligned_images_original[self.rgb_resolution_index]
+                if self.color:
+                    self.input_image_hsv = self.auto_rgb_aligned_images_original_hsv[
+                            self.rgb_resolution_index]
+                # Set the RGB shifts for this version to the values computed automatically.
+                self.postproc_data_object.versions[self.version_selected].shift_red = \
+                    self.auto_rgb_shifts_red[self.rgb_resolution_index]
+                self.postproc_data_object.versions[self.version_selected].shift_blue = \
+                    self.auto_rgb_shifts_blue[self.rgb_resolution_index]
+            else:
+                self.input_image = self.image_original
+                self.input_image_hsv = self.image_original_hsv
+
+            # If the RGB auto-alignment checkbox was changed since the last image was computed for
+            # this version, invalidate all intermediate results for this version.
+            if self.rgb_automatic != self.last_version_rgb_aligned[self.version_selected]:
+                self.last_version_rgb_aligned[self.version_selected] = self.rgb_automatic
+                self.reset_intermediate_images()
+                rgb_shift_changed = True
+            else:
+                rgb_shift_changed = False
+            self.set_shift_display_signal.emit()
 
             # Compare the currently active version with the last one for which an image was
             # computed. If there is a difference, start a new computation. Special case
-            # self.version_selected = 0: For the original image nothing must be computed.
-            if self.new_computation_required(self.version_selected != self.last_version_selected) \
-                    and self.version_selected:
-
+            # self.version_selected = 0: For the original image no layers are applied. But if
+            # the RGB automatic checkbox was changed, the image must be set according to the new
+            # shift status.
+            if rgb_shift_changed and not self.version_selected:
+                print ("Recomputing version 0")
+                self.postproc_data_object.versions[0].image = self.recompute_selected_version(
+                    self.layers_selected)
+                # Show the new image in the image viewer, and remember its parameters.
+                self.set_photo_signal.emit(self.version_selected)
+                self.last_version_selected = self.version_selected
+            elif rgb_shift_changed or self.new_computation_required(
+                    self.version_selected != self.last_version_selected):
                 # Change the main GUI's status bar to show that a computation is going on.
-                self.set_status_bar_signal.emit("Processing " + self.file_name +
-                    ", busy computing a new postprocessing image.", "black")
+                self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                                ", busy computing a new image.", "black")
 
                 # Perform the new computation. Try to store intermediate results. If it fails
                 # because there is not enough RAM, switch to direct computation.
@@ -731,8 +841,7 @@ class ImageProcessor(QtCore.QThread):
                         self.input_image, self.layers_selected)
 
                 # Reset the status bar to its idle state.
-                self.set_status_bar_signal.emit("Processing " + self.file_name +
-                    ", postprocessing.", "black")
+                self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
 
                 # Show the new image in the image viewer, and remember its parameters.
                 self.set_photo_signal.emit(self.version_selected)
@@ -846,9 +955,11 @@ class ImageProcessor(QtCore.QThread):
         :return: -
         """
 
-        # Check if the original image is selected (version 0). In this case nothing is to be done.
+        # Check if the original image is selected (version 0). In this case return the (potentially
+        # RGB-shifted) original iamge.
         if not layers:
-            return self.postproc_data_object.image_original
+            print ("recompute_selected_version 0")
+            return self.input_image.astype(uint16)
 
         for layer_index, layer in enumerate(layers):
             if self.layer_input[layer_index] is None:
@@ -1010,6 +1121,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.image_processor = ImageProcessor(self.configuration)
         self.image_processor.setTerminationEnabled(True)
         self.image_processor.set_photo_signal.connect(self.select_image)
+        self.image_processor.set_shift_display_signal.connect(self.display_shifts)
         self.image_processor.set_status_bar_signal.connect(set_status_bar_callback)
 
     def fgw_changed(self, value):
@@ -1350,7 +1462,9 @@ class EmulateStatusBar(object):
 
 
 if __name__ == '__main__':
-    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
+    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
+    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\" \
+                      "2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_rgb-shifted.png"
     # Change colors to standard RGB
     input_image = cvtColor(imread(input_file_name, -1), COLOR_BGR2RGB)
 

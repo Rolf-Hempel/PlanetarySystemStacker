@@ -97,15 +97,15 @@ def test_auto_rgbg_align(input_file_name, interpolation_factor, blur_strength):
     waitKey()
     destroyAllWindows()
 
-input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_gpp.png"
-input_file_name_shifted = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_gpp_rgb-shifted.png"
+input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48.png"
+input_file_name_shifted = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_rgb-shifted.png"
 
 # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48.png"
 # input_file_name_shifted = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_rgb-shifted.png"
 
 interpolation_factor = 4
 reduction_factor = 1
-blur_strength = 7
+blur_strength = 1
 shift_red = (1.3, -3.2)
 shift_blue = (-1.8, 1.1)
 
