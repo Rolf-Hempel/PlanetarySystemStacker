@@ -793,7 +793,8 @@ class ImageProcessor(QtCore.QThread):
                     self.auto_rgb_shifts_blue[self.rgb_resolution_index]
             else:
                 self.input_image = self.image_original
-                self.input_image_hsv = self.image_original_hsv
+                if self.color:
+                    self.input_image_hsv = self.image_original_hsv
 
             # If the RGB auto-alignment checkbox was changed since the last image was computed for
             # this version, invalidate all intermediate results for this version.
@@ -872,7 +873,7 @@ class ImageProcessor(QtCore.QThread):
         # Initialize the flag which remembers if a change was found. Do not return on the first
         # detection in order to invalidate all affected intermediate results.
         change_detected = False
-        
+
         # If a new version is selected, reset images with intermediate results.
         if version_has_changed:
             self.reset_intermediate_images()
