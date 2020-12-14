@@ -723,9 +723,6 @@ class ImageProcessor(QtCore.QThread):
         self.version_selected = None
         self.layers_selected = None
 
-        # Remember that a new image must be computed because the ImageProcessor is just initialized.
-        self.initial_state = True
-
         self.start()
 
     def reset_intermediate_images(self):
@@ -814,7 +811,6 @@ class ImageProcessor(QtCore.QThread):
             # the RGB automatic checkbox was changed, the image must be set according to the new
             # shift status.
             if rgb_shift_changed and not self.version_selected:
-                print ("Recomputing version 0")
                 self.postproc_data_object.versions[0].image = self.recompute_selected_version(
                     self.layers_selected)
                 # Show the new image in the image viewer, and remember its parameters.
