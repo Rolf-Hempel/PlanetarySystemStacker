@@ -948,6 +948,12 @@ class PostprocVersion(object):
         self.rgb_resolution_index = 1
         self.shift_red = (0., 0.)
         self.shift_blue = (0., 0.)
+        self.correction_red = (0., 0.)
+        self.correction_blue = (0., 0.)
+        self.correction_red_saved = (0., 0.)
+        self.correction_blue_saved = (0., 0.)
+        self.image = None
+        self.images_uncorrected = [None] * 3
 
     def set_image(self, image):
         """
