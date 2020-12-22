@@ -1334,7 +1334,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # print ("cleaning up rgb corrections")
         for version_index, version in enumerate(self.postproc_data_object.versions):
             if version.correction_red != (0., 0.) or version.correction_blue != (0., 0.):
-                print("Applying corrections to version " + str(version_index))
+                # print("Applying corrections to version " + str(version_index))
                 version.shift_red = (version.shift_red[0] + version.correction_red[0],
                                      version.shift_red[1] + version.correction_red[1])
                 version.shift_blue = (version.shift_blue[0] + version.correction_blue[0],

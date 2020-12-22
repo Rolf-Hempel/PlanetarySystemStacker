@@ -139,16 +139,6 @@ class Ui_postproc_editor(object):
         self.verticalLayout_4.addWidget(self.group_general)
         spacerItem5 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
         self.verticalLayout_4.addItem(spacerItem5)
-        self.pushButton_auto_align = QtWidgets.QPushButton(self.tab_rgb)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Fixed)
-        sizePolicy.setHorizontalStretch(0)
-        sizePolicy.setVerticalStretch(0)
-        sizePolicy.setHeightForWidth(self.pushButton_auto_align.sizePolicy().hasHeightForWidth())
-        self.pushButton_auto_align.setSizePolicy(sizePolicy)
-        self.pushButton_auto_align.setObjectName("pushButton_auto_align")
-        self.verticalLayout_4.addWidget(self.pushButton_auto_align)
-        spacerItem6 = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Expanding)
-        self.verticalLayout_4.addItem(spacerItem6)
         self.group_red = QtWidgets.QGroupBox(self.tab_rgb)
         font = QtGui.QFont()
         font.setBold(False)
@@ -248,9 +238,8 @@ class Ui_postproc_editor(object):
         self.verticalLayout_4.addWidget(self.group_blue)
         self.verticalLayout_4.setStretch(0, 8)
         self.verticalLayout_4.setStretch(1, 1)
-        self.verticalLayout_4.setStretch(3, 1)
-        self.verticalLayout_4.setStretch(4, 8)
-        self.verticalLayout_4.setStretch(5, 8)
+        self.verticalLayout_4.setStretch(2, 8)
+        self.verticalLayout_4.setStretch(3, 8)
         self.tabWidget_postproc_control.addTab(self.tab_rgb, "")
         self.gridLayout.addWidget(self.tabWidget_postproc_control, 0, 1, 1, 2)
 
@@ -258,7 +247,6 @@ class Ui_postproc_editor(object):
         self.tabWidget_postproc_control.setCurrentIndex(0)
         self.checkBox_automatic.toggled['bool'].connect(self.group_red.setDisabled)
         self.checkBox_automatic.toggled['bool'].connect(self.group_blue.setDisabled)
-        self.checkBox_automatic.toggled['bool'].connect(self.pushButton_auto_align.setDisabled)
         QtCore.QMetaObject.connectSlotsByName(postproc_editor)
 
     def retranslateUi(self, postproc_editor):
@@ -281,9 +269,6 @@ class Ui_postproc_editor(object):
 "that RAM usage and execution time increase quadratically."))
         self.fgw_slider_value.setToolTip(_translate("postproc_editor", "Smoothen the image before computing the channel shifts.\n"
 "In the presence of noise this results in better accuracy."))
-        self.pushButton_auto_align.setToolTip(_translate("postproc_editor", "Compute optimal red / blue channel shifts automatically.\n"
-"Manual corrections are still possible afterwards."))
-        self.pushButton_auto_align.setText(_translate("postproc_editor", "Adjust the color channels automatically now"))
         self.group_red.setToolTip(_translate("postproc_editor", "The current red channel shift is shown.\n"
 "Use push buttons for manual adjustments."))
         self.group_red.setTitle(_translate("postproc_editor", "Red channel status / manual adjustments"))

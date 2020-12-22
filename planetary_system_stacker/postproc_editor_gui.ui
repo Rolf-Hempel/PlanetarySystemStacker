@@ -118,7 +118,7 @@
       <attribute name="title">
        <string>RGB Alignment</string>
       </attribute>
-      <layout class="QVBoxLayout" name="verticalLayout_4" stretch="8,1,0,1,8,8">
+      <layout class="QVBoxLayout" name="verticalLayout_4" stretch="8,1,8,8">
        <item>
         <widget class="QGroupBox" name="group_general">
          <property name="title">
@@ -303,36 +303,6 @@ In the presence of noise this results in better accuracy.</string>
            </layout>
           </item>
          </layout>
-        </widget>
-       </item>
-       <item>
-        <spacer name="verticalSpacer_4">
-         <property name="orientation">
-          <enum>Qt::Vertical</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>20</width>
-           <height>40</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
-       <item>
-        <widget class="QPushButton" name="pushButton_auto_align">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Fixed">
-           <horstretch>0</horstretch>
-           <verstretch>0</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="toolTip">
-          <string>Compute optimal red / blue channel shifts automatically.
-Manual corrections are still possible afterwards.</string>
-         </property>
-         <property name="text">
-          <string>Adjust the color channels automatically now</string>
-         </property>
         </widget>
        </item>
        <item>
@@ -654,22 +624,6 @@ Use push buttons for manual adjustments.</string>
     <hint type="destinationlabel">
      <x>574</x>
      <y>593</y>
-    </hint>
-   </hints>
-  </connection>
-  <connection>
-   <sender>checkBox_automatic</sender>
-   <signal>toggled(bool)</signal>
-   <receiver>pushButton_auto_align</receiver>
-   <slot>setDisabled(bool)</slot>
-   <hints>
-    <hint type="sourcelabel">
-     <x>574</x>
-     <y>64</y>
-    </hint>
-    <hint type="destinationlabel">
-     <x>574</x>
-     <y>269</y>
     </hint>
    </hints>
   </connection>
