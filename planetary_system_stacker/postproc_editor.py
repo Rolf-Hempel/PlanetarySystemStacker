@@ -799,8 +799,8 @@ class ImageProcessor(QtCore.QThread):
                     self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
 
                     # Since the auto-shifted image is new, the postprocessing pipeline must be
-                    # applied.
-                    compute_new_image = True
+                    # applied. (This does not seem to be necessary.)
+                    # compute_new_image = True
 
                 # Set the processing pipeline input to the RGB aligned original image.
                 self.input_image = self.auto_rgb_aligned_images_original[self.rgb_resolution_index]
@@ -867,27 +867,60 @@ class ImageProcessor(QtCore.QThread):
                 # The image without shift correction is available for the required resolution. Check
                 # if the shift correction has changed. If so, apply the correction. Otherwise, leave
                 # the image unchanged.
-                elif self.correction_red != self.correction_red_saved or self.correction_blue != self.correction_blue_saved:
-                    # print ("correction_red: " + str(self.correction_red) + ", correction_red_saved: " +
-                    #        str(self.correction_red_saved)+ ", correction_blue: " + str(self.correction_blue) +
-                    #        ", correction_blue_saved: " + str(self.correction_blue_saved))
-                    # print ("red: " + str(self.correction_red != self.correction_red_saved))
-                    # print("blue: " + str(self.correction_blue != self.correction_blue_saved))
-                    self.postproc_data_object.versions[self.version_selected].correction_red_saved = self.correction_red
-                    self.postproc_data_object.versions[self.version_selected].correction_blue_saved = self.correction_blue
+                elif self.correction_red != self.correction_red_saved or self.correction_blue != \
+                        self.correction_blue_saved:
+                    self.postproc_data_object.versions[
+                        self.version_selected].correction_red_saved = self.correction_red
+                    self.postproc_data_object.versions[
+                        self.version_selected].correction_blue_saved = self.correction_blue
                     shift_image = True
 
-            # Wavelet mode, RGB auto-alignment off: Set the input image for the processing pipeline to the original image.
+            # Wavelet mode, RGB auto-alignment off: Set the input image for the processing pipeline
+            # to the original image, shifted by the accumulated shift vectors (not in correction
+            # mode).
             else:
-                self.input_image = self.image_original
-                if self.color:
-                    self.input_image_hsv = self.image_original_hsv
+                # The accumulated shift vectors have changed since the last computation. Apply the
+                # new shifts to the original image.
+                if postproc_version.shift_red != postproc_version.shift_red_saved or \
+                    postproc_version.shift_blue != postproc_version.shift_blue_saved:
+                    self.input_image = Miscellaneous.shift_colors(self.image_original,
+                                                                  postproc_version.shift_red,
+                                                                  postproc_version.shift_blue)
+                    if self.color:
+                        if postproc_version.shift_red != (
+                                0., 0.) or postproc_version.shift_blue != (0., 0.):
+                            self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
+                        else:
+                            self.input_image_hsv = self.image_original_hsv
+
+                    # Save the new shifted original image together with the current accumulated
+                    # shift vectors.
+                    self.postproc_data_object.versions[self.version_selected].input_image_saved = \
+                        self.input_image
+                    if self.color:
+                        self.postproc_data_object.versions[
+                            self.version_selected].input_image_hsv_saved = self.input_image_hsv
+                    self.postproc_data_object.versions[self.version_selected].shift_red_saved = \
+                        postproc_version.shift_red
+                    self.postproc_data_object.versions[
+                        self.version_selected].shift_blue_saved = postproc_version.shift_blue
+
+                    # Since the processing pipeline input has changed, reset intermediate results
+                    # and set the computation flag.
+                    self.reset_intermediate_images()
+                    compute_new_image = True
+
+                # The accumulated shift vectors have not changed. Reuse the saved pipeline input
+                # images.
+                else:
+                    self.input_image = postproc_version.input_image_saved
+                    if self.color:
+                        self.input_image_hsv = postproc_version.input_image_hsv_saved
 
             self.set_shift_display_signal.emit()
 
-            # print ("shift_image: " + str(shift_image) + ", compute_new_image: " + str(compute_new_image))
             # The image has already passed the postprocessing pipeline (as contained in
-            # postproc_version.images_uncorrected). Only the correction shift is to be applied.
+            # postproc_version.images_uncorrected). Only the correction shift must be applied.
             if shift_image:
                 interpolation_factor = [1, 2, 4][self.rgb_resolution_index]
                 self.postproc_data_object.versions[self.version_selected].image = \
@@ -1288,17 +1321,17 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         version.correction_red_saved = version.correction_blue_saved = version.correction_red = \
             version.correction_blue = (0., 0.)
         version.images_uncorrected = [None] * 3
-        print ("initialize rgb correction for single version")
+        # print ("initialize rgb correction for single version")
 
     def rgb_correction_version_reset(self, version):
         version.rgb_correction_mode = False
         version.correction_red_saved = version.correction_blue_saved = version.correction_red =\
             version.correction_blue = (0., 0.)
         version.images_uncorrected = [None] * 3
-        print("reset rgb correction for single version")
+        # print("reset rgb correction for single version")
 
     def finish_rgb_correction_mode(self):
-        print ("cleaning up rgb corrections")
+        # print ("cleaning up rgb corrections")
         for version_index, version in enumerate(self.postproc_data_object.versions):
             if version.correction_red != (0., 0.) or version.correction_blue != (0., 0.):
                 print("Applying corrections to version " + str(version_index))
@@ -1306,6 +1339,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
                                      version.shift_red[1] + version.correction_red[1])
                 version.shift_blue = (version.shift_blue[0] + version.correction_blue[0],
                                       version.shift_blue[1] + version.correction_blue[1])
+        version.rgb_correction_mode = False
         self.select_image(self.postproc_data_object.version_selected)
 
     def prreset_clicked(self):
@@ -1500,9 +1534,9 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         # Check if the image size has changed by more than 10%. If so, reset the zoom factor of the
         # FrameViewer.
-        print ("Select image")
+        # print ("Select image")
         if abs((image.shape[0] - self.image_size_y)/ image.shape[0]) > 0.1:
-            print("Fit in view")
+            # print("Fit in view")
             self.frame_viewer.fitInView()
             self.image_size_y = image.shape[0]
 
