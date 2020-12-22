@@ -948,6 +948,7 @@ class PostprocVersion(object):
         self.rgb_resolution_index = 1
         self.shift_red = (0., 0.)
         self.shift_blue = (0., 0.)
+        self.rgb_correction_mode = False
         self.correction_red = (0., 0.)
         self.correction_blue = (0., 0.)
         self.correction_red_saved = (0., 0.)

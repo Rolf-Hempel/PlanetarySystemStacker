@@ -29,7 +29,7 @@ from PyQt5 import QtWidgets, QtCore
 from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT,\
     COLOR_BGR2HSV, COLOR_HSV2BGR
 from math import sqrt
-from numpy import uint16, float32
+from numpy import uint8, uint16, float32
 
 from configuration import Configuration, PostprocLayer
 from exceptions import InternalError
@@ -745,6 +745,7 @@ class ImageProcessor(QtCore.QThread):
             self.layers_selected = postproc_version.layers
             self.rgb_automatic = postproc_version.rgb_automatic
             self.rgb_resolution_index = postproc_version.rgb_resolution_index
+            # print ("resolution index: " + str(self.rgb_resolution_index))
             self.rgb_gauss_width = postproc_version.rgb_gauss_width
             self.shift_red = postproc_version.shift_red
             self.shift_blue = postproc_version.shift_blue
@@ -819,14 +820,22 @@ class ImageProcessor(QtCore.QThread):
 
                 # If the uncorrected image for this resolution index is not available, it must be
                 # computed. Try if an image for this version has been computed. If not, this version
-                # is new. In that case process the wavelets first, and do the shift in the next pass.
+                # is new. In that case process the wavelets first (only applying the accumulated
+                # shifts), and do the shift corrections in the next pass.
                 if postproc_version.images_uncorrected[self.rgb_resolution_index] is None:
-                    if postproc_version.image is None:
-                        self.input_image = self.image_original
+                    if postproc_version.image is None or postproc_version.image.dtype == uint8:
+                        self.input_image = Miscellaneous.shift_colors(self.image_original,
+                                                                      postproc_version.shift_red,
+                                                                      postproc_version.shift_blue)
                         if self.color:
-                            self.input_image_hsv = self.image_original_hsv
-                        self.postproc_data_object.versions[self.version_selected].shift_red = \
-                            self.postproc_data_object.versions[self.version_selected].shift_blue = (0., 0.)
+                            if postproc_version.shift_red != (
+                            0., 0.) or postproc_version.shift_blue != (0., 0.):
+                                self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
+                            else:
+                                self.input_image_hsv = self.image_original_hsv
+
+                        # self.postproc_data_object.versions[self.version_selected].shift_red = \
+                        #     self.postproc_data_object.versions[self.version_selected].shift_blue = (0., 0.)
                         self.reset_intermediate_images()
                         compute_new_image = True
 
@@ -834,15 +843,30 @@ class ImageProcessor(QtCore.QThread):
                     # input for this resolution index of the correction mode. The image is
                     # blown up by the resolution factor to show shifts in detail.
                     else:
-                        self.postproc_data_object.versions[
-                            self.version_selected].images_uncorrected[self.rgb_resolution_index] = \
-                            Miscellaneous.shift_colors(postproc_version.image, (0., 0.), (0., 0.),
-                                                       interpolate_input=[1, 2, 4][
-                                                           self.rgb_resolution_index])
+                        # In the first pass, convert the input image to 8bit unsigned int (to speed
+                        # up the image viewer). Store it as resolution version 0 (1 Pixel, i.e. no
+                        # change in resolution).
+                        if self.postproc_data_object.versions[
+                            self.version_selected].images_uncorrected[0] is None:
+                            self.postproc_data_object.versions[
+                                self.version_selected].images_uncorrected[0] = (
+                                    postproc_version.image / 256.).astype(
+                                uint8)
+
+                        # If the resolution selected is not 1 pixel, interpolate the 1 pixel image
+                        # to the required resolution and store the result for later reuse.
+                        if self.rgb_resolution_index > 0:
+                            self.postproc_data_object.versions[
+                                self.version_selected].images_uncorrected[
+                                self.rgb_resolution_index] = \
+                                Miscellaneous.shift_colors(self.postproc_data_object.versions[
+                                    self.version_selected].images_uncorrected[0], (0., 0.), (0., 0.),
+                                    interpolate_input=[1, 2, 4][self.rgb_resolution_index])
                         shift_image = True
 
-                # The uncorrected image is available. Check if the correction has changed. If so,
-                # shift the image. Otherwise, leave the image unchanged.
+                # The image without shift correction is available for the required resolution. Check
+                # if the shift correction has changed. If so, apply the correction. Otherwise, leave
+                # the image unchanged.
                 elif self.correction_red != self.correction_red_saved or self.correction_blue != self.correction_blue_saved:
                     # print ("correction_red: " + str(self.correction_red) + ", correction_red_saved: " +
                     #        str(self.correction_red_saved)+ ", correction_blue: " + str(self.correction_blue) +
@@ -853,7 +877,7 @@ class ImageProcessor(QtCore.QThread):
                     self.postproc_data_object.versions[self.version_selected].correction_blue_saved = self.correction_blue
                     shift_image = True
 
-            # Wavelet mode. Set the input image for the processing pipeline to the original image.
+            # Wavelet mode, RGB auto-alignment off: Set the input image for the processing pipeline to the original image.
             else:
                 self.input_image = self.image_original
                 if self.color:
@@ -931,9 +955,6 @@ class ImageProcessor(QtCore.QThread):
             # Idle loop before doing the next check for updates.
             else:
                 sleep(self.postproc_idle_loop_time)
-
-    def shifts_are_equal(self, shift_1, shift_2):
-        return abs(shift_2[0] - shift_1[0]) < 1.e-4 and abs(shift_2[1] - shift_1[1]) < 1.e-4
 
     def new_computation_required(self, version_has_changed):
         """
@@ -1185,6 +1206,14 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum,
                                             QtWidgets.QSizePolicy.Expanding)
 
+        # Set the resolution index to an impossible value. It is used to check for changes.
+        self.rgb_resolution_index = -1
+
+        # Set the vertical image size (in pixels) to an impossible value. It is used to check for
+        # changes later. When the pixel resolution of the displayed image changes, the "fit in view"
+        # method of the image viewer is invoked to normalize the appearance of the image.
+        self.image_size_y = -1
+
         # Create the version manager and pass it the "select_version" callback function.
         self.version_manager_widget = VersionManagerWidget(self.configuration, self.select_version)
         self.gridLayout.addWidget(self.version_manager_widget, 1, 1, 1, 1)
@@ -1277,6 +1306,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
                                      version.shift_red[1] + version.correction_red[1])
                 version.shift_blue = (version.shift_blue[0] + version.correction_blue[0],
                                       version.shift_blue[1] + version.correction_blue[1])
+        self.select_image(self.postproc_data_object.version_selected)
 
     def prreset_clicked(self):
         version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
@@ -1465,7 +1495,16 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return: -
         """
 
-        self.frame_viewer.setPhoto(self.postproc_data_object.versions[version_index].image)
+        image = self.postproc_data_object.versions[version_index].image
+        self.frame_viewer.setPhoto(image)
+
+        # Check if the image size has changed by more than 10%. If so, reset the zoom factor of the
+        # FrameViewer.
+        print ("Select image")
+        if abs((image.shape[0] - self.image_size_y)/ image.shape[0]) > 0.1:
+            print("Fit in view")
+            self.frame_viewer.fitInView()
+            self.image_size_y = image.shape[0]
 
     def add_layer(self):
         """
