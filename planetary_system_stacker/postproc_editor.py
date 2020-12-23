@@ -631,6 +631,10 @@ class ImageProcessor(QtCore.QThread):
     # The set_status_bar_signal triggers the display of a (colored) message in the main GUI's
     # status bar.
     set_status_bar_signal = QtCore.pyqtSignal(str, str)
+    # While computations are going on, GUI widgets are disabled to avoid race conditions.
+    disable_widgets_signal = QtCore.pyqtSignal()
+    # When computations have finished, reactivate GUI widgets.
+    enable_widgets_signal = QtCore.pyqtSignal()
 
     def __init__(self, configuration, parent=None):
         """
@@ -647,6 +651,22 @@ class ImageProcessor(QtCore.QThread):
         # Extract the file name from its path.
         self.file_name = Path(self.postproc_data_object.file_name_original).name
 
+        self.start()
+
+    def run(self):
+
+        # Before executing the main loop, initialize images for all versions kept in the version
+        # manager. In particular if versions have the "Auto RGB alignment" checkbox set, this may
+        # take a while.
+
+        # Change the main GUI's status bar to show that a computation is going on, and disable GUI
+        # widgets to avoid race conditions.
+        self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                        ", busy computing initial images for all versions; "
+                                        "This will take a while",
+                                        "black")
+        self.disable_widgets_signal.emit()
+
         # Do the computations in float32 to avoid clipping effects. If the input image is color,
         # also create a version for "luminance only" computations.
         self.image_original = self.postproc_data_object.image_original.astype(float32)
@@ -661,13 +681,9 @@ class ImageProcessor(QtCore.QThread):
         self.auto_rgb_shifts_red = [None, None, None]
         self.auto_rgb_shifts_blue = [None, None, None]
 
-        # Change the main GUI's status bar to show that a computation is going on.
-        self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
-            ", busy computing initial images for all versions.", "black")
-
         # Initialize images for all versions using the current layer data.
         self.last_version_layers = []
-        # self.last_version_rgb_aligned = [None]*self.configuration.postproc_max_versions
+
         for version in self.postproc_data_object.versions:
             # For every version, keep a copy of the current layer parameters for later checks for
             # changes. Also, remember if for this version RGB alignment was active.
@@ -711,9 +727,10 @@ class ImageProcessor(QtCore.QThread):
         self.reset_intermediate_images()
         self.ram_sufficient = True
 
-        # Reset the status bar to its idle state.
+        # Reset the status bar to its idle state, and enable GUI widgets.
         self.set_status_bar_signal.emit("Postprocessing " + self.file_name,
-                "black")
+                                        "black")
+        self.enable_widgets_signal.emit()
 
         # Remember the last version (and the corresponding layer parameters) shown in the image
         # viewer. As soon as this index changes, a new image is displayed.
@@ -723,21 +740,7 @@ class ImageProcessor(QtCore.QThread):
         self.version_selected = None
         self.layers_selected = None
 
-        self.start()
-
-    def reset_intermediate_images(self):
-        """
-        Initialize all intermediate image versions, so that they will be re-computed next time.
-
-        :return: -
-        """
-
-        self.layer_input = [None] * (self.configuration.postproc_max_layers + 1)
-        self.layer_gauss = [None] * (self.configuration.postproc_max_layers)
-        self.layer_bilateral = [None] * (self.configuration.postproc_max_layers)
-        self.layer_denoised = [None] * (self.configuration.postproc_max_layers)
-
-    def run(self):
+        # Enter the main loop and wait for parameter changes in the version selected.
         while True:
             # To avoid chasing a moving target, copy the parameters of the currently active version
             self.version_selected = self.postproc_data_object.version_selected
@@ -771,9 +774,11 @@ class ImageProcessor(QtCore.QThread):
             if self.rgb_automatic:
                 if self.auto_rgb_aligned_images_original[
                     self.rgb_resolution_index] is None:
+
                     # Change the main GUI's status bar to show that a computation is going on.
                     self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
-                                                    ", busy computing a new image.", "black")
+                                                    ", busy auto-aligning image", "black")
+                    self.disable_widgets_signal.emit()
                     try:
                         self.auto_rgb_aligned_images_original[self.rgb_resolution_index], \
                         self.auto_rgb_shifts_red[self.rgb_resolution_index], \
@@ -797,6 +802,7 @@ class ImageProcessor(QtCore.QThread):
                                 self.rgb_resolution_index] = self.image_original_hsv
                     # Reset the status bar to its idle state.
                     self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
+                    self.enable_widgets_signal.emit()
 
                     # Since the auto-shifted image is new, the postprocessing pipeline must be
                     # applied. (This does not seem to be necessary.)
@@ -823,6 +829,13 @@ class ImageProcessor(QtCore.QThread):
                 # is new. In that case process the wavelets first (only applying the accumulated
                 # shifts), and do the shift corrections in the next pass.
                 if postproc_version.images_uncorrected[self.rgb_resolution_index] is None:
+
+                    # Change the main GUI's status bar to show that correction mode is being
+                    # initialized.
+                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                                    ", initializing manual alignment", "black")
+                    self.disable_widgets_signal.emit()
+
                     if postproc_version.image is None or postproc_version.image.dtype == uint8:
                         self.input_image = Miscellaneous.shift_colors(self.image_original,
                                                                       postproc_version.shift_red,
@@ -834,8 +847,6 @@ class ImageProcessor(QtCore.QThread):
                             else:
                                 self.input_image_hsv = self.image_original_hsv
 
-                        # self.postproc_data_object.versions[self.version_selected].shift_red = \
-                        #     self.postproc_data_object.versions[self.version_selected].shift_blue = (0., 0.)
                         self.reset_intermediate_images()
                         compute_new_image = True
 
@@ -863,6 +874,10 @@ class ImageProcessor(QtCore.QThread):
                                     self.version_selected].images_uncorrected[0], (0., 0.), (0., 0.),
                                     interpolate_input=[1, 2, 4][self.rgb_resolution_index])
                         shift_image = True
+
+                    # Reset the status bar to its idle state.
+                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
+                    self.enable_widgets_signal.emit()
 
                 # The image without shift correction is available for the required resolution. Check
                 # if the shift correction has changed. If so, apply the correction. Otherwise, leave
@@ -918,6 +933,9 @@ class ImageProcessor(QtCore.QThread):
                         self.input_image_hsv = postproc_version.input_image_hsv_saved
 
             self.set_shift_display_signal.emit()
+
+            # End of preparatory phase. Flags "compute_new_image" or "shift_image" have been set.
+            # Now perform the appropriate action.
 
             # The image has already passed the postprocessing pipeline (as contained in
             # postproc_version.images_uncorrected). Only the correction shift must be applied.
@@ -988,6 +1006,18 @@ class ImageProcessor(QtCore.QThread):
             # Idle loop before doing the next check for updates.
             else:
                 sleep(self.postproc_idle_loop_time)
+
+    def reset_intermediate_images(self):
+        """
+        Initialize all intermediate image versions, so that they will be re-computed next time.
+
+        :return: -
+        """
+
+        self.layer_input = [None] * (self.configuration.postproc_max_layers + 1)
+        self.layer_gauss = [None] * (self.configuration.postproc_max_layers)
+        self.layer_bilateral = [None] * (self.configuration.postproc_max_layers)
+        self.layer_denoised = [None] * (self.configuration.postproc_max_layers)
 
     def new_computation_required(self, version_has_changed):
         """
@@ -1265,6 +1295,31 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.image_processor.set_photo_signal.connect(self.select_image)
         self.image_processor.set_shift_display_signal.connect(self.display_shifts)
         self.image_processor.set_status_bar_signal.connect(set_status_bar_callback)
+        self.image_processor.disable_widgets_signal.connect(self.disable_widgets)
+        self.image_processor.enable_widgets_signal.connect(self.enable_widgets)
+
+    def disable_widgets(self):
+        """
+        To avoid race conditions, GUI widgets are disabled while computations are going on. The only
+        button remaining active is "Cancel".
+
+        :return: -
+        """
+
+        self.version_manager_widget.setEnabled(False)
+        self.tabWidget_postproc_control.setEnabled(False)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(False)
+
+    def enable_widgets(self):
+        """
+        Enable the GUI buttons when background computations have finished.
+
+        :return: -
+        """
+
+        self.version_manager_widget.setEnabled(True)
+        self.tabWidget_postproc_control.setEnabled(True)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(True)
 
     def fgw_changed(self, value):
         """
@@ -1600,8 +1655,6 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         :return: -
         """
-
-        self.version_manager_widget.save_version()
 
         # Terminate the image processor thread.
         self.image_processor.stop()

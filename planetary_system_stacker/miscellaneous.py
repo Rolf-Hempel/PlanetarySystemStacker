@@ -23,7 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import datetime
 from os import unlink
 from sys import stdout
-from time import time
+from time import time, sleep
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
     putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev,\
@@ -850,6 +850,7 @@ class Miscellaneous(object):
                                   corrected_image.
         """
 
+        sleep(2.)
         # Immediately return for monochrome input.
         if len(input_image.shape) != 3:
             return input_image
@@ -908,6 +909,7 @@ class Miscellaneous(object):
         :return: Three-channel RGB image with the color shifts applied.
         """
 
+        sleep(1.)
         # Immediately return for monochrome input.
         if len(input_image.shape) != 3:
             return input_image
