@@ -420,6 +420,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
+        sleep(0.5)
         self.postproc_data_object.version_compared = self.spinBox_compare.value()
 
     def new_version(self):
@@ -524,6 +525,9 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
+        # In case "correction mode" is on, process the current version image in full 16bit
+        # resolution.
+        self.postproc_data_object.finalize_postproc_version()
         Frames.save_image(self.postproc_data_object.file_name_processed,
                           self.postproc_data_object.versions[
                               self.postproc_data_object.version_selected].image,
@@ -544,6 +548,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
                             "Image Files (*.png *.tiff *.fits)", options=options)
 
         if filename and extension:
+            self.postproc_data_object.finalize_postproc_version()
             Frames.save_image(filename,
                               self.postproc_data_object.versions[
                                   self.postproc_data_object.version_selected].image,
@@ -594,10 +599,15 @@ class BlinkComparator(QtCore.QThread):
         while self.postproc_data_object.blinking:
             # Show the "selected" version.
             if show_selected_version:
+                # In case the blink comparator is invoked during manual RGB shift corrections,
+                # produce a final image of the selected version before blinking.
+                self.postproc_data_object.finalize_postproc_version()
                 self.set_photo_signal.emit(self.postproc_data_object.version_selected)
                 self.variant_shown_signal.emit(True, False)
             # Show the "compared" version.
             else:
+                self.postproc_data_object.finalize_postproc_version(
+                    version_index=self.postproc_data_object.version_compared)
                 self.set_photo_signal.emit(self.postproc_data_object.version_compared)
                 self.variant_shown_signal.emit(False, True)
 
@@ -748,7 +758,6 @@ class ImageProcessor(QtCore.QThread):
             self.layers_selected = postproc_version.layers
             self.rgb_automatic = postproc_version.rgb_automatic
             self.rgb_resolution_index = postproc_version.rgb_resolution_index
-            # print ("resolution index: " + str(self.rgb_resolution_index))
             self.rgb_gauss_width = postproc_version.rgb_gauss_width
             self.shift_red = postproc_version.shift_red
             self.shift_blue = postproc_version.shift_blue
@@ -1105,7 +1114,7 @@ class ImageProcessor(QtCore.QThread):
                     self.layer_denoised[layer_index] = None
                     change_detected = True
 
-        # Remember the current parameter settings to compare with new paraemters next time.
+        # Remember the current parameter settings to compare with new parameters next time.
         self.last_version_layers[self.version_selected] = deepcopy(self.layers_selected)
         return change_detected
 
@@ -1142,6 +1151,7 @@ class ImageProcessor(QtCore.QThread):
                 if self.layer_bilateral[layer_index] is None:
                     self.layer_bilateral[layer_index] = bilateralFilter(self.layer_input[layer_index],
                         0, layer.bi_range * 256., layer.radius/3., borderType=BORDER_DEFAULT)
+
             # Gaussian filter is needed:
             if abs(layer.bi_fraction - 1.) > 1.e-5:
                 # Filter must be recomputed.
@@ -1278,6 +1288,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.image_size_y = -1
 
         # Create the version manager and pass it the "select_version" callback function.
+        self.selected_version = None
         self.version_manager_widget = VersionManagerWidget(self.configuration, self.select_version)
         self.gridLayout.addWidget(self.version_manager_widget, 1, 1, 1, 1)
 
@@ -1376,25 +1387,21 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         version.correction_red_saved = version.correction_blue_saved = version.correction_red = \
             version.correction_blue = (0., 0.)
         version.images_uncorrected = [None] * 3
-        # print ("initialize rgb correction for single version")
 
     def rgb_correction_version_reset(self, version):
         version.rgb_correction_mode = False
         version.correction_red_saved = version.correction_blue_saved = version.correction_red =\
             version.correction_blue = (0., 0.)
         version.images_uncorrected = [None] * 3
-        # print("reset rgb correction for single version")
 
     def finish_rgb_correction_mode(self):
-        # print ("cleaning up rgb corrections")
         for version_index, version in enumerate(self.postproc_data_object.versions):
             if version.correction_red != (0., 0.) or version.correction_blue != (0., 0.):
-                # print("Applying corrections to version " + str(version_index))
                 version.shift_red = (version.shift_red[0] + version.correction_red[0],
                                      version.shift_red[1] + version.correction_red[1])
                 version.shift_blue = (version.shift_blue[0] + version.correction_blue[0],
                                       version.shift_blue[1] + version.correction_blue[1])
-        version.rgb_correction_mode = False
+            self.rgb_correction_version_reset(version)
         self.select_image(self.postproc_data_object.version_selected)
 
     def prreset_clicked(self):
@@ -1531,7 +1538,12 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return: -
         """
 
-        version_selected = self.postproc_data_object.versions[version_index]
+        # Check if we are leaving a version in correction mode. In this case apply the corrections.
+        if self.selected_version is not None:
+            if self.selected_version.rgb_correction_mode:
+                self.finish_rgb_correction_mode()
+
+        self.selected_version = self.postproc_data_object.versions[version_index]
 
         # Remove all existing layer widgets and the lower vertical spacer.
         if self.sharpening_layer_widgets:
@@ -1543,7 +1555,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.verticalLayout.removeItem(self.spacerItem)
 
         # Create new layer widgets for all active layers and put them into the scroll area.
-        for layer_index, layer in enumerate(version_selected.layers):
+        for layer_index, layer in enumerate(self.selected_version.layers):
             sharpening_layer_widget = SharpeningLayerWidget(layer_index, self.remove_layer)
             sharpening_layer_widget.set_values(layer)
             self.verticalLayout.addWidget(sharpening_layer_widget)
@@ -1563,10 +1575,10 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.verticalLayout.addItem(self.spacerItem)
 
         # Load the parameters of this version into the RGB alignment tab.
-        self.checkBox_automatic.setChecked(version_selected.rgb_automatic)
-        self.comboBox_resolution.setCurrentIndex(version_selected.rgb_resolution_index)
-        self.fgw_slider_value.setValue(int((version_selected.rgb_gauss_width + 1) / 2))
-        self.fgw_label_display.setText(str(version_selected.rgb_gauss_width))
+        self.checkBox_automatic.setChecked(self.selected_version.rgb_automatic)
+        self.comboBox_resolution.setCurrentIndex(self.selected_version.rgb_resolution_index)
+        self.fgw_slider_value.setValue(int((self.selected_version.rgb_gauss_width + 1) / 2))
+        self.fgw_label_display.setText(str(self.selected_version.rgb_gauss_width))
 
         # Load the current image into the image viewer.
         self.select_image(version_index)
@@ -1656,12 +1668,22 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return: -
         """
 
+        # In case "correction mode" is on, process the current version image in full 16bit
+        # resolution.
+        self.disable_widgets()
+        self.postproc_data_object.finalize_postproc_version()
+
         # Terminate the image processor thread.
         self.image_processor.stop()
         self.configuration.write_config()
         if self.signal_save_postprocessed_image:
             self.signal_save_postprocessed_image.emit(self.postproc_data_object.versions[
                 self.postproc_data_object.version_selected].image)
+        # The else branch is only for the test program below which does not provide a signal for
+        # saving the result. In this case use the save method of the version manager.
+        else:
+            self.version_manager_widget.save_version()
+        self.enable_widgets()
         self.close()
 
     def reject(self):

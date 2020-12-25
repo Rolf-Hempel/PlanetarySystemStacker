@@ -850,7 +850,7 @@ class Miscellaneous(object):
                                   corrected_image.
         """
 
-        sleep(2.)
+        # sleep(2.)
         # Immediately return for monochrome input.
         if len(input_image.shape) != 3:
             return input_image
@@ -909,7 +909,7 @@ class Miscellaneous(object):
         :return: Three-channel RGB image with the color shifts applied.
         """
 
-        sleep(1.)
+        # sleep(1.)
         # Immediately return for monochrome input.
         if len(input_image.shape) != 3:
             return input_image

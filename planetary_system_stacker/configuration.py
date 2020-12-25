@@ -25,8 +25,10 @@ from configparser import ConfigParser
 from copy import deepcopy
 from os.path import expanduser, join, isfile, dirname
 from os.path import splitext
+from numpy import uint8
 
 from exceptions import IncompatibleVersionsError
+from miscellaneous import Miscellaneous
 
 # Set the current software version.
 PSS_Version = "PlanetarySystemStacker 0.8.16"
@@ -811,6 +813,47 @@ class PostprocDataObject(object):
             self.versions = self.versions[:index] + self.versions[index + 1:]
             self.number_versions -= 1
             self.version_selected = index - 1
+
+    def finalize_postproc_version(self, version_index=None):
+        """
+        If "correction mode" is on, the image stored with the selected version is in 8bit and
+        potentially interpolated by the resolution factor. Before the image is saved, it has to be
+        processed from the original image using the current shift and layer data. The 16bit image is
+        stored with the current version object.
+
+        :param version_index: If an index is specified, process the version with this index.
+                              Otherwise, process the version currently selected.
+        :return: The processed 16bit image (also stored with the version).
+        """
+
+        if version_index is None:
+            # The computation is based on the current "version selected".
+            version = self.versions[self.version_selected]
+        else:
+            version = self.versions[version_index]
+
+        # If the dtype is "uint16", nothing is to be done. If it is "uint8", the current image is
+        # an intermediate product of the correction mode. In this case the rigorous postprocessing
+        # pipeline must be traversed to get the final image.
+        if version.image is not None and version.image.dtype == uint8:
+
+            # Compute the complete current shifts, including temporary shift corrections.
+            shift_red = (version.shift_red[0] + version.correction_red[0],
+                        version.shift_red[1] + version.correction_red[1])
+            shift_blue = (version.shift_blue[0] + version.correction_blue[0],
+                        version.shift_blue[1] + version.correction_blue[1])
+
+            # Shift the image with the resolution given by the selected interpolation factor.
+            interpolation_factor = [1, 2, 4][version.rgb_resolution_index]
+            shifted_image = Miscellaneous.shift_colors(self.image_original,
+                                                       shift_red, shift_blue,
+                                                       interpolate_input=interpolation_factor,
+                                                       reduce_output=interpolation_factor)
+
+            # Apply all wavelet layers.
+            version.image = Miscellaneous.post_process(shifted_image, version.layers)
+
+        return version.image
 
     def dump_config(self, config_parser_object):
         """
