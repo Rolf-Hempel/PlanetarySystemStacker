@@ -948,6 +948,8 @@ class Workflow(QtCore.QObject):
             version_index].rgb_gauss_width
         rgb_resolution_index = self.configuration.postproc_data_object.versions[
             version_index].rgb_resolution_index
+        shift_red = self.configuration.postproc_data_object.versions[version_index].shift_red
+        shift_blue = self.configuration.postproc_data_object.versions[version_index].shift_blue
 
         # Auto-align RGB channels, if requested.
         if rgb_automatic:
@@ -957,6 +959,13 @@ class Workflow(QtCore.QObject):
                 self.postproc_input_image, self.configuration.postproc_max_shift,
                 interpolation_factor=[1, 2, 4][rgb_resolution_index], reduce_output=True,
                 blur_strength=rgb_gauss_width)
+        elif shift_red != (0., 0.) or shift_blue != (0., 0.):
+            # Shift the image with the resolution given by the selected interpolation factor.
+            interpolation_factor = [1, 2, 4][rgb_resolution_index]
+            sharpening_input = Miscellaneous.shift_colors(self.postproc_input_image,
+                                                       shift_red, shift_blue,
+                                                       interpolate_input=interpolation_factor,
+                                                       reduce_output=interpolation_factor)
         else:
             sharpening_input = self.postproc_input_image
 

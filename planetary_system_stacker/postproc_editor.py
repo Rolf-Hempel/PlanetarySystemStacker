@@ -420,7 +420,6 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
-        sleep(0.5)
         self.postproc_data_object.version_compared = self.spinBox_compare.value()
 
     def new_version(self):
@@ -729,6 +728,16 @@ class ImageProcessor(QtCore.QThread):
                 version.image = Miscellaneous.post_process(
                     self.auto_rgb_aligned_images_original[version.rgb_resolution_index],
                     version.layers)
+            # If shifts were set manually, apply them before sharpening the input image.
+            elif version.shift_red != (0., 0.) or version.shift_blue != (0., 0.):
+                # Shift the image with the resolution given by the selected interpolation factor.
+                interpolation_factor = [1, 2, 4][version.rgb_resolution_index]
+                shifted_image = Miscellaneous.shift_colors(self.image_original,
+                                                          version.shift_red, version.shift_blue,
+                                                          interpolate_input=interpolation_factor,
+                                                          reduce_output=interpolation_factor)
+                version.image = Miscellaneous.post_process(shifted_image, version.layers)
+            # No RGB corrections were specified.
             else:
                 version.image = Miscellaneous.post_process(self.image_original, version.layers)
 
@@ -1671,6 +1680,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # In case "correction mode" is on, process the current version image in full 16bit
         # resolution.
         self.disable_widgets()
+        self.finish_rgb_correction_mode()
         self.postproc_data_object.finalize_postproc_version()
 
         # Terminate the image processor thread.

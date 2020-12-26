@@ -885,6 +885,14 @@ class PostprocDataObject(object):
             config_parser_object.set(section_name, 'rgb gauss width', str(version.rgb_gauss_width))
             config_parser_object.set(section_name, 'rgb resolution index',
                                      str(version.rgb_resolution_index))
+            config_parser_object.set(section_name, 'rgb shift red y',
+                                     str(version.shift_red[0]))
+            config_parser_object.set(section_name, 'rgb shift red x',
+                                     str(version.shift_red[1]))
+            config_parser_object.set(section_name, 'rgb shift blue y',
+                                     str(version.shift_blue[0]))
+            config_parser_object.set(section_name, 'rgb shift blue x',
+                                     str(version.shift_blue[1]))
 
             # For every postprocessing layer of this version, create a separate section.
             for layer_index, layer in enumerate(version.layers):
@@ -951,6 +959,12 @@ class PostprocDataObject(object):
                                                                               'rgb gauss width')
                     new_version.rgb_resolution_index = config_parser_object.getint(section,
                                                                             'rgb resolution index')
+                    new_version.shift_red = (
+                        config_parser_object.getfloat(section, 'rgb shift red y'),
+                        config_parser_object.getfloat(section, 'rgb shift red x'))
+                    new_version.shift_blue = (
+                        config_parser_object.getfloat(section, 'rgb shift blue y'),
+                        config_parser_object.getfloat(section, 'rgb shift blue x'))
 
                 # A layer section is found. Store it for the current version.
                 elif section_items[2] == 'Layer':
