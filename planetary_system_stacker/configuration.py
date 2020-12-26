@@ -745,8 +745,14 @@ class PostprocDataObject(object):
         self.file_name_processed = PostprocDataObject.set_file_name_processed(
             self.file_name_original, self.postproc_suffix, image_format)
 
+        # Reset images and shift vectors which still might hold data from the previous job.
         for version in self.versions:
             version.set_image(self.image_original)
+            version.input_image_saved = None
+            version.input_image_hsv_saved = None
+            version.shift_red_saved = None
+            version.shift_blue_saved = None
+            version.last_rgb_automatic = None
 
     @staticmethod
     def set_file_name_processed(file_name_original, postproc_suffix, image_format):
@@ -1015,7 +1021,7 @@ class PostprocVersion(object):
         self.image = None
         self.images_uncorrected = [None] * 3
         self.input_image_saved = None
-        self.input_image_saved_hsv = None
+        self.input_image_hsv_saved = None
 
     def set_image(self, image):
         """

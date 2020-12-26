@@ -976,7 +976,7 @@ class ImageProcessor(QtCore.QThread):
             # changed, the image must be set according to the new shift status. The shift was
             # applied in self.input_image above.
             elif compute_new_image and not self.version_selected:
-                self.postproc_data_object.versions[0].image = self.input_image
+                self.postproc_data_object.versions[0].image = self.input_image.astype(uint16)
                 # Show the new image in the image viewer, and remember its parameters.
                 self.set_photo_signal.emit(self.version_selected)
                 self.last_version_selected = self.version_selected
