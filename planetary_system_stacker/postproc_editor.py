@@ -369,12 +369,13 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
     # The blink comparator emits the variant_shown_signal to highlight / de-highlight the GUI image
     # selector which corresponds to the image currently displayed.
     variant_shown_signal = QtCore.pyqtSignal(bool, bool)
+    # This signal tells the PostprocEditorWidget to show the selected version in the frame viewer.
+    select_version_signal = QtCore.pyqtSignal(int)
 
-    def __init__(self, configuration, select_version_callback, parent=None):
+    def __init__(self, configuration, parent=None):
         """
 
         :param configuration: Configuration object with parameters.
-        :param select_version_callback: Higher-level method to set the currently selected version.
         :param parent: parent object.
         """
 
@@ -384,7 +385,6 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.pss_version = configuration.global_parameters_version
         self.postproc_data_object = configuration.postproc_data_object
         self.postproc_blinking_period = configuration.postproc_blinking_period
-        self.select_version_callback = select_version_callback
 
         self.spinBox_version.valueChanged.connect(self.select_version)
         self.spinBox_compare.valueChanged.connect(self.select_version_compared)
@@ -411,7 +411,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
         self.postproc_data_object.version_selected = self.spinBox_version.value()
-        self.select_version_callback(self.postproc_data_object.version_selected)
+        self.select_version_signal.emit(self.postproc_data_object.version_selected)
 
     def select_version_compared(self):
         """
@@ -753,7 +753,7 @@ class ImageProcessor(QtCore.QThread):
 
         # Remember the last version (and the corresponding layer parameters) shown in the image
         # viewer. As soon as this index changes, a new image is displayed.
-        self.last_version_selected = -1
+        self.last_version_selected = 0
 
         # Initialize the data objects holding the currently active and the previous version.
         self.version_selected = None
@@ -1301,13 +1301,14 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         # Create the version manager and pass it the "select_version" callback function.
         self.selected_version = None
-        self.version_manager_widget = VersionManagerWidget(self.configuration, self.select_version)
+        self.version_manager_widget = VersionManagerWidget(self.configuration)
         self.gridLayout.addWidget(self.version_manager_widget, 1, 1, 1, 1)
 
         # The "set_photo_signal" from the VersionManagerWidget is not passed to the image viewer
-        # directly. (The image viewer does not accept signals.) Instead, it calls the "select_image"
-        # method below which in turn invokes the image viewer.
+        # directly. (The image viewer does not accept signals.) Instead, it sends a signal to this
+        # object which in turn invokes the image viewer.
         self.version_manager_widget.set_photo_signal.connect(self.select_image)
+        self.version_manager_widget.select_version_signal.connect(self.select_version)
 
         # Select the initial current version.
         self.select_version(self.postproc_data_object.version_selected)
