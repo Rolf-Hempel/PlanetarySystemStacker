@@ -21,14 +21,16 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from copy import copy, deepcopy
+from math import sqrt
 from pathlib import Path
 from sys import argv, stdout
 from time import sleep
 
+import psutil
 from PyQt5 import QtWidgets, QtCore
-from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT,\
+from PyQt5.QtWidgets import QProxyStyle, QStyle
+from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT, \
     COLOR_BGR2HSV, COLOR_HSV2BGR
-from math import sqrt
 from numpy import uint8, uint16, float32
 
 from configuration import Configuration, PostprocLayer
@@ -358,6 +360,27 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.remove_layer_callback(self.layer_index)
 
 
+class CustomStyle(QProxyStyle):
+    """
+    This class is used to prevent the version spinbox from jumping two steps at once. The solution
+    was found on Stackoverflow
+    (https://stackoverflow.com/questions/40746350/why-qspinbox-jumps-twice-the-step-value).
+
+    """
+
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QStyle.SH_SpinBox_KeyPressAutoRepeatRate:
+            return 10**6
+        elif hint == QStyle.SH_SpinBox_ClickAutoRepeatRate:
+            return 10**6
+        elif hint == QStyle.SH_SpinBox_ClickAutoRepeatThreshold:
+            # You can use only this condition to avoid the auto-repeat,
+            # but better safe than sorry ;-)
+            return 10**6
+        else:
+            return super().styleHint(hint, option, widget, returnData)
+
+
 class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
     """
     This GUI widget manages the different postprocessing versions and controls which image is
@@ -400,6 +423,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.spinBox_version.setMinimum(0)
         self.spinBox_compare.setMaximum(configuration.postproc_data_object.number_versions)
         self.spinBox_compare.setMinimum(0)
+        self.spinBox_version.setStyle(CustomStyle())
+        self.spinBox_compare.setStyle(CustomStyle())
 
         # Set the spinbox to the newly created version.
         self.spinBox_version.setValue(self.postproc_data_object.version_selected)
@@ -1252,9 +1277,11 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.buttonBox.rejected.connect(self.reject)
         self.pushButton_add_layer.clicked.connect(self.add_layer)
 
-        self.comboBox_resolution.addItem('     1 Pixel ')
-        self.comboBox_resolution.addItem('   0.5 Pixels')
-        self.comboBox_resolution.addItem('  0.25 Pixels')
+        rgb_resolutions = ['     1 Pixel ', '   0.5 Pixels', '  0.25 Pixels']
+        max_rgb_index = self.max_auto_rgb_index()
+        for resolution_index in range(max_rgb_index + 1):
+            self.comboBox_resolution.addItem(rgb_resolutions[resolution_index])
+
         self.fgw_slider_value.valueChanged['int'].connect(self.fgw_changed)
         self.comboBox_resolution.currentIndexChanged.connect(self.rgb_resolution_changed)
         self.checkBox_automatic.stateChanged.connect(self.rgb_automatic_changed)
@@ -1321,6 +1348,28 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.image_processor.set_status_bar_signal.connect(set_status_bar_callback)
         self.image_processor.disable_widgets_signal.connect(self.disable_widgets)
         self.image_processor.enable_widgets_signal.connect(self.enable_widgets)
+
+        if max_rgb_index == -1:
+            self.checkBox_automatic.setChecked(False)
+            self.tab_rgb.setEnabled(False)
+
+        for version in self.postproc_data_object.versions:
+            if max_rgb_index == -1:
+                version.rgb_automatic = False
+            version.rgb_resolution_index = min(version.rgb_resolution_index, max(max_rgb_index, 0))
+
+    def max_auto_rgb_index(self):
+        max_levels = 3
+        # Look up the available RAM (without paging)
+        virtual_memory = dict(psutil.virtual_memory()._asdict())
+        available_ram = virtual_memory['available']
+        if self.postproc_data_object.color:
+            image = self.postproc_data_object.image_original
+            size_of_image = image.shape[0] * image.shape[1] * 12.
+            return min(int(sqrt(available_ram/10./size_of_image)), max_levels) - 1
+        else:
+            return max_levels - 1
+
 
     def disable_widgets(self):
         """
