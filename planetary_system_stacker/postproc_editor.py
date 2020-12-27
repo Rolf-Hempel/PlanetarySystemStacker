@@ -1359,17 +1359,41 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             version.rgb_resolution_index = min(version.rgb_resolution_index, max(max_rgb_index, 0))
 
     def max_auto_rgb_index(self):
-        max_levels = 3
+        """
+        Return the maximal auto RGB alignment index such that the image created is not larger than
+        10% of the available RAM. This makes sure that the postprocessing does not run out of RAM.
+
+        :return: Maximal RGB alignment index (0, 1, or 2). If the image is too large to do any
+                 auto RGB alignment, -1 is returned.
+        """
+
+        max_index = 2
+        factors = [1, 2, 4]
+
         # Look up the available RAM (without paging)
         virtual_memory = dict(psutil.virtual_memory()._asdict())
         available_ram = virtual_memory['available']
+
+        # For monochrome images, nothing is to be done.
         if self.postproc_data_object.color:
             image = self.postproc_data_object.image_original
-            size_of_image = image.shape[0] * image.shape[1] * 12.
-            return min(int(sqrt(available_ram/10./size_of_image)), max_levels) - 1
-        else:
-            return max_levels - 1
 
+            # The intermediate image is in float32 (4 bytes) and has 3 color channels.
+            size_of_image = image.shape[0] * image.shape[1] * 12.
+
+            # Compute the maximal interpolation factor.
+            max_factor = int(sqrt(available_ram/10./size_of_image))
+
+            # In this case auto RGB alignment does not even work for standard size.
+            if max_factor == 0:
+                return -1
+
+            # Look for the maximal interpolation index.
+            for level in range(max_index, -1, -1):
+                if factors[level] <= max_factor:
+                    break
+
+            return level
 
     def disable_widgets(self):
         """
