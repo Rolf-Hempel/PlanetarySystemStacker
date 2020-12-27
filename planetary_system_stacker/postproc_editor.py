@@ -1269,6 +1269,9 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.pushButton_blue_left.clicked.connect(self.pbl_clicked)
         self.pushButton_blue_right.clicked.connect(self.pbr_clicked)
 
+        # Enable RGB alignment for color input only.
+        self.tab_rgb.setEnabled(self.postproc_data_object.color)
+
         # Initialize list of sharpening layer widgets, and set the maximal number of layers.
         self.sharpening_layer_widgets = []
         self.max_layers = self.configuration.postproc_max_layers
