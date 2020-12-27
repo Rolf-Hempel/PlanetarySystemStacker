@@ -951,26 +951,33 @@ class Workflow(QtCore.QObject):
         shift_red = self.configuration.postproc_data_object.versions[version_index].shift_red
         shift_blue = self.configuration.postproc_data_object.versions[version_index].shift_blue
 
-        # Auto-align RGB channels, if requested.
-        if rgb_automatic:
-            sharpening_input, self.configuration.postproc_data_object.versions[
-                version_index].shift_red, self.configuration.postproc_data_object.versions[
-                version_index].shift_blue = Miscellaneous.auto_rgb_align(
-                self.postproc_input_image, self.configuration.postproc_max_shift,
-                interpolation_factor=[1, 2, 4][rgb_resolution_index], reduce_output=True,
-                blur_strength=rgb_gauss_width)
-        elif shift_red != (0., 0.) or shift_blue != (0., 0.):
-            # Shift the image with the resolution given by the selected interpolation factor.
-            interpolation_factor = [1, 2, 4][rgb_resolution_index]
-            sharpening_input = Miscellaneous.shift_colors(self.postproc_input_image,
-                                                       shift_red, shift_blue,
-                                                       interpolate_input=interpolation_factor,
-                                                       reduce_output=interpolation_factor)
-        else:
-            sharpening_input = self.postproc_input_image
+        try:
+            # Auto-align RGB channels, if requested.
+            if rgb_automatic:
+                sharpening_input, self.configuration.postproc_data_object.versions[
+                    version_index].shift_red, self.configuration.postproc_data_object.versions[
+                    version_index].shift_blue = Miscellaneous.auto_rgb_align(
+                    self.postproc_input_image, self.configuration.postproc_max_shift,
+                    interpolation_factor=[1, 2, 4][rgb_resolution_index], reduce_output=True,
+                    blur_strength=rgb_gauss_width)
+            elif shift_red != (0., 0.) or shift_blue != (0., 0.):
+                # Shift the image with the resolution given by the selected interpolation factor.
+                interpolation_factor = [1, 2, 4][rgb_resolution_index]
+                sharpening_input = Miscellaneous.shift_colors(self.postproc_input_image,
+                                                           shift_red, shift_blue,
+                                                           interpolate_input=interpolation_factor,
+                                                           reduce_output=interpolation_factor)
+            else:
+                sharpening_input = self.postproc_input_image
 
-        # Apply all sharpening layers of the postprocessing version selected last time.
-        self.postprocessed_image = Miscellaneous.post_process(sharpening_input, postproc_layers)
+            # Apply all sharpening layers of the postprocessing version selected last time.
+            self.postprocessed_image = Miscellaneous.post_process(sharpening_input, postproc_layers)
+
+        except Exception as e:
+            self.abort_job_signal.emit(
+                "Error in postprocessing: " + str(e) + ", continuing with next job")
+            return
+
         self.my_timer.stop('Conputing image postprocessing')
 
         self.work_next_task_signal.emit("Save postprocessed image")
