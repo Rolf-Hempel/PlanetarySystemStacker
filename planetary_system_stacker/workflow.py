@@ -146,8 +146,8 @@ class Workflow(QtCore.QObject):
                     self.attached_log_file, precede_with_timestamp=True)
         else:
             Miscellaneous.protocol(
-                "Warning: " + mkl_rt_name + " not found (Intel Math Kernel Library not "
-                "installed?). Performance may be reduced.\n", self.attached_log_file,
+                "Info: " + mkl_rt_name + " not found (Intel Math Kernel Library not "
+                "installed?). Performance might be slightly reduced.\n", self.attached_log_file,
                 precede_with_timestamp=True)
 
         # Create the calibration object, used for potential flat / dark corrections.
