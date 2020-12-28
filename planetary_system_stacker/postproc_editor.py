@@ -1278,8 +1278,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.pushButton_add_layer.clicked.connect(self.add_layer)
 
         rgb_resolutions = ['     1 Pixel ', '   0.5 Pixels', '  0.25 Pixels']
-        max_rgb_index = self.max_auto_rgb_index()
-        for resolution_index in range(max_rgb_index + 1):
+        self.max_rgb_index = self.max_auto_rgb_index()
+        for resolution_index in range(self.max_rgb_index + 1):
             self.comboBox_resolution.addItem(rgb_resolutions[resolution_index])
 
         self.fgw_slider_value.valueChanged['int'].connect(self.fgw_changed)
@@ -1349,14 +1349,14 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.image_processor.disable_widgets_signal.connect(self.disable_widgets)
         self.image_processor.enable_widgets_signal.connect(self.enable_widgets)
 
-        if max_rgb_index == -1:
+        if self.max_rgb_index == -1:
             self.checkBox_automatic.setChecked(False)
             self.tab_rgb.setEnabled(False)
 
         for version in self.postproc_data_object.versions:
-            if max_rgb_index == -1:
+            if self.max_rgb_index == -1:
                 version.rgb_automatic = False
-            version.rgb_resolution_index = min(version.rgb_resolution_index, max(max_rgb_index, 0))
+            version.rgb_resolution_index = min(version.rgb_resolution_index, max(self.max_rgb_index, 0))
 
     def max_auto_rgb_index(self):
         """
@@ -1663,7 +1663,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         # Load the parameters of this version into the RGB alignment tab.
         self.checkBox_automatic.setChecked(self.selected_version.rgb_automatic)
-        self.comboBox_resolution.setCurrentIndex(self.selected_version.rgb_resolution_index)
+        self.comboBox_resolution.setCurrentIndex(min(self.selected_version.rgb_resolution_index,
+                                                     self.max_rgb_index))
         self.fgw_slider_value.setValue(int((self.selected_version.rgb_gauss_width + 1) / 2))
         self.fgw_label_display.setText(str(self.selected_version.rgb_gauss_width))
 
