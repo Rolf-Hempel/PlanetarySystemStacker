@@ -1382,7 +1382,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             size_of_image = image.shape[0] * image.shape[1] * 12.
 
             # Compute the maximal interpolation factor.
-            max_factor = int(sqrt(available_ram/10./size_of_image))
+            max_factor = int(sqrt(
+                available_ram * self.configuration.postproc_max_ram_percentage / 100. / size_of_image))
 
             # In this case auto RGB alignment does not even work for standard size.
             if max_factor == 0:
