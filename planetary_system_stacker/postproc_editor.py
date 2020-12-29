@@ -1367,6 +1367,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
                  auto RGB alignment, -1 is returned.
         """
 
+        level = 2
         max_index = 2
         factors = [1, 2, 4]
 
@@ -1394,7 +1395,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
                 if factors[level] <= max_factor:
                     break
 
-            return level
+        return level
 
     def disable_widgets(self):
         """
@@ -1829,10 +1830,14 @@ class EmulateStatusBar(object):
 
 if __name__ == '__main__':
     # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
-    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\" \
-                      "2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_rgb-shifted.png"
+    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\" \
+    #                   "2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_rgb-shifted.png"
+    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter\\2019-05-26-0115_4-L-Jupiter_ZWO ASI290MM Mini_pipp_pss.png"
+
+    input_image = imread(input_file_name, -1)
     # Change colors to standard RGB
-    input_image = cvtColor(imread(input_file_name, -1), COLOR_BGR2RGB)
+    if len(input_image.shape) == 3:
+        input_image = cvtColor(input_image, COLOR_BGR2RGB)
 
     configuration = Configuration()
     configuration.initialize_configuration()

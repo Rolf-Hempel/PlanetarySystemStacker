@@ -31,7 +31,7 @@ from exceptions import IncompatibleVersionsError
 from miscellaneous import Miscellaneous
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.8.16"
+PSS_Version = "PlanetarySystemStacker 0.8.17"
 # PSS_Version = "PlanetarySystemStacker"
 
 
