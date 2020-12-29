@@ -23,11 +23,11 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from datetime import datetime
 from os import unlink
 from sys import stdout
-from time import time
+from time import time, sleep
 
 from cv2 import CV_32F, Laplacian, VideoWriter_fourcc, VideoWriter, FONT_HERSHEY_SIMPLEX, LINE_AA, \
     putText, GaussianBlur, cvtColor, COLOR_BGR2HSV, COLOR_HSV2BGR, BORDER_DEFAULT, meanStdDev,\
-    resize, matchTemplate, minMaxLoc, TM_CCORR_NORMED, bilateralFilter
+    resize, matchTemplate, minMaxLoc, TM_CCORR_NORMED, bilateralFilter, INTER_CUBIC
 from numpy import abs as np_abs
 from numpy import diff, average, hypot, sqrt, unravel_index, argmax, zeros, arange, array, matmul, \
     empty, argmin, stack, sin, uint8, float32, uint16, full
@@ -37,7 +37,7 @@ from numpy.fft import fft2, ifft2
 from numpy.linalg import solve
 from scipy.ndimage import sobel
 
-from exceptions import DivideByZeroError, ArgumentError
+from exceptions import DivideByZeroError, ArgumentError, Error
 
 
 class Miscellaneous(object):
@@ -820,6 +820,257 @@ class Miscellaneous(object):
         return [dy-search_width, dx-search_width], dev_table[dy, dx]
 
     @staticmethod
+    def auto_rgb_align(input_image, max_shift, interpolation_factor=1, reduce_output=True,
+                       blur_strength=None):
+        """
+        Align the three color channels of an RGB image automatically. For sub-pixel resolution the
+        image can be interpolated before the shift is measured. Optionally, a Gaussian blur can be
+        added to suppress noise.
+
+        If no matching shift can be found within the range given by "max_shift", an Exception of
+        type Error is thrown.
+
+        :param input_image: Three-channel RGB image.
+        :param max_shift: Maximal displacement between channels.
+        :param interpolation_factor: Scaling factor (integer) for subpixel measurements.
+        :param reduce_output: If True, the corrected image is reduced to the input resolution.
+                              If False, it stays at the interpolated resolution. In this case the
+                              output values for correction_red and correction_blue are in terms of
+                              the interpolated resolution as well.
+        :param blur_strength: Optional blur strength, must be an uneven integer > 0.
+        :return: (corrected_image, correction_red, correction_blue) with:
+                 corrected_image: The corrected image with the same datatype as the input image.
+                                  Please note that the size may be reduced because of channel
+                                  mismatch at the borders.
+                 correction_red:  Tuple (shift_y, shift_x) with coordinate shifts in y and x
+                                  applied to the red channel of input_image to produce the
+                                  corrected_image.
+                 correction_blue: Tuple (shift_y, shift_x) with coordinate shifts in y and x
+                                  applied to the blue channel of input_image to produce the
+                                  corrected_image.
+        """
+
+        # sleep(2.)
+        # Immediately return for monochrome input.
+        if len(input_image.shape) != 3:
+            return input_image
+
+        # If subpixel resolution is asked for, interpolate the input image first.
+        if interpolation_factor != 1:
+            input_interpolated = Miscellaneous.shift_colors(input_image, (0, 0), (0, 0),
+                                                            interpolate_input=interpolation_factor)
+        else:
+            input_interpolated = input_image
+
+        # Measure the shifts of the red and blue channels, respectively, with respect to the green
+        # channel.
+        channel_green = 1
+        channel_red = 0
+        shift_red = Miscellaneous.measure_rgb_shift(input_interpolated, channel_red,
+                                                    channel_green, max_shift * interpolation_factor,
+                                                    blur_strength=blur_strength)
+        channel_blue = 2
+        shift_blue = Miscellaneous.measure_rgb_shift(input_interpolated, channel_blue,
+                                                     channel_green, max_shift*interpolation_factor,
+                                                     blur_strength=blur_strength)
+
+        # Reverse the shift measured in the input image.
+        if reduce_output:
+            factor = interpolation_factor
+        else:
+            factor = 1
+        return Miscellaneous.shift_colors(input_interpolated, (-shift_red[0], -shift_red[1]),
+               (-shift_blue[0], -shift_blue[1]), reduce_output=factor), \
+               (-shift_red[0]/factor, -shift_red[1]/factor), \
+               (-shift_blue[0]/factor, -shift_blue[1]/factor)
+
+
+    @staticmethod
+    def shift_colors(input_image, shift_red, shift_blue, interpolate_input=1, reduce_output=1):
+        """
+        Shift the red and blue channel of a color image in y and x direction, and leave the green
+        channel unchanged. The shift is sub-pixel accurate if the input is interpolated. Optionally
+        the resulting image is reduced in size by a given factor.
+
+        :param input_image: Three-channel RGB image.
+        :param shift_red: Tuple (shift_y, shift_x) with shifts in y and x direction for the red
+                          channel. After multiplication with the interpolate_input factor (if given)
+                          the shifts are rounded to the next integer value. This enables sub-pixel
+                          shifts at the original image scale.
+        :param shift_blue: Tuple (shift_y, shift_x) with shifts in y and x direction for the blue
+                           channel.
+        :param interpolate_input: If set, it must be an integer >= 1. The input image is
+                                  interpolated in both directions by this factor before the shift is
+                                  applied.
+        :param reduce_output: If set, it must be an integer >= 1. The intermediate image is reduced
+                              in size by this factor. Please note that interpolate_input =
+                              reduce_output assures that the input and output images are the same
+                              size.
+        :return: Three-channel RGB image with the color shifts applied.
+        """
+
+        # sleep(1.)
+        # Immediately return for monochrome input.
+        if len(input_image.shape) != 3:
+            return input_image
+
+        # If all shifts are zero, nothing is to be done except interpolation / reduction.
+        if not (shift_red[0] or shift_red[1] or shift_blue[0] or shift_blue[1]):
+            # If the factors for interpolation and reduction are the same, nothing is to be done.
+            if not (interpolate_input - reduce_output) or not reduce_output:
+                return input_image
+            # Simple resizing. reduce_output is not zero (see above)!
+            else:
+                scale_factor = float(interpolate_input) / float(reduce_output)
+                return resize(input_image, (round(input_image.shape[1] * scale_factor),
+                                round(input_image.shape[0] * scale_factor)),
+                                interpolation=INTER_CUBIC)
+
+        # If interpolation is requested, resize the input image and multiply the shift values.
+        if interpolate_input != 1:
+            dim_y = input_image.shape[0] * interpolate_input
+            dim_x = input_image.shape[1] * interpolate_input
+            interp_image = resize(input_image, (dim_x, dim_y), interpolation=INTER_CUBIC)
+            s_red_y = round(interpolate_input * shift_red[0])
+            s_red_x = round(interpolate_input * shift_red[1])
+            s_blue_y = round(interpolate_input * shift_blue[0])
+            s_blue_x = round(interpolate_input * shift_blue[1])
+        else:
+            dim_y = input_image.shape[0]
+            dim_x = input_image.shape[1]
+            interp_image = input_image
+            s_red_y = round(shift_red[0])
+            s_red_x = round(shift_red[1])
+            s_blue_y = round(shift_blue[0])
+            s_blue_x = round(shift_blue[1])
+
+        # Remember the data type of the input image. The output image will be of the same type.
+        type = input_image.dtype
+
+        # In the following, for both the red and blue channels the index areas are computed for
+        # which no shift is beyond the image dimensions. First treat the y coordinate.
+        y_low_source_r = -s_red_y
+        y_high_source_r = dim_y - s_red_y
+        y_low_target_r = 0
+        # If the shift reaches beyond the frame, reduce the copy area.
+        if y_low_source_r < 0:
+            y_low_target_r = -y_low_source_r
+            y_low_source_r = 0
+        if y_high_source_r > dim_y:
+            y_high_source_r = dim_y
+        y_high_target_r = y_low_target_r + y_high_source_r - y_low_source_r
+
+        y_low_source_b = -s_blue_y
+        y_high_source_b = dim_y - s_blue_y
+        y_low_target_b = 0
+        # If the shift reaches beyond the frame, reduce the copy area.
+        if y_low_source_b < 0:
+            y_low_target_b = -y_low_source_b
+            y_low_source_b = 0
+        if y_high_source_b > dim_y:
+            y_high_source_b = dim_y
+        y_high_target_b = y_low_target_b + y_high_source_b - y_low_source_b
+
+        # The same for the x coordinate.
+        x_low_source_r = -s_red_x
+        x_high_source_r = dim_x - s_red_x
+        x_low_target_r = 0
+        # If the shift reaches beyond the frame, reduce the copy area.
+        if x_low_source_r < 0:
+            x_low_target_r = -x_low_source_r
+            x_low_source_r = 0
+        if x_high_source_r > dim_x:
+            x_high_source_r = dim_x
+        x_high_target_r = x_low_target_r + x_high_source_r - x_low_source_r
+
+        x_low_source_b = -s_blue_x
+        x_high_source_b = dim_x - s_blue_x
+        x_low_target_b = 0
+        # If the shift reaches beyond the frame, reduce the copy area.
+        if x_low_source_b < 0:
+            x_low_target_b = -x_low_source_b
+            x_low_source_b = 0
+        if x_high_source_b > dim_x:
+            x_high_source_b = dim_x
+        x_high_target_b = x_low_target_b + x_high_source_b - x_low_source_b
+
+        # Now the coordinate bounds can be computed for which the output image has entries in all
+        # three channels. The green channel is not shifted and can just be copied in place.
+        min_y_g = max(y_low_target_r, y_low_target_b)
+        max_y_g = min(y_high_target_r, y_high_target_b)
+        min_x_g = max(x_low_target_r, x_low_target_b)
+        max_x_g = min(x_high_target_r, x_high_target_b)
+
+        # Allocate space for the output image (still not reduced in size), and copy the three color
+        # channels with the appropriate shifts applied.
+        output_image_interp = empty((max_y_g - min_y_g, max_x_g - min_x_g, 3), dtype=type)
+        output_image_interp[:, :, 0] = interp_image[min_y_g - s_red_y:max_y_g - s_red_y,
+                                       min_x_g - s_red_x:max_x_g - s_red_x, 0]
+        output_image_interp[:, :, 1] = interp_image[min_y_g:max_y_g, min_x_g:max_x_g, 1]
+        output_image_interp[:, :, 2] = interp_image[min_y_g - s_blue_y:max_y_g - s_blue_y,
+                                       min_x_g - s_blue_x:max_x_g - s_blue_x, 2]
+
+        # If output size reduction is specified, resize the intermediate image.
+        if reduce_output != 1:
+            output_image = resize(output_image_interp,
+                                  (round(output_image_interp.shape[1] / reduce_output),
+                                   round(output_image_interp.shape[0] / reduce_output)),
+                                  interpolation=INTER_CUBIC)
+        else:
+            output_image = output_image_interp
+
+        return output_image
+
+    @staticmethod
+    def measure_rgb_shift(image, channel_id, reference_id, max_shift, blur_strength=None):
+        """
+        Measure the shift between two color channels of a three-color RGB image. Before measuring
+        the shift with cross correlation, a Gaussian blur can be applied to both channels to reduce
+        noise.
+
+        :param image: Input image (3 channel RGB).
+        :param channel_id: Index of the channel, the shift of which is to be measured against the
+                           reference channel.
+        :param reference_id: Index of the reference channel, usually 1 for "green".
+        :param max_shift: Maximal search space radius in pixels.
+        :param blur_strength: Strength of the Gaussian blur to be applied first.
+        :return: Tuple (shift_y, shift_x) with coordinate shifts in y and x.
+        """
+
+        # Test for invalid channel ids.
+        if not (0 <= channel_id <= 2):
+            raise ArgumentError("Invalid color channel id: " + str(channel_id))
+        if not (0 <= reference_id <= 2):
+            raise ArgumentError("Invalid reference channel id: " + str(reference_id))
+
+        # Reduce the size of the window for which the correlation will be computed to make space for
+        # the search space around it.
+        channel_window = image[max_shift:-max_shift, max_shift:-max_shift, channel_id]
+        channel_reference = image[:, :, reference_id]
+
+        # Apply Gaussian blur if requested.
+        if blur_strength:
+            channel_blurred = GaussianBlur(channel_window, (blur_strength, blur_strength), 0)
+            channel_reference_blurred = GaussianBlur(channel_reference,
+                                                     (blur_strength, blur_strength), 0)
+        else:
+            channel_blurred = channel_window
+            channel_reference_blurred = channel_reference
+
+        # Compute the normalized cross correlation.
+        result = matchTemplate((channel_reference_blurred).astype(float32),
+                               channel_blurred.astype(float32), TM_CCORR_NORMED)
+
+        # Determine the position of the maximum correlation, and compute the corresponding shifts.
+        minVal, maxVal, minLoc, maxLoc = minMaxLoc(result)
+        shift_y = max_shift - maxLoc[1]
+        shift_x = max_shift - maxLoc[0]
+        if abs(shift_y) != max_shift and abs(shift_x) != max_shift:
+            return (shift_y, shift_x)
+        else:
+            raise Error ("No matching shift found within given range")
+
+    @staticmethod
     def insert_cross(frame, y_center, x_center, cross_half_len, color):
         """
         Insert a colored cross into an image at a given location.
@@ -1347,26 +1598,75 @@ class Miscellaneous(object):
         Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
 
     @staticmethod
-    def print_postproc_parameters(layers, logfile):
+    def print_postproc_parameters(postproc_version, logfile):
         """
         Print a table with postprocessing layer info for the selected postprocessing version.
 
-        :param layers: Object holding postprocessing parameters for all active layers.
+        :param postproc_version: Object holding postprocessing parameters for the selected version.
         :param logfile: logfile or None (no logging)
         :return: -
         """
 
-        output_string = "\n           Postprocessing method: " + layers[0].postproc_method + "\n\n" + \
-                        "           Layer    |    Radius    |   Amount   |   Bi fraction (%)   |   Bi range   |   Denoise (%)   |   Luminance only   |\n" \
-                        "           ------------------------------------------------------------------------------------------------------------------" \
-                        "\n           "
+        # Test if an RGB correction has been applied.
+        if postproc_version.shift_red != (0., 0.) or postproc_version.shift_blue != (0., 0.):
+            # Find out if the RGB correction was done automatically.
+            if postproc_version.rgb_automatic:
+                intro = "           Automatic RGB correction, "
+            else:
+                intro = "           Manual RGB correction, "
+            (shift_red_y, shift_red_x) = postproc_version.shift_red
+            (shift_blue_y, shift_blue_x) = postproc_version.shift_blue
 
-        # Extend the three table lines up to the max index.
-        for index, layer in enumerate(layers):
-            output_string += " {0:3d}     |     {1:5.2f}    |   {2:6.2f}   |         {3:4.0f}        |    {4:5.1f}     |       {5:4.0f}      |       {6:8s}     |" \
-                 "\n           ".format(index + 1, layer.radius, layer.amount, layer.bi_fraction*100., layer.bi_range, layer.denoise*100., str(layer.luminance_only))
+            n_digits = [0, 1, 2][postproc_version.rgb_resolution_index]
+            if shift_red_y >= 0.:
+                dir_red_y = " pixels down"
+            else:
+                dir_red_y = " pixels up"
+            if shift_red_x >= 0.:
+                dir_red_x = " pixels right"
+            else:
+                dir_red_x = " pixels left"
+            if shift_blue_y >= 0.:
+                dir_blue_y = " pixels down"
+            else:
+                dir_blue_y = " pixels up"
+            if shift_blue_x >= 0.:
+                dir_blue_x = " pixels right"
+            else:
+                dir_blue_x = " pixels left"
 
-        Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
+            # Special case 0 digits: In this case the number of digits must be omitted.
+            # If the round function is called with "n_digits=0", the result still has one digit
+            # after the decimal point.
+            if n_digits:
+                Miscellaneous.protocol(
+                    intro + "red channel shifted " +
+                    str(round(abs(shift_red_y), n_digits)) + dir_red_y + ", " +
+                    str(round(abs(shift_red_x), n_digits)) + dir_red_x + ", blue channel shifted " +
+                    str(round(abs(shift_blue_y), n_digits)) + dir_blue_y + ", " +
+                    str(round(abs(shift_blue_x), n_digits)) + dir_blue_x + ".",
+                    logfile, precede_with_timestamp=False)
+            else:
+                Miscellaneous.protocol(
+                    intro + "red channel shifted " +
+                    str(round(abs(shift_red_y))) + dir_red_y + ", " +
+                    str(round(abs(shift_red_x))) + dir_red_x + ", blue channel shifted " +
+                    str(round(abs(shift_blue_y))) + dir_blue_y + ", " +
+                    str(round(abs(shift_blue_x))) + dir_blue_x + ".",
+                    logfile, precede_with_timestamp=False)
+
+        if postproc_version.layers:
+            output_string = "           Postprocessing method: " + postproc_version.layers[0].postproc_method + "\n\n" + \
+                            "           Layer    |    Radius    |   Amount   |   Bi fraction (%)   |   Bi range   |   Denoise (%)   |   Luminance only   |\n" \
+                            "           ------------------------------------------------------------------------------------------------------------------" \
+                            "\n           "
+
+            # Extend the three table lines up to the max index.
+            for index, layer in enumerate(postproc_version.layers):
+                output_string += " {0:3d}     |     {1:5.2f}    |   {2:6.2f}   |         {3:4.0f}        |    {4:5.1f}     |       {5:4.0f}      |       {6:8s}     |" \
+                     "\n           ".format(index + 1, layer.radius, layer.amount, layer.bi_fraction*100., layer.bi_range, layer.denoise*100., str(layer.luminance_only))
+
+            Miscellaneous.protocol(output_string, logfile, precede_with_timestamp=False)
 
 
 if __name__ == "__main__":

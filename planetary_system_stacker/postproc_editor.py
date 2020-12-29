@@ -21,15 +21,17 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from copy import copy, deepcopy
+from math import sqrt
 from pathlib import Path
 from sys import argv, stdout
 from time import sleep
 
+import psutil
 from PyQt5 import QtWidgets, QtCore
-from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT,\
+from PyQt5.QtWidgets import QProxyStyle, QStyle
+from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT, \
     COLOR_BGR2HSV, COLOR_HSV2BGR
-from math import sqrt
-from numpy import uint16, float32
+from numpy import uint8, uint16, float32
 
 from configuration import Configuration, PostprocLayer
 from exceptions import InternalError
@@ -358,6 +360,27 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.remove_layer_callback(self.layer_index)
 
 
+class CustomStyle(QProxyStyle):
+    """
+    This class is used to prevent the version spinbox from jumping two steps at once. The solution
+    was found on Stackoverflow
+    (https://stackoverflow.com/questions/40746350/why-qspinbox-jumps-twice-the-step-value).
+
+    """
+
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QStyle.SH_SpinBox_KeyPressAutoRepeatRate:
+            return 10**6
+        elif hint == QStyle.SH_SpinBox_ClickAutoRepeatRate:
+            return 10**6
+        elif hint == QStyle.SH_SpinBox_ClickAutoRepeatThreshold:
+            # You can use only this condition to avoid the auto-repeat,
+            # but better safe than sorry ;-)
+            return 10**6
+        else:
+            return super().styleHint(hint, option, widget, returnData)
+
+
 class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
     """
     This GUI widget manages the different postprocessing versions and controls which image is
@@ -369,12 +392,13 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
     # The blink comparator emits the variant_shown_signal to highlight / de-highlight the GUI image
     # selector which corresponds to the image currently displayed.
     variant_shown_signal = QtCore.pyqtSignal(bool, bool)
+    # This signal tells the PostprocEditorWidget to show the selected version in the frame viewer.
+    select_version_signal = QtCore.pyqtSignal(int)
 
-    def __init__(self, configuration, select_version_callback, parent=None):
+    def __init__(self, configuration, parent=None):
         """
 
         :param configuration: Configuration object with parameters.
-        :param select_version_callback: Higher-level method to set the currently selected version.
         :param parent: parent object.
         """
 
@@ -384,7 +408,6 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.pss_version = configuration.global_parameters_version
         self.postproc_data_object = configuration.postproc_data_object
         self.postproc_blinking_period = configuration.postproc_blinking_period
-        self.select_version_callback = select_version_callback
 
         self.spinBox_version.valueChanged.connect(self.select_version)
         self.spinBox_compare.valueChanged.connect(self.select_version_compared)
@@ -400,6 +423,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.spinBox_version.setMinimum(0)
         self.spinBox_compare.setMaximum(configuration.postproc_data_object.number_versions)
         self.spinBox_compare.setMinimum(0)
+        self.spinBox_version.setStyle(CustomStyle())
+        self.spinBox_compare.setStyle(CustomStyle())
 
         # Set the spinbox to the newly created version.
         self.spinBox_version.setValue(self.postproc_data_object.version_selected)
@@ -411,7 +436,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
         self.postproc_data_object.version_selected = self.spinBox_version.value()
-        self.select_version_callback(self.postproc_data_object.version_selected)
+        self.select_version_signal.emit(self.postproc_data_object.version_selected)
 
     def select_version_compared(self):
         """
@@ -524,6 +549,9 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
+        # In case "correction mode" is on, process the current version image in full 16bit
+        # resolution.
+        self.postproc_data_object.finalize_postproc_version()
         Frames.save_image(self.postproc_data_object.file_name_processed,
                           self.postproc_data_object.versions[
                               self.postproc_data_object.version_selected].image,
@@ -544,6 +572,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
                             "Image Files (*.png *.tiff *.fits)", options=options)
 
         if filename and extension:
+            self.postproc_data_object.finalize_postproc_version()
             Frames.save_image(filename,
                               self.postproc_data_object.versions[
                                   self.postproc_data_object.version_selected].image,
@@ -594,10 +623,15 @@ class BlinkComparator(QtCore.QThread):
         while self.postproc_data_object.blinking:
             # Show the "selected" version.
             if show_selected_version:
+                # In case the blink comparator is invoked during manual RGB shift corrections,
+                # produce a final image of the selected version before blinking.
+                self.postproc_data_object.finalize_postproc_version()
                 self.set_photo_signal.emit(self.postproc_data_object.version_selected)
                 self.variant_shown_signal.emit(True, False)
             # Show the "compared" version.
             else:
+                self.postproc_data_object.finalize_postproc_version(
+                    version_index=self.postproc_data_object.version_compared)
                 self.set_photo_signal.emit(self.postproc_data_object.version_compared)
                 self.variant_shown_signal.emit(False, True)
 
@@ -625,9 +659,16 @@ class ImageProcessor(QtCore.QThread):
 
     # The set_photo_signal tells the image viewer which image it should show.
     set_photo_signal = QtCore.pyqtSignal(int)
+    # The set_shift_display_signal tells the PostprocEditorWidget to update the display of RGB
+    # shift values.
+    set_shift_display_signal = QtCore.pyqtSignal()
     # The set_status_bar_signal triggers the display of a (colored) message in the main GUI's
     # status bar.
     set_status_bar_signal = QtCore.pyqtSignal(str, str)
+    # While computations are going on, GUI widgets are disabled to avoid race conditions.
+    disable_widgets_signal = QtCore.pyqtSignal()
+    # When computations have finished, reactivate GUI widgets.
+    enable_widgets_signal = QtCore.pyqtSignal()
 
     def __init__(self, configuration, parent=None):
         """
@@ -644,74 +685,335 @@ class ImageProcessor(QtCore.QThread):
         # Extract the file name from its path.
         self.file_name = Path(self.postproc_data_object.file_name_original).name
 
+        self.start()
+
+    def run(self):
+
+        # Before executing the main loop, initialize images for all versions kept in the version
+        # manager. In particular if versions have the "Auto RGB alignment" checkbox set, this may
+        # take a while.
+
+        # Change the main GUI's status bar to show that a computation is going on, and disable GUI
+        # widgets to avoid race conditions.
+        self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                        ", busy computing initial images for all versions; "
+                                        "This will take a while",
+                                        "black")
+        self.disable_widgets_signal.emit()
+
         # Do the computations in float32 to avoid clipping effects. If the input image is color,
         # also create a version for "luminance only" computations.
-        self.input_image = self.postproc_data_object.image_original.astype(float32)
-        self.color = len(self.input_image.shape) == 3
+        self.image_original = self.postproc_data_object.image_original.astype(float32)
+        self.color = len(self.image_original.shape) == 3
         if self.color:
-            self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
+            self.image_original_hsv = cvtColor(self.image_original, COLOR_BGR2HSV)
 
-        # Change the main GUI's status bar to show that a computation is going on.
-        self.set_status_bar_signal.emit("Processing " + self.file_name +
-            ", busy computing a new postprocessing image.", "black")
+        # Initialize list of auto-rgb-aligned input images for all resolution levels.
+        self.auto_rgb_aligned_images_original = [None, None, None]
+        if self.color:
+            self.auto_rgb_aligned_images_original_hsv = [None, None, None]
+        self.auto_rgb_shifts_red = [None, None, None]
+        self.auto_rgb_shifts_blue = [None, None, None]
 
         # Initialize images for all versions using the current layer data.
         self.last_version_layers = []
+
         for version in self.postproc_data_object.versions:
-            # Initialize intermediate images for all possible layers.
+            # For every version, keep a copy of the current layer parameters for later checks for
+            # changes. Also, remember if for this version RGB alignment was active.
             self.last_version_layers.append(deepcopy(version.layers))
-            version.image = Miscellaneous.post_process(self.input_image, version.layers)
+            version.last_rgb_automatic = version.rgb_automatic
+
+            # If automatic RGB alignment is selected for this version, compute the shifted
+            # original image for this version's resolution if not yet available.
+            if version.rgb_automatic:
+                if self.auto_rgb_aligned_images_original[version.rgb_resolution_index] is None:
+                    try:
+                        self.auto_rgb_aligned_images_original[version.rgb_resolution_index], \
+                        self.auto_rgb_shifts_red[version.rgb_resolution_index], \
+                        self.auto_rgb_shifts_blue[
+                            version.rgb_resolution_index] = Miscellaneous.auto_rgb_align(
+                            self.image_original, self.configuration.postproc_max_shift,
+                            interpolation_factor=[1, 2, 4][version.rgb_resolution_index],
+                            blur_strength=version.rgb_gauss_width)
+                        if self.color:
+                            self.auto_rgb_aligned_images_original_hsv[
+                                version.rgb_resolution_index] = cvtColor(
+                                self.auto_rgb_aligned_images_original[version.rgb_resolution_index],
+                                COLOR_BGR2HSV)
+                    except:
+                        self.auto_rgb_aligned_images_original[
+                            version.rgb_resolution_index] = self.image_original
+                        self.auto_rgb_shifts_red[version.rgb_resolution_index] = (0., 0.)
+                        self.auto_rgb_shifts_blue[version.rgb_resolution_index] = (0., 0.)
+                        if self.color:
+                            self.auto_rgb_aligned_images_original_hsv[
+                                version.rgb_resolution_index] = self.image_original_hsv
+
+                version.image = Miscellaneous.post_process(
+                    self.auto_rgb_aligned_images_original[version.rgb_resolution_index],
+                    version.layers)
+            # If shifts were set manually, apply them before sharpening the input image.
+            elif version.shift_red != (0., 0.) or version.shift_blue != (0., 0.):
+                # Shift the image with the resolution given by the selected interpolation factor.
+                interpolation_factor = [1, 2, 4][version.rgb_resolution_index]
+                shifted_image = Miscellaneous.shift_colors(self.image_original,
+                                                          version.shift_red, version.shift_blue,
+                                                          interpolate_input=interpolation_factor,
+                                                          reduce_output=interpolation_factor)
+                version.image = Miscellaneous.post_process(shifted_image, version.layers)
+            # No RGB corrections were specified.
+            else:
+                version.image = Miscellaneous.post_process(self.image_original, version.layers)
 
         # Initialize lists for intermediate results (to speed up image updates). The efficient
         # reuse of intermediate results is only possible if there is enough RAM.
         self.reset_intermediate_images()
         self.ram_sufficient = True
 
-        # Reset the status bar to its idle state.
-        self.set_status_bar_signal.emit("Processing " + self.file_name + ", postprocessing.",
-                "black")
+        # Reset the status bar to its idle state, and enable GUI widgets.
+        self.set_status_bar_signal.emit("Postprocessing " + self.file_name,
+                                        "black")
+        self.enable_widgets_signal.emit()
 
         # Remember the last version (and the corresponding layer parameters) shown in the image
         # viewer. As soon as this index changes, a new image is displayed.
-        self.last_version_selected = -1
+        self.last_version_selected = 0
 
         # Initialize the data objects holding the currently active and the previous version.
         self.version_selected = None
         self.layers_selected = None
 
-        # Remember that a new image must be computed because the ImageProcessor is just initialized.
-        self.initial_state = True
-
-        self.start()
-
-    def reset_intermediate_images(self):
-        """
-        Initialize all intermediate image versions, so that they will be re-computed next time.
-
-        :return: -
-        """
-
-        self.layer_input = [None] * (self.configuration.postproc_max_layers + 1)
-        self.layer_gauss = [None] * (self.configuration.postproc_max_layers)
-        self.layer_bilateral = [None] * (self.configuration.postproc_max_layers)
-        self.layer_denoised = [None] * (self.configuration.postproc_max_layers)
-
-    def run(self):
+        # Enter the main loop and wait for parameter changes in the version selected.
         while True:
             # To avoid chasing a moving target, copy the parameters of the currently active version
             self.version_selected = self.postproc_data_object.version_selected
-            self.layers_selected = deepcopy(self.postproc_data_object.versions[
-                                                self.version_selected].layers)
+            postproc_version = deepcopy(self.postproc_data_object.versions[self.version_selected])
+            self.layers_selected = postproc_version.layers
+            self.rgb_automatic = postproc_version.rgb_automatic
+            self.rgb_resolution_index = postproc_version.rgb_resolution_index
+            self.rgb_gauss_width = postproc_version.rgb_gauss_width
+            self.shift_red = postproc_version.shift_red
+            self.shift_blue = postproc_version.shift_blue
+            self.correction_red = postproc_version.correction_red
+            self.correction_blue = postproc_version.correction_blue
+            self.correction_red_saved = postproc_version.correction_red_saved
+            self.correction_blue_saved = postproc_version.correction_blue_saved
 
-            # Compare the currently active version with the last one for which an image was
-            # computed. If there is a difference, start a new computation. Special case
-            # self.version_selected = 0: For the original image nothing must be computed.
-            if self.new_computation_required(self.version_selected != self.last_version_selected) \
-                    and self.version_selected:
+            compute_new_image = False
+            shift_image = False
 
+            # If the RGB auto-alignment checkbox was changed since the last image was computed for
+            # this version, invalidate all intermediate results for this version.
+            if self.rgb_automatic != self.postproc_data_object.versions[
+                self.version_selected].last_rgb_automatic:
+                self.postproc_data_object.versions[
+                    self.version_selected].last_rgb_automatic = self.rgb_automatic
+                self.reset_intermediate_images()
+                compute_new_image = True
+
+            # If automatic RGB alignment is on, check if the shifted image for the current
+            # resolution has been computed already. Otherwise, compute it now.
+            if self.rgb_automatic:
+                if self.auto_rgb_aligned_images_original[
+                    self.rgb_resolution_index] is None:
+
+                    # Change the main GUI's status bar to show that a computation is going on.
+                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                                    ", busy auto-aligning image", "black")
+                    self.disable_widgets_signal.emit()
+                    try:
+                        self.auto_rgb_aligned_images_original[self.rgb_resolution_index], \
+                        self.auto_rgb_shifts_red[self.rgb_resolution_index], \
+                        self.auto_rgb_shifts_blue[
+                            self.rgb_resolution_index] = Miscellaneous.auto_rgb_align(
+                            self.image_original, self.configuration.postproc_max_shift,
+                            interpolation_factor=[1, 2, 4][self.rgb_resolution_index],
+                            blur_strength=self.rgb_gauss_width)
+                        if self.color:
+                            self.auto_rgb_aligned_images_original_hsv[
+                                self.rgb_resolution_index] = cvtColor(
+                                self.auto_rgb_aligned_images_original[self.rgb_resolution_index],
+                                COLOR_BGR2HSV)
+                    except:
+                        self.auto_rgb_aligned_images_original[
+                            self.rgb_resolution_index] = self.image_original
+                        self.auto_rgb_shifts_red[self.rgb_resolution_index] = (0., 0.)
+                        self.auto_rgb_shifts_blue[self.rgb_resolution_index] = (0., 0.)
+                        if self.color:
+                            self.auto_rgb_aligned_images_original_hsv[
+                                self.rgb_resolution_index] = self.image_original_hsv
+                    # Reset the status bar to its idle state.
+                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
+                    self.enable_widgets_signal.emit()
+
+                    # Since the auto-shifted image is new, the postprocessing pipeline must be
+                    # applied. (This does not seem to be necessary.)
+                    # compute_new_image = True
+
+                # Set the processing pipeline input to the RGB aligned original image.
+                self.input_image = self.auto_rgb_aligned_images_original[self.rgb_resolution_index]
+                if self.color:
+                    self.input_image_hsv = self.auto_rgb_aligned_images_original_hsv[
+                            self.rgb_resolution_index]
+
+                # Set the RGB shifts for this version to the values computed automatically.
+                self.postproc_data_object.versions[self.version_selected].shift_red = \
+                    self.auto_rgb_shifts_red[self.rgb_resolution_index]
+                self.postproc_data_object.versions[self.version_selected].shift_blue = \
+                    self.auto_rgb_shifts_blue[self.rgb_resolution_index]
+
+            # In correction mode the wavelets are computed only once, and then only the shift
+            # corrections are applied.
+            elif postproc_version.rgb_correction_mode:
+
+                # If the uncorrected image for this resolution index is not available, it must be
+                # computed. Try if an image for this version has been computed. If not, this version
+                # is new. In that case process the wavelets first (only applying the accumulated
+                # shifts), and do the shift corrections in the next pass.
+                if postproc_version.images_uncorrected[self.rgb_resolution_index] is None:
+
+                    # Change the main GUI's status bar to show that correction mode is being
+                    # initialized.
+                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                                    ", initializing manual alignment", "black")
+                    self.disable_widgets_signal.emit()
+
+                    if postproc_version.image is None or postproc_version.image.dtype == uint8:
+                        self.input_image = Miscellaneous.shift_colors(self.image_original,
+                                                                      postproc_version.shift_red,
+                                                                      postproc_version.shift_blue)
+                        if self.color:
+                            if postproc_version.shift_red != (
+                            0., 0.) or postproc_version.shift_blue != (0., 0.):
+                                self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
+                            else:
+                                self.input_image_hsv = self.image_original_hsv
+
+                        self.reset_intermediate_images()
+                        compute_new_image = True
+
+                    # The postprocessing pipeline has been applied to this version before, set the
+                    # input for this resolution index of the correction mode. The image is
+                    # blown up by the resolution factor to show shifts in detail.
+                    else:
+                        # In the first pass, convert the input image to 8bit unsigned int (to speed
+                        # up the image viewer). Store it as resolution version 0 (1 Pixel, i.e. no
+                        # change in resolution).
+                        if self.postproc_data_object.versions[
+                            self.version_selected].images_uncorrected[0] is None:
+                            self.postproc_data_object.versions[
+                                self.version_selected].images_uncorrected[0] = (
+                                    postproc_version.image / 256.).astype(
+                                uint8)
+
+                        # If the resolution selected is not 1 pixel, interpolate the 1 pixel image
+                        # to the required resolution and store the result for later reuse.
+                        if self.rgb_resolution_index > 0:
+                            self.postproc_data_object.versions[
+                                self.version_selected].images_uncorrected[
+                                self.rgb_resolution_index] = \
+                                Miscellaneous.shift_colors(self.postproc_data_object.versions[
+                                    self.version_selected].images_uncorrected[0], (0., 0.), (0., 0.),
+                                    interpolate_input=[1, 2, 4][self.rgb_resolution_index])
+                        shift_image = True
+
+                    # Reset the status bar to its idle state.
+                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
+                    self.enable_widgets_signal.emit()
+
+                # The image without shift correction is available for the required resolution. Check
+                # if the shift correction has changed. If so, apply the correction. Otherwise, leave
+                # the image unchanged.
+                elif self.correction_red != self.correction_red_saved or self.correction_blue != \
+                        self.correction_blue_saved:
+                    self.postproc_data_object.versions[
+                        self.version_selected].correction_red_saved = self.correction_red
+                    self.postproc_data_object.versions[
+                        self.version_selected].correction_blue_saved = self.correction_blue
+                    shift_image = True
+
+            # Wavelet mode, RGB auto-alignment off: Set the input image for the processing pipeline
+            # to the original image, shifted by the accumulated shift vectors (not in correction
+            # mode).
+            else:
+                # The accumulated shift vectors have changed since the last computation. Apply the
+                # new shifts to the original image.
+                if postproc_version.shift_red != postproc_version.shift_red_saved or \
+                    postproc_version.shift_blue != postproc_version.shift_blue_saved:
+                    self.input_image = Miscellaneous.shift_colors(self.image_original,
+                                                                  postproc_version.shift_red,
+                                                                  postproc_version.shift_blue)
+                    if self.color:
+                        if postproc_version.shift_red != (
+                                0., 0.) or postproc_version.shift_blue != (0., 0.):
+                            self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
+                        else:
+                            self.input_image_hsv = self.image_original_hsv
+
+                    # Save the new shifted original image together with the current accumulated
+                    # shift vectors.
+                    self.postproc_data_object.versions[self.version_selected].input_image_saved = \
+                        self.input_image
+                    if self.color:
+                        self.postproc_data_object.versions[
+                            self.version_selected].input_image_hsv_saved = self.input_image_hsv
+                    self.postproc_data_object.versions[self.version_selected].shift_red_saved = \
+                        postproc_version.shift_red
+                    self.postproc_data_object.versions[
+                        self.version_selected].shift_blue_saved = postproc_version.shift_blue
+
+                    # Since the processing pipeline input has changed, reset intermediate results
+                    # and set the computation flag.
+                    self.reset_intermediate_images()
+                    compute_new_image = True
+
+                # The accumulated shift vectors have not changed. Reuse the saved pipeline input
+                # images.
+                else:
+                    self.input_image = postproc_version.input_image_saved
+                    if self.color:
+                        self.input_image_hsv = postproc_version.input_image_hsv_saved
+
+            self.set_shift_display_signal.emit()
+
+            # End of preparatory phase. Flags "compute_new_image" or "shift_image" have been set.
+            # Now perform the appropriate action.
+
+            # The image has already passed the postprocessing pipeline (as contained in
+            # postproc_version.images_uncorrected). Only the correction shift must be applied.
+            if shift_image:
+                interpolation_factor = [1, 2, 4][self.rgb_resolution_index]
+                self.postproc_data_object.versions[self.version_selected].image = \
+                    Miscellaneous.shift_colors(
+                        self.postproc_data_object.versions[
+                            self.version_selected].images_uncorrected[self.rgb_resolution_index],
+                        (self.correction_red[0] * interpolation_factor,
+                         self.correction_red[1] * interpolation_factor),
+                        (self.correction_blue[0] * interpolation_factor,
+                         self.correction_blue[1] * interpolation_factor))
+                # Show the new image in the image viewer, and remember its parameters.
+                self.set_photo_signal.emit(self.version_selected)
+                self.last_version_selected = self.version_selected
+
+            # A new image must be computed for this version. Special case self.version_selected = 0:
+            # For the original image no layers are applied. But if the RGB automatic checkbox was
+            # changed, the image must be set according to the new shift status. The shift was
+            # applied in self.input_image above.
+            elif compute_new_image and not self.version_selected:
+                self.postproc_data_object.versions[0].image = self.input_image.astype(uint16)
+                # Show the new image in the image viewer, and remember its parameters.
+                self.set_photo_signal.emit(self.version_selected)
+                self.last_version_selected = self.version_selected
+
+            # General case for new image computation: Either it was decided above that a new
+            # computation is required, or the test "new_computation_required" for changes in the
+            # correction layers is performed.
+            elif compute_new_image or self.new_computation_required(
+                    self.version_selected != self.last_version_selected):
                 # Change the main GUI's status bar to show that a computation is going on.
-                self.set_status_bar_signal.emit("Processing " + self.file_name +
-                    ", busy computing a new postprocessing image.", "black")
+                self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                                ", busy computing a new image.", "black")
 
                 # Perform the new computation. Try to store intermediate results. If it fails
                 # because there is not enough RAM, switch to direct computation.
@@ -731,13 +1033,14 @@ class ImageProcessor(QtCore.QThread):
                         self.input_image, self.layers_selected)
 
                 # Reset the status bar to its idle state.
-                self.set_status_bar_signal.emit("Processing " + self.file_name +
-                    ", postprocessing.", "black")
+                self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
 
                 # Show the new image in the image viewer, and remember its parameters.
                 self.set_photo_signal.emit(self.version_selected)
                 self.last_version_selected = self.version_selected
 
+            # Neither the shift nor parameters have changed. If the version selection has changed,
+            # display the image stored with the version selected.
             elif self.version_selected != self.last_version_selected:
                 # Show the new image in the image viewer, and remember its parameters.
                 self.set_photo_signal.emit(self.version_selected)
@@ -746,6 +1049,18 @@ class ImageProcessor(QtCore.QThread):
             # Idle loop before doing the next check for updates.
             else:
                 sleep(self.postproc_idle_loop_time)
+
+    def reset_intermediate_images(self):
+        """
+        Initialize all intermediate image versions, so that they will be re-computed next time.
+
+        :return: -
+        """
+
+        self.layer_input = [None] * (self.configuration.postproc_max_layers + 1)
+        self.layer_gauss = [None] * (self.configuration.postproc_max_layers)
+        self.layer_bilateral = [None] * (self.configuration.postproc_max_layers)
+        self.layer_denoised = [None] * (self.configuration.postproc_max_layers)
 
     def new_computation_required(self, version_has_changed):
         """
@@ -761,7 +1076,7 @@ class ImageProcessor(QtCore.QThread):
         # Initialize the flag which remembers if a change was found. Do not return on the first
         # detection in order to invalidate all affected intermediate results.
         change_detected = False
-        
+
         # If a new version is selected, reset images with intermediate results.
         if version_has_changed:
             self.reset_intermediate_images()
@@ -833,7 +1148,7 @@ class ImageProcessor(QtCore.QThread):
                     self.layer_denoised[layer_index] = None
                     change_detected = True
 
-        # Remember the current parameter settings to compare with new paraemters next time.
+        # Remember the current parameter settings to compare with new parameters next time.
         self.last_version_layers[self.version_selected] = deepcopy(self.layers_selected)
         return change_detected
 
@@ -846,9 +1161,10 @@ class ImageProcessor(QtCore.QThread):
         :return: -
         """
 
-        # Check if the original image is selected (version 0). In this case nothing is to be done.
+        # Check if the original image is selected (version 0). In this case return the (potentially
+        # RGB-shifted) original iamge.
         if not layers:
-            return self.postproc_data_object.image_original
+            return self.input_image.astype(uint16)
 
         for layer_index, layer in enumerate(layers):
             if self.layer_input[layer_index] is None:
@@ -869,6 +1185,7 @@ class ImageProcessor(QtCore.QThread):
                 if self.layer_bilateral[layer_index] is None:
                     self.layer_bilateral[layer_index] = bilateralFilter(self.layer_input[layer_index],
                         0, layer.bi_range * 256., layer.radius/3., borderType=BORDER_DEFAULT)
+
             # Gaussian filter is needed:
             if abs(layer.bi_fraction - 1.) > 1.e-5:
                 # Filter must be recomputed.
@@ -954,9 +1271,33 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
                                                 self.configuration.global_parameters_image_format)
         self.signal_save_postprocessed_image = signal_save_postprocessed_image
 
+        self.tabWidget_postproc_control.currentChanged.connect(self.tab_changed)
+
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
         self.pushButton_add_layer.clicked.connect(self.add_layer)
+
+        rgb_resolutions = ['     1 Pixel ', '   0.5 Pixels', '  0.25 Pixels']
+        self.max_rgb_index = self.max_auto_rgb_index()
+        for resolution_index in range(self.max_rgb_index + 1):
+            self.comboBox_resolution.addItem(rgb_resolutions[resolution_index])
+
+        self.fgw_slider_value.valueChanged['int'].connect(self.fgw_changed)
+        self.comboBox_resolution.currentIndexChanged.connect(self.rgb_resolution_changed)
+        self.checkBox_automatic.stateChanged.connect(self.rgb_automatic_changed)
+        self.pushButton_red_reset.clicked.connect(self.prreset_clicked)
+        self.pushButton_red_up.clicked.connect(self.pru_clicked)
+        self.pushButton_red_down.clicked.connect(self.prd_clicked)
+        self.pushButton_red_left.clicked.connect(self.prl_clicked)
+        self.pushButton_red_right.clicked.connect(self.prr_clicked)
+        self.pushButton_blue_reset.clicked.connect(self.pbreset_clicked)
+        self.pushButton_blue_up.clicked.connect(self.pbu_clicked)
+        self.pushButton_blue_down.clicked.connect(self.pbd_clicked)
+        self.pushButton_blue_left.clicked.connect(self.pbl_clicked)
+        self.pushButton_blue_right.clicked.connect(self.pbr_clicked)
+
+        # Enable RGB alignment for color input only.
+        self.tab_rgb.setEnabled(self.postproc_data_object.color)
 
         # Initialize list of sharpening layer widgets, and set the maximal number of layers.
         self.sharpening_layer_widgets = []
@@ -970,21 +1311,31 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # Start the frame viewer.
         self.frame_viewer = FrameViewer()
         self.frame_viewer.setObjectName("framewiever")
-        self.gridLayout.addWidget(self.frame_viewer, 0, 0, 3, 1)
+        self.gridLayout.addWidget(self.frame_viewer, 0, 0, 2, 1)
 
         # Initialize a vertical spacer used to fill the lower part of the sharpening widget scroll
         # area.
         self.spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum,
                                             QtWidgets.QSizePolicy.Expanding)
 
+        # Set the resolution index to an impossible value. It is used to check for changes.
+        self.rgb_resolution_index = -1
+
+        # Set the vertical image size (in pixels) to an impossible value. It is used to check for
+        # changes later. When the pixel resolution of the displayed image changes, the "fit in view"
+        # method of the image viewer is invoked to normalize the appearance of the image.
+        self.image_size_y = -1
+
         # Create the version manager and pass it the "select_version" callback function.
-        self.version_manager_widget = VersionManagerWidget(self.configuration, self.select_version)
-        self.gridLayout.addWidget(self.version_manager_widget, 2, 1, 1, 1)
+        self.selected_version = None
+        self.version_manager_widget = VersionManagerWidget(self.configuration)
+        self.gridLayout.addWidget(self.version_manager_widget, 1, 1, 1, 1)
 
         # The "set_photo_signal" from the VersionManagerWidget is not passed to the image viewer
-        # directly. (The image viewer does not accept signals.) Instead, it calls the "select_image"
-        # method below which in turn invokes the image viewer.
+        # directly. (The image viewer does not accept signals.) Instead, it sends a signal to this
+        # object which in turn invokes the image viewer.
         self.version_manager_widget.set_photo_signal.connect(self.select_image)
+        self.version_manager_widget.select_version_signal.connect(self.select_version)
 
         # Select the initial current version.
         self.select_version(self.postproc_data_object.version_selected)
@@ -993,18 +1344,293 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.image_processor = ImageProcessor(self.configuration)
         self.image_processor.setTerminationEnabled(True)
         self.image_processor.set_photo_signal.connect(self.select_image)
+        self.image_processor.set_shift_display_signal.connect(self.display_shifts)
         self.image_processor.set_status_bar_signal.connect(set_status_bar_callback)
+        self.image_processor.disable_widgets_signal.connect(self.disable_widgets)
+        self.image_processor.enable_widgets_signal.connect(self.enable_widgets)
+
+        if self.max_rgb_index == -1:
+            self.checkBox_automatic.setChecked(False)
+            self.tab_rgb.setEnabled(False)
+
+        for version in self.postproc_data_object.versions:
+            if self.max_rgb_index == -1:
+                version.rgb_automatic = False
+            version.rgb_resolution_index = min(version.rgb_resolution_index, max(self.max_rgb_index, 0))
+
+    def max_auto_rgb_index(self):
+        """
+        Return the maximal auto RGB alignment index such that the image created is not larger than
+        10% of the available RAM. This makes sure that the postprocessing does not run out of RAM.
+
+        :return: Maximal RGB alignment index (0, 1, or 2). If the image is too large to do any
+                 auto RGB alignment, -1 is returned.
+        """
+
+        max_index = 2
+        factors = [1, 2, 4]
+
+        # Look up the available RAM (without paging)
+        virtual_memory = dict(psutil.virtual_memory()._asdict())
+        available_ram = virtual_memory['available']
+
+        # For monochrome images, nothing is to be done.
+        if self.postproc_data_object.color:
+            image = self.postproc_data_object.image_original
+
+            # The intermediate image is in float32 (4 bytes) and has 3 color channels.
+            size_of_image = image.shape[0] * image.shape[1] * 12.
+
+            # Compute the maximal interpolation factor.
+            max_factor = int(sqrt(
+                available_ram * self.configuration.postproc_max_ram_percentage / 100. / size_of_image))
+
+            # In this case auto RGB alignment does not even work for standard size.
+            if max_factor == 0:
+                return -1
+
+            # Look for the maximal interpolation index.
+            for level in range(max_index, -1, -1):
+                if factors[level] <= max_factor:
+                    break
+
+            return level
+
+    def disable_widgets(self):
+        """
+        To avoid race conditions, GUI widgets are disabled while computations are going on. The only
+        button remaining active is "Cancel".
+
+        :return: -
+        """
+
+        self.version_manager_widget.setEnabled(False)
+        self.tabWidget_postproc_control.setEnabled(False)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(False)
+
+    def enable_widgets(self):
+        """
+        Enable the GUI buttons when background computations have finished.
+
+        :return: -
+        """
+
+        self.version_manager_widget.setEnabled(True)
+        self.tabWidget_postproc_control.setEnabled(True)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(True)
+
+    def fgw_changed(self, value):
+        """
+        When the widget changes its value, update the corresponding entry for the current version.
+        Please note that for some parameters the representations differ.
+
+        The methods following this one do the same for all other configuration parameters.
+
+        :param value: New value sent by widget
+        :return: -
+        """
+
+        gauss_width = 2 * value - 1
+        self.postproc_data_object.versions[self.postproc_data_object.version_selected].rgb_gauss_width = gauss_width
+        self.fgw_label_display.setText(str(gauss_width))
+
+    def rgb_resolution_changed(self, value):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        version.rgb_resolution_index = value
+
+        # Round the shift values according to the new resolution.
+        factor = [1., 2., 4.][value]
+        factor_incremented = [1.01, 2.01, 4.01][value]
+        version.shift_red = (round(version.shift_red[0] * factor_incremented) / factor ,
+                             round(version.shift_red[1] * factor_incremented) / factor)
+        version.shift_blue = (round(version.shift_blue[0] * factor_incremented) / factor,
+                              round(version.shift_blue[1] * factor_incremented) / factor)
+        version.correction_red = (round(version.correction_red[0] * factor_incremented) / factor,
+                             round(version.correction_red[1] * factor_incremented) / factor)
+        version.correction_blue = (round(version.correction_blue[0] * factor_incremented) / factor,
+                              round(version.correction_blue[1] * factor_incremented) / factor)
+        self.display_shifts()
+
+    def tab_changed(self, index):
+        version = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected]
+        if index and not version.rgb_automatic:
+            self.rgb_correction_version_init(version)
+        elif not index:
+            self.finish_rgb_correction_mode()
+
+    def rgb_automatic_changed(self, state):
+        rgb_on = state == QtCore.Qt.Checked
+        version = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected]
+        version.rgb_automatic = rgb_on
+        if rgb_on:
+            self.rgb_correction_version_reset(version)
+        else:
+            self.rgb_correction_version_init(version)
+
+    def rgb_correction_version_init(self, version):
+        version.rgb_correction_mode = True
+        version.correction_red_saved = version.correction_blue_saved = version.correction_red = \
+            version.correction_blue = (0., 0.)
+        version.images_uncorrected = [None] * 3
+
+    def rgb_correction_version_reset(self, version):
+        version.rgb_correction_mode = False
+        version.correction_red_saved = version.correction_blue_saved = version.correction_red =\
+            version.correction_blue = (0., 0.)
+        version.images_uncorrected = [None] * 3
+
+    def finish_rgb_correction_mode(self):
+        for version_index, version in enumerate(self.postproc_data_object.versions):
+            if version.correction_red != (0., 0.) or version.correction_blue != (0., 0.):
+                version.shift_red = (version.shift_red[0] + version.correction_red[0],
+                                     version.shift_red[1] + version.correction_red[1])
+                version.shift_blue = (version.shift_blue[0] + version.correction_blue[0],
+                                      version.shift_blue[1] + version.correction_blue[1])
+            self.rgb_correction_version_reset(version)
+        self.select_image(self.postproc_data_object.version_selected)
+
+    def prreset_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        version.correction_red = (-version.shift_red[0], -version.shift_red[1])
+        self.display_shifts()
+
+    def pru_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.correction_red = (version.correction_red[0] - increment, version.correction_red[1])
+        self.display_shifts()
+
+    def prd_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.correction_red = (version.correction_red[0] + increment, version.correction_red[1])
+        self.display_shifts()
+
+    def prl_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.correction_red = (version.correction_red[0], version.correction_red[1] - increment)
+        self.display_shifts()
+
+    def prr_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.correction_red = (version.correction_red[0], version.correction_red[1] + increment)
+        self.display_shifts()
+
+    def pbreset_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        version.correction_blue = (-version.shift_blue[0], -version.shift_blue[1])
+        self.display_shifts()
+
+    def pbu_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.correction_blue = (version.correction_blue[0] - increment, version.correction_blue[1])
+        self.display_shifts()
+
+    def pbd_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.correction_blue = (
+        version.correction_blue[0] + increment, version.correction_blue[1])
+        self.display_shifts()
+
+    def pbl_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.correction_blue = (version.correction_blue[0], version.correction_blue[1] - increment)
+        self.display_shifts()
+
+    def pbr_clicked(self):
+        version = self.postproc_data_object.versions[self.postproc_data_object.version_selected]
+        increment = [1., 0.5, 0.25][version.rgb_resolution_index]
+        version.correction_blue = (
+        version.correction_blue[0], version.correction_blue[1] + increment)
+        self.display_shifts()
+
+    def display_shifts(self):
+        """
+        Set the current channel shifts in the RGB alignment GUI tab.
+
+        :return: -
+        """
+
+        format_string = ["{0:2.0f}", "{0:4.1f}", "{0:5.2f}"][self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].rgb_resolution_index]
+
+        # Red channel shifts:
+        shift_red_base = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].shift_red
+        correction_red = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].correction_red
+        shift_red = (shift_red_base[0] + correction_red[0], shift_red_base[1] + correction_red[1])
+
+        if abs(shift_red[0]) < 0.05:
+            self.label_red_down.setText("")
+            self.label_red_up.setText("")
+        elif shift_red[0] > 0:
+            self.label_red_down.setText((format_string.format(shift_red[0])))
+            self.label_red_up.setText("")
+        else:
+            self.label_red_up.setText((format_string.format(-shift_red[0])))
+            self.label_red_down.setText("")
+
+        if abs(shift_red[1]) < 0.05:
+            self.label_red_left.setText("")
+            self.label_red_right.setText("")
+        elif shift_red[1] > 0:
+            self.label_red_right.setText((format_string.format(shift_red[1])))
+            self.label_red_left.setText("")
+        else:
+            self.label_red_left.setText((format_string.format(-shift_red[1])))
+            self.label_red_right.setText("")
+
+        # Blue channel shifts:
+        shift_blue_base = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].shift_blue
+        correction_blue = self.postproc_data_object.versions[
+            self.postproc_data_object.version_selected].correction_blue
+        shift_blue = (shift_blue_base[0] + correction_blue[0], shift_blue_base[1] + correction_blue[1])
+
+        if abs(shift_blue[0]) < 0.05:
+            self.label_blue_down.setText("")
+            self.label_blue_up.setText("")
+        elif shift_blue[0] > 0:
+            self.label_blue_down.setText((format_string.format(shift_blue[0])))
+            self.label_blue_up.setText("")
+        else:
+            self.label_blue_up.setText((format_string.format(-shift_blue[0])))
+            self.label_blue_down.setText("")
+
+        if abs(shift_blue[1]) < 0.05:
+            self.label_blue_left.setText("")
+            self.label_blue_right.setText("")
+        elif shift_blue[1] > 0:
+            self.label_blue_right.setText((format_string.format(shift_blue[1])))
+            self.label_blue_left.setText("")
+        else:
+            self.label_blue_left.setText((format_string.format(-shift_blue[1])))
+            self.label_blue_right.setText("")
 
     def select_version(self, version_index):
         """
-        Select a new current version and update the scroll area with all layer widgets.
+        Select a new current version, update the scroll area with all layer widgets, and update the
+        parameters of the RGB alignment tab.
 
         :param version_index: Index of the version selected in version list of the central data
                               object.
         :return: -
         """
 
-        version_selected = self.postproc_data_object.versions[version_index]
+        # Check if we are leaving a version in correction mode. In this case apply the corrections.
+        if self.selected_version is not None:
+            if self.selected_version.rgb_correction_mode:
+                self.finish_rgb_correction_mode()
+
+        self.selected_version = self.postproc_data_object.versions[version_index]
 
         # Remove all existing layer widgets and the lower vertical spacer.
         if self.sharpening_layer_widgets:
@@ -1016,7 +1642,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.verticalLayout.removeItem(self.spacerItem)
 
         # Create new layer widgets for all active layers and put them into the scroll area.
-        for layer_index, layer in enumerate(version_selected.layers):
+        for layer_index, layer in enumerate(self.selected_version.layers):
             sharpening_layer_widget = SharpeningLayerWidget(layer_index, self.remove_layer)
             sharpening_layer_widget.set_values(layer)
             self.verticalLayout.addWidget(sharpening_layer_widget)
@@ -1035,8 +1661,18 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # At the end of the scroll area, add a vertical spacer.
         self.verticalLayout.addItem(self.spacerItem)
 
+        # Load the parameters of this version into the RGB alignment tab.
+        self.checkBox_automatic.setChecked(self.selected_version.rgb_automatic)
+        self.comboBox_resolution.setCurrentIndex(min(self.selected_version.rgb_resolution_index,
+                                                     self.max_rgb_index))
+        self.fgw_slider_value.setValue(int((self.selected_version.rgb_gauss_width + 1) / 2))
+        self.fgw_label_display.setText(str(self.selected_version.rgb_gauss_width))
+
         # Load the current image into the image viewer.
         self.select_image(version_index)
+
+        # Display the current RGB shifts for the selected version.
+        self.display_shifts()
 
     def select_image(self, version_index):
         """
@@ -1048,7 +1684,16 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return: -
         """
 
-        self.frame_viewer.setPhoto(self.postproc_data_object.versions[version_index].image)
+        image = self.postproc_data_object.versions[version_index].image
+        self.frame_viewer.setPhoto(image)
+
+        # Check if the image size has changed by more than 10%. If so, reset the zoom factor of the
+        # FrameViewer.
+        # print ("Select image")
+        if abs((image.shape[0] - self.image_size_y)/ image.shape[0]) > 0.1:
+            # print("Fit in view")
+            self.frame_viewer.fitInView()
+            self.image_size_y = image.shape[0]
 
     def add_layer(self):
         """
@@ -1111,7 +1756,11 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         :return: -
         """
 
-        self.version_manager_widget.save_version()
+        # In case "correction mode" is on, process the current version image in full 16bit
+        # resolution.
+        self.disable_widgets()
+        self.finish_rgb_correction_mode()
+        self.postproc_data_object.finalize_postproc_version()
 
         # Terminate the image processor thread.
         self.image_processor.stop()
@@ -1119,6 +1768,11 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         if self.signal_save_postprocessed_image:
             self.signal_save_postprocessed_image.emit(self.postproc_data_object.versions[
                 self.postproc_data_object.version_selected].image)
+        # The else branch is only for the test program below which does not provide a signal for
+        # saving the result. In this case use the save method of the version manager.
+        else:
+            self.version_manager_widget.save_version()
+        self.enable_widgets()
         self.close()
 
     def reject(self):
@@ -1174,7 +1828,9 @@ class EmulateStatusBar(object):
 
 
 if __name__ == '__main__':
-    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
+    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
+    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\" \
+                      "2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_rgb-shifted.png"
     # Change colors to standard RGB
     input_image = cvtColor(imread(input_file_name, -1), COLOR_BGR2RGB)
 

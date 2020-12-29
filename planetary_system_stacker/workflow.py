@@ -146,8 +146,8 @@ class Workflow(QtCore.QObject):
                     self.attached_log_file, precede_with_timestamp=True)
         else:
             Miscellaneous.protocol(
-                "Warning: " + mkl_rt_name + " not found (Intel Math Kernel Library not "
-                "installed?). Performance may be reduced.\n", self.attached_log_file,
+                "Info: " + mkl_rt_name + " not found (Intel Math Kernel Library not "
+                "installed?). Performance might be slightly reduced.\n", self.attached_log_file,
                 precede_with_timestamp=True)
 
         # Create the calibration object, used for potential flat / dark corrections.
@@ -939,11 +939,45 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol("+++ Start postprocessing +++", self.attached_log_file)
         self.my_timer.create_no_check('Conputing image postprocessing')
 
-        # Apply all sharpening layers of the postprocessing version selected last time.
+        # Look up parameters of the last postproc version which was selected in interactive mode.
         version_index = self.configuration.postproc_data_object.version_selected
         postproc_layers = self.configuration.postproc_data_object.versions[version_index].layers
-        self.postprocessed_image = Miscellaneous.post_process(self.postproc_input_image,
-                                                                postproc_layers)
+        rgb_automatic = self.configuration.postproc_data_object.versions[
+            version_index].rgb_automatic
+        rgb_gauss_width = self.configuration.postproc_data_object.versions[
+            version_index].rgb_gauss_width
+        rgb_resolution_index = self.configuration.postproc_data_object.versions[
+            version_index].rgb_resolution_index
+        shift_red = self.configuration.postproc_data_object.versions[version_index].shift_red
+        shift_blue = self.configuration.postproc_data_object.versions[version_index].shift_blue
+
+        try:
+            # Auto-align RGB channels, if requested.
+            if rgb_automatic:
+                sharpening_input, self.configuration.postproc_data_object.versions[
+                    version_index].shift_red, self.configuration.postproc_data_object.versions[
+                    version_index].shift_blue = Miscellaneous.auto_rgb_align(
+                    self.postproc_input_image, self.configuration.postproc_max_shift,
+                    interpolation_factor=[1, 2, 4][rgb_resolution_index], reduce_output=True,
+                    blur_strength=rgb_gauss_width)
+            elif shift_red != (0., 0.) or shift_blue != (0., 0.):
+                # Shift the image with the resolution given by the selected interpolation factor.
+                interpolation_factor = [1, 2, 4][rgb_resolution_index]
+                sharpening_input = Miscellaneous.shift_colors(self.postproc_input_image,
+                                                           shift_red, shift_blue,
+                                                           interpolate_input=interpolation_factor,
+                                                           reduce_output=interpolation_factor)
+            else:
+                sharpening_input = self.postproc_input_image
+
+            # Apply all sharpening layers of the postprocessing version selected last time.
+            self.postprocessed_image = Miscellaneous.post_process(sharpening_input, postproc_layers)
+
+        except Exception as e:
+            self.abort_job_signal.emit(
+                "Error in postprocessing: " + str(e) + ", continuing with next job")
+            return
+
         self.my_timer.stop('Conputing image postprocessing')
 
         self.work_next_task_signal.emit("Save postprocessed image")
@@ -954,6 +988,21 @@ class Workflow(QtCore.QObject):
         # The signal payload is None only if the editor was left with "cancel" in interactive mode.
         # In this case, skip saving the result and proceed with the next job.
         if postprocessed_image is not None:
+
+            # Print postprocessing info if sharpening layers have been applied or RGB alignment was
+            # active.
+            if self.configuration.global_parameters_protocol_level > 1:
+                version_selected = self.configuration.postproc_data_object.version_selected
+                postproc_version = self.configuration.postproc_data_object.versions[
+                    self.configuration.postproc_data_object.version_selected]
+                if version_selected or postproc_version.rgb_automatic:
+                    Miscellaneous.print_postproc_parameters(postproc_version,
+                                                            self.attached_log_file)
+                else:
+                    Miscellaneous.protocol(
+                        "           The image was not modified in postprocessing.",
+                        self.attached_log_file, precede_with_timestamp=False)
+
             self.set_status_bar_processing_phase("saving result")
             # Save the image as 16bit int (color or mono).
             if self.configuration.global_parameters_protocol_level > 0:
@@ -969,17 +1018,6 @@ class Workflow(QtCore.QObject):
                     "           The postprocessed image was written to: " +
                     self.postprocessed_image_name,
                     self.attached_log_file, precede_with_timestamp=False)
-
-            if self.configuration.global_parameters_protocol_level > 1:
-                if self.configuration.postproc_data_object.version_selected:
-                    Miscellaneous.print_postproc_parameters(
-                        self.configuration.postproc_data_object.versions[
-                            self.configuration.postproc_data_object.version_selected].layers,
-                        self.attached_log_file)
-                else:
-                    Miscellaneous.protocol(
-                        "           The image was not modified in postprocessing.",
-                        self.attached_log_file, precede_with_timestamp=False)
 
         self.work_next_task_signal.emit("Next job")
 

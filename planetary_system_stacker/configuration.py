@@ -25,11 +25,13 @@ from configparser import ConfigParser
 from copy import deepcopy
 from os.path import expanduser, join, isfile, dirname
 from os.path import splitext
+from numpy import uint8
 
 from exceptions import IncompatibleVersionsError
+from miscellaneous import Miscellaneous
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.8.15"
+PSS_Version = "PlanetarySystemStacker 0.8.16"
 # PSS_Version = "PlanetarySystemStacker"
 
 
@@ -232,6 +234,8 @@ class Configuration(object):
         self.postproc_suffix = "_gpp"
         self.postproc_max_layers = 10
         self.postproc_bi_range_standard = 13
+        self.postproc_max_shift = 5
+        self.postproc_max_ram_percentage = 20.
         self.postproc_blinking_period = 1.
         self.postproc_idle_loop_time = 0.2
 
@@ -742,8 +746,14 @@ class PostprocDataObject(object):
         self.file_name_processed = PostprocDataObject.set_file_name_processed(
             self.file_name_original, self.postproc_suffix, image_format)
 
+        # Reset images and shift vectors which still might hold data from the previous job.
         for version in self.versions:
             version.set_image(self.image_original)
+            version.input_image_saved = None
+            version.input_image_hsv_saved = None
+            version.shift_red_saved = None
+            version.shift_blue_saved = None
+            version.last_rgb_automatic = None
 
     @staticmethod
     def set_file_name_processed(file_name_original, postproc_suffix, image_format):
@@ -752,7 +762,7 @@ class PostprocDataObject(object):
 
         :param file_name_original: Postprocessing input file name (e.g. result from stacking)
         :param postproc_suffix: Additional suffix to be inserted before file extension.
-        :param image_format: Image format, either 'tiff' or 'fits'.
+        :param image_format: Image format, either 'png', 'tiff' or 'fits'.
         :return: Name of postprocessing result.
         """
 
@@ -811,6 +821,47 @@ class PostprocDataObject(object):
             self.number_versions -= 1
             self.version_selected = index - 1
 
+    def finalize_postproc_version(self, version_index=None):
+        """
+        If "correction mode" is on, the image stored with the selected version is in 8bit and
+        potentially interpolated by the resolution factor. Before the image is saved, it has to be
+        processed from the original image using the current shift and layer data. The 16bit image is
+        stored with the current version object.
+
+        :param version_index: If an index is specified, process the version with this index.
+                              Otherwise, process the version currently selected.
+        :return: The processed 16bit image (also stored with the version).
+        """
+
+        if version_index is None:
+            # The computation is based on the current "version selected".
+            version = self.versions[self.version_selected]
+        else:
+            version = self.versions[version_index]
+
+        # If the dtype is "uint16", nothing is to be done. If it is "uint8", the current image is
+        # an intermediate product of the correction mode. In this case the rigorous postprocessing
+        # pipeline must be traversed to get the final image.
+        if version.image is not None and version.image.dtype == uint8:
+
+            # Compute the complete current shifts, including temporary shift corrections.
+            shift_red = (version.shift_red[0] + version.correction_red[0],
+                        version.shift_red[1] + version.correction_red[1])
+            shift_blue = (version.shift_blue[0] + version.correction_blue[0],
+                        version.shift_blue[1] + version.correction_blue[1])
+
+            # Shift the image with the resolution given by the selected interpolation factor.
+            interpolation_factor = [1, 2, 4][version.rgb_resolution_index]
+            shifted_image = Miscellaneous.shift_colors(self.image_original,
+                                                       shift_red, shift_blue,
+                                                       interpolate_input=interpolation_factor,
+                                                       reduce_output=interpolation_factor)
+
+            # Apply all wavelet layers.
+            version.image = Miscellaneous.post_process(shifted_image, version.layers)
+
+        return version.image
+
     def dump_config(self, config_parser_object):
         """
         Dump all version and layer parameters into a ConfigParser object (except for image data).
@@ -832,14 +883,31 @@ class PostprocDataObject(object):
         config_parser_object.set('PostprocessingInfo', 'version selected',
                                  str(self.version_selected))
 
-        # For every version, and for all layers in each version, create a separate section.
+        # For every version create a section with RGB alignment parameters.
         for version_index, version in enumerate(self.versions):
+            section_name = "PostprocessingVersion " + str(version_index) + " RGBAlignment"
+            config_parser_object.add_section(section_name)
+            # Add the parameters of this version.
+            config_parser_object.set(section_name, 'rgb automatic', str(version.rgb_automatic))
+            config_parser_object.set(section_name, 'rgb gauss width', str(version.rgb_gauss_width))
+            config_parser_object.set(section_name, 'rgb resolution index',
+                                     str(version.rgb_resolution_index))
+            config_parser_object.set(section_name, 'rgb shift red y',
+                                     str(version.shift_red[0]))
+            config_parser_object.set(section_name, 'rgb shift red x',
+                                     str(version.shift_red[1]))
+            config_parser_object.set(section_name, 'rgb shift blue y',
+                                     str(version.shift_blue[0]))
+            config_parser_object.set(section_name, 'rgb shift blue x',
+                                     str(version.shift_blue[1]))
+
+            # For every postprocessing layer of this version, create a separate section.
             for layer_index, layer in enumerate(version.layers):
-                section_name = "PostprocessingVersion " + str(version_index) + " layer " + str(
+                section_name = "PostprocessingVersion " + str(version_index) + " Layer " + str(
                     layer_index)
                 config_parser_object.add_section(section_name)
 
-                # Add the four parameters of the layer.
+                # Add the parameters of the layer.
                 config_parser_object.set(section_name, 'postprocessing method', layer.postproc_method)
                 config_parser_object.set(section_name, 'radius', str(layer.radius))
                 config_parser_object.set(section_name, 'amount', str(layer.amount))
@@ -847,6 +915,8 @@ class PostprocDataObject(object):
                 config_parser_object.set(section_name, 'bilateral range', str(layer.bi_range))
                 config_parser_object.set(section_name, 'denoise', str(layer.denoise))
                 config_parser_object.set(section_name, 'luminance only', str(layer.luminance_only))
+
+
 
     def load_config(self, config_parser_object):
         """
@@ -878,23 +948,43 @@ class PostprocDataObject(object):
         for section in config_parser_object.sections():
             section_items = section.split()
             if section_items[0] == 'PostprocessingVersion':
-                this_version_index = section_items[1]
 
-                # A layer section with a new version index is found. Allocate a new version.
-                if this_version_index != old_version_index:
-                    new_version = self.add_postproc_version()
-                    old_version_index = this_version_index
+                # For a new version the first section contains the RGB alignment info. Create a new
+                # version and store the RGB alignment parameters with it. For the first (neutral)
+                # version 0 only RGB shift parameters are stored (no layers). In this case
+                # initialize the version list.
+                if section_items[2] == 'RGBAlignment':
+                    version_index = int(section_items[1])
+                    if version_index:
+                        new_version = self.add_postproc_version()
+                    else:
+                        self.initialize_versions()
+                        new_version = self.versions[0]
+                    new_version.rgb_automatic = config_parser_object.getboolean(section,
+                                                                                'rgb automatic')
+                    new_version.rgb_gauss_width = config_parser_object.getint(section,
+                                                                              'rgb gauss width')
+                    new_version.rgb_resolution_index = config_parser_object.getint(section,
+                                                                            'rgb resolution index')
+                    new_version.shift_red = (
+                        config_parser_object.getfloat(section, 'rgb shift red y'),
+                        config_parser_object.getfloat(section, 'rgb shift red x'))
+                    new_version.shift_blue = (
+                        config_parser_object.getfloat(section, 'rgb shift blue y'),
+                        config_parser_object.getfloat(section, 'rgb shift blue x'))
 
-                # Read all parameters of this layer, and add a layer to the current version.
-                method = config_parser_object.get(section, 'postprocessing method')
-                radius = config_parser_object.getfloat(section, 'radius')
-                amount = config_parser_object.getfloat(section, 'amount')
-                bi_fraction = config_parser_object.getfloat(section, 'bilateral fraction')
-                bi_range = config_parser_object.getfloat(section, 'bilateral range')
-                denoise = config_parser_object.getfloat(section, 'denoise')
-                luminance_only = config_parser_object.getboolean(section, 'luminance only')
-                new_version.add_postproc_layer(PostprocLayer(method, radius, amount, bi_fraction,
-                                                             bi_range, denoise, luminance_only))
+                # A layer section is found. Store it for the current version.
+                elif section_items[2] == 'Layer':
+                    # Read all parameters of this layer, and add a layer to the current version.
+                    method = config_parser_object.get(section, 'postprocessing method')
+                    radius = config_parser_object.getfloat(section, 'radius')
+                    amount = config_parser_object.getfloat(section, 'amount')
+                    bi_fraction = config_parser_object.getfloat(section, 'bilateral fraction')
+                    bi_range = config_parser_object.getfloat(section, 'bilateral range')
+                    denoise = config_parser_object.getfloat(section, 'denoise')
+                    luminance_only = config_parser_object.getboolean(section, 'luminance only')
+                    new_version.add_postproc_layer(PostprocLayer(method, radius, amount, bi_fraction,
+                                                                 bi_range, denoise, luminance_only))
 
         # Set the selected version again, because it may have been changed by reading versions.
         self.version_selected = config_parser_object.getint('PostprocessingInfo',
@@ -916,6 +1006,23 @@ class PostprocVersion(object):
         self.postproc_method = "Multilevel unsharp masking"
         self.layers = []
         self.number_layers = 0
+        self.rgb_automatic = False
+        self.last_rgb_automatic = None
+        self.rgb_gauss_width = 7
+        self.rgb_resolution_index = 1
+        self.shift_red = (0., 0.)
+        self.shift_blue = (0., 0.)
+        self.shift_red_saved = None
+        self.shift_blue_saved = None
+        self.rgb_correction_mode = False
+        self.correction_red = (0., 0.)
+        self.correction_blue = (0., 0.)
+        self.correction_red_saved = (0., 0.)
+        self.correction_blue_saved = (0., 0.)
+        self.image = None
+        self.images_uncorrected = [None] * 3
+        self.input_image_saved = None
+        self.input_image_hsv_saved = None
 
     def set_image(self, image):
         """
