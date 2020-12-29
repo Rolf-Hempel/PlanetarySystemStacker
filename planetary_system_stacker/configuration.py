@@ -725,12 +725,12 @@ def get_from_conf(config_parser_object, section, name, default):
     try:
         if isinstance(default, str):
             value = config_parser_object.get(section, name)
+        elif isinstance(default, bool):
+            value = config_parser_object.getboolean(section, name)
         elif isinstance(default, int):
             value = config_parser_object.getint(section, name)
         elif isinstance(default, float):
             value = config_parser_object.getfloat(section, name)
-        elif isinstance(default, bool):
-            value = config_parser_object.getboolean(section, name)
         else:
             raise ArgumentError("Parameter " + name + " in section " + section + " cannot be parsed")
 
