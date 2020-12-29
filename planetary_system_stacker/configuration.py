@@ -27,11 +27,11 @@ from os.path import expanduser, join, isfile, dirname
 from os.path import splitext
 from numpy import uint8
 
-from exceptions import IncompatibleVersionsError
+from exceptions import ArgumentError
 from miscellaneous import Miscellaneous
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.8.17"
+PSS_Version = "PlanetarySystemStacker 0.8.18"
 # PSS_Version = "PlanetarySystemStacker"
 
 
@@ -448,71 +448,86 @@ class Configuration(object):
         :return: -
         """
 
-        # Check for version compatibility.
-        ver = conf.get('Global parameters', 'version')
-        if self.global_parameters_version != conf.get('Global parameters', 'version'):
-            raise IncompatibleVersionsError(
-                "Error: parameter file read does not match program version")
+        # Create an object with default parameters. They are inserted if the corresponding value
+        # cannot be read from the config parser object.
+        default_conf_obj = ConfigurationParameters()
+        default_conf_obj.set_defaults()
 
-        self.hidden_parameters_current_dir = conf.get('Hidden parameters', 'current directory')
-        self.hidden_parameters_main_window_x0 = conf.getint('Hidden parameters', 'main window x0')
-        self.hidden_parameters_main_window_y0 = conf.getint('Hidden parameters', 'main window y0')
-        self.hidden_parameters_main_window_width = \
-            conf.getint('Hidden parameters', 'main window width')
-        self.hidden_parameters_main_window_height = conf.getint('Hidden parameters',
-                                                                'main window height')
-        self.hidden_parameters_main_window_maximized = conf.getboolean('Hidden parameters',
-                                                                       'main window maximized')
+        self.hidden_parameters_current_dir = get_from_conf(conf, 'Hidden parameters',
+            'current directory', default_conf_obj.hidden_parameters_current_dir)
+        self.hidden_parameters_main_window_x0 = get_from_conf(conf, 'Hidden parameters',
+            'main window x0', default_conf_obj.hidden_parameters_main_window_x0)
+        self.hidden_parameters_main_window_y0 = get_from_conf(conf, 'Hidden parameters',
+            'main window y0', default_conf_obj.hidden_parameters_main_window_y0)
+        self.hidden_parameters_main_window_width = get_from_conf(conf, 'Hidden parameters',
+            'main window width', default_conf_obj.hidden_parameters_main_window_width)
+        self.hidden_parameters_main_window_height = get_from_conf(conf, 'Hidden parameters',
+            'main window height', default_conf_obj.hidden_parameters_main_window_height)
+        self.hidden_parameters_main_window_maximized = get_from_conf(conf, 'Hidden parameters',
+            'main window maximized', default_conf_obj.hidden_parameters_main_window_maximized)
 
-        self.global_parameters_protocol_level = conf.getint('Global parameters',
-                                                            'protocol level')
-        self.global_parameters_write_protocol_to_file = conf.getboolean('Global parameters',
-                                                                        'write protocol to file')
-        self.global_parameters_store_protocol_with_result = conf.getboolean(
-            'Global parameters', 'store protocol with result')
-        self.global_parameters_buffering_level = conf.getint('Global parameters', 'buffering level')
-        self.global_parameters_include_postprocessing = conf.getboolean(
-            'Global parameters', 'include postprocessing')
-        self.global_parameters_image_format = conf.get(
-            'Global parameters', 'image format')
-        self.global_parameters_parameters_in_filename = conf.getboolean(
-            'Global parameters', 'parameters in filename')
-        self.global_parameters_stack_number_frames = conf.getboolean(
-            'Global parameters', 'stack number frames')
-        self.global_parameters_stack_percent_frames = conf.getboolean(
-            'Global parameters', 'stack percent frames')
-        self.global_parameters_ap_box_size = conf.getboolean(
-            'Global parameters', 'ap box size')
-        self.global_parameters_ap_number = conf.getboolean(
-            'Global parameters', 'ap number')
+        self.global_parameters_protocol_level = get_from_conf(conf, 'Global parameters',
+            'protocol level', default_conf_obj.global_parameters_protocol_level)
+        self.global_parameters_write_protocol_to_file = get_from_conf(conf, 'Global parameters',
+            'write protocol to file', default_conf_obj.global_parameters_write_protocol_to_file)
+        self.global_parameters_store_protocol_with_result = get_from_conf(conf, 'Global parameters',
+            'store protocol with result', default_conf_obj.global_parameters_store_protocol_with_result)
+        self.global_parameters_buffering_level = get_from_conf(conf, 'Global parameters',
+            'buffering level', default_conf_obj.global_parameters_buffering_level)
+        self.global_parameters_include_postprocessing = get_from_conf(conf, 'Global parameters',
+            'include postprocessing', default_conf_obj.global_parameters_include_postprocessing)
+        self.global_parameters_image_format = get_from_conf(conf, 'Global parameters',
+            'image format', default_conf_obj.global_parameters_image_format)
+        self.global_parameters_parameters_in_filename = get_from_conf(conf, 'Global parameters',
+            'parameters in filename', default_conf_obj.global_parameters_parameters_in_filename)
+        self.global_parameters_stack_number_frames = get_from_conf(conf, 'Global parameters',
+            'stack number frames', default_conf_obj.global_parameters_stack_number_frames)
+        self.global_parameters_stack_percent_frames = get_from_conf(conf, 'Global parameters',
+            'stack percent frames', default_conf_obj.global_parameters_stack_percent_frames)
+        self.global_parameters_ap_box_size = get_from_conf(conf, 'Global parameters',
+            'ap box size', default_conf_obj.global_parameters_ap_box_size)
+        self.global_parameters_ap_number = get_from_conf(conf, 'Global parameters',
+            'ap number', default_conf_obj.global_parameters_ap_number)
 
-        self.frames_gauss_width = conf.getint('Frames', 'gauss width')
-        self.frames_debayering_default = conf.get('Frames', 'debayering default')
-        self.frames_debayering_method = conf.get('Frames', 'debayering method')
-        self.frames_normalization = conf.getboolean('Frames', 'normalization')
-        self.frames_normalization_threshold = conf.getint('Frames', 'normalization threshold')
-        self.frames_add_selection_dialog = conf.getboolean('Frames', 'add selection dialog')
+        self.frames_gauss_width = get_from_conf(conf, 'Frames',
+            'gauss width', default_conf_obj.frames_gauss_width)
+        self.frames_debayering_default = get_from_conf(conf, 'Frames',
+            'debayering default', default_conf_obj.frames_debayering_default)
+        self.frames_debayering_method = get_from_conf(conf, 'Frames',
+            'debayering method', default_conf_obj.frames_debayering_method)
+        self.frames_normalization = get_from_conf(conf, 'Frames',
+            'normalization', default_conf_obj.frames_normalization)
+        self.frames_normalization_threshold = get_from_conf(conf, 'Frames',
+            'normalization threshold', default_conf_obj.frames_normalization_threshold)
+        self.frames_add_selection_dialog = get_from_conf(conf, 'Frames',
+            'add selection dialog', default_conf_obj.frames_add_selection_dialog)
 
-        self.align_frames_fast_changing_object = conf.getboolean('Align frames',
-                                                                 'fast changing object')
-        self.align_frames_mode = conf.get('Align frames', 'mode')
-        self.align_frames_automation = conf.getboolean('Align frames', 'automation')
-        self.align_frames_rectangle_scale_factor = conf.getfloat('Align frames',
-                                                                 'rectangle scale factor')
-        self.align_frames_search_width = conf.getint('Align frames', 'search width')
-        self.align_frames_average_frame_percent = conf.getint('Align frames',
-                                                              'average frame percent')
+        self.align_frames_fast_changing_object = get_from_conf(conf, 'Align frames',
+            'fast changing object', default_conf_obj.align_frames_fast_changing_object)
+        self.align_frames_mode = get_from_conf(conf, 'Align frames',
+            'mode', default_conf_obj.align_frames_mode)
+        self.align_frames_automation = get_from_conf(conf, 'Align frames',
+            'automation', default_conf_obj.align_frames_automation)
+        self.align_frames_rectangle_scale_factor = get_from_conf(conf, 'Align frames',
+            'rectangle scale factor', default_conf_obj.align_frames_rectangle_scale_factor)
+        self.align_frames_search_width = get_from_conf(conf, 'Align frames',
+            'search width', default_conf_obj.align_frames_search_width)
+        self.align_frames_average_frame_percent = get_from_conf(conf, 'Align frames',
+            'average frame percent', default_conf_obj.align_frames_average_frame_percent)
 
-        self.alignment_points_half_box_width = conf.getint('Alignment points',
-                                                           'half box width')
-        self.alignment_points_search_width = conf.getint('Alignment points', 'search width')
-        self.alignment_points_structure_threshold = conf.getfloat('Alignment points',
-                                                                  'structure threshold')
-        self.alignment_points_brightness_threshold = conf.getint('Alignment points',
-                                                                 'brightness threshold')
-        self.alignment_points_frame_percent = conf.getint('Alignment points', 'frame percent')
+        self.alignment_points_half_box_width = get_from_conf(conf, 'Alignment points',
+            'half box width', default_conf_obj.alignment_points_half_box_width)
+        self.alignment_points_search_width = get_from_conf(conf, 'Alignment points',
+            'search width', default_conf_obj.alignment_points_search_width)
+        self.alignment_points_structure_threshold = get_from_conf(conf, 'Alignment points',
+            'structure threshold', default_conf_obj.alignment_points_structure_threshold)
+        self.alignment_points_brightness_threshold = get_from_conf(conf, 'Alignment points',
+            'brightness threshold', default_conf_obj.alignment_points_brightness_threshold)
+        self.alignment_points_frame_percent = get_from_conf(conf, 'Alignment points',
+            'frame percent', default_conf_obj.alignment_points_frame_percent)
 
-        self.stack_frames_drizzle_factor_string = conf.get('Stack frames', 'drizzle factor string')
+        self.stack_frames_drizzle_factor_string = get_from_conf(conf, 'Stack frames',
+            'drizzle factor string', default_conf_obj.stack_frames_drizzle_factor_string)
 
     def store_all_parameters_to_config_parser(self):
         """
@@ -696,6 +711,33 @@ class Configuration(object):
 
         return self.config_parser_object
 
+def get_from_conf(config_parser_object, section, name, default):
+    """
+    Try to read a parameter from the config parser object. If it is not found, a default parameter
+    is set instead.
+
+    :param config_parser_object: Config parser object with all input parameters.
+    :param section: Section name in config parser object.
+    :param name: Variable name in section.
+    :param default: Default value if variable cannot be read.
+    :return: Either the value read, or default.
+    """
+    try:
+        if isinstance(default, str):
+            value = config_parser_object.get(section, name)
+        elif isinstance(default, int):
+            value = config_parser_object.getint(section, name)
+        elif isinstance(default, float):
+            value = config_parser_object.getfloat(section, name)
+        elif isinstance(default, bool):
+            value = config_parser_object.getboolean(section, name)
+        else:
+            raise ArgumentError("Parameter " + name + " in section " + section + " cannot be parsed")
+
+    except:
+        value = default
+
+    return value
 
 class PostprocDataObject(object):
     """
@@ -928,6 +970,9 @@ class PostprocDataObject(object):
         :return: -
         """
 
+        standard_version = PostprocVersion()
+        standard_layer = PostprocLayer("Multilevel unsharp masking", 1., 1., 0., 20, 0., False)
+
         # Initialize the postprocessing image versions with the unprocessed image (as version 0).
         self.initialize_versions()
 
@@ -941,7 +986,6 @@ class PostprocDataObject(object):
             return
 
         # Initialize the version index for comparison with an impossible value.
-        old_version_index = -1
         self.number_versions = 0
 
         # Go through all sections and find the postprocessing sections.
@@ -960,29 +1004,38 @@ class PostprocDataObject(object):
                     else:
                         self.initialize_versions()
                         new_version = self.versions[0]
-                    new_version.rgb_automatic = config_parser_object.getboolean(section,
-                                                                                'rgb automatic')
-                    new_version.rgb_gauss_width = config_parser_object.getint(section,
-                                                                              'rgb gauss width')
-                    new_version.rgb_resolution_index = config_parser_object.getint(section,
-                                                                            'rgb resolution index')
-                    new_version.shift_red = (
-                        config_parser_object.getfloat(section, 'rgb shift red y'),
-                        config_parser_object.getfloat(section, 'rgb shift red x'))
-                    new_version.shift_blue = (
-                        config_parser_object.getfloat(section, 'rgb shift blue y'),
-                        config_parser_object.getfloat(section, 'rgb shift blue x'))
+                    new_version.rgb_automatic = get_from_conf(config_parser_object, section,
+                        'rgb automatic', standard_version.rgb_automatic)
+                    new_version.rgb_gauss_width = get_from_conf(config_parser_object, section,
+                        'rgb gauss width', standard_version.rgb_gauss_width)
+                    new_version.rgb_resolution_index = get_from_conf(config_parser_object, section,
+                        'rgb resolution index', standard_version.rgb_resolution_index)
+                    new_version.shift_red = (get_from_conf(config_parser_object, section,
+                        'rgb shift red y', standard_version.shift_red[0]),
+                        get_from_conf(config_parser_object, section, 'rgb shift red x',
+                        standard_version.shift_red[1]))
+                    new_version.shift_blue = (get_from_conf(config_parser_object, section,
+                        'rgb shift blue y', standard_version.shift_blue[0]),
+                        get_from_conf(config_parser_object, section, 'rgb shift blue x',
+                        standard_version.shift_blue[1]))
 
                 # A layer section is found. Store it for the current version.
                 elif section_items[2] == 'Layer':
                     # Read all parameters of this layer, and add a layer to the current version.
-                    method = config_parser_object.get(section, 'postprocessing method')
-                    radius = config_parser_object.getfloat(section, 'radius')
-                    amount = config_parser_object.getfloat(section, 'amount')
-                    bi_fraction = config_parser_object.getfloat(section, 'bilateral fraction')
-                    bi_range = config_parser_object.getfloat(section, 'bilateral range')
-                    denoise = config_parser_object.getfloat(section, 'denoise')
-                    luminance_only = config_parser_object.getboolean(section, 'luminance only')
+                    method = get_from_conf(config_parser_object, section,
+                        'postprocessing method', standard_layer.postproc_method)
+                    radius = get_from_conf(config_parser_object, section,
+                        'radius', standard_layer.radius)
+                    amount = get_from_conf(config_parser_object, section,
+                        'amount', standard_layer.amount)
+                    bi_fraction = get_from_conf(config_parser_object, section,
+                        'bilateral fraction', standard_layer.bi_fraction)
+                    bi_range = get_from_conf(config_parser_object, section,
+                        'bilateral range', standard_layer.bi_range)
+                    denoise = get_from_conf(config_parser_object, section,
+                        'denoise', standard_layer.denoise)
+                    luminance_only = get_from_conf(config_parser_object, section,
+                        'luminance only', standard_layer.luminance_only)
                     new_version.add_postproc_layer(PostprocLayer(method, radius, amount, bi_fraction,
                                                                  bi_range, denoise, luminance_only))
 
