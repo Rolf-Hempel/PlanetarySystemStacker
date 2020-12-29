@@ -1039,9 +1039,9 @@ class PostprocDataObject(object):
                     new_version.add_postproc_layer(PostprocLayer(method, radius, amount, bi_fraction,
                                                                  bi_range, denoise, luminance_only))
 
-        # Set the selected version again, because it may have been changed by reading versions.
-        self.version_selected = config_parser_object.getint('PostprocessingInfo',
-                                                            'version selected')
+        # Set the selected version again, because not all versions might have been read successfully.
+        self.version_selected = min(config_parser_object.getint('PostprocessingInfo',
+                                                            'version selected'), self.number_versions)
 
 
 class PostprocVersion(object):
