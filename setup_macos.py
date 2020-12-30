@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-release_tag = "0.8.17"
+release_tag = "0.8.18"
 
 setuptools.setup(
     name="planetary-system-stacker",
@@ -35,7 +35,7 @@ setuptools.setup(
         "Operating System :: OS Independent"
         # "Operating System :: MacOS"
     ],
-    python_requires='>=3.5',
+    python_requires='>=3.5, <3.9',
     entry_points={
         "console_scripts": [
         "PlanetarySystemStacker=planetary_system_stacker.planetary_system_stacker:main",
