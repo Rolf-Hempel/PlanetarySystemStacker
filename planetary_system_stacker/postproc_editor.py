@@ -488,7 +488,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.spinBox_compare.setMaximum(self.postproc_data_object.number_versions)
         self.spinBox_compare.setValue(
             min(self.spinBox_compare.value(), self.postproc_data_object.number_versions))
-        self.select_version_callback(self.postproc_data_object.version_selected)
+        self.select_version_signal.emit(self.postproc_data_object.version_selected)
 
     def blinking_toggled(self):
         """
@@ -1326,7 +1326,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # method of the image viewer is invoked to normalize the appearance of the image.
         self.image_size_y = -1
 
-        # Create the version manager and pass it the "select_version" callback function.
+        # Create the version manager.
         self.selected_version = None
         self.version_manager_widget = VersionManagerWidget(self.configuration)
         self.gridLayout.addWidget(self.version_manager_widget, 1, 1, 1, 1)
