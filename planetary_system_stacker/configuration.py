@@ -186,7 +186,7 @@ class Configuration(object):
 
         # Look for PSS icon in several places:
         python_dir = dirname(sys.executable)
-        icon_locations = [join('Icons', 'PSS-Icon-64.png'),
+        icon_locations = ['PSS-Icon-64.png', join('Icons', 'PSS-Icon-64.png'),
                           join(python_dir, "Lib", "site-packages", 'planetary_system_stacker',
                                 'Icons', 'PSS-Icon-64.png')]
 
