@@ -96,6 +96,13 @@ class Workflow(QtCore.QObject):
                 "\n           Python interpreter location: " +
                 python_dir, self.attached_log_file, precede_with_timestamp=True)
 
+        # Check if the configuration was imported from an older version. If so, print a message.
+        if self.configuration.global_parameters_version_imported_from != \
+                self.configuration.global_parameters_version:
+            Miscellaneous.protocol("           Configuration imported from older version: " +
+                                   self.configuration.global_parameters_version_imported_from,
+                                   self.attached_log_file, precede_with_timestamp=False)
+
         # For every OS platform create a list of potential places to look for the MKL library.
         # Start with an empty path (i.e. no absolute path necessary). Also, set the OS-dependent
         # name of the library.

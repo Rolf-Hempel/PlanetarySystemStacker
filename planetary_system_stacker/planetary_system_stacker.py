@@ -447,6 +447,14 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
             self.configuration.current_dir = str(Path(file_name).parents[0])
             self.display_widget(ConfigurationEditor(self))
 
+            if self.configuration.global_parameters_protocol_level > 1 and \
+                    self.configuration.global_parameters_version_imported_from != \
+                    self.configuration.global_parameters_version:
+                Miscellaneous.protocol("+++ Importing configuration from older version: " +
+                                self.configuration.global_parameters_version_imported_from + " +++",
+                                self.workflow.attached_log_file)
+        pass
+
     def save_config_file(self):
         """
         Save all stacking parameters in a configuration file.

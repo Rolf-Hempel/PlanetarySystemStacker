@@ -453,6 +453,10 @@ class Configuration(object):
         default_conf_obj = ConfigurationParameters()
         default_conf_obj.set_defaults()
 
+        # Read the PSS version with which the ini file was created.
+        self.global_parameters_version_imported_from = get_from_conf(conf, 'Global parameters',
+            'version', ' version number could not be identified')
+
         self.hidden_parameters_current_dir = get_from_conf(conf, 'Hidden parameters',
             'current directory', default_conf_obj.hidden_parameters_current_dir)
         self.hidden_parameters_main_window_x0 = get_from_conf(conf, 'Hidden parameters',
