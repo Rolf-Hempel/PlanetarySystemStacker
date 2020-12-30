@@ -35,7 +35,7 @@ setuptools.setup(
         "Operating System :: OS Independent"
         # "Operating System :: Microsoft :: Windows"
     ],
-    python_requires='>=3.5, <3.7',
+    python_requires='>=3.5,  <3.7',
     entry_points={
         "console_scripts": [
         "PlanetarySystemStacker=planetary_system_stacker.planetary_system_stacker:main",
