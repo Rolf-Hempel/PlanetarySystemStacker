@@ -19,13 +19,13 @@ python3 -m twine upload --repository testpypi dist/*
 
 Install the package:
 --------------------
-pip3 install planetary-system-stacker==0.8.19
+pip3 install planetary-system-stacker==0.8.20
 or, to upgrade from an earlier version:
 pip3 install --upgrade planetary-system-stacker
 
 Or, to install / upgrade the package from the test server:
 ------------------------------------------------
-pip3 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.19
+pip3 install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker==0.8.20
 pip3 install --upgrade --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple planetary-system-stacker
 
 On Windows, the location of the MKL library is: <Python3.6>\Library\bin

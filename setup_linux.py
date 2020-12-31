@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-release_tag = "0.8.19"
+release_tag = "0.8.20"
 
 setuptools.setup(
     name="planetary-system-stacker",
@@ -17,7 +17,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     ext_modules=None,
     install_requires=[
-        'numpy == 1.18.4',
+        'numpy',
         'mkl',
         'matplotlib',
         'psutil',
