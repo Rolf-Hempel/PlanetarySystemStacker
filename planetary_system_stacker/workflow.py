@@ -97,7 +97,11 @@ class Workflow(QtCore.QObject):
                 python_dir, self.attached_log_file, precede_with_timestamp=True)
 
         # Check if the configuration was imported from an older version. If so, print a message.
-        if self.configuration.global_parameters_version_imported_from != \
+        # Please note that the "version imported from" parameter is set only if a configuration
+        # has been read.
+        if self.configuration.global_parameters_protocol_level > 1 and \
+                self.configuration.configuration_read and \
+                self.configuration.global_parameters_version_imported_from != \
                 self.configuration.global_parameters_version:
             Miscellaneous.protocol("           Configuration imported from older version: " +
                                    self.configuration.global_parameters_version_imported_from,
