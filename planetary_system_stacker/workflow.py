@@ -89,6 +89,13 @@ class Workflow(QtCore.QObject):
         # system configuration, this library may be callable without specifying its absolute path.
         # If not, try to find the library at various locations in the file system.
         platform_name = platform.system()
+        processor_name = platform.processor()
+
+        # The following code is necessary to make mkl run correctly on AMD-based Windows systems
+        # where PSS is installed using the Windows installer (which was built on an Intel system).
+        if platform_name == "Windows" and "AMD" in processor_name:
+            os.environ['MKL_DEBUG_CPU_TYPE'] = '5'
+
         python_dir = dirname(sys.executable)
         if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol(
