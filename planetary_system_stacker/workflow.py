@@ -91,17 +91,22 @@ class Workflow(QtCore.QObject):
         platform_name = platform.system()
         processor_name = platform.processor()
 
-        # The following code is necessary to make mkl run correctly on AMD-based Windows systems
-        # where PSS is installed using the Windows installer (which was built on an Intel system).
-        if platform_name == "Windows" and "AMD" in processor_name:
-            os.environ['MKL_DEBUG_CPU_TYPE'] = '5'
-
         python_dir = dirname(sys.executable)
         if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol(
                 "Operating system used: " + platform_name +
                 "\n           Python interpreter location: " +
                 python_dir, self.attached_log_file, precede_with_timestamp=True)
+
+        # The following code is necessary to make mkl run correctly on AMD-based Windows systems
+        # where PSS is installed using the Windows installer (which was built on an Intel system).
+        if platform_name == "Windows" and "AMD" in processor_name:
+            os.environ['MKL_DEBUG_CPU_TYPE'] = '5'
+            if self.configuration.global_parameters_protocol_level > 1:
+                Miscellaneous.protocol(
+                    "           Processor used: '" + processor_name +
+                    "', setting env variable 'MKL_DEBUG_CPU_TYPE'=5 to optimize mkl performance",
+                    self.attached_log_file, precede_with_timestamp=False)
 
         # Check if the configuration was imported from an older version. If so, print a message.
         # Please note that the "version imported from" parameter is set only if a configuration
