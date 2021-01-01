@@ -1259,8 +1259,10 @@ class Miscellaneous(object):
         # Convert the image to 32bit floating point format.
         input_image = image.astype(float32)
 
+        color = len(image.shape) == 3
+
         # If the luminance channel is to be processed only, extract the luminance channel.
-        if layers[0].luminance_only:
+        if color and layers[0].luminance_only:
             input_image_hsv = cvtColor(input_image, COLOR_BGR2HSV)
             layer_input = input_image_hsv[:, :, 2]
         else:
@@ -1314,7 +1316,7 @@ class Miscellaneous(object):
         # Reduce the value range so that they fit into 16bit uint, and convert to uint16. In case
         # the luminance channel was processed only, insert the processed luminance channel into the
         # HSV representation of the original image, and convert back to BGR.
-        if layers[0].luminance_only:
+        if color and layers[0].luminance_only:
             input_image_hsv[:, :, 2] = components_accumulated
             return cvtColor(input_image_hsv.clip(min=0., max=65535.), COLOR_HSV2BGR).astype(uint16)
         else:
