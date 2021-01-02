@@ -405,7 +405,7 @@ class VideoFrameViewer(FrameViewer):
         Convert a grayscale image to a pixmap and assign it to the photo object.
 
         :param index: Index into the frame list. Frames are assumed to be grayscale image in format
-                      float32.
+                      uint8 or uint16.
         :return: -
         """
 
