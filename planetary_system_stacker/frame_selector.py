@@ -163,7 +163,6 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
         # finishes.
         self.player_thread = QtCore.QThread()
         self.frame_player = FramePlayer(self)
-        self.frame_player.setParent(self)
         self.frame_player.moveToThread(self.player_thread)
         self.frame_player.block_widgets_signal.connect(self.block_widgets)
         self.frame_player.unblock_widgets_signal.connect(self.unblock_widgets)

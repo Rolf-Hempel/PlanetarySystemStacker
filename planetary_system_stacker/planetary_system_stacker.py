@@ -948,6 +948,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                                            self.write_status_bar,
                                            self.signal_save_postprocessed_image)
                 self.display_widget(pew)
+                pew.frame_viewer.setFocus()
             self.busy = True
 
         elif self.activity == "Save postprocessed image":
