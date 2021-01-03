@@ -142,7 +142,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
         # The image is RGB color.
         else:
             qt_image = QtGui.QImage(image_uint8, self.shape_x,
-                                    self.shape_y, 3*self.shape_x, QtGui.QImage.Format_RGB888)
+                                    self.shape_y, 3 * self.shape_x, QtGui.QImage.Format_RGB888)
         pixmap = QtGui.QPixmap(qt_image)
 
         if pixmap and not pixmap.isNull():
@@ -191,13 +191,13 @@ class FrameViewer(QtWidgets.QGraphicsView):
             if direction > 0:
                 factor = 1.25
             else:
-                min_factor = min(min(self.photorect.width(), self.viewrect.width()) / self.scenerect.width(),
-                                   min(self.photorect.height(), self.viewrect.height()) / self.scenerect.height())
+                min_factor = min(
+                    min(self.photorect.width(), self.viewrect.width()) / self.scenerect.width(),
+                    min(self.photorect.height(), self.viewrect.height()) / self.scenerect.height())
                 factor = max(0.8, min_factor)
 
             self.scale(factor, factor)
             self.scenerect = self.transform().mapRect(self.photorect)
-
 
     def keyPressEvent(self, event):
         """
