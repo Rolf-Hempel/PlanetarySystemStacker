@@ -20,7 +20,6 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
     def __init__(self):
         super(FrameViewer, self).__init__()
-        self._zoom = 0
         self._empty = True
 
         # Initialize a flag which indicates when an image is being loaded.
@@ -48,7 +47,17 @@ class FrameViewer(QtWidgets.QGraphicsView):
         self.setFocus()
 
     def resizeEvent(self, event):
-        self.resized.emit()
+        """
+        This method is called when the window size changes. In this case the image is zoomed so it
+        fills the entire view.
+
+        :param event: Resize event.
+        :return: -
+        """
+
+        # Set the rectangle surrounding the current view.
+        self.viewrect = self.viewport().rect()
+        self.fitInView()
         return super(FrameViewer, self).resizeEvent(event)
 
     def hasPhoto(self):
@@ -61,18 +70,27 @@ class FrameViewer(QtWidgets.QGraphicsView):
         :return: -
         """
 
-        rect = QtCore.QRectF(self._photo.pixmap().rect())
-        if not rect.isNull():
-            self.setSceneRect(rect)
+        if not self.photorect.isNull():
             if self.hasPhoto():
-                unity = self.transform().mapRect(QtCore.QRectF(0, 0, 1, 1))
-                self.scale(1 / unity.width(), 1 / unity.height())
-                viewrect = self.viewport().rect()
-                scenerect = self.transform().mapRect(rect)
-                factor = min(viewrect.width() / scenerect.width(),
-                             viewrect.height() / scenerect.height())
+                factor = min(self.viewrect.width() / self.scenerect.width(),
+                             self.viewrect.height() / self.scenerect.height())
                 self.scale(factor, factor)
-            self._zoom = 0
+                self.scenerect = self.transform().mapRect(self.photorect)
+
+    def set_original_scale(self):
+        """
+        Scale the scene to the original size of the photo. If the photo has more pixels than the
+        current view, only part of the image is displayed.
+
+        :return: -
+        """
+
+        if not self.photorect.isNull():
+            if self.hasPhoto():
+                factor = min(self.photorect.width() / self.scenerect.width(),
+                             self.photorect.height() / self.scenerect.height())
+                self.scale(factor, factor)
+                self.scenerect = self.transform().mapRect(self.photorect)
 
     def setPhoto(self, image, overlay_exclude_mark=False):
         """
@@ -134,6 +152,10 @@ class FrameViewer(QtWidgets.QGraphicsView):
             self._empty = True
             self._photo.setPixmap(QtGui.QPixmap())
 
+        # Set the new rectangles surrounding the photo and the current scene.
+        self.photorect = QtCore.QRectF(self._photo.pixmap().rect())
+        self.scenerect = self.transform().mapRect(self.photorect)
+
         # Release the image loading flag.
         self.image_loading_busy = False
 
@@ -156,30 +178,26 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
     def zoom(self, direction):
         """
-        Zoom in or out. This is only active when a photo is loaded
+        Zoom in or out. This is only active when a photo is loaded. For small images (smaller than
+        the current view), zooming out is limited by the original photo resolution. For larger
+        images zooming out stops when the scene fills the entire view.
 
         :param direction: If > 0, zoom in, otherwise zoom out.
         :return: -
         """
 
         if self.hasPhoto():
-
             # Depending of direction value, set the zoom factor to greater or smaller than 1.
             if direction > 0:
                 factor = 1.25
-                self._zoom += 1
             else:
-                factor = 0.8
-                self._zoom -= 1
+                min_factor = min(min(self.photorect.width(), self.viewrect.width()) / self.scenerect.width(),
+                                   min(self.photorect.height(), self.viewrect.height()) / self.scenerect.height())
+                factor = max(0.8, min_factor)
 
-            # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene
-            # to the window size.
-            if self._zoom > 0:
-                self.scale(factor, factor)
-            elif self._zoom == 0:
-                self.fitInView()
-            else:
-                self._zoom = 0
+            self.scale(factor, factor)
+            self.scenerect = self.transform().mapRect(self.photorect)
+
 
     def keyPressEvent(self, event):
         """
@@ -194,6 +212,8 @@ class FrameViewer(QtWidgets.QGraphicsView):
             self.zoom(1)
         elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
             self.zoom(-1)
+        elif event.key() == QtCore.Qt.Key_1 and not event.modifiers() & QtCore.Qt.ControlModifier:
+            self.set_original_scale()
         else:
             super(FrameViewer, self).keyPressEvent(event)
 
@@ -207,17 +227,18 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_Frame):
         frame_viewer.setObjectName("frame_viewer")
         frame_viewer.setFrameShape(QtWidgets.QFrame.Panel)
         frame_viewer.setFrameShadow(QtWidgets.QFrame.Sunken)
-        frame_viewer.setMinimumSize(800, 600)
+        frame_viewer.setMinimumSize(600, 600)
         frame_viewer.setPhoto(input_image)
         self.gridLayout.addWidget(frame_viewer, 0, 0, 1, 1)
 
 
 if __name__ == '__main__':
     input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_gpp.png"
+    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss_drizzle2_gpp.png"
     input_image = Frames.read_image(input_file_name)
 
     app = QtWidgets.QApplication(argv)
 
     window = FrameViewerWidget(input_image)
-    window.show()
+    window.showMaximized()
     app.exec_()

@@ -14,7 +14,7 @@ from PyQt5 import QtCore, QtGui, QtWidgets
 class Ui_Frame(object):
     def setupUi(self, Frame):
         Frame.setObjectName("Frame")
-        Frame.resize(505, 409)
+        Frame.resize(270, 170)
         self.gridLayout = QtWidgets.QGridLayout(Frame)
         self.gridLayout.setObjectName("gridLayout")
         self.label = QtWidgets.QLabel(Frame)
