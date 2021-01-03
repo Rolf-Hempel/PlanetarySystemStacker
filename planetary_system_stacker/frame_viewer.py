@@ -206,18 +206,15 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
     def __init__(self):
         super(FrameViewer, self).__init__()
-        self._zoom = 0
         self._empty = True
 
         # Initialize a flag which indicates when an image is being loaded.
         self.image_loading_busy = False
 
-        # Initialize the scene. This object handles mouse events if not in drag mode.
-        self._scene = QtWidgets.QGraphicsScene()
         # Initialize the photo object. No image is loaded yet.
         self._photo = QtWidgets.QGraphicsPixmapItem()
-        self._scene.addItem(self._photo)
-        self.setScene(self._scene)
+
+        self.viewrect = self.viewport().rect()
 
         self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
@@ -234,7 +231,17 @@ class FrameViewer(QtWidgets.QGraphicsView):
         self.setFocus()
 
     def resizeEvent(self, event):
-        self.resized.emit()
+        """
+        This method is called when the window size changes. In this case the image is zoomed so it
+        fills the entire view.
+
+        :param event: Resize event.
+        :return: -
+        """
+
+        # Set the rectangle surrounding the current view.
+        self.viewrect = self.viewport().rect()
+        self.fitInView()
         return super(FrameViewer, self).resizeEvent(event)
 
     def hasPhoto(self):
@@ -247,18 +254,27 @@ class FrameViewer(QtWidgets.QGraphicsView):
         :return: -
         """
 
-        rect = QtCore.QRectF(self._photo.pixmap().rect())
-        if not rect.isNull():
-            self.setSceneRect(rect)
+        if not self.photorect.isNull():
             if self.hasPhoto():
-                unity = self.transform().mapRect(QtCore.QRectF(0, 0, 1, 1))
-                self.scale(1 / unity.width(), 1 / unity.height())
-                viewrect = self.viewport().rect()
-                scenerect = self.transform().mapRect(rect)
-                factor = min(viewrect.width() / scenerect.width(),
-                             viewrect.height() / scenerect.height())
+                factor = min(self.viewrect.width() / self.scenerect.width(),
+                             self.viewrect.height() / self.scenerect.height())
                 self.scale(factor, factor)
-            self._zoom = 0
+                self.scenerect = self.transform().mapRect(self.photorect)
+
+    def set_original_scale(self):
+        """
+        Scale the scene to the original size of the photo. If the photo has more pixels than the
+        current view, only part of the image is displayed.
+
+        :return: -
+        """
+
+        if not self.photorect.isNull():
+            if self.hasPhoto():
+                factor = min(self.photorect.width() / self.scenerect.width(),
+                             self.photorect.height() / self.scenerect.height())
+                self.scale(factor, factor)
+                self.scenerect = self.transform().mapRect(self.photorect)
 
     def setPhoto(self, image, overlay_exclude_mark=False):
         """
@@ -310,7 +326,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
         # The image is RGB color.
         else:
             qt_image = QtGui.QImage(image_uint8, self.shape_x,
-                                    self.shape_y, 3*self.shape_x, QtGui.QImage.Format_RGB888)
+                                    self.shape_y, 3 * self.shape_x, QtGui.QImage.Format_RGB888)
         pixmap = QtGui.QPixmap(qt_image)
 
         if pixmap and not pixmap.isNull():
@@ -319,6 +335,15 @@ class FrameViewer(QtWidgets.QGraphicsView):
         else:
             self._empty = True
             self._photo.setPixmap(QtGui.QPixmap())
+
+        # Initialize the scene. This object handles mouse events if not in drag mode.
+        self._scene = QtWidgets.QGraphicsScene()
+        self._scene.addItem(self._photo)
+        self.setScene(self._scene)
+
+        # Set the new rectangles surrounding the photo and the current scene.
+        self.photorect = QtCore.QRectF(self._photo.pixmap().rect())
+        self.scenerect = self.transform().mapRect(self.photorect)
 
         # Release the image loading flag.
         self.image_loading_busy = False
@@ -342,30 +367,26 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
     def zoom(self, direction):
         """
-        Zoom in or out. This is only active when a photo is loaded
+        Zoom in or out. This is only active when a photo is loaded. For small images (smaller than
+        the current view), zooming out is limited by the original photo resolution. For larger
+        images zooming out stops when the scene fills the entire view.
 
         :param direction: If > 0, zoom in, otherwise zoom out.
         :return: -
         """
 
         if self.hasPhoto():
-
             # Depending of direction value, set the zoom factor to greater or smaller than 1.
             if direction > 0:
                 factor = 1.25
-                self._zoom += 1
             else:
-                factor = 0.8
-                self._zoom -= 1
+                min_factor = min(
+                    min(self.photorect.width(), self.viewrect.width()) / self.scenerect.width(),
+                    min(self.photorect.height(), self.viewrect.height()) / self.scenerect.height())
+                factor = max(0.8, min_factor)
 
-            # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene
-            # to the window size.
-            if self._zoom > 0:
-                self.scale(factor, factor)
-            elif self._zoom == 0:
-                self.fitInView()
-            else:
-                self._zoom = 0
+            self.scale(factor, factor)
+            self.scenerect = self.transform().mapRect(self.photorect)
 
     def keyPressEvent(self, event):
         """
@@ -380,8 +401,11 @@ class FrameViewer(QtWidgets.QGraphicsView):
             self.zoom(1)
         elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
             self.zoom(-1)
+        elif event.key() == QtCore.Qt.Key_1 and not event.modifiers() & QtCore.Qt.ControlModifier:
+            self.set_original_scale()
         else:
             super(FrameViewer, self).keyPressEvent(event)
+
 
 class VideoFrameViewer(FrameViewer):
     """
