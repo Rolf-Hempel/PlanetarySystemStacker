@@ -1676,12 +1676,24 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # At the end of the scroll area, add a vertical spacer.
         self.verticalLayout.addItem(self.spacerItem)
 
-        # Load the parameters of this version into the RGB alignment tab.
+        # Load the parameters of this version into the RGB alignment tab. Block signals to avoid
+        # triggering change actions which are not required at this point.
+        self.checkBox_automatic.blockSignals(True)
+        self.comboBox_resolution.blockSignals(True)
         self.checkBox_automatic.setChecked(self.selected_version.rgb_automatic)
         self.comboBox_resolution.setCurrentIndex(min(self.selected_version.rgb_resolution_index,
                                                      self.max_rgb_index))
+        self.checkBox_automatic.blockSignals(False)
+        self.comboBox_resolution.blockSignals(False)
         self.fgw_slider_value.setValue(int((self.selected_version.rgb_gauss_width + 1) / 2))
         self.fgw_label_display.setText(str(self.selected_version.rgb_gauss_width))
+
+        # Only if the RGB tab is selected: Enter / leave RGB correction mode.
+        if self.tabWidget_postproc_control.currentIndex():
+            if self.selected_version.rgb_automatic:
+                self.rgb_correction_version_reset(self.selected_version)
+            else:
+                self.rgb_correction_version_init(self.selected_version)
 
         # Load the current image into the image viewer.
         self.select_image(version_index)
