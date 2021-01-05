@@ -16,8 +16,6 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
     """
 
-    resized = QtCore.pyqtSignal()
-
     def __init__(self):
         super(FrameViewer, self).__init__()
         self._empty = True
@@ -40,8 +38,6 @@ class FrameViewer(QtWidgets.QGraphicsView):
         self.setFrameShape(QtWidgets.QFrame.NoFrame)
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.drag_mode = True
-
-        self.resized.connect(self.fitInView)
 
         # Set the focus on the viewer.
         self.setFocus()
@@ -171,6 +167,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
         if self.drag_mode:
             # Depending of wheel direction, set the direction value to greater or smaller than 1.
             self.zoom(event.angleDelta().y())
+            print ("Wheel event")
 
         # If not in drag mode, the wheel event is handled at the scene level.
         else:
@@ -233,7 +230,9 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_Frame):
 
 
 if __name__ == '__main__':
-    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_gpp.png"
+    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_gpp.png"
+    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\" \
+                      "2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48.png"
     # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss_drizzle2_gpp.png"
     input_image = Frames.read_image(input_file_name)
 

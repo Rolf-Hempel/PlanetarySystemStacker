@@ -1303,15 +1303,15 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         self.sharpening_layer_widgets = []
         self.max_layers = self.configuration.postproc_max_layers
 
-        self.label_message.setText("Create sharp image versions using up to "
-                                   + str(self.max_layers) + " correction layers."
-                                   " Adjust layer parameters as required.")
+        self.label_message.setText("Edit postproc versions with up to "
+                                   + str(self.max_layers) + " correction layers.")
         self.label_message.setStyleSheet('color: red')
 
         # Start the frame viewer.
         self.frame_viewer = FrameViewer()
         self.frame_viewer.setObjectName("framewiever")
-        self.gridLayout.addWidget(self.frame_viewer, 0, 0, 2, 1)
+        self.gridLayout.addWidget(self.frame_viewer, 0, 0, 2, 2)
+        self.frame_viewer.zoom_factor_signal.connect(self.display_zoom_factor)
 
         # Initialize a vertical spacer used to fill the lower part of the sharpening widget scroll
         # area.
@@ -1329,7 +1329,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
         # Create the version manager.
         self.selected_version = None
         self.version_manager_widget = VersionManagerWidget(self.configuration)
-        self.gridLayout.addWidget(self.version_manager_widget, 1, 1, 1, 1)
+        self.gridLayout.addWidget(self.version_manager_widget, 1, 2, 1, 1)
 
         # The "set_photo_signal" from the VersionManagerWidget is not passed to the image viewer
         # directly. (The image viewer does not accept signals.) Instead, it sends a signal to this
@@ -1619,6 +1619,17 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             self.label_blue_left.setText((format_string.format(-shift_blue[1])))
             self.label_blue_right.setText("")
 
+    def display_zoom_factor(self, zoom_factor):
+        """
+        Write the current viewer zoom factor under the viewer window.
+
+        :param zoom_factor: Current zoom factor, sent by the FrameViewer via a signal.
+
+        :return: -
+        """
+
+        self.label_zoom.setText("Zoom: " + str(zoom_factor) + "%")
+
     def select_version(self, version_index):
         """
         Select a new current version, update the scroll area with all layer widgets, and update the
@@ -1833,10 +1844,10 @@ class EmulateStatusBar(object):
 
 if __name__ == '__main__':
     # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
-    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\" \
-    #                   "2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48_rgb-shifted.png"
+    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\" \
+                      "2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48.png"
     # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter\\2019-05-26-0115_4-L-Jupiter_ZWO ASI290MM Mini_pipp_pss.png"
-    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South.stacked.tiff"
+    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South.stacked.tiff"
 
     input_image = imread(input_file_name, -1)
     # Change colors to standard RGB

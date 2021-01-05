@@ -48,8 +48,6 @@ class VideoFrameSelector(FrameViewer):
 
     """
 
-    resized = QtCore.pyqtSignal()
-
     def __init__(self, frames, index_included, frame_index=0):
         super(VideoFrameSelector, self).__init__()
         self.frames = frames

@@ -202,7 +202,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
     """
 
-    resized = QtCore.pyqtSignal()
+    zoom_factor_signal = QtCore.pyqtSignal(int)
 
     def __init__(self):
         super(FrameViewer, self).__init__()
@@ -225,8 +225,6 @@ class FrameViewer(QtWidgets.QGraphicsView):
         self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
         self.drag_mode = True
 
-        self.resized.connect(self.fitInView)
-
         # Set the focus on the viewer.
         self.setFocus()
 
@@ -247,6 +245,17 @@ class FrameViewer(QtWidgets.QGraphicsView):
     def hasPhoto(self):
         return not self._empty
 
+    def get_zoom_factor(self):
+        """
+        Compute the current zoom factor. It is sent to the GUI widget via the "zoom_factor_signal".
+
+        :return: The current zoom factor, rounded to the next int.
+        """
+
+        zoom_factor = round(self.scenerect.width() / self.photorect.width() * 100.)
+        self.zoom_factor_signal.emit(zoom_factor)
+        return zoom_factor
+
     def fitInView(self):
         """
         Scale the scene such that it fits into the window completely.
@@ -260,6 +269,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
                              self.viewrect.height() / self.scenerect.height())
                 self.scale(factor, factor)
                 self.scenerect = self.transform().mapRect(self.photorect)
+                self.get_zoom_factor()
 
     def set_original_scale(self):
         """
@@ -275,6 +285,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
                              self.photorect.height() / self.scenerect.height())
                 self.scale(factor, factor)
                 self.scenerect = self.transform().mapRect(self.photorect)
+                self.get_zoom_factor()
 
     def setPhoto(self, image, overlay_exclude_mark=False):
         """
@@ -387,6 +398,7 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
             self.scale(factor, factor)
             self.scenerect = self.transform().mapRect(self.photorect)
+            self.get_zoom_factor()
 
     def keyPressEvent(self, event):
         """
@@ -413,8 +425,6 @@ class VideoFrameViewer(FrameViewer):
     implemented by using the mouse and scroll wheel.
 
     """
-
-    resized = QtCore.pyqtSignal()
 
     def __init__(self, frames, align_frames, frame_index=0):
         super(VideoFrameViewer, self).__init__()
