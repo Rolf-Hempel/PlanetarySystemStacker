@@ -257,15 +257,19 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         :return: -
         """
 
+        # Find the closest AP.
+        ap, dist = self.photo_editor.aps.find_neighbor(self.y, self.x,
+                                                       self.photo_editor.aps.alignment_points)
+
+        # If no AP has been set, there is nothing do be done.
+        if ap is None:
+            return
+
         # Depending of direction value, set the factor to greater or smaller than 1.
         if direction > 0:
             factor = self.ap_size_change_factor
         else:
             factor = 1. / self.ap_size_change_factor
-
-        # Find the closest AP.
-        ap, dist = self.photo_editor.aps.find_neighbor(self.y, self.x,
-                                                       self.photo_editor.aps.alignment_points)
 
         # Copy the AP, and apply the changes to the copy only.
         new_ap = ap.copy()
@@ -363,8 +367,6 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
     The "cntrl" key is used to switch between the two modes.
     """
 
-    resized = QtCore.pyqtSignal()
-
     def __init__(self, image, alignment_points):
         super(AlignmentPointEditor, self).__init__()
         self._zoom = 0
@@ -394,13 +396,12 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
 
         # Load the image, and connect it to resizing of this window.
         self.setPhoto(self.image)
-        self.resized.connect(self.fitInView)
 
         # Set the focus on the viewer, so the key event is caught.
         self.setFocus()
 
     def resizeEvent(self, event):
-        self.resized.emit()
+        self.fitInView()
         return super(AlignmentPointEditor, self).resizeEvent(event)
 
     def hasPhoto(self):

@@ -306,10 +306,6 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
             self.zoom(1)
         elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
             self.zoom(-1)
-        elif event.key() == QtCore.Qt.Key_Z and event.modifiers() & QtCore.Qt.ControlModifier:
-            self.undoStack.undo()
-        elif event.key() == QtCore.Qt.Key_Y and event.modifiers() & QtCore.Qt.ControlModifier:
-            self.undoStack.redo()
         else:
             super(RectangularPatchEditor, self).keyPressEvent(event)
 
@@ -320,7 +316,7 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
             self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
             self.drag_mode = True
         else:
-            super(RectangularPatchEditor, self).keyPressEvent(event)
+            super(RectangularPatchEditor, self).keyReleaseEvent(event)
 
     def set_selection_rectangle(self, y_low, y_high, x_low, x_high):
         """
