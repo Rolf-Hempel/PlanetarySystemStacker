@@ -37,8 +37,8 @@ from exceptions import Error
 from frame_selector_gui import Ui_frame_selector
 from frame_viewer import FrameViewer
 from frames import Frames
-from rank_frames import RankFrames
 from miscellaneous import Miscellaneous
+from rank_frames import RankFrames
 
 
 class VideoFrameSelector(FrameViewer):

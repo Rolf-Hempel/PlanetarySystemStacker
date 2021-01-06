@@ -26,9 +26,8 @@ from glob import glob
 from sys import argv, exit
 from time import time
 
-from numpy import uint8
 from PyQt5 import QtCore, QtGui, QtWidgets
-from cv2 import NORM_MINMAX, normalize
+from numpy import uint8
 
 from align_frames import AlignFrames
 from alignment_point_editor_gui import Ui_alignment_point_editor

@@ -26,17 +26,16 @@ from glob import glob
 from sys import argv, exit
 from time import time
 
+from PyQt5 import QtCore, QtWidgets
 from numpy import uint8, uint16, int32
-from cv2 import NORM_MINMAX, normalize
-from PyQt5 import QtCore, QtGui, QtWidgets
 
-from exceptions import InternalError, NotSupportedError, Error
 from align_frames import AlignFrames
-from configuration import Configuration
-from frames import Frames
-from frame_viewer import FrameViewer
-from rank_frames import RankFrames
 from alignment_point_editor import SelectionRectangleGraphicsItem
+from configuration import Configuration
+from exceptions import InternalError, NotSupportedError, Error
+from frame_viewer import FrameViewer
+from frames import Frames
+from rank_frames import RankFrames
 from rectangular_patch_editor_gui import Ui_rectangular_patch_editor
 
 

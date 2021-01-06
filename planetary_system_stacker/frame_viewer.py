@@ -30,6 +30,7 @@ from sys import argv, exit
 from time import time, sleep
 
 import matplotlib
+
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from PyQt5 import QtCore, QtGui, QtWidgets
