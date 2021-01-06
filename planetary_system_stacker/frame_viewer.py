@@ -216,11 +216,6 @@ class FrameViewer(QtWidgets.QGraphicsView):
         self.shape_y = None
         self.shape_x = None
 
-        # Initialize the scene. This object handles mouse events if not in drag mode.
-        self._scene = QtWidgets.QGraphicsScene()
-        self._scene.addItem(self._photo)
-        self.setScene(self._scene)
-
         self.viewrect = self.viewport().rect()
 
         self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
@@ -356,12 +351,28 @@ class FrameViewer(QtWidgets.QGraphicsView):
             self._empty = True
             self._photo.setPixmap(QtGui.QPixmap())
 
+        # Initialize the scene. This object handles mouse events if not in drag mode.
+        self.initialize_scene()
+
         # Set the new rectangles surrounding the photo and the current scene.
         self.photorect = QtCore.QRectF(self._photo.pixmap().rect())
         self.scenerect = self.transform().mapRect(self.photorect)
 
         # Release the image loading flag.
         self.image_loading_busy = False
+
+    def initialize_scene(self):
+        """
+        Initialize the scene. This object handles mouse events if not in drag mode. In derived
+        viewer classes this method is replaced with the instantiation of a custom version of the
+        graphics scene.
+
+        :return:
+        """
+
+        self._scene = QtWidgets.QGraphicsScene()
+        self._scene.addItem(self._photo)
+        self.setScene(self._scene)
 
     def wheelEvent(self, event):
         """

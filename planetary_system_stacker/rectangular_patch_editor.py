@@ -168,14 +168,20 @@ class RectangularPatchEditor(FrameViewer):
         self.x_low = None
         self.x_high = None
 
-        # Initialize the scene. This object handles mouse events if not in drag mode.
+        self.setPhoto(self.image)
+
+    def initialize_scene(self):
+        """
+        Initialize the scene. This object handles mouse events if not in drag mode. In derived
+        viewer classes this method is replaced with the instantiation of a custom version of the
+        graphics scene.
+
+        :return:
+        """
+
         self._scene = GraphicsScene(self, self)
-        # Initialize the photo object. No image is loaded yet.
-        self._photo = QtWidgets.QGraphicsPixmapItem()
         self._scene.addItem(self._photo)
         self.setScene(self._scene)
-
-        self.setPhoto(self.image)
 
     def set_selection_rectangle(self, y_low, y_high, x_low, x_high):
         """

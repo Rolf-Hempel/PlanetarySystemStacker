@@ -372,11 +372,6 @@ class AlignmentPointEditor(FrameViewer):
         super(AlignmentPointEditor, self).__init__()
         self.image = image
 
-        # Initialize the scene. This object handles mouse events if not in drag mode.
-        self._scene = GraphicsScene(self, self)
-        self._scene.addItem(self._photo)
-        self.setScene(self._scene)
-
         # Initialize the undo stack.
         self.undoStack = QtWidgets.QUndoStack(self)
 
@@ -385,6 +380,19 @@ class AlignmentPointEditor(FrameViewer):
 
         # Load the image.
         self.setPhoto(self.image)
+
+    def initialize_scene(self):
+        """
+        Initialize the scene. This object handles mouse events if not in drag mode. In derived
+        viewer classes this method is replaced with the instantiation of a custom version of the
+        graphics scene.
+
+        :return:
+        """
+
+        self._scene = GraphicsScene(self, self)
+        self._scene.addItem(self._photo)
+        self.setScene(self._scene)
 
     def keyPressEvent(self, event):
         """
