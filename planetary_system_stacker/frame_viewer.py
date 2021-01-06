@@ -37,7 +37,7 @@ from cv2 import NORM_MINMAX, normalize, cvtColor, COLOR_GRAY2RGB, circle, line
 from matplotlib import patches
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
 from matplotlib.figure import Figure
-from numpy import array, full, uint8, uint16
+from numpy import array, full, uint8, uint16, float64
 
 from align_frames import AlignFrames
 from configuration import Configuration
@@ -213,6 +213,13 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
         # Initialize the photo object. No image is loaded yet.
         self._photo = QtWidgets.QGraphicsPixmapItem()
+        self.shape_y = None
+        self.shape_x = None
+
+        # Initialize the scene. This object handles mouse events if not in drag mode.
+        self._scene = QtWidgets.QGraphicsScene()
+        self._scene.addItem(self._photo)
+        self.setScene(self._scene)
 
         self.viewrect = self.viewport().rect()
 
@@ -307,9 +314,11 @@ class FrameViewer(QtWidgets.QGraphicsView):
             image_uint8 = (image / 256.).astype(uint8)
         elif image.dtype == uint8:
             image_uint8 = image.astype(uint8)
+        elif image.dtype == float64:
+            image_uint8 = image.astype(uint8)
         else:
             raise NotSupportedError("Attempt to set a photo in frame viewer with type neither"
-                                    " uint8 nor uint16")
+                                    " uint8 nor uint16 nor float64")
 
         self.shape_y = image_uint8.shape[0]
         self.shape_x = image_uint8.shape[1]
@@ -347,11 +356,6 @@ class FrameViewer(QtWidgets.QGraphicsView):
             self._empty = True
             self._photo.setPixmap(QtGui.QPixmap())
 
-        # Initialize the scene. This object handles mouse events if not in drag mode.
-        self._scene = QtWidgets.QGraphicsScene()
-        self._scene.addItem(self._photo)
-        self.setScene(self._scene)
-
         # Set the new rectangles surrounding the photo and the current scene.
         self.photorect = QtCore.QRectF(self._photo.pixmap().rect())
         self.scenerect = self.transform().mapRect(self.photorect)
@@ -374,7 +378,13 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
         # If not in drag mode, the wheel event is handled at the scene level.
         else:
-            self._scene.wheelEvent(event)
+            try:
+                self._scene.wheelEvent(event)
+
+            # This exception occurs if the user uses "Ctrl + Wheel action" in the postproc_editor.
+            # There this activity does not make any sense, so just ignore the event.
+            except TypeError:
+                pass
 
     def zoom(self, direction):
         """
@@ -409,7 +419,10 @@ class FrameViewer(QtWidgets.QGraphicsView):
         """
 
         # If the "+" key is pressed, zoom in. If "-" is pressed, zoom out.
-        if event.key() == QtCore.Qt.Key_Plus and not event.modifiers() & QtCore.Qt.ControlModifier:
+        if event.key() == QtCore.Qt.Key_Control:
+            self.setDragMode(QtWidgets.QGraphicsView.NoDrag)
+            self.drag_mode = False
+        elif event.key() == QtCore.Qt.Key_Plus and not event.modifiers() & QtCore.Qt.ControlModifier:
             self.zoom(1)
         elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
             self.zoom(-1)
@@ -417,6 +430,15 @@ class FrameViewer(QtWidgets.QGraphicsView):
             self.set_original_scale()
         else:
             super(FrameViewer, self).keyPressEvent(event)
+
+    def keyReleaseEvent(self, event):
+        # If the control key is released, switch back to "drag mode".
+        # Use default handling for other keys.
+        if event.key() == QtCore.Qt.Key_Control:
+            self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
+            self.drag_mode = True
+        else:
+            super(FrameViewer, self).keyReleaseEvent(event)
 
 
 class VideoFrameViewer(FrameViewer):

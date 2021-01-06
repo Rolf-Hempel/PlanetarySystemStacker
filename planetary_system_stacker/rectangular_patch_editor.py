@@ -34,6 +34,7 @@ from exceptions import InternalError, NotSupportedError, Error
 from align_frames import AlignFrames
 from configuration import Configuration
 from frames import Frames
+from frame_viewer import FrameViewer
 from rank_frames import RankFrames
 from alignment_point_editor import SelectionRectangleGraphicsItem
 from rectangular_patch_editor_gui import Ui_rectangular_patch_editor
@@ -146,7 +147,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
             self.update()
 
 
-class RectangularPatchEditor(QtWidgets.QGraphicsView):
+class RectangularPatchEditor(FrameViewer):
     """
     This widget implements an editor for handling a rectangular patch superimposed onto an image.
     It supports two modes:
@@ -156,15 +157,10 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
     The "cntrl" key is used to switch between the two modes.
     """
 
-    resized = QtCore.pyqtSignal()
-
     def __init__(self, image):
         super(RectangularPatchEditor, self).__init__()
-        self._zoom = 0
-        self._empty = True
+
         self.image = image
-        self.shape_y = None
-        self.shape_x = None
 
         # Initialize the rectangular patch.
         self.y_low = None
@@ -179,144 +175,7 @@ class RectangularPatchEditor(QtWidgets.QGraphicsView):
         self._scene.addItem(self._photo)
         self.setScene(self._scene)
 
-        self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(30, 30, 30)))
-        self.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
-        self.drag_mode = True
-
         self.setPhoto(self.image)
-        self.resized.connect(self.fitInView)
-
-        # Set the focus on the viewer.
-        self.setFocus()
-
-    def resizeEvent(self, event):
-        self.resized.emit()
-        return super(RectangularPatchEditor, self).resizeEvent(event)
-
-    def hasPhoto(self):
-        return not self._empty
-
-    def fitInView(self):
-        """
-        Scale the scene such that it fits into the window completely.
-
-        :return: -
-        """
-
-        rect = QtCore.QRectF(self._photo.pixmap().rect())
-        if not rect.isNull():
-            self.setSceneRect(rect)
-            if self.hasPhoto():
-                unity = self.transform().mapRect(QtCore.QRectF(0, 0, 1, 1))
-                self.scale(1 / unity.width(), 1 / unity.height())
-                viewrect = self.viewport().rect()
-                scenerect = self.transform().mapRect(rect)
-                factor = min(viewrect.width() / scenerect.width(),
-                             viewrect.height() / scenerect.height())
-                self.scale(factor, factor)
-            self._zoom = 0
-
-    def setPhoto(self, image):
-        """
-        Convert a grayscale image to a pixmap and assign it to the photo object.
-
-        :param image: grayscale image in format float32.
-        :return: -
-        """
-
-        self.image = image
-        # Convert the float32 monochrome image into uint8 format.
-        image_uint8 = self.image.astype(uint8)
-        self.shape_y = image_uint8.shape[0]
-        self.shape_x = image_uint8.shape[1]
-
-        # Normalize the frame brightness.
-        image_uint8 = normalize(image_uint8, None, alpha=0, beta=255, norm_type=NORM_MINMAX)
-
-        qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
-                                QtGui.QImage.Format_Grayscale8)
-        pixmap = QtGui.QPixmap(qt_image)
-
-        if pixmap and not pixmap.isNull():
-            self._empty = False
-            self._photo.setPixmap(pixmap)
-        else:
-            self._empty = True
-            self._photo.setPixmap(QtGui.QPixmap())
-
-    def wheelEvent(self, event):
-        """
-        Handle scroll events for zooming in and out of the scene. This is only active when a photo
-        is loaded.
-
-        :param event: wheel event object
-        :return: -
-        """
-
-        if self.drag_mode:
-            # Depending of wheel direction, set the direction value to greater or smaller than 1.
-            self.zoom(event.angleDelta().y())
-
-    def zoom(self, direction):
-        """
-        Zoom in or out. This is only active when a photo is loaded
-
-        :param direction: If > 0, zoom in, otherwise zoom out.
-        :return: -
-        """
-
-        if self.hasPhoto():
-
-            # Depending of direction value, set the zoom factor to greater or smaller than 1.
-            if direction > 0:
-                factor = 1.25
-                self._zoom += 1
-            else:
-                factor = 0.8
-                self._zoom -= 1
-
-            # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene
-            # to the window size.
-            if self._zoom > 0:
-                self.scale(factor, factor)
-            elif self._zoom == 0:
-                self.fitInView()
-            else:
-                self._zoom = 0
-
-    def keyPressEvent(self, event):
-        """
-        The control key is used to switch between drag and AP modes.
-
-        :param event: event object
-        :return: -
-        """
-
-        # If the control key is pressed, switch to "no drag mode".
-        # Use default handling for other keys.
-        if event.key() == QtCore.Qt.Key_Control:
-            self.setDragMode(QtWidgets.QGraphicsView.NoDrag)
-            self.drag_mode = False
-        elif event.key() == QtCore.Qt.Key_Plus and not event.modifiers() & QtCore.Qt.ControlModifier:
-            self.zoom(1)
-        elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
-            self.zoom(-1)
-        else:
-            super(RectangularPatchEditor, self).keyPressEvent(event)
-
-    def keyReleaseEvent(self, event):
-        # If the control key is released, switch back to "drag mode".
-        # Use default handling for other keys.
-        if event.key() == QtCore.Qt.Key_Control:
-            self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
-            self.drag_mode = True
-        else:
-            super(RectangularPatchEditor, self).keyReleaseEvent(event)
 
     def set_selection_rectangle(self, y_low, y_high, x_low, x_high):
         """
@@ -486,7 +345,7 @@ if __name__ == '__main__':
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
             x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
         reference_frame_with_alignment_points = frames.frames_mono(
-            align_frames.frame_ranks_max_index).copy()
+            rank_frames.frame_ranks_max_index).copy()
         reference_frame_with_alignment_points[y_low_opt,
         x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
                                 x_low_opt:x_high_opt] = 255

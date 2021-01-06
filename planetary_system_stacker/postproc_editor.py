@@ -784,270 +784,289 @@ class ImageProcessor(QtCore.QThread):
         self.version_selected = None
         self.layers_selected = None
 
+        # Initialize Exception state.
+        exception_status = False
+
         # Enter the main loop and wait for parameter changes in the version selected.
         while True:
-            # To avoid chasing a moving target, copy the parameters of the currently active version
-            self.version_selected = self.postproc_data_object.version_selected
-            postproc_version = deepcopy(self.postproc_data_object.versions[self.version_selected])
-            self.layers_selected = postproc_version.layers
-            self.rgb_automatic = postproc_version.rgb_automatic
-            self.rgb_resolution_index = postproc_version.rgb_resolution_index
-            self.rgb_gauss_width = postproc_version.rgb_gauss_width
-            self.shift_red = postproc_version.shift_red
-            self.shift_blue = postproc_version.shift_blue
-            self.correction_red = postproc_version.correction_red
-            self.correction_blue = postproc_version.correction_blue
-            self.correction_red_saved = postproc_version.correction_red_saved
-            self.correction_blue_saved = postproc_version.correction_blue_saved
 
-            compute_new_image = False
-            shift_image = False
+            # The whole computation is enclosed in a try/except block. If something goes wrong, e.g.
+            # because during the execution of a loop pass the postproc_data_object was changed by
+            # the GUI thread, the ImageProcessor tries again in the next pass.
+            try:
+                # To avoid chasing a moving target, copy the parameters of the currently active version
+                self.version_selected = self.postproc_data_object.version_selected
+                postproc_version = deepcopy(self.postproc_data_object.versions[self.version_selected])
+                self.layers_selected = postproc_version.layers
+                self.rgb_automatic = postproc_version.rgb_automatic
+                self.rgb_resolution_index = postproc_version.rgb_resolution_index
+                self.rgb_gauss_width = postproc_version.rgb_gauss_width
+                self.shift_red = postproc_version.shift_red
+                self.shift_blue = postproc_version.shift_blue
+                self.correction_red = postproc_version.correction_red
+                self.correction_blue = postproc_version.correction_blue
+                self.correction_red_saved = postproc_version.correction_red_saved
+                self.correction_blue_saved = postproc_version.correction_blue_saved
 
-            # If the RGB auto-alignment checkbox was changed since the last image was computed for
-            # this version, invalidate all intermediate results for this version.
-            if self.rgb_automatic != self.postproc_data_object.versions[
-                self.version_selected].last_rgb_automatic:
-                self.postproc_data_object.versions[
-                    self.version_selected].last_rgb_automatic = self.rgb_automatic
-                self.reset_intermediate_images()
-                compute_new_image = True
+                compute_new_image = False
+                shift_image = False
 
-            # If automatic RGB alignment is on, check if the shifted image for the current
-            # resolution has been computed already. Otherwise, compute it now.
-            if self.rgb_automatic:
-                if self.auto_rgb_aligned_images_original[
-                    self.rgb_resolution_index] is None:
+                # If the RGB auto-alignment checkbox was changed since the last image was computed for
+                # this version, invalidate all intermediate results for this version.
+                if self.rgb_automatic != self.postproc_data_object.versions[
+                    self.version_selected].last_rgb_automatic:
+                    self.postproc_data_object.versions[
+                        self.version_selected].last_rgb_automatic = self.rgb_automatic
+                    self.reset_intermediate_images()
+                    compute_new_image = True
 
-                    # Change the main GUI's status bar to show that a computation is going on.
-                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
-                                                    ", busy auto-aligning image", "black")
-                    self.disable_widgets_signal.emit()
-                    try:
-                        self.auto_rgb_aligned_images_original[self.rgb_resolution_index], \
-                        self.auto_rgb_shifts_red[self.rgb_resolution_index], \
-                        self.auto_rgb_shifts_blue[
-                            self.rgb_resolution_index] = Miscellaneous.auto_rgb_align(
-                            self.image_original, self.configuration.postproc_max_shift,
-                            interpolation_factor=[1, 2, 4][self.rgb_resolution_index],
-                            blur_strength=self.rgb_gauss_width)
-                        if self.color:
-                            self.auto_rgb_aligned_images_original_hsv[
-                                self.rgb_resolution_index] = cvtColor(
-                                self.auto_rgb_aligned_images_original[self.rgb_resolution_index],
-                                COLOR_BGR2HSV)
-                    except:
-                        self.auto_rgb_aligned_images_original[
-                            self.rgb_resolution_index] = self.image_original
-                        self.auto_rgb_shifts_red[self.rgb_resolution_index] = (0., 0.)
-                        self.auto_rgb_shifts_blue[self.rgb_resolution_index] = (0., 0.)
-                        if self.color:
-                            self.auto_rgb_aligned_images_original_hsv[
-                                self.rgb_resolution_index] = self.image_original_hsv
-                    # Reset the status bar to its idle state.
-                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
-                    self.enable_widgets_signal.emit()
+                # If automatic RGB alignment is on, check if the shifted image for the current
+                # resolution has been computed already. Otherwise, compute it now.
+                if self.rgb_automatic:
+                    if self.auto_rgb_aligned_images_original[
+                        self.rgb_resolution_index] is None:
 
-                    # Since the auto-shifted image is new, the postprocessing pipeline must be
-                    # applied. (This does not seem to be necessary.)
-                    # compute_new_image = True
+                        # Change the main GUI's status bar to show that a computation is going on.
+                        self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                                        ", busy auto-aligning image", "black")
+                        self.disable_widgets_signal.emit()
+                        try:
+                            self.auto_rgb_aligned_images_original[self.rgb_resolution_index], \
+                            self.auto_rgb_shifts_red[self.rgb_resolution_index], \
+                            self.auto_rgb_shifts_blue[
+                                self.rgb_resolution_index] = Miscellaneous.auto_rgb_align(
+                                self.image_original, self.configuration.postproc_max_shift,
+                                interpolation_factor=[1, 2, 4][self.rgb_resolution_index],
+                                blur_strength=self.rgb_gauss_width)
+                            if self.color:
+                                self.auto_rgb_aligned_images_original_hsv[
+                                    self.rgb_resolution_index] = cvtColor(
+                                    self.auto_rgb_aligned_images_original[self.rgb_resolution_index],
+                                    COLOR_BGR2HSV)
+                        except:
+                            self.auto_rgb_aligned_images_original[
+                                self.rgb_resolution_index] = self.image_original
+                            self.auto_rgb_shifts_red[self.rgb_resolution_index] = (0., 0.)
+                            self.auto_rgb_shifts_blue[self.rgb_resolution_index] = (0., 0.)
+                            if self.color:
+                                self.auto_rgb_aligned_images_original_hsv[
+                                    self.rgb_resolution_index] = self.image_original_hsv
+                        # Reset the status bar to its idle state.
+                        self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
+                        self.enable_widgets_signal.emit()
 
-                # Set the processing pipeline input to the RGB aligned original image.
-                self.input_image = self.auto_rgb_aligned_images_original[self.rgb_resolution_index]
-                if self.color:
-                    self.input_image_hsv = self.auto_rgb_aligned_images_original_hsv[
-                            self.rgb_resolution_index]
+                        # Since the auto-shifted image is new, the postprocessing pipeline must be
+                        # applied. (This does not seem to be necessary.)
+                        # compute_new_image = True
 
-                # Set the RGB shifts for this version to the values computed automatically.
-                self.postproc_data_object.versions[self.version_selected].shift_red = \
-                    self.auto_rgb_shifts_red[self.rgb_resolution_index]
-                self.postproc_data_object.versions[self.version_selected].shift_blue = \
-                    self.auto_rgb_shifts_blue[self.rgb_resolution_index]
+                    # Set the processing pipeline input to the RGB aligned original image.
+                    self.input_image = self.auto_rgb_aligned_images_original[self.rgb_resolution_index]
+                    if self.color:
+                        self.input_image_hsv = self.auto_rgb_aligned_images_original_hsv[
+                                self.rgb_resolution_index]
 
-            # In correction mode the wavelets are computed only once, and then only the shift
-            # corrections are applied.
-            elif postproc_version.rgb_correction_mode:
+                    # Set the RGB shifts for this version to the values computed automatically.
+                    self.postproc_data_object.versions[self.version_selected].shift_red = \
+                        self.auto_rgb_shifts_red[self.rgb_resolution_index]
+                    self.postproc_data_object.versions[self.version_selected].shift_blue = \
+                        self.auto_rgb_shifts_blue[self.rgb_resolution_index]
 
-                # If the uncorrected image for this resolution index is not available, it must be
-                # computed. Try if an image for this version has been computed. If not, this version
-                # is new. In that case process the wavelets first (only applying the accumulated
-                # shifts), and do the shift corrections in the next pass.
-                if postproc_version.images_uncorrected[self.rgb_resolution_index] is None:
+                # In correction mode the wavelets are computed only once, and then only the shift
+                # corrections are applied.
+                elif postproc_version.rgb_correction_mode:
 
-                    # Change the main GUI's status bar to show that correction mode is being
-                    # initialized.
-                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
-                                                    ", initializing manual alignment", "black")
-                    self.disable_widgets_signal.emit()
+                    # If the uncorrected image for this resolution index is not available, it must be
+                    # computed. Try if an image for this version has been computed. If not, this version
+                    # is new. In that case process the wavelets first (only applying the accumulated
+                    # shifts), and do the shift corrections in the next pass.
+                    if postproc_version.images_uncorrected[self.rgb_resolution_index] is None:
 
-                    if postproc_version.image is None or postproc_version.image.dtype == uint8:
+                        # Change the main GUI's status bar to show that correction mode is being
+                        # initialized.
+                        self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                                        ", initializing manual alignment", "black")
+                        self.disable_widgets_signal.emit()
+
+                        if postproc_version.image is None or postproc_version.image.dtype == uint8:
+                            self.input_image = Miscellaneous.shift_colors(self.image_original,
+                                                                          postproc_version.shift_red,
+                                                                          postproc_version.shift_blue)
+                            if self.color:
+                                if postproc_version.shift_red != (
+                                0., 0.) or postproc_version.shift_blue != (0., 0.):
+                                    self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
+                                else:
+                                    self.input_image_hsv = self.image_original_hsv
+
+                            self.reset_intermediate_images()
+                            compute_new_image = True
+
+                        # The postprocessing pipeline has been applied to this version before, set the
+                        # input for this resolution index of the correction mode. The image is
+                        # blown up by the resolution factor to show shifts in detail.
+                        else:
+                            # In the first pass, convert the input image to 8bit unsigned int (to speed
+                            # up the image viewer). Store it as resolution version 0 (1 Pixel, i.e. no
+                            # change in resolution).
+                            if self.postproc_data_object.versions[
+                                self.version_selected].images_uncorrected[0] is None:
+                                self.postproc_data_object.versions[
+                                    self.version_selected].images_uncorrected[0] = (
+                                        postproc_version.image / 256.).astype(
+                                    uint8)
+
+                            # If the resolution selected is not 1 pixel, interpolate the 1 pixel image
+                            # to the required resolution and store the result for later reuse.
+                            if self.rgb_resolution_index > 0:
+                                self.postproc_data_object.versions[
+                                    self.version_selected].images_uncorrected[
+                                    self.rgb_resolution_index] = \
+                                    Miscellaneous.shift_colors(self.postproc_data_object.versions[
+                                        self.version_selected].images_uncorrected[0], (0., 0.), (0., 0.),
+                                        interpolate_input=[1, 2, 4][self.rgb_resolution_index])
+                            shift_image = True
+
+                        # Reset the status bar to its idle state.
+                        self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
+                        self.enable_widgets_signal.emit()
+
+                    # The image without shift correction is available for the required resolution. Check
+                    # if the shift correction has changed. If so, apply the correction. Otherwise, leave
+                    # the image unchanged.
+                    elif self.correction_red != self.correction_red_saved or self.correction_blue != \
+                            self.correction_blue_saved:
+                        self.postproc_data_object.versions[
+                            self.version_selected].correction_red_saved = self.correction_red
+                        self.postproc_data_object.versions[
+                            self.version_selected].correction_blue_saved = self.correction_blue
+                        shift_image = True
+
+                # Wavelet mode, RGB auto-alignment off: Set the input image for the processing pipeline
+                # to the original image, shifted by the accumulated shift vectors (not in correction
+                # mode).
+                else:
+                    # The accumulated shift vectors have changed since the last computation. Apply the
+                    # new shifts to the original image.
+                    if postproc_version.shift_red != postproc_version.shift_red_saved or \
+                        postproc_version.shift_blue != postproc_version.shift_blue_saved:
                         self.input_image = Miscellaneous.shift_colors(self.image_original,
                                                                       postproc_version.shift_red,
                                                                       postproc_version.shift_blue)
                         if self.color:
                             if postproc_version.shift_red != (
-                            0., 0.) or postproc_version.shift_blue != (0., 0.):
+                                    0., 0.) or postproc_version.shift_blue != (0., 0.):
                                 self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
                             else:
                                 self.input_image_hsv = self.image_original_hsv
 
+                        # Save the new shifted original image together with the current accumulated
+                        # shift vectors.
+                        self.postproc_data_object.versions[self.version_selected].input_image_saved = \
+                            self.input_image
+                        if self.color:
+                            self.postproc_data_object.versions[
+                                self.version_selected].input_image_hsv_saved = self.input_image_hsv
+                        self.postproc_data_object.versions[self.version_selected].shift_red_saved = \
+                            postproc_version.shift_red
+                        self.postproc_data_object.versions[
+                            self.version_selected].shift_blue_saved = postproc_version.shift_blue
+
+                        # Since the processing pipeline input has changed, reset intermediate results
+                        # and set the computation flag.
                         self.reset_intermediate_images()
                         compute_new_image = True
 
-                    # The postprocessing pipeline has been applied to this version before, set the
-                    # input for this resolution index of the correction mode. The image is
-                    # blown up by the resolution factor to show shifts in detail.
+                    # The accumulated shift vectors have not changed. Reuse the saved pipeline input
+                    # images.
                     else:
-                        # In the first pass, convert the input image to 8bit unsigned int (to speed
-                        # up the image viewer). Store it as resolution version 0 (1 Pixel, i.e. no
-                        # change in resolution).
-                        if self.postproc_data_object.versions[
-                            self.version_selected].images_uncorrected[0] is None:
-                            self.postproc_data_object.versions[
-                                self.version_selected].images_uncorrected[0] = (
-                                    postproc_version.image / 256.).astype(
-                                uint8)
+                        self.input_image = postproc_version.input_image_saved
+                        if self.color:
+                            self.input_image_hsv = postproc_version.input_image_hsv_saved
 
-                        # If the resolution selected is not 1 pixel, interpolate the 1 pixel image
-                        # to the required resolution and store the result for later reuse.
-                        if self.rgb_resolution_index > 0:
+                self.set_shift_display_signal.emit()
+
+                # End of preparatory phase. Flags "compute_new_image" or "shift_image" have been set.
+                # Now perform the appropriate action.
+
+                # The image has already passed the postprocessing pipeline (as contained in
+                # postproc_version.images_uncorrected). Only the correction shift must be applied.
+                if shift_image:
+                    interpolation_factor = [1, 2, 4][self.rgb_resolution_index]
+                    self.postproc_data_object.versions[self.version_selected].image = \
+                        Miscellaneous.shift_colors(
                             self.postproc_data_object.versions[
-                                self.version_selected].images_uncorrected[
-                                self.rgb_resolution_index] = \
-                                Miscellaneous.shift_colors(self.postproc_data_object.versions[
-                                    self.version_selected].images_uncorrected[0], (0., 0.), (0., 0.),
-                                    interpolate_input=[1, 2, 4][self.rgb_resolution_index])
-                        shift_image = True
+                                self.version_selected].images_uncorrected[self.rgb_resolution_index],
+                            (self.correction_red[0] * interpolation_factor,
+                             self.correction_red[1] * interpolation_factor),
+                            (self.correction_blue[0] * interpolation_factor,
+                             self.correction_blue[1] * interpolation_factor))
+                    # Show the new image in the image viewer, and remember its parameters.
+                    self.set_photo_signal.emit(self.version_selected)
+                    self.last_version_selected = self.version_selected
+
+                # A new image must be computed for this version. Special case self.version_selected = 0:
+                # For the original image no layers are applied. But if the RGB automatic checkbox was
+                # changed, the image must be set according to the new shift status. The shift was
+                # applied in self.input_image above.
+                elif compute_new_image and not self.version_selected:
+                    self.postproc_data_object.versions[0].image = self.input_image.astype(uint16)
+                    # Show the new image in the image viewer, and remember its parameters.
+                    self.set_photo_signal.emit(self.version_selected)
+                    self.last_version_selected = self.version_selected
+
+                # General case for new image computation: Either it was decided above that a new
+                # computation is required, or the test "new_computation_required" for changes in the
+                # correction layers is performed.
+                elif compute_new_image or self.new_computation_required(
+                        self.version_selected != self.last_version_selected):
+                    # Change the main GUI's status bar to show that a computation is going on.
+                    self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
+                                                    ", busy computing a new image.", "black")
+
+                    # Perform the new computation. Try to store intermediate results. If it fails
+                    # because there is not enough RAM, switch to direct computation.
+                    if self.ram_sufficient:
+                        try:
+                            self.postproc_data_object.versions[
+                                self.version_selected].image = self.recompute_selected_version(
+                                                                self.layers_selected)
+                        except:
+                            self.ram_sufficient = False
+                            self.postproc_data_object.versions[
+                                self.version_selected].image = Miscellaneous.post_process(
+                                                            self.input_image, self.layers_selected)
+                    else:
+                        self.postproc_data_object.versions[
+                            self.version_selected].image = Miscellaneous.post_process(
+                            self.input_image, self.layers_selected)
 
                     # Reset the status bar to its idle state.
                     self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
-                    self.enable_widgets_signal.emit()
 
-                # The image without shift correction is available for the required resolution. Check
-                # if the shift correction has changed. If so, apply the correction. Otherwise, leave
-                # the image unchanged.
-                elif self.correction_red != self.correction_red_saved or self.correction_blue != \
-                        self.correction_blue_saved:
-                    self.postproc_data_object.versions[
-                        self.version_selected].correction_red_saved = self.correction_red
-                    self.postproc_data_object.versions[
-                        self.version_selected].correction_blue_saved = self.correction_blue
-                    shift_image = True
+                    # Show the new image in the image viewer, and remember its parameters.
+                    self.set_photo_signal.emit(self.version_selected)
+                    self.last_version_selected = self.version_selected
 
-            # Wavelet mode, RGB auto-alignment off: Set the input image for the processing pipeline
-            # to the original image, shifted by the accumulated shift vectors (not in correction
-            # mode).
-            else:
-                # The accumulated shift vectors have changed since the last computation. Apply the
-                # new shifts to the original image.
-                if postproc_version.shift_red != postproc_version.shift_red_saved or \
-                    postproc_version.shift_blue != postproc_version.shift_blue_saved:
-                    self.input_image = Miscellaneous.shift_colors(self.image_original,
-                                                                  postproc_version.shift_red,
-                                                                  postproc_version.shift_blue)
-                    if self.color:
-                        if postproc_version.shift_red != (
-                                0., 0.) or postproc_version.shift_blue != (0., 0.):
-                            self.input_image_hsv = cvtColor(self.input_image, COLOR_BGR2HSV)
-                        else:
-                            self.input_image_hsv = self.image_original_hsv
+                # Neither the shift nor parameters have changed. If the version selection has changed,
+                # display the image stored with the version selected.
+                elif self.version_selected != self.last_version_selected:
+                    # Show the new image in the image viewer, and remember its parameters.
+                    self.set_photo_signal.emit(self.version_selected)
+                    self.last_version_selected = self.version_selected
 
-                    # Save the new shifted original image together with the current accumulated
-                    # shift vectors.
-                    self.postproc_data_object.versions[self.version_selected].input_image_saved = \
-                        self.input_image
-                    if self.color:
-                        self.postproc_data_object.versions[
-                            self.version_selected].input_image_hsv_saved = self.input_image_hsv
-                    self.postproc_data_object.versions[self.version_selected].shift_red_saved = \
-                        postproc_version.shift_red
-                    self.postproc_data_object.versions[
-                        self.version_selected].shift_blue_saved = postproc_version.shift_blue
-
-                    # Since the processing pipeline input has changed, reset intermediate results
-                    # and set the computation flag.
-                    self.reset_intermediate_images()
-                    compute_new_image = True
-
-                # The accumulated shift vectors have not changed. Reuse the saved pipeline input
-                # images.
+                # Idle loop before doing the next check for updates.
                 else:
-                    self.input_image = postproc_version.input_image_saved
-                    if self.color:
-                        self.input_image_hsv = postproc_version.input_image_hsv_saved
+                    sleep(self.postproc_idle_loop_time)
 
-            self.set_shift_display_signal.emit()
+                # Reset any exception condition after a successful loop pass.
+                exception_status = False
 
-            # End of preparatory phase. Flags "compute_new_image" or "shift_image" have been set.
-            # Now perform the appropriate action.
-
-            # The image has already passed the postprocessing pipeline (as contained in
-            # postproc_version.images_uncorrected). Only the correction shift must be applied.
-            if shift_image:
-                interpolation_factor = [1, 2, 4][self.rgb_resolution_index]
-                self.postproc_data_object.versions[self.version_selected].image = \
-                    Miscellaneous.shift_colors(
-                        self.postproc_data_object.versions[
-                            self.version_selected].images_uncorrected[self.rgb_resolution_index],
-                        (self.correction_red[0] * interpolation_factor,
-                         self.correction_red[1] * interpolation_factor),
-                        (self.correction_blue[0] * interpolation_factor,
-                         self.correction_blue[1] * interpolation_factor))
-                # Show the new image in the image viewer, and remember its parameters.
-                self.set_photo_signal.emit(self.version_selected)
-                self.last_version_selected = self.version_selected
-
-            # A new image must be computed for this version. Special case self.version_selected = 0:
-            # For the original image no layers are applied. But if the RGB automatic checkbox was
-            # changed, the image must be set according to the new shift status. The shift was
-            # applied in self.input_image above.
-            elif compute_new_image and not self.version_selected:
-                self.postproc_data_object.versions[0].image = self.input_image.astype(uint16)
-                # Show the new image in the image viewer, and remember its parameters.
-                self.set_photo_signal.emit(self.version_selected)
-                self.last_version_selected = self.version_selected
-
-            # General case for new image computation: Either it was decided above that a new
-            # computation is required, or the test "new_computation_required" for changes in the
-            # correction layers is performed.
-            elif compute_new_image or self.new_computation_required(
-                    self.version_selected != self.last_version_selected):
-                # Change the main GUI's status bar to show that a computation is going on.
-                self.set_status_bar_signal.emit("Postprocessing " + self.file_name +
-                                                ", busy computing a new image.", "black")
-
-                # Perform the new computation. Try to store intermediate results. If it fails
-                # because there is not enough RAM, switch to direct computation.
-                if self.ram_sufficient:
-                    try:
-                        self.postproc_data_object.versions[
-                            self.version_selected].image = self.recompute_selected_version(
-                                                            self.layers_selected)
-                    except:
-                        self.ram_sufficient = False
-                        self.postproc_data_object.versions[
-                            self.version_selected].image = Miscellaneous.post_process(
-                                                            self.input_image, self.layers_selected)
-                else:
-                    self.postproc_data_object.versions[
-                        self.version_selected].image = Miscellaneous.post_process(
-                        self.input_image, self.layers_selected)
-
-                # Reset the status bar to its idle state.
-                self.set_status_bar_signal.emit("Postprocessing " + self.file_name, "black")
-
-                # Show the new image in the image viewer, and remember its parameters.
-                self.set_photo_signal.emit(self.version_selected)
-                self.last_version_selected = self.version_selected
-
-            # Neither the shift nor parameters have changed. If the version selection has changed,
-            # display the image stored with the version selected.
-            elif self.version_selected != self.last_version_selected:
-                # Show the new image in the image viewer, and remember its parameters.
-                self.set_photo_signal.emit(self.version_selected)
-                self.last_version_selected = self.version_selected
-
-            # Idle loop before doing the next check for updates.
-            else:
+            except Exception as e:
+                # Print the error message only once. The error status is reset after the next
+                # successful loop pass.
+                if not exception_status:
+                    print ("Exception in ImageProcessor: " + str(e) + ". Will try again.")
+                    exception_status = True
                 sleep(self.postproc_idle_loop_time)
 
     def reset_intermediate_images(self):

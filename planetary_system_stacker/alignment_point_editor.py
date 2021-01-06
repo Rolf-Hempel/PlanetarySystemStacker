@@ -35,6 +35,7 @@ from alignment_point_editor_gui import Ui_alignment_point_editor
 from alignment_points import AlignmentPoints
 from configuration import Configuration, ConfigurationParameters
 from exceptions import InternalError, NotSupportedError, Error
+from frame_viewer import FrameViewer
 from frames import Frames
 from rank_frames import RankFrames
 
@@ -357,7 +358,7 @@ class SelectionRectangleGraphicsItem(QtWidgets.QGraphicsItem):
         painter.drawRect(self.x_low, self.y_low, self.width_x, self.width_y)
 
 
-class AlignmentPointEditor(QtWidgets.QGraphicsView):
+class AlignmentPointEditor(FrameViewer):
     """
     This widget implements an editor for handling APs superimposed onto an image. It supports two
     modes:
@@ -369,135 +370,21 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
 
     def __init__(self, image, alignment_points):
         super(AlignmentPointEditor, self).__init__()
-        self._zoom = 0
-        self._empty = True
         self.image = image
-        self.shape_y = None
-        self.shape_x = None
+
         # Initialize the scene. This object handles mouse events if not in drag mode.
         self._scene = GraphicsScene(self, self)
-        # Initialize the photo object. No image is loaded yet.
-        self._photo = QtWidgets.QGraphicsPixmapItem()
         self._scene.addItem(self._photo)
         self.setScene(self._scene)
+
         # Initialize the undo stack.
         self.undoStack = QtWidgets.QUndoStack(self)
 
-        self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(30, 30, 30)))
-        self.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
-        self.drag_mode = True
         # Initialize the alignment point object.
         self.aps = alignment_points
 
-        # Load the image, and connect it to resizing of this window.
+        # Load the image.
         self.setPhoto(self.image)
-
-        # Set the focus on the viewer, so the key event is caught.
-        self.setFocus()
-
-    def resizeEvent(self, event):
-        self.fitInView()
-        return super(AlignmentPointEditor, self).resizeEvent(event)
-
-    def hasPhoto(self):
-        return not self._empty
-
-    def fitInView(self):
-        """
-        Scale the scene such that it fits into the window completely.
-
-        :return: -
-        """
-
-        rect = QtCore.QRectF(self._photo.pixmap().rect())
-        if not rect.isNull():
-            self.setSceneRect(rect)
-            if self.hasPhoto():
-                unity = self.transform().mapRect(QtCore.QRectF(0, 0, 1, 1))
-                self.scale(1 / unity.width(), 1 / unity.height())
-                viewrect = self.viewport().rect()
-                scenerect = self.transform().mapRect(rect)
-                factor = min(viewrect.width() / scenerect.width(),
-                             viewrect.height() / scenerect.height())
-                self.scale(factor, factor)
-            self._zoom = 0
-
-    def setPhoto(self, image):
-        """
-        Convert a grayscale image to a pixmap and assign it to the photo object.
-
-        :param image: grayscale image in format float32.
-        :return: -
-        """
-
-        self.image = image
-        # Convert the float32 monochrome image into uint8 format.
-        image_uint8 = self.image.astype(uint8)
-
-        # Normalize the frame brightness.
-        image_uint8 = normalize(image_uint8, None, alpha=0, beta=255, norm_type=NORM_MINMAX)
-
-        self.shape_y = image_uint8.shape[0]
-        self.shape_x = image_uint8.shape[1]
-        qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
-                                QtGui.QImage.Format_Grayscale8)
-        pixmap = QtGui.QPixmap(qt_image)
-
-        if pixmap and not pixmap.isNull():
-            self._empty = False
-            self._photo.setPixmap(pixmap)
-        else:
-            self._empty = True
-            self._photo.setPixmap(QtGui.QPixmap())
-
-    def wheelEvent(self, event):
-        """
-        Handle scroll events for zooming in and out of the scene. This is only active when a photo
-        is loaded.
-
-        :param event: wheel event object
-        :return: -
-        """
-
-        if self.drag_mode:
-            # Depending of wheel direction, set the direction value to greater or smaller than 1.
-            self.zoom(event.angleDelta().y())
-
-        # If not in drag mode, the wheel event is handled at the scene level.
-        else:
-            self._scene.wheelEvent(event)
-
-    def zoom(self, direction):
-        """
-        Zoom in or out. This is only active when a photo is loaded
-
-        :param direction: If > 0, zoom in, otherwise zoom out.
-        :return: -
-        """
-
-        if self.hasPhoto():
-
-            # Depending of direction value, set the zoom factor to greater or smaller than 1.
-            if direction > 0:
-                factor = 1.25
-                self._zoom += 1
-            else:
-                factor = 0.8
-                self._zoom -= 1
-
-            # Apply the zoom factor to the scene. If the zoom counter is zero, fit the scene
-            # to the window size.
-            if self._zoom > 0:
-                self.scale(factor, factor)
-            elif self._zoom == 0:
-                self.fitInView()
-            else:
-                self._zoom = 0
 
     def keyPressEvent(self, event):
         """
@@ -508,27 +395,10 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
         """
 
         # If the control key is pressed, switch to "no drag mode".
-        # Use default handling for other keys.
-        if event.key() == QtCore.Qt.Key_Control:
-            self.setDragMode(QtWidgets.QGraphicsView.NoDrag)
-            self.drag_mode = False
-        elif event.key() == QtCore.Qt.Key_Plus and not event.modifiers() & QtCore.Qt.ControlModifier:
-            self.zoom(1)
-        elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
-            self.zoom(-1)
-        elif event.key() == QtCore.Qt.Key_Z and event.modifiers() & QtCore.Qt.ControlModifier:
+        if event.key() == QtCore.Qt.Key_Z and event.modifiers() & QtCore.Qt.ControlModifier:
             self.undoStack.undo()
         elif event.key() == QtCore.Qt.Key_Y and event.modifiers() & QtCore.Qt.ControlModifier:
             self.undoStack.redo()
-        else:
-            super(AlignmentPointEditor, self).keyPressEvent(event)
-
-    def keyReleaseEvent(self, event):
-        # If the control key is released, switch back to "drag mode".
-        # Use default handling for other keys.
-        if event.key() == QtCore.Qt.Key_Control:
-            self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
-            self.drag_mode = True
         else:
             super(AlignmentPointEditor, self).keyPressEvent(event)
 
@@ -575,6 +445,7 @@ class AlignmentPointEditor(QtWidgets.QGraphicsView):
 
         command = CommandReplace(self, self.aps, ap_old, ap_new)
         self.undoStack.push(command)
+
 
 class CommandCreateApGrid(QtWidgets.QUndoCommand):
     """
@@ -882,7 +753,7 @@ if __name__ == '__main__':
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
             x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
         reference_frame_with_alignment_points = frames.frames_mono(
-            align_frames.frame_ranks_max_index).copy()
+            rank_frames.frame_ranks_max_index).copy()
         reference_frame_with_alignment_points[y_low_opt,
         x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
                                 x_low_opt:x_high_opt] = 255
