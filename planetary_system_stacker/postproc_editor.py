@@ -23,7 +23,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from copy import copy, deepcopy
 from math import sqrt
 from pathlib import Path
-from sys import argv, stdout
+from sys import argv, stdout, stderr
 from time import sleep
 
 import psutil
@@ -1065,7 +1065,8 @@ class ImageProcessor(QtCore.QThread):
                 # Print the error message only once. The error status is reset after the next
                 # successful loop pass.
                 if not exception_status:
-                    print ("Exception in ImageProcessor: " + str(e) + ". Will try again.")
+                    print ("Exception in ImageProcessor: " + str(e) + ". Will try again.",
+                           file=stderr)
                     exception_status = True
                 sleep(self.postproc_idle_loop_time)
 

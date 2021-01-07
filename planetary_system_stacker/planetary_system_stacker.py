@@ -236,6 +236,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         # Create the workflow thread and start it.
         self.thread = QtCore.QThread()
         self.workflow = Workflow(self)
+        self.workflow.setParent(None)
         self.workflow.moveToThread(self.thread)
         self.workflow.master_dark_created_signal.connect(self.master_dark_created)
         self.workflow.master_flat_created_signal.connect(self.master_flat_created)

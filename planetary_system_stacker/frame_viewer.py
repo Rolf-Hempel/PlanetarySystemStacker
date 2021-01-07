@@ -569,7 +569,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         # finishes.
         self.frame_player = FramePlayer(self)
         self.player_thread = QtCore.QThread()
-        self.frame_player.setParent(self)
+        self.frame_player.setParent(None)
         self.frame_player.moveToThread(self.player_thread)
         self.frame_player.block_widgets_signal.connect(self.block_widgets)
         self.frame_player.unblock_widgets_signal.connect(self.unblock_widgets)
@@ -875,7 +875,7 @@ class FramePlayer(QtCore.QObject):
     set_photo_signal = QtCore.pyqtSignal(int)
     set_slider_value = QtCore.pyqtSignal(int)
 
-    def __init__(self, frame_viewer_widget):
+    def __init__(self, frame_viewer_widget, parent=None):
         super(FramePlayer, self).__init__()
 
         # Store a reference of the frame viewer widget.

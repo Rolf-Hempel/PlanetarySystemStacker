@@ -248,6 +248,7 @@ class PssConsole(QtCore.QObject):
         # Create the workflow thread and start it.
         self.thread = QtCore.QThread()
         self.workflow = Workflow(self)
+        self.workflow.setParent(None)
         self.workflow.moveToThread(self.thread)
         self.workflow.calibration.report_calibration_error_signal.connect(
             self.report_calibration_error)
