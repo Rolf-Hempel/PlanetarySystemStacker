@@ -1071,7 +1071,11 @@ of the total number of frames.</string>
         </widget>
        </item>
        <item row="1" column="3" colspan="2">
-        <widget class="QSpinBox" name="apfp_spinBox"/>
+        <widget class="QSpinBox" name="apfp_spinBox">
+         <property name="minimum">
+          <number>1</number>
+         </property>
+        </widget>
        </item>
       </layout>
      </widget>
