@@ -1571,12 +1571,21 @@ class Miscellaneous(object):
                                    ["Minimum structure",
                                     str(configuration.alignment_points_structure_threshold)],
                                    ["Minimum brightness",
-                                    str(configuration.alignment_points_brightness_threshold)],
-                                   ["Percentage of best frames to be stacked",
-                                    str(configuration.alignment_points_frame_percent)],
-                                   ["Normalize frame brightness", str(
-                                           configuration.frames_normalization)]
+                                    str(configuration.alignment_points_brightness_threshold)]
                                    ]
+
+        # The stack size is defined either as frame number or percentage.
+        if configuration.alignment_points_frame_percent > 0:
+            parameters = parameters + [["Percentage of best frames to be stacked",
+                                    str(configuration.alignment_points_frame_percent)],
+                                       ["Normalize frame brightness",
+                                        str(configuration.frames_normalization)]
+                                       ]
+        else:
+            parameters = parameters + [["Number of best frames to be stacked",
+                                        str(configuration.alignment_points_frame_number)],
+                                       ["Normalize frame brightness",
+                                        str(configuration.frames_normalization)]]
 
         # If brightness normalization is checked, add the black cut-off value.
         if configuration.frames_normalization:

@@ -548,12 +548,17 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         # Initialize variables. The values for "alignment_point_frame_number" and
         # "alignment_points_frame_percent" are held as copies in this object. Only if the user
         # presses "OK" at the end, the values are copied back into the configuration object.
-        self.alignment_points_frame_number = self.configuration.alignment_points_frame_number
-        self.alignment_points_frame_percent = self.configuration.alignment_points_frame_percent
-        if self.alignment_points_frame_number is None or 0 < self.alignment_points_frame_number \
-                <= self.frames.number:
+        self.stack_size_changed = None
+
+        # The number of frames to be stacked is selected explicitly.
+        if self.configuration.alignment_points_frame_number > 0:
+            self.alignment_points_frame_number = min(self.configuration.alignment_points_frame_number, self.frames.number)
+            self.alignment_points_frame_percent = min(1, round(self.alignment_points_frame_number / self.frames.number))
+        else:
+            self.alignment_points_frame_percent = self.configuration.alignment_points_frame_percent
             self.alignment_points_frame_number = max(1, int(
                 round(self.frames.number * self.alignment_points_frame_percent / 100.)))
+
         self.frame_ranks = rank_frames.frame_ranks
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
 
@@ -591,9 +596,8 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.radioButton_quality.setChecked(True)
 
         self.spinBox_number_frames.setMaximum(self.frames.number)
-        self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
-
         self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
+        self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
 
         # Create the Matplotlib widget showing the quality lines.
         self.matplotlib_widget = MatplotlibWidget(self.configuration, self.rank_frames)
@@ -695,6 +699,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         self.spinBox_percentage_frames.blockSignals(False)
         self.matplotlib_widget.plot_cutoff_lines(self.frame_ordering,
                                                  self.alignment_points_frame_number)
+        self.stack_size_changed = 'number'
 
     def spinbox_percentage_frames_changed(self):
         """
@@ -704,13 +709,14 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         """
 
         self.alignment_points_frame_percent = self.spinBox_percentage_frames.value()
-        self.alignment_points_frame_number = int(
-            round(self.frames.number * self.alignment_points_frame_percent / 100.))
+        self.alignment_points_frame_number = min(1, round(
+            self.frames.number * self.alignment_points_frame_percent / 100.))
         self.spinBox_number_frames.blockSignals(True)
         self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
         self.spinBox_number_frames.blockSignals(False)
         self.matplotlib_widget.plot_cutoff_lines(self.frame_ordering,
                                                  self.alignment_points_frame_number)
+        self.stack_size_changed = 'percent'
 
     def radiobutton_quality_changed(self):
         """
@@ -786,10 +792,11 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         :return:
         """
         self.alignment_points_frame_number = self.quality_index + 1
-        self.alignment_points_frame_percent = int(
-            round(self.alignment_points_frame_number * 100. / self.frames.number))
+        self.alignment_points_frame_percent = min(1, round(
+            self.alignment_points_frame_number * 100. / self.frames.number))
         self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
         self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)
+        self.stack_size_changed = 'number'
 
     @QtCore.pyqtSlot()
     def pushbutton_play_clicked(self):
@@ -819,22 +826,29 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         """
 
         # Check if a new stack size was selected.
-        if (self.configuration.alignment_points_frame_number !=
-                self.spinBox_number_frames.value() and
-                self.configuration.alignment_points_frame_number is not None) or \
-                self.configuration.alignment_points_frame_percent != \
-                self.spinBox_percentage_frames.value():
-            # Save the (potentially changed) stack size.
-            self.configuration.alignment_points_frame_percent = \
-                self.spinBox_percentage_frames.value()
-            self.configuration.alignment_points_frame_number = self.spinBox_number_frames.value()
+        if self.stack_size_changed is not None:
 
-            # Write the stack size change into the protocol.
-            if self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.protocol("           The user has selected a new stack size: " +
-                    str(self.configuration.alignment_points_frame_number) + " frames (" +
-                    str(self.configuration.alignment_points_frame_percent) + "% of all frames).",
-                    self.stacked_image_log_file, precede_with_timestamp=False)
+            # The number of frames has been set explicitly. Check if it has changed.
+            if self.stack_size_changed == 'number':
+                if self.spinBox_number_frames.value() != self.configuration.alignment_points_frame_number:
+                    self.configuration.alignment_points_frame_number = self.spinBox_number_frames.value()
+                    self.configuration.alignment_points_frame_percent = -1
+                    if self.configuration.global_parameters_protocol_level > 1:
+                        Miscellaneous.protocol(
+                            "           The user has selected a new stack size: " + str(
+                                self.configuration.alignment_points_frame_number) + " frames.",
+                            self.stacked_image_log_file, precede_with_timestamp=False)
+
+            # The percentage of frames has been set. Check if it has changed.
+            elif self.spinBox_percentage_frames.value() != self.configuration.alignment_points_frame_percent:
+                self.configuration.alignment_points_frame_number = -1
+                self.configuration.alignment_points_frame_percent = \
+                    self.spinBox_percentage_frames.value()
+                if self.configuration.global_parameters_protocol_level > 1:
+                    Miscellaneous.protocol(
+                        "           The user has selected a new stack size: " + str(
+                            self.configuration.alignment_points_frame_percent) + "% of all frames.",
+                        self.stacked_image_log_file, precede_with_timestamp=False)
 
         # Send a completion message.
         if self.parent_gui is not None:

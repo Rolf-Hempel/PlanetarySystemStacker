@@ -236,7 +236,12 @@ class PssConsole(QtCore.QObject):
         self.configuration.alignment_points_brightness_threshold = arguments.align_min_bright
 
         self.configuration.alignment_points_frame_percent = arguments.stack_percent
-        # Add something here for "number of frames to be stacked"
+        self.configuration.alignment_points_frame_number = -1
+
+        # If the number of frames to be stacked is given, it has precedence over the percentage.
+        if arguments.stack_number is not None:
+            self.configuration.alignment_points_frame_number = arguments.stack_number
+            self.configuration.alignment_points_frame_percent = -1
 
         self.configuration.frames_normalization = arguments.normalize_bright
         self.configuration.frames_normalization_threshold = arguments.normalize_bco

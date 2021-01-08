@@ -520,8 +520,7 @@ class AlignmentPoints(object):
 
         :param alignment_point: Alignment_point object
         :param drizzle_factor: Drizzle factor (integer: 1, 2 or 3)
-        :param color: True, if stacking is to be done for color frames. False for
-        monochrome case.
+        :param color: True, if stacking is to be done for color frames. False for monochrome case.
         :return: -
         """
 
@@ -601,12 +600,13 @@ class AlignmentPoints(object):
         """
 
         # If the user has entered a value for the number of frames, use it.
-        if self.configuration.alignment_points_frame_number is not None:
+        if self.configuration.alignment_points_frame_number > 0:
             self.stack_size = self.configuration.alignment_points_frame_number
         # Otherwise compute the stack size from the given percentage. Take at least one frame.
         else:
             self.stack_size = max(int(ceil(
                 self.frames.number * self.configuration.alignment_points_frame_percent / 100.)), 1)
+
         # Select the ranking method.
         if self.configuration.alignment_points_rank_method == "xy gradient":
             method = Miscellaneous.local_contrast

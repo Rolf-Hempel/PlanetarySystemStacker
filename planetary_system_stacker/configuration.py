@@ -72,6 +72,7 @@ class ConfigurationParameters(object):
         self.alignment_points_structure_threshold = None
         self.alignment_points_brightness_threshold = None
         self.alignment_points_frame_percent = None
+        self.alignment_points_frame_number = None
         self.stack_frames_drizzle_factor_string = None
 
     def set_defaults(self):
@@ -107,6 +108,7 @@ class ConfigurationParameters(object):
         self.align_frames_average_frame_percent = 5
         self.alignment_points_search_width = 14
         self.alignment_points_frame_percent = 10
+        self.alignment_points_frame_number = -1
         self.stack_frames_drizzle_factor_string = "Off"
         self.set_defaults_ap_editing()
 
@@ -172,6 +174,7 @@ class ConfigurationParameters(object):
         self.alignment_points_brightness_threshold = \
             configuration_object.alignment_points_brightness_threshold
         self.alignment_points_frame_percent = configuration_object.alignment_points_frame_percent
+        self.alignment_points_frame_number = configuration_object.alignment_points_frame_number
         self.stack_frames_drizzle_factor_string = \
             configuration_object.stack_frames_drizzle_factor_string
 
@@ -365,6 +368,8 @@ class Configuration(object):
             configuration_parameters.alignment_points_brightness_threshold
         self.alignment_points_frame_percent = \
             configuration_parameters.alignment_points_frame_percent
+        self.alignment_points_frame_number = \
+            configuration_parameters.alignment_points_frame_number
         self.stack_frames_drizzle_factor_string = \
             configuration_parameters.stack_frames_drizzle_factor_string
 
@@ -435,6 +440,8 @@ class Configuration(object):
             self.alignment_points_brightness_threshold
         configuration_parameters.alignment_points_frame_percent = \
             self.alignment_points_frame_percent
+        configuration_parameters.alignment_points_frame_number = \
+            self.alignment_points_frame_number
         configuration_parameters.stack_frames_drizzle_factor_string = \
             self.stack_frames_drizzle_factor_string
 
@@ -529,6 +536,8 @@ class Configuration(object):
             'brightness threshold', default_conf_obj.alignment_points_brightness_threshold)
         self.alignment_points_frame_percent = get_from_conf(conf, 'Alignment points',
             'frame percent', default_conf_obj.alignment_points_frame_percent)
+        self.alignment_points_frame_number = get_from_conf(conf, 'Alignment points',
+            'frame number', default_conf_obj.alignment_points_frame_number)
 
         self.stack_frames_drizzle_factor_string = get_from_conf(conf, 'Stack frames',
             'drizzle factor string', default_conf_obj.stack_frames_drizzle_factor_string)
@@ -616,6 +625,8 @@ class Configuration(object):
                            str(self.alignment_points_brightness_threshold))
         self.set_parameter('Alignment points', 'frame percent',
                            str(self.alignment_points_frame_percent))
+        self.set_parameter('Alignment points', 'frame number',
+                           str(self.alignment_points_frame_number))
 
         self.config_parser_object.add_section('Stack frames')
         self.set_parameter('Stack frames', 'drizzle factor string',
@@ -653,11 +664,6 @@ class Configuration(object):
         # of their width.
         self.alignment_points_step_size = int(
             round((self.alignment_points_half_patch_width * 4.5) / 3))
-
-        # Initialze the number of frames to be stacked. It will be computed from the corresponding
-        # percentage. The user, however, can override this value with a (more precise) figure
-        # during the workflow.
-        self.alignment_points_frame_number = None
 
         # Set the drizzling parameters.
         if self.stack_frames_drizzle_factor_string == "Off":

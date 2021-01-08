@@ -101,7 +101,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.apsw_slider_value.valueChanged['int'].connect(self.apsw_changed)
         self.apst_slider_value.valueChanged['int'].connect(self.apst_changed)
         self.apbt_slider_value.valueChanged['int'].connect(self.apbt_changed)
-        self.apfp_slider_value.valueChanged['int'].connect(self.apfp_changed)
+        self.apfp_comboBox.addItem('Percent of frames to be stacked')
+        self.apfp_comboBox.addItem('Number of frames to be stacked')
+        self.apfp_comboBox.activated[str].connect(self.apfp_state_changed)
+        self.apfp_spinBox.valueChanged['int'].connect(self.apfp_value_changed)
         self.spp_checkBox.stateChanged.connect(self.spp_changed)
         self.ipfn_checkBox.stateChanged.connect(self.ipfn_changed)
         self.nfs_checkBox.stateChanged.connect(self.nfs_changed)
@@ -177,8 +180,14 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.apst_label_display.setText(str(self.config_copy.alignment_points_structure_threshold))
         self.apbt_slider_value.setValue(self.config_copy.alignment_points_brightness_threshold)
         self.apbt_label_display.setText(str(self.config_copy.alignment_points_brightness_threshold))
-        self.apfp_slider_value.setValue(self.config_copy.alignment_points_frame_percent)
-        self.apfp_label_display.setText(str(self.config_copy.alignment_points_frame_percent))
+        if self.config_copy.alignment_points_frame_percent != -1:
+            self.apfp_comboBox.setCurrentIndex(0)
+            self.apfp_spinBox.setMaximum(100)
+            self.apfp_spinBox.setValue(self.config_copy.alignment_points_frame_percent)
+        else:
+            self.apfp_comboBox.setCurrentIndex(1)
+            self.apfp_spinBox.setMaximum(1000000)
+            self.apfp_spinBox.setValue(self.config_copy.alignment_points_frame_number)
         self.spp_checkBox.setChecked(self.config_copy.global_parameters_include_postprocessing)
         self.fn_checkBox.setChecked(self.config_copy.frames_normalization)
         self.fn_activate_deactivate_widgets()
@@ -310,8 +319,29 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
     def apbt_changed(self, value):
         self.config_copy.alignment_points_brightness_threshold = value
 
-    def apfp_changed(self, value):
-        self.config_copy.alignment_points_frame_percent = value
+    def apfp_state_changed(self, value):
+        self.apfp_spinBox.blockSignals(True)
+        if value == 'Percent of frames to be stacked':
+            self.apfp_spinBox.setMaximum(100)
+            if self.config_copy.alignment_points_frame_percent > 0:
+                self.apfp_spinBox.setValue(self.config_copy.alignment_points_frame_percent)
+            else:
+                self.apfp_spinBox.setValue(0)
+                self.apfp_spinBox.clear()
+        else:
+            self.apfp_spinBox.setMaximum(1000000)
+            if self.config_copy.alignment_points_frame_number > 0:
+                self.apfp_spinBox.setValue(self.config_copy.alignment_points_frame_number)
+            else:
+                self.apfp_spinBox.setValue(0)
+                self.apfp_spinBox.clear()
+        self.apfp_spinBox.blockSignals(False)
+
+    def apfp_value_changed(self, value):
+        if self.apfp_comboBox.currentIndex() == 0:
+            self.config_copy.alignment_points_frame_percent = value
+        else:
+            self.config_copy.alignment_points_frame_number = value
 
     def spp_changed(self, state):
         self.config_copy.global_parameters_include_postprocessing = (state == QtCore.Qt.Checked)
@@ -366,11 +396,24 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         go_back_to_activities = []
 
         if self.config_copy.alignment_points_frame_percent != \
-                self.configuration.alignment_points_frame_percent:
-            self.configuration.alignment_points_frame_percent = \
-                self.config_copy.alignment_points_frame_percent
-            self.configuration.configuration_changed = True
-            go_back_to_activities.append('Compute frame qualities')
+                self.configuration.alignment_points_frame_percent or \
+                self.config_copy.alignment_points_frame_number != \
+                self.configuration.alignment_points_frame_number:
+            # Additional to the state of the comboBox check if a valid number has been entered.
+            if self.apfp_comboBox.currentIndex() == 0 and \
+                    self.config_copy.alignment_points_frame_percent > 0:
+                self.configuration.alignment_points_frame_percent = \
+                    self.config_copy.alignment_points_frame_percent
+                self.configuration.alignment_points_frame_number = -1
+                self.configuration.configuration_changed = True
+                go_back_to_activities.append('Compute frame qualities')
+            elif self.apfp_comboBox.currentIndex() == 1 and \
+                    self.config_copy.alignment_points_frame_number > 0:
+                self.configuration.alignment_points_frame_percent = -1
+                self.configuration.alignment_points_frame_number = \
+                    self.config_copy.alignment_points_frame_number
+                self.configuration.configuration_changed = True
+                go_back_to_activities.append('Compute frame qualities')
 
         if self.config_copy.alignment_points_brightness_threshold != \
                 self.configuration.alignment_points_brightness_threshold:
