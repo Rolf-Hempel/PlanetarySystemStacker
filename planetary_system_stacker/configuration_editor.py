@@ -406,14 +406,14 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                     self.config_copy.alignment_points_frame_percent
                 self.configuration.alignment_points_frame_number = -1
                 self.configuration.configuration_changed = True
-                go_back_to_activities.append('Compute frame qualities')
+                go_back_to_activities.append('Select stack size')
             elif self.apfp_comboBox.currentIndex() == 1 and \
                     self.config_copy.alignment_points_frame_number > 0:
                 self.configuration.alignment_points_frame_percent = -1
                 self.configuration.alignment_points_frame_number = \
                     self.config_copy.alignment_points_frame_number
                 self.configuration.configuration_changed = True
-                go_back_to_activities.append('Compute frame qualities')
+                go_back_to_activities.append('Select stack size')
 
         if self.config_copy.alignment_points_brightness_threshold != \
                 self.configuration.alignment_points_brightness_threshold:

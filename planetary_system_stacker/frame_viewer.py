@@ -552,12 +552,14 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
 
         # The number of frames to be stacked is selected explicitly.
         if self.configuration.alignment_points_frame_number > 0:
-            self.alignment_points_frame_number = min(self.configuration.alignment_points_frame_number, self.frames.number)
-            self.alignment_points_frame_percent = min(1, round(self.alignment_points_frame_number / self.frames.number))
+            self.alignment_points_frame_number = min(
+                self.configuration.alignment_points_frame_number, self.frames.number)
+            self.alignment_points_frame_percent = max(1, min(round(
+                self.alignment_points_frame_number / self.frames.number * 100.), 100))
         else:
             self.alignment_points_frame_percent = self.configuration.alignment_points_frame_percent
-            self.alignment_points_frame_number = max(1, int(
-                round(self.frames.number * self.alignment_points_frame_percent / 100.)))
+            self.alignment_points_frame_number = max(1, round(
+                self.frames.number * self.alignment_points_frame_percent / 100.))
 
         self.frame_ranks = rank_frames.frame_ranks
         self.quality_sorted_indices = rank_frames.quality_sorted_indices
@@ -709,7 +711,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         """
 
         self.alignment_points_frame_percent = self.spinBox_percentage_frames.value()
-        self.alignment_points_frame_number = min(1, round(
+        self.alignment_points_frame_number = max(1, round(
             self.frames.number * self.alignment_points_frame_percent / 100.))
         self.spinBox_number_frames.blockSignals(True)
         self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
@@ -792,7 +794,7 @@ class FrameViewerWidget(QtWidgets.QFrame, Ui_frame_viewer):
         :return:
         """
         self.alignment_points_frame_number = self.quality_index + 1
-        self.alignment_points_frame_percent = min(1, round(
+        self.alignment_points_frame_percent = max(1, round(
             self.alignment_points_frame_number * 100. / self.frames.number))
         self.spinBox_number_frames.setValue(self.alignment_points_frame_number)
         self.spinBox_percentage_frames.setValue(self.alignment_points_frame_percent)

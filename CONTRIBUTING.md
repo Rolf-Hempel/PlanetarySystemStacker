@@ -5,7 +5,7 @@ Contributions to PlanetarySystemStacker are welcome:
 We are using git and github as source code management and bug tracker systems. 
 Development takes place on the "prototype" or alternatively feature-branches.
 So please prepare your pull-requests against "prototype".
-Changes will committed to master only during a release. 
+Changes will be committed to master only during a release. 
 
 # Test Data
 We have not yet settled down on an approach how to manage test data. For the

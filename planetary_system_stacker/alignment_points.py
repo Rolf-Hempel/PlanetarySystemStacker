@@ -165,7 +165,7 @@ class AlignmentPoints(object):
         # Compute the minimum distance of an AP from the boundary.
         min_boundary_distance = max(half_box_width + search_width, half_patch_width)
 
-        # Compute y and x coordinate locations of alignemnt points. Note that the grid is staggered.
+        # Compute y and x coordinate locations of alignment points. Note that the grid is staggered.
         ap_locations_y = self.ap_locations(self.num_pixels_y, min_boundary_distance,
                                            step_size, True)
         ap_locations_x_even = self.ap_locations(self.num_pixels_x, min_boundary_distance,
