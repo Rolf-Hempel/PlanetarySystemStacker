@@ -16,6 +16,12 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <widget class="QLabel" name="label">
+     <property name="minimumSize">
+      <size>
+       <width>0</width>
+       <height>400</height>
+      </size>
+     </property>
      <property name="font">
       <font>
        <pointsize>10</pointsize>
@@ -48,7 +54,7 @@
    <item>
     <widget class="QCheckBox" name="dont_show_checkBox">
      <property name="text">
-      <string>Don't show this message again</string>
+      <string>Don't show this message again (to reactivate it, press 'Info / Show quickstart')</string>
      </property>
     </widget>
    </item>
