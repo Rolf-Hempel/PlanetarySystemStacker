@@ -43,6 +43,7 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_width = None
         self.hidden_parameters_main_window_height = None
         self.hidden_parameters_main_window_maximized = None
+        self.global_parameters_display_quickstart = None
         self.global_parameters_version = None
         self.global_parameters_protocol_level = None
         self.global_parameters_write_protocol_to_file = None
@@ -82,6 +83,7 @@ class ConfigurationParameters(object):
         self.hidden_parameters_main_window_width = 1200
         self.hidden_parameters_main_window_height = 800
         self.hidden_parameters_main_window_maximized = False
+        self.global_parameters_display_quickstart = True
         self.global_parameters_version = PSS_Version
         self.global_parameters_protocol_level = 1
         self.global_parameters_write_protocol_to_file = False
@@ -129,6 +131,8 @@ class ConfigurationParameters(object):
             configuration_object.hidden_parameters_main_window_height
         self.hidden_parameters_main_window_maximized = \
             configuration_object.hidden_parameters_main_window_maximized
+        self.global_parameters_display_quickstart = \
+            configuration_object.global_parameters_display_quickstart
         self.global_parameters_version = configuration_object.global_parameters_version
         self.global_parameters_protocol_level = \
             configuration_object.global_parameters_protocol_level
@@ -319,6 +323,8 @@ class Configuration(object):
             configuration_parameters.hidden_parameters_main_window_height
         self.hidden_parameters_main_window_maximized = \
             configuration_parameters.hidden_parameters_main_window_maximized
+        self.global_parameters_display_quickstart = \
+            configuration_parameters.global_parameters_display_quickstart
         self.global_parameters_version = configuration_parameters.global_parameters_version
         self.global_parameters_protocol_level = \
             configuration_parameters.global_parameters_protocol_level
@@ -392,6 +398,8 @@ class Configuration(object):
             self.hidden_parameters_main_window_height
         configuration_parameters.hidden_parameters_main_window_maximized = \
             self.hidden_parameters_main_window_maximized
+        configuration_parameters.global_parameters_display_quickstart = \
+            self.global_parameters_display_quickstart
         configuration_parameters.global_parameters_version = self.global_parameters_version
         configuration_parameters.global_parameters_protocol_level = \
             self.global_parameters_protocol_level
@@ -477,6 +485,8 @@ class Configuration(object):
         self.hidden_parameters_main_window_maximized = get_from_conf(conf, 'Hidden parameters',
             'main window maximized', default_conf_obj.hidden_parameters_main_window_maximized)
 
+        self.global_parameters_display_quickstart = get_from_conf(conf, 'Global parameters',
+            'display quickstart', default_conf_obj.global_parameters_display_quickstart)
         self.global_parameters_protocol_level = get_from_conf(conf, 'Global parameters',
             'protocol level', default_conf_obj.global_parameters_protocol_level)
         self.global_parameters_write_protocol_to_file = get_from_conf(conf, 'Global parameters',
@@ -569,6 +579,8 @@ class Configuration(object):
         self.set_parameter('Hidden parameters', 'main window maximized',
                            str(self.hidden_parameters_main_window_maximized))
         self.config_parser_object.add_section('Global parameters')
+        self.set_parameter('Global parameters', 'display quickstart',
+                           str(self.global_parameters_display_quickstart))
         self.set_parameter('Global parameters', 'version', self.global_parameters_version)
         self.set_parameter('Global parameters', 'protocol level',
                            str(self.global_parameters_protocol_level))

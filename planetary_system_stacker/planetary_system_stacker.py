@@ -50,6 +50,7 @@ from alignment_point_editor import AlignmentPointEditorWidget
 from alignment_points import AlignmentPoints
 from configuration import Configuration
 from configuration_editor import ConfigurationEditor
+from display_quickstart import DisplayQuickstart
 from exceptions import NotSupportedError
 from frame_selector import FrameSelectorWidget
 from frame_viewer import FrameViewerWidget
@@ -232,6 +233,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.ui.actionCreate_new_master_dark_frame.triggered.connect(self.create_master_dark)
         self.ui.actionCreate_new_master_flat_frame.triggered.connect(self.create_master_flat)
         self.ui.actionAbout.triggered.connect(self.about_pss)
+        self.ui.actionShow_Quickstart.setChecked(self.configuration.global_parameters_display_quickstart)
+        self.ui.actionShow_Quickstart.triggered.connect(self.show_quickstart)
 
         # Create the workflow thread and start it.
         self.thread = QtCore.QThread()
@@ -314,8 +317,24 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 "Specify video(s) or dir(s) with image files to be stacked, or single image "
                 "files for postprocessing (menu: File / Open).", 'red')
 
+        # Show the quickstart guide (if checkbox has not been de-activated.
+        if self.configuration.global_parameters_display_quickstart:
+            self.display_widget(DisplayQuickstart(self, self.configuration))
+
         # Initialize objects.
         self.image_window = None
+
+    @QtCore.pyqtSlot()
+    def show_quickstart(self):
+        """
+        If the user requests to re-activate the quickstart guide display at startup, change the
+        corresponding gobal parameter.
+
+        :return:
+        """
+
+        self.configuration.global_parameters_display_quickstart = \
+            self.ui.actionShow_Quickstart.isChecked()
 
     @QtCore.pyqtSlot()
     def create_image_window(self):
@@ -454,7 +473,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 Miscellaneous.protocol("+++ Importing configuration from older version: " +
                                 self.configuration.global_parameters_version_imported_from + " +++",
                                 self.workflow.attached_log_file)
-        pass
 
     def save_config_file(self):
         """

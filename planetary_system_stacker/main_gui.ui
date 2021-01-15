@@ -272,6 +272,7 @@
      <string>Info</string>
     </property>
     <addaction name="actionAbout"/>
+    <addaction name="actionShow_Quickstart"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuEdit"/>
@@ -363,6 +364,17 @@
   <action name="actionAbout">
    <property name="text">
     <string>About PSS</string>
+   </property>
+  </action>
+  <action name="actionShow_Quickstart">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Show quickstart</string>
    </property>
   </action>
  </widget>
