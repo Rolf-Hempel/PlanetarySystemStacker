@@ -21,6 +21,8 @@ class LabelGui(QtWidgets.QWidget, Ui_Form):
 
         md = self.get_markdown()
         self.label.setText(md)
+        markdown_text = md.encode()
+        print (str(markdown_text))
 
     def get_markdown(self):
         url = 'file:..\quickstart.md'

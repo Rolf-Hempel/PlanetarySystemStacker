@@ -31,7 +31,7 @@ from exceptions import ArgumentError
 from miscellaneous import Miscellaneous
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.8.27"
+PSS_Version = "PlanetarySystemStacker 0.8.29"
 # PSS_Version = "PlanetarySystemStacker"
 
 
@@ -202,8 +202,6 @@ class Configuration(object):
             if isfile(location):
                 self.window_icon = location
                 break
-
-        self.global_parameters_quickstart_url = 'file:quickstart.md'
 
         self.frames_mono_channel = 'panchromatic'
         self.frames_color_difference_threshold = 0
