@@ -203,6 +203,8 @@ class Configuration(object):
                 self.window_icon = location
                 break
 
+        self.global_parameters_quickstart_url = 'file:quickstart.md'
+
         self.frames_mono_channel = 'panchromatic'
         self.frames_color_difference_threshold = 0
         self.frames_bayer_max_noise_diff_green = 2.
