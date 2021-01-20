@@ -19,7 +19,21 @@ class LabelGui(QtWidgets.QWidget, Ui_Form):
 
         self.label.setTextFormat(Qt.MarkdownText)
 
-        md = self.get_markdown()
+        # md = self.get_markdown()
+
+        md = """
+# Demo
+
+### Quickstart Guide
+
+Hier Text
+
+#### Configuration
+
+Hier Text (es folgen hier drei Leerzeichen)
+Mit Umbruch
+"""
+
         self.label.setText(md)
         markdown_text = md.encode()
         print (str(markdown_text))
