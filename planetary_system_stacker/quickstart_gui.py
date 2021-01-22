@@ -18,7 +18,7 @@ class Ui_Form(object):
         self.verticalLayout = QtWidgets.QVBoxLayout(Form)
         self.verticalLayout.setObjectName("verticalLayout")
         self.label = QtWidgets.QLabel(Form)
-        self.label.setMinimumSize(QtCore.QSize(0, 400))
+        self.label.setMinimumSize(QtCore.QSize(900, 500))
         font = QtGui.QFont()
         font.setPointSize(10)
         self.label.setFont(font)
