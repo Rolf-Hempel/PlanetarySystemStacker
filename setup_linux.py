@@ -25,7 +25,7 @@ setuptools.setup(
         'scipy',
         'astropy',
         'scikit-image',
-        'opencv-python'
+        'opencv-python-headless'
     ],
     include_package_data=True,
     classifiers=[
