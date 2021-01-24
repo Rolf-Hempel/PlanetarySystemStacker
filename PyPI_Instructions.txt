@@ -1,10 +1,13 @@
 Build the package:
 ------------------
-python3 setup.py sdist
-python3 setup_windows.py bdist_wheel --plat-name win_amd64
-python3 setup_linux.py bdist_wheel --plat-name manylinux1_x86_64
-python3 setup_linux.py bdist_wheel --plat-name linux_armv7l
-python3 setup_macos.py bdist_wheel --plat-name macosx_10_6_intel
+# python3 setup.py sdist
+# python3 setup_linux.py bdist_wheel --plat-name linux_armv7l
+
+For each OS version, first create the wheel, then upload it to PyPI, and delete the build, dist and
+egg-info directories:
+    python3 setup_windows.py bdist_wheel --plat-name win_amd64
+    python3 setup_linux.py bdist_wheel --plat-name manylinux1_x86_64
+    python3 setup_macos.py bdist_wheel --plat-name macosx_10_6_intel
 
 
 Upload the package to PyPI:
