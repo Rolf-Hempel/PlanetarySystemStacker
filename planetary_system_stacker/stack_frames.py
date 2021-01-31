@@ -795,7 +795,7 @@ if __name__ == "__main__":
         print("optimal alignment rectangle, x_low: " + str(x_low_opt) + ", x_high: " + str(
             x_high_opt) + ", y_low: " + str(y_low_opt) + ", y_high: " + str(y_high_opt))
         reference_frame_with_alignment_points = frames.frames_mono(
-            align_frames.frame_ranks_max_index).copy()
+            rank_frames.frame_ranks_max_index).copy()
         reference_frame_with_alignment_points[y_low_opt,
         x_low_opt:x_high_opt] = reference_frame_with_alignment_points[y_high_opt - 1,
                                 x_low_opt:x_high_opt] = 255
