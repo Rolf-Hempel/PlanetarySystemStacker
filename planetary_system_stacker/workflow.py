@@ -671,6 +671,12 @@ class Workflow(QtCore.QObject):
                                     x_low_opt) + "<x<" + str(x_high_opt), self.attached_log_file,
                                 precede_with_timestamp=False)
 
+                # Catch all other exceptions. In this case abort the job and try the next one.
+                except Exception as e:
+                    self.abort_job_signal.emit("Error: " + str(e) + ", continuing with next job")
+                    self.my_timer.stop('Global frame alignment')
+                    return
+
         # Align all frames in "Planet" mode.
         else:
             try:
