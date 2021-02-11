@@ -21,13 +21,10 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 import gc
-import glob
 import platform
 import sys
-from ctypes import CDLL, byref, c_int
 from os import listdir, rename, remove
-import os
-from os.path import splitext, join, dirname, expanduser
+from os.path import splitext, join, dirname
 
 import psutil
 from PyQt5 import QtCore
@@ -85,9 +82,7 @@ class Workflow(QtCore.QObject):
         # Switch alignment point debugging on / off.
         self.debug_AP = False
 
-        # Try to find the OS-dependent MKL library for multi-threading support. Depending on the
-        # system configuration, this library may be callable without specifying its absolute path.
-        # If not, try to find the library at various locations in the file system.
+        # Print info on the platform used.
         platform_name = platform.system()
         processor_name = platform.processor()
 
