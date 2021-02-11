@@ -94,19 +94,9 @@ class Workflow(QtCore.QObject):
         python_dir = dirname(sys.executable)
         if self.configuration.global_parameters_protocol_level > 1:
             Miscellaneous.protocol(
-                "Operating system used: " + platform_name +
+                "Operating system used: " + platform_name + ", Processor used: " + processor_name +
                 "\n           Python interpreter location: " +
                 python_dir, self.attached_log_file, precede_with_timestamp=True)
-
-        # The following code is necessary to make mkl run correctly on AMD-based Windows systems
-        # where PSS is installed using the Windows installer (which was built on an Intel system).
-        if platform_name == "Windows" and "AMD" in processor_name:
-            os.environ['MKL_DEBUG_CPU_TYPE'] = '5'
-            if self.configuration.global_parameters_protocol_level > 1:
-                Miscellaneous.protocol(
-                    "           Processor used: '" + processor_name +
-                    "', setting env variable 'MKL_DEBUG_CPU_TYPE'=5 to optimize mkl performance",
-                    self.attached_log_file, precede_with_timestamp=False)
 
         # Check if the configuration was imported from an older version. If so, print a message.
         # Please note that the "version imported from" parameter is set only if a configuration
@@ -118,60 +108,6 @@ class Workflow(QtCore.QObject):
             Miscellaneous.protocol("           Configuration imported from older version: " +
                                    self.configuration.global_parameters_version_imported_from,
                                    self.attached_log_file, precede_with_timestamp=False)
-
-        # For every OS platform create a list of potential places to look for the MKL library.
-        # Start with an empty path (i.e. no absolute path necessary). Also, set the OS-dependent
-        # name of the library.
-        if platform_name == 'Windows':
-            mkl_rt_paths = ["", join(python_dir, "Library", "bin"),
-                            join(python_dir, "Lib", "site-packages", "numpy", "core")]
-            mkl_rt_name = "mkl_rt.dll"
-        elif platform_name == 'Linux':
-            mkl_rt_paths = ["", join(expanduser("~"), ".local", "lib")]
-            mkl_rt_name = "libmkl_rt.so"
-        else:   # MacOS:
-            path_with_wildcard = '/opt/intel/compilers_and_libraries_*/mac/mkl/lib/libmkl_rt.dylib'
-            mkl_rt_paths = [""] + [dirname(path) for path in glob.glob(path_with_wildcard)]
-            mkl_rt_name = "libmkl_rt.dylib"
-
-        # Try instantiating the library at all potential locations:
-        mkl_rt_found = False
-        for mkl_dir in mkl_rt_paths:
-            try:
-                mkl_rt = CDLL(join(mkl_dir, mkl_rt_name))
-                mkl_rt_found = True
-                if self.configuration.global_parameters_protocol_level > 1:
-                    Miscellaneous.protocol(
-                        "           MKL library used: " + join(mkl_dir, mkl_rt_name),
-                        self.attached_log_file, precede_with_timestamp=False)
-                break
-            except:
-                pass
-
-        # If the MKL library could be instantiated at one of the given locations, try using it to
-        # set the number of parallel threads to be used by MKL.
-        if mkl_rt_found:
-            try:
-                mkl_get_max_threads = mkl_rt.mkl_get_max_threads
-
-                def mkl_set_num_threads(cores):
-                    mkl_rt.mkl_set_num_threads(byref(c_int(cores)))
-
-                mkl_set_num_threads(mkl_get_max_threads())
-                if self.configuration.global_parameters_protocol_level > 1:
-                    Miscellaneous.protocol(
-                        "           Number of threads used by mkl: " + str(mkl_get_max_threads()) +
-                        "\n", self.attached_log_file, precede_with_timestamp=False)
-            except:
-                Miscellaneous.protocol(
-                    "Warning: Setting number of threads in " + mkl_rt_name +
-                    " failed. Performance may be reduced.",
-                    self.attached_log_file, precede_with_timestamp=True)
-        else:
-            Miscellaneous.protocol(
-                "Info: " + mkl_rt_name + " not found (Intel Math Kernel Library not "
-                "installed?). Performance might be slightly reduced.\n", self.attached_log_file,
-                precede_with_timestamp=True)
 
         # Create the calibration object, used for potential flat / dark corrections.
         self.calibration = Calibration(self.configuration)

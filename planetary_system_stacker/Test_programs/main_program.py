@@ -268,20 +268,6 @@ if __name__ == "__main__":
         protocol_file = open(os.path.join(input_directory, 'Protocol.txt'), 'a')
         sys.stdout = protocol_file
 
-    if platform.system() == 'Windows':
-        mkl_rt = CDLL('mkl_rt.dll')
-    else:
-        mkl_rt = CDLL('libmkl_rt.so')
-
-    mkl_get_max_threads = mkl_rt.mkl_get_max_threads
-
-    def mkl_set_num_threads(cores):
-        mkl_rt.mkl_set_num_threads(ctypes.byref(ctypes.c_int(cores)))
-
-    mkl_set_num_threads(2)
-    print("Number of threads used by mkl: " + str(mkl_get_max_threads()))
-
-
     # For videos, batch processing is done for all videos in the input directory.
     if input_type == 'video':
         input_names = glob.glob(os.path.join(input_directory, '*.avi'))

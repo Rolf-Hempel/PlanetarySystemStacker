@@ -1385,16 +1385,6 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                              PIP_VERSION
                              ))
 
-        # MKL might not be installed as a separate package. Therefore add its version number only
-        # if it is available.
-        try:
-            import mkl
-            MKL_VERSION = mkl.__version__
-            CONTENT += ('''<br>
-            MKL: {0}'''.format(MKL_VERSION))
-        except:
-            pass
-
         msgBox = QtWidgets.QMessageBox()
         msgBox.setIcon(QtWidgets.QMessageBox.Information)
         msgBox.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
