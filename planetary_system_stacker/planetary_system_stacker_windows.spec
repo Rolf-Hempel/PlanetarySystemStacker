@@ -8,7 +8,7 @@ astropy_path, = astropy.__path__
 
 a = Analysis(['planetary_system_stacker.py'],
              pathex=['D:\\SW-Development\\Python\\PlanetarySystemStacker\\planetary_system_stacker'],
-             binaries=[('C:\Python35\Lib\site-packages\opencv_ffmpeg342_64.dll', '.'),
+             binaries=[('C:\Python36\Lib\site-packages\cv2\opencv_videoio_ffmpeg420_64.dll', '.'),
               ('D:\SW-Development\Python\PlanetarySystemStacker\planetary_system_stacker\Binaries\Api-ms-win-core-xstate-l2-1-0.dll', '.'),
               ('D:\SW-Development\Python\PlanetarySystemStacker\planetary_system_stacker\Binaries\Api-ms-win-crt-private-l1-1-0.dll', '.'),
               ('C:\Windows\System32\downlevel\API-MS-Win-Eventing-Provider-L1-1-0.dll', '.'),

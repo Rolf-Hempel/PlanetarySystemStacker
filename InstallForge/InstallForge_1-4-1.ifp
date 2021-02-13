@@ -3,7 +3,7 @@
 ProjectFileVersion = 1.1
 [General]
 Program name = PlanetarySystemStacker
-Program version = 0.8.22
+Program version = 0.8.31
 Windows 2000 = 0
 Windows XP = 0
 Windows Server 2003 = 0
@@ -55,7 +55,7 @@ Time = 2
 PlaySound = 0
 Allow = 0
 [Build]
-File = D:\SW-Development\Python\PlanetarySystemStacker\Windows_Installer\PlanetarySystemStacker_V0.8.22_Windows-Installer.exe
+File = D:\SW-Development\Python\PlanetarySystemStacker\Windows_Installer\PlanetarySystemStacker_V0.8.31_Windows-Installer.exe
 SetupIconPath = D:\SW-Development\Python\PlanetarySystemStacker\Documentation\Icon\PSS-Icon-64.ico
 UninstallIconPath = D:\SW-Development\Python\PlanetarySystemStacker\Documentation\Icon\PSS-Icon-64.ico
 CompressionMethod = 0
