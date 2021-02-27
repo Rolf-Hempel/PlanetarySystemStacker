@@ -673,7 +673,7 @@ class Configuration(object):
             round((self.alignment_points_half_box_width * 3) / 2))
 
         # Set the AP distance per coordinate direction such that adjacent patches overlap by 1/6
-        # of their width.
+        # step on both sides.
         self.alignment_points_step_size = int(
             round((self.alignment_points_half_patch_width * 4.5) / 3))
 
