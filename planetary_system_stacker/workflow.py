@@ -40,6 +40,8 @@ from rank_frames import RankFrames
 from stack_frames import StackFrames
 from timer import timer
 
+# The following lists define the allowed file extensions for still images.
+image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
 
 class Workflow(QtCore.QObject):
     master_dark_created_signal = QtCore.pyqtSignal(bool)
@@ -221,7 +223,9 @@ class Workflow(QtCore.QObject):
         # "names".
         else:  # input_type = 'image'
             self.activity = 'stacking'
-            names = [join(self.job.name, name) for name in listdir(self.job.name)]
+            # Include only names with image extensions.
+            names = [join(self.job.name, name) for name in listdir(self.job.name) if
+                     splitext(name)[-1].lower() in image_extensions]
             self.attached_log_name = self.job.name + '_stacking-log.txt'
 
         # Redirect stdout to a file if requested.

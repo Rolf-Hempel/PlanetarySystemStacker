@@ -31,7 +31,7 @@ from exceptions import ArgumentError
 from miscellaneous import Miscellaneous
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.8.31"
+PSS_Version = "PlanetarySystemStacker 0.9.0"
 # PSS_Version = "PlanetarySystemStacker"
 
 
@@ -89,7 +89,7 @@ class ConfigurationParameters(object):
         self.global_parameters_write_protocol_to_file = False
         self.global_parameters_store_protocol_with_result = False
         self.global_parameters_buffering_level = -1
-        self.global_parameters_include_postprocessing = False
+        self.global_parameters_include_postprocessing = True
         self.global_parameters_image_format = "png"
         self.global_parameters_parameters_in_filename = False
         self.global_parameters_stack_number_frames = False
