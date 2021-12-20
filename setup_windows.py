@@ -17,10 +17,10 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     ext_modules=None,
     install_requires=[
-        'numpy == 1.18.4',
+        'numpy',
         'matplotlib',
         'psutil',
-        'PyQt5 >= 5.15',
+        'PyQt5',
         'scipy',
         'astropy',
         'scikit-image',
@@ -34,7 +34,7 @@ setuptools.setup(
         # "Operating System :: OS Independent"
         "Operating System :: Microsoft :: Windows"
     ],
-    python_requires='>=3.5,  <3.7',
+    python_requires='>=3.5',
     entry_points={
         "console_scripts": [
         "PlanetarySystemStacker=planetary_system_stacker.planetary_system_stacker:main",

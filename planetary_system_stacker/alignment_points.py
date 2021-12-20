@@ -29,7 +29,7 @@ import matplotlib.pyplot as plt
 from math import ceil
 from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, int32, uint16
 from scipy import ndimage
-from skimage.feature import register_translation
+from skimage.registration import phase_cross_correlation
 from cv2 import meanStdDev, GaussianBlur
 
 from align_frames import AlignFrames
@@ -801,8 +801,11 @@ class AlignmentPoints(object):
                 # explained above.
                 box_in_frame = frame_mono_blurred[y_low + dy:y_high + dy,
                                x_low + dx:x_high + dx]
-                shift_pixel, error, diffphase = register_translation(
-                    alignment_point['reference_box'], box_in_frame, 10, space='real')
+                # The following use of "phase_cross_correlation" replaces the original call to
+                # "register_translation" which seems not to be in the package anymore. If this
+                # replacement really works has not been tested.
+                shift_pixel, error, diffphase = phase_cross_correlation(
+                    alignment_point['reference_box'], box_in_frame, upsample_factor=10)
 
             # Use a simple phase shift computation (contained in module "miscellaneous").
             elif self.configuration.alignment_points_method == 'CrossCorrelation':
