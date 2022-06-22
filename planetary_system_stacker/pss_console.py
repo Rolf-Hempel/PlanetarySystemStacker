@@ -204,6 +204,10 @@ class PssConsole(QtCore.QObject):
         self.configuration = Configuration()
         self.configuration.initialize_configuration(read_from_file=False)
 
+        # In the standard configuration postprocessing is included in the workflow. This does not
+        # make sense in command line mode.
+        self.configuration.global_parameters_include_postprocessing = False
+
         # Modify the standard configuration as specified in the command line arguments.
         self.configuration.global_parameters_store_protocol_with_result = arguments.protocol
         self.configuration.global_parameters_protocol_level = arguments.protocol_detail
