@@ -25,6 +25,8 @@ from configparser import ConfigParser
 from copy import deepcopy
 from os.path import expanduser, join, isfile, dirname
 from os.path import splitext
+
+import psutil
 from numpy import uint8
 
 from exceptions import ArgumentError
@@ -49,6 +51,8 @@ class ConfigurationParameters(object):
         self.global_parameters_write_protocol_to_file = None
         self.global_parameters_store_protocol_with_result = None
         self.global_parameters_buffering_level = None
+        self.global_parameters_maximum_memory_active = None
+        self.global_parameters_maximum_memory_amount = None
         self.global_parameters_include_postprocessing = None
         self.global_parameters_image_format = None
         self.global_parameters_parameters_in_filename = None
@@ -89,6 +93,9 @@ class ConfigurationParameters(object):
         self.global_parameters_write_protocol_to_file = False
         self.global_parameters_store_protocol_with_result = False
         self.global_parameters_buffering_level = -1
+        self.global_parameters_maximum_memory_active = False
+        self.global_parameters_maximum_memory_amount = \
+            max(1, int(dict(psutil.virtual_memory()._asdict())['available'] / 1e9))
         self.global_parameters_include_postprocessing = True
         self.global_parameters_image_format = "png"
         self.global_parameters_parameters_in_filename = False
@@ -142,6 +149,10 @@ class ConfigurationParameters(object):
             configuration_object.global_parameters_store_protocol_with_result
         self.global_parameters_buffering_level = \
             configuration_object.global_parameters_buffering_level
+        self.global_parameters_maximum_memory_active = \
+            configuration_object.global_parameters_maximum_memory_active
+        self.global_parameters_maximum_memory_amount = \
+            configuration_object.global_parameters_maximum_memory_amount
         self.global_parameters_include_postprocessing = \
             configuration_object.global_parameters_include_postprocessing
         self.global_parameters_image_format = \
@@ -334,6 +345,10 @@ class Configuration(object):
             configuration_parameters.global_parameters_store_protocol_with_result
         self.global_parameters_buffering_level = \
             configuration_parameters.global_parameters_buffering_level
+        self.global_parameters_maximum_memory_active = \
+            configuration_parameters.global_parameters_maximum_memory_active
+        self.global_parameters_maximum_memory_amount = \
+            configuration_parameters.global_parameters_maximum_memory_amount
         self.global_parameters_include_postprocessing = \
             configuration_parameters.global_parameters_include_postprocessing
         self.global_parameters_image_format = \
@@ -495,6 +510,10 @@ class Configuration(object):
             'store protocol with result', default_conf_obj.global_parameters_store_protocol_with_result)
         self.global_parameters_buffering_level = get_from_conf(conf, 'Global parameters',
             'buffering level', default_conf_obj.global_parameters_buffering_level)
+        self.global_parameters_maximum_memory_active = get_from_conf(conf, 'Global parameters',
+            'maximum memory active', default_conf_obj.global_parameters_maximum_memory_active)
+        self.global_parameters_maximum_memory_amount = get_from_conf(conf, 'Global parameters',
+            'maximum memory amount', default_conf_obj.global_parameters_maximum_memory_amount)
         self.global_parameters_include_postprocessing = get_from_conf(conf, 'Global parameters',
             'include postprocessing', default_conf_obj.global_parameters_include_postprocessing)
         self.global_parameters_image_format = get_from_conf(conf, 'Global parameters',
@@ -590,6 +609,10 @@ class Configuration(object):
                            str(self.global_parameters_store_protocol_with_result))
         self.set_parameter('Global parameters', 'buffering level',
                            str(self.global_parameters_buffering_level))
+        self.set_parameter('Global parameters', 'maximum memory active',
+                           str(self.global_parameters_maximum_memory_active))
+        self.set_parameter('Global parameters', 'maximum memory amount',
+                           str(self.global_parameters_maximum_memory_amount))
         self.set_parameter('Global parameters', 'include postprocessing',
                            str(self.global_parameters_include_postprocessing))
         self.set_parameter('Global parameters', 'image format',

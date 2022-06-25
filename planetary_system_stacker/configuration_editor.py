@@ -21,6 +21,8 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from PyQt5 import QtWidgets, QtCore
+from PyQt5.QtGui import QIntValidator
+from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QLabel
 
 from configuration import ConfigurationParameters
 from parameter_configuration import Ui_ConfigurationDialog
@@ -93,6 +95,9 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.gpbl_combobox.addItem('3')
         self.gpbl_combobox.addItem('4')
         self.gpbl_combobox.activated[str].connect(self.gpbl_changed)
+        self.mr_checkBox.stateChanged.connect(self.mr_changed)
+        self.mr_lineEdit.setValidator(QIntValidator())
+        self.mr_lineEdit.textChanged.connect(self.mr_text_changed)
         self.gpif_comboBox.addItem('png')
         self.gpif_comboBox.addItem('tiff')
         self.gpif_comboBox.addItem('fits')
@@ -162,6 +167,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.gpbl_combobox.setCurrentIndex(self.config_copy.global_parameters_buffering_level+1)
         else:
             self.gpbl_combobox.setCurrentIndex(0)
+
+        self.mr_lineEdit.setText(str(self.config_copy.global_parameters_maximum_memory_amount))
+        self.mr_checkBox.setChecked(self.config_copy.global_parameters_maximum_memory_active)
+
         index = self.gpif_comboBox.findText(self.config_copy.global_parameters_image_format,
                                            QtCore.Qt.MatchFixedString)
         if index >= 0:
@@ -302,6 +311,36 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.config_copy.global_parameters_buffering_level = -1
         else:
             self.config_copy.global_parameters_buffering_level = int(value)
+
+    def mr_activate(self):
+        self.config_copy.global_parameters_maximum_memory_active = True
+        self.config_copy.global_parameters_buffering_level = -1
+        self.gpbl_combobox.setCurrentIndex(0)  # set buffering to 'auto'
+        self.gpbl_combobox.setEnabled(False)
+        self.mr_lineEdit.setEnabled(True)
+
+    def mr_deactivate(self):
+        self.config_copy.global_parameters_maximum_memory_active = False
+        self.gpbl_combobox.setEnabled(True)
+        self.mr_lineEdit.setEnabled(False)
+
+    def mr_changed(self, state):
+        explicit_memory_on = (state == QtCore.Qt.Checked)
+        if explicit_memory_on:
+            if explicit_memory_on != self.config_copy.global_parameters_maximum_memory_active:
+                warning = ExplicitMemoryWarning()
+                if warning.exec():
+                    self.mr_activate()
+                else:
+                    self.mr_checkBox.setCheckState(QtCore.Qt.Unchecked)
+            else:
+                self.mr_activate()
+        else:
+            self.mr_deactivate()
+
+    def mr_text_changed(self, state):
+        if state != '' and int(state) != 0:
+            self.config_copy.global_parameters_maximum_memory_amount = state
 
     def gpif_changed(self, value):
         self.config_copy.global_parameters_image_format = value
@@ -538,6 +577,18 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
                 self.config_copy.global_parameters_buffering_level
             self.configuration.configuration_changed = True
 
+        if self.config_copy.global_parameters_maximum_memory_active != \
+                self.configuration.global_parameters_maximum_memory_active:
+            self.configuration.global_parameters_maximum_memory_active = \
+                self.config_copy.global_parameters_maximum_memory_active
+            self.configuration.configuration_changed = True
+
+        if self.config_copy.global_parameters_maximum_memory_amount != \
+                self.configuration.global_parameters_maximum_memory_amount:
+            self.configuration.global_parameters_maximum_memory_amount = \
+                self.config_copy.global_parameters_maximum_memory_amount
+            self.configuration.configuration_changed = True
+
         if self.config_copy.global_parameters_include_postprocessing != \
                 self.configuration.global_parameters_include_postprocessing:
             self.configuration.global_parameters_include_postprocessing = \
@@ -613,3 +664,20 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
         self.parent_gui.display_widget(None, display=False)
         self.close()
+
+
+class ExplicitMemoryWarning(QDialog):
+    def __init__(self):
+        super().__init__()
+
+        self.setWindowTitle("Explicit memory activation warning!")
+
+        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        self.buttonBox.accepted.connect(self.accept)
+        self.buttonBox.rejected.connect(self.reject)
+
+        self.layout = QVBoxLayout()
+        message = QLabel("Setting the memory limit too high may cause degraded OS performance and/or process crashes")
+        self.layout.addWidget(message)
+        self.layout.addWidget(self.buttonBox)
+        self.setLayout(self.layout)
