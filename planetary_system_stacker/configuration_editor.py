@@ -339,7 +339,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.mr_deactivate()
 
     def mr_text_changed(self, state):
-        if state != '' and int(state) != 0:
+        if state != '' and int(state) > 0:
             self.config_copy.global_parameters_maximum_memory_amount = state
 
     def gpif_changed(self, value):
