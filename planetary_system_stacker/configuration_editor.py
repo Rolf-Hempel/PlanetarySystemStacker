@@ -96,7 +96,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.gpbl_combobox.addItem('4')
         self.gpbl_combobox.activated[str].connect(self.gpbl_changed)
         self.mr_checkBox.stateChanged.connect(self.mr_changed)
-        self.mr_lineEdit.setValidator(QIntValidator())
+        self.mr_lineEdit.setValidator(QIntValidator(1, 2147483647))
         self.mr_lineEdit.textChanged.connect(self.mr_text_changed)
         self.gpif_comboBox.addItem('png')
         self.gpif_comboBox.addItem('tiff')
@@ -339,9 +339,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
     def mr_text_changed(self, state):
         try:
-            memory_amount = int(state)
-            if memory_amount > 0:
-                self.config_copy.global_parameters_maximum_memory_amount = memory_amount
+            self.config_copy.global_parameters_maximum_memory_amount = int(state)
         except ValueError:
             return
 
