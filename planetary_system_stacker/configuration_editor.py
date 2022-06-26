@@ -678,7 +678,8 @@ class ExplicitMemoryWarning(QDialog):
         self.buttonBox.rejected.connect(self.reject)
 
         self.layout = QVBoxLayout()
-        message = QLabel("Setting the memory limit too high may cause degraded OS performance and/or process crashes")
+        message = QLabel("PlanetarySystemStacker takes no responsibility for enough memory being available.\r\n"
+                         "Setting the memory limit too high may cause degraded OS performance and/or process crashes")
         self.layout.addWidget(message)
         self.layout.addWidget(self.buttonBox)
         self.setLayout(self.layout)
