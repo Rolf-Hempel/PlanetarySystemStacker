@@ -338,8 +338,12 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.mr_deactivate()
 
     def mr_text_changed(self, state):
-        if state != '' and int(state) > 0:
-            self.config_copy.global_parameters_maximum_memory_amount = state
+        try:
+            memory_amount = int(state)
+            if memory_amount > 0:
+                self.config_copy.global_parameters_maximum_memory_amount = memory_amount
+        except ValueError:
+            return
 
     def gpif_changed(self, value):
         self.config_copy.global_parameters_image_format = value
