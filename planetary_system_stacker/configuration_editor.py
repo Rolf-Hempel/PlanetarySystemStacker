@@ -324,14 +324,14 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.mr_lineEdit.setEnabled(False)
 
     def mr_changed(self, state):
-        explicit_memory_on = (state == QtCore.Qt.Checked)
-        if explicit_memory_on:
-            if explicit_memory_on != self.config_copy.global_parameters_maximum_memory_active:
+        max_memory_active = (state == QtCore.Qt.Checked)
+        if max_memory_active:
+            if max_memory_active != self.config_copy.global_parameters_maximum_memory_active:  # Only dialog on change
                 warning = ExplicitMemoryWarning()
                 if warning.exec():
                     self.mr_activate()
                 else:
-                    self.mr_checkBox.setCheckState(QtCore.Qt.Unchecked)
+                    self.mr_checkBox.setCheckState(QtCore.Qt.Unchecked)  # Go back to unchecked if cancelled
             else:
                 self.mr_activate()
         else:
