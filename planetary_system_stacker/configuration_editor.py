@@ -671,7 +671,7 @@ class ExplicitMemoryWarning(QDialog):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Explicit memory activation warning!")
+        self.setWindowTitle("Memory limit warning")
 
         self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         self.buttonBox.accepted.connect(self.accept)
