@@ -314,7 +314,6 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
     def mr_activate(self):
         self.config_copy.global_parameters_maximum_memory_active = True
-        self.config_copy.global_parameters_buffering_level = -1
         self.gpbl_combobox.setCurrentIndex(0)  # set buffering to 'auto'
         self.gpbl_combobox.setEnabled(False)
         self.mr_lineEdit.setEnabled(True)
