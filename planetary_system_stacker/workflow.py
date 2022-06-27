@@ -274,9 +274,12 @@ class Workflow(QtCore.QObject):
                 Miscellaneous.print_stacking_parameters(self.configuration, self.attached_log_file)
 
             try:
-                # Look up the available RAM (without paging)
-                virtual_memory = dict(psutil.virtual_memory()._asdict())
-                available_ram = virtual_memory['available'] / 1e9
+                if self.configuration.global_parameters_maximum_memory_active:
+                    available_ram = float(self.configuration.global_parameters_maximum_memory_amount)
+                else:
+                    # Look up the available RAM (without paging)
+                    virtual_memory = dict(psutil.virtual_memory()._asdict())
+                    available_ram = virtual_memory['available'] / 1e9
 
                 self.frames = Frames(self.configuration, names, type=self.job.type,
                                      bayer_option_selected=self.job.bayer_option_selected,
