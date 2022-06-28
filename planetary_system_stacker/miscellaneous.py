@@ -1545,14 +1545,26 @@ class Miscellaneous(object):
         """
 
         # Compile all parameters and their values to be printed.
-        parameters = [["Debayering default", configuration.frames_debayering_default],
-                      ["Debayering method", configuration.frames_debayering_method],
-                      ["Noise level (add Gaussian blur)", str(configuration.frames_gauss_width)],
-                      ["Frame stabilization mode", configuration.align_frames_mode]]
+
+        if configuration.global_parameters_maximum_memory_active:
+            parameters = [["RAM limit set explicitly (GBytes)",
+                           str(configuration.global_parameters_maximum_memory_amount)]]
+        else:
+            parameters = [["RAM limit set explicitly", "False"]]
+            if configuration.global_parameters_buffering_level == -1:
+                parameters += [["Buffering level", "auto"]]
+            else:
+                parameters += [["Buffering level set explicitly",
+                                str(configuration.global_parameters_buffering_level)]]
+
+        parameters += [["Debayering default", configuration.frames_debayering_default],
+                       ["Debayering method", configuration.frames_debayering_method],
+                       ["Noise level (add Gaussian blur)", str(configuration.frames_gauss_width)],
+                       ["Frame stabilization mode", configuration.align_frames_mode]]
 
         # The following parameters are only active in "Surface" mode.
         if configuration.align_frames_mode == "Surface":
-            parameters = parameters + [
+            parameters += [
                 ["Automatic frame stabilization", str(configuration.align_frames_automation)],
                 ["Stabilization patch size (% of frame size)",
                  str(int(round(100. / configuration.align_frames_rectangle_scale_factor)))],
@@ -1560,45 +1572,42 @@ class Miscellaneous(object):
                  str(configuration.align_frames_search_width)]]
 
         # Continue with general parameters.
-        parameters = parameters + [["Percentage of best frames for reference frame computation",
-                                    str(configuration.align_frames_average_frame_percent)],
-                                   ["Object is changing fast (e.g. Jupiter, Sun)",
-                                    str(configuration.align_frames_fast_changing_object)],
-                                   ["Alignment box width (pixels)",
-                                    str(2 * configuration.alignment_points_half_box_width)],
-                                   ["Max. alignment search width (pixels)",
-                                    str(configuration.alignment_points_search_width)],
-                                   ["Minimum structure",
-                                    str(configuration.alignment_points_structure_threshold)],
-                                   ["Minimum brightness",
-                                    str(configuration.alignment_points_brightness_threshold)]
-                                   ]
+        parameters += [["Percentage of best frames for reference frame computation",
+                        str(configuration.align_frames_average_frame_percent)],
+                       ["Object is changing fast (e.g. Jupiter, Sun)",
+                        str(configuration.align_frames_fast_changing_object)],
+                       ["Alignment box width (pixels)",
+                        str(2 * configuration.alignment_points_half_box_width)],
+                       ["Max. alignment search width (pixels)",
+                        str(configuration.alignment_points_search_width)], ["Minimum structure",
+                                                                            str(configuration.alignment_points_structure_threshold)],
+                       ["Minimum brightness",
+                        str(configuration.alignment_points_brightness_threshold)]]
 
         # The stack size is defined either as frame number or percentage.
         if configuration.alignment_points_frame_percent > 0:
-            parameters = parameters + [["Percentage of best frames to be stacked",
-                                    str(configuration.alignment_points_frame_percent)],
-                                       ["Normalize frame brightness",
-                                        str(configuration.frames_normalization)]
-                                       ]
+            parameters += [["Percentage of best frames to be stacked",
+                            str(configuration.alignment_points_frame_percent)],
+                           ["Normalize frame brightness", str(configuration.frames_normalization)]]
         else:
-            parameters = parameters + [["Number of best frames to be stacked",
-                                        str(configuration.alignment_points_frame_number)],
-                                       ["Normalize frame brightness",
-                                        str(configuration.frames_normalization)]]
+            parameters += [["Number of best frames to be stacked",
+                            str(configuration.alignment_points_frame_number)],
+                           ["Normalize frame brightness", str(configuration.frames_normalization)]]
 
         # If brightness normalization is checked, add the black cut-off value.
         if configuration.frames_normalization:
-            parameters = parameters + [
+            parameters += [
                 ["Normalization black cut-off", str(configuration.frames_normalization_threshold)]]
 
         # If drizzling is active, add the factor.
         if configuration.stack_frames_drizzle_factor_string != "Off":
-            parameters = parameters + [
-                ["Drizzle factor in stacking", str(configuration.stack_frames_drizzle_factor_string)]]
+            parameters += [["Drizzle factor in stacking",
+                            str(configuration.stack_frames_drizzle_factor_string)]]
 
-        output_string = "\n           Stacking parameters:                                         | Value                        |\n" \
-                        "           ---------------------------------------------------------------------------------------------" \
+        output_string = "\n           Stacking parameters:                                       " \
+                        "  | Value                        |\n" \
+                        "           " \
+                        "---------------------------------------------------------------------------------------------" \
                         "\n          "
 
         # Extend the output string with a line for every parameter to be printed.

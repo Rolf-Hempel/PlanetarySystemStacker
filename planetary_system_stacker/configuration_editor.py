@@ -170,6 +170,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
         self.mr_lineEdit.setText(str(self.config_copy.global_parameters_maximum_memory_amount))
         self.mr_checkBox.setChecked(self.config_copy.global_parameters_maximum_memory_active)
+        self.make_mr_label_visible(self.config_copy.global_parameters_maximum_memory_active)
+        self.mr_label.setStyleSheet('color: red')
+        if not self.config_copy.global_parameters_maximum_memory_active:
+            self.mr_lineEdit.setEnabled(False)
 
         index = self.gpif_comboBox.findText(self.config_copy.global_parameters_image_format,
                                            QtCore.Qt.MatchFixedString)
@@ -312,34 +316,42 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         else:
             self.config_copy.global_parameters_buffering_level = int(value)
 
-    def mr_activate(self):
-        self.config_copy.global_parameters_maximum_memory_active = True
-        self.gpbl_combobox.setCurrentText('auto')  # With a fixed memory limit buffering is set to 'auto'
-        self.gpbl_combobox.setEnabled(False)
-        self.mr_lineEdit.setEnabled(True)
+    def mr_activate(self, state):
+        if state:
+            self.config_copy.global_parameters_maximum_memory_active = True
+            # With a fixed memory limit buffering is set to 'auto'
+            self.gpbl_combobox.setCurrentText('auto')
+            self.gpbl_combobox.setEnabled(False)
+            self.mr_lineEdit.setEnabled(True)
+        else:
+            self.config_copy.global_parameters_maximum_memory_active = False
+            self.config_copy.global_parameters_buffering_level = -1
+            self.gpbl_combobox.setEnabled(True)
+            self.mr_lineEdit.setEnabled(False)
 
-    def mr_deactivate(self):
-        self.config_copy.global_parameters_maximum_memory_active = False
-        self.gpbl_combobox.setEnabled(True)
-        self.mr_lineEdit.setEnabled(False)
+    def make_mr_label_visible(self, state):
+        if state:
+            text = "PlanetarySystemStacker takes no responsibility for enough memory being " \
+                   "available.\r\n" + "Setting the memory limit too high may cause degraded OS " \
+                                      "performance and/or process crashes."
+        else:
+            text = ""
+        self.mr_label.setText(text)
 
     def mr_changed(self, state):
         max_memory_active = (state == QtCore.Qt.Checked)
-        if max_memory_active:
-            if max_memory_active != self.config_copy.global_parameters_maximum_memory_active:  # Only dialog on change
-                warning = ExplicitMemoryWarning()
-                if warning.exec():
-                    self.mr_activate()
-                else:
-                    self.mr_checkBox.setCheckState(QtCore.Qt.Unchecked)  # Go back to unchecked if cancelled
-            else:
-                self.mr_activate()
-        else:
-            self.mr_deactivate()
+        self.mr_activate(max_memory_active)
+        self.make_mr_label_visible(max_memory_active)
 
     def mr_text_changed(self, state):
         try:
-            self.config_copy.global_parameters_maximum_memory_amount = int(state)
+            value = int(state)
+            if value > 0:
+                self.config_copy.global_parameters_maximum_memory_amount = value
+            else:
+                self.mr_lineEdit.setText(
+                    str(self.config_copy.global_parameters_maximum_memory_amount))
+                raise ValueError
         except ValueError:
             return
 
@@ -665,21 +677,3 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
 
         self.parent_gui.display_widget(None, display=False)
         self.close()
-
-
-class ExplicitMemoryWarning(QDialog):
-    def __init__(self):
-        super().__init__()
-
-        self.setWindowTitle("Memory limit warning")
-
-        self.buttonBox = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
-        self.buttonBox.accepted.connect(self.accept)
-        self.buttonBox.rejected.connect(self.reject)
-
-        self.layout = QVBoxLayout()
-        message = QLabel("PlanetarySystemStacker takes no responsibility for enough memory being available.\r\n"
-                         "Setting the memory limit too high may cause degraded OS performance and/or process crashes")
-        self.layout.addWidget(message)
-        self.layout.addWidget(self.buttonBox)
-        self.setLayout(self.layout)

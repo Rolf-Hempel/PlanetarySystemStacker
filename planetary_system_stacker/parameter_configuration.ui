@@ -295,19 +295,6 @@ rather than in a separate job</string>
          </property>
         </widget>
        </item>
-       <item row="12" column="4" colspan="3">
-        <spacer name="horizontalSpacer_3">
-         <property name="orientation">
-          <enum>Qt::Horizontal</enum>
-         </property>
-         <property name="sizeHint" stdset="0">
-          <size>
-           <width>160</width>
-           <height>20</height>
-          </size>
-         </property>
-        </spacer>
-       </item>
        <item row="1" column="7">
         <spacer name="horizontalSpacer_2">
          <property name="orientation">
@@ -321,10 +308,16 @@ rather than in a separate job</string>
          </property>
         </spacer>
        </item>
-       <item row="16" column="4" colspan="3">
+       <item row="12" column="4" rowspan="7" colspan="4">
         <widget class="QLabel" name="mr_label">
          <property name="text">
           <string/>
+         </property>
+         <property name="alignment">
+          <set>Qt::AlignLeading|Qt::AlignLeft|Qt::AlignTop</set>
+         </property>
+         <property name="wordWrap">
+          <bool>true</bool>
          </property>
         </widget>
        </item>
