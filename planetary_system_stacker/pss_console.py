@@ -11,6 +11,16 @@ from miscellaneous import Miscellaneous
 from workflow import Workflow
 
 # Definition of data types, including value bounds, used in command line argument parsing.
+def ram_size_type(x):
+    try:
+        x = int(x)
+    except:
+        raise ArgumentTypeError("Maximum RAM size must be an integer > 0")
+    if x < 1:
+        raise ArgumentTypeError("Maximum RAM size must be an integer > 0")
+    return x
+
+
 def noise_type(x):
     x = int(x)
     if not 0 <= x <= 11:
@@ -140,6 +150,8 @@ class PssConsole(QtCore.QObject):
                             help="Protocol detail level")
         parser.add_argument("-b", "--buffering_level", choices=["auto", "0", "1", "2", "3", "4"],
                             default="auto", help="Buffering level")
+        parser.add_argument("-r", "--ram_size", type=ram_size_type, default=-1,
+                            help="Maximum RAM for this job (GBytes)")
         parser.add_argument("--out_format", choices=["png", "tiff", "fits"], default="png",
                             help="Image format for output")
         parser.add_argument("--name_add_f", action="store_true",
@@ -211,10 +223,17 @@ class PssConsole(QtCore.QObject):
         # Modify the standard configuration as specified in the command line arguments.
         self.configuration.global_parameters_store_protocol_with_result = arguments.protocol
         self.configuration.global_parameters_protocol_level = arguments.protocol_detail
-        if arguments.buffering_level == "auto":
-            self.configuration.global_parameters_buffering_level = -1
+        if arguments.ram_size == -1:
+            self.configuration.global_parameters_maximum_memory_active = False
+            if arguments.buffering_level == "auto":
+                self.configuration.global_parameters_buffering_level = -1
+            else:
+                self.configuration.global_parameters_buffering_level = int(arguments.buffering_level)
         else:
-            self.configuration.global_parameters_buffering_level = int(arguments.buffering_level)
+            self.configuration.global_parameters_buffering_level = -1
+            self.configuration.global_parameters_maximum_memory_active = True
+            self.configuration.global_parameters_maximum_memory_amount = arguments.ram_size
+
         self.configuration.global_parameters_image_format = arguments.out_format
         self.configuration.global_parameters_parameters_in_filename = arguments.name_add_f or \
             arguments.name_add_p or arguments.name_add_apb or arguments.name_add_apn
@@ -449,6 +468,7 @@ class PssConsole(QtCore.QObject):
         print("Store protocol with results: " + str(arguments.protocol))
         print("Protocol detail level: " + str(arguments.protocol_detail))
         print("Buffering level: " + str(arguments.buffering_level))
+        print("Maximum RAM size: " + str(arguments.ram_size))
         print("Image format for output: " + arguments.out_format)
         print("Add number of stacked frames to output file name: " + str(arguments.name_add_f))
         print("Add percentage of stacked frames to output file name: " + str(arguments.name_add_p))
