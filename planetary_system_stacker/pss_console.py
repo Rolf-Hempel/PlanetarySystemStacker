@@ -310,6 +310,9 @@ class PssConsole(QtCore.QObject):
 
                 # Test if the path specifies a stacking job.
                 if job.type == 'video' or job.type == 'image':
+                    # Override the "Auto detect color" value of the "Job" object with the
+                    # command line value.
+                    job.bayer_option_selected = self.configuration.frames_debayering_default
                     self.jobs.append(job)
                 else:
                     if self.configuration.global_parameters_protocol_level > 0:
