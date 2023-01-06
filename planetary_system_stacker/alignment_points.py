@@ -29,7 +29,10 @@ import matplotlib.pyplot as plt
 from math import ceil
 from numpy import arange, amax, stack, amin, float32, uint8, zeros, sqrt, empty, int32, uint16
 from scipy import ndimage
-from skimage.registration import phase_cross_correlation
+try:
+    from skimage.registration import phase_cross_correlation
+except ImportError:
+    from skimage.feature import register_translation as phase_cross_correlation
 from cv2 import meanStdDev, GaussianBlur
 
 from align_frames import AlignFrames
