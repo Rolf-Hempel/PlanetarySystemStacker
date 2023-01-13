@@ -33,7 +33,7 @@ from exceptions import ArgumentError
 from miscellaneous import Miscellaneous
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.9.3"
+PSS_Version = "PlanetarySystemStacker 0.9.4"
 # PSS_Version = "PlanetarySystemStacker"
 
 
