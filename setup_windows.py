@@ -17,7 +17,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     ext_modules=None,
     install_requires=[
-        'numpy',
+        'numpy < 1.23.0',
         'matplotlib',
         'psutil',
         'PyQt5',
