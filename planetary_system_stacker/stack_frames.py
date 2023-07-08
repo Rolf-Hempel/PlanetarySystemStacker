@@ -30,8 +30,6 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize, INTER_CUBIC, INTER_LINEAR
-from numpy import int as np_int
-from numpy import ma as np_ma
 from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
     sqrt, uint16, clip, minimum, mean
 from skimage import img_as_uint, img_as_ubyte
@@ -294,7 +292,7 @@ class StackFrames(object):
         # Initialize the array for shift distribution statistics.
         self.shift_distribution = full((
             self.configuration.alignment_points_search_width *
-            self.configuration.drizzle_factor * 2,), 0, dtype=np_int)
+            self.configuration.drizzle_factor * 2,), 0, dtype=int)
         self.shift_failure_counter = 0
 
         # If multi-level correlation AP matching is selected, prepare frame-independent data
