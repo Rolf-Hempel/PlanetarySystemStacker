@@ -33,7 +33,7 @@ from exceptions import ArgumentError
 from miscellaneous import Miscellaneous
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.9.7"
+PSS_Version = "PlanetarySystemStacker 0.9.8"
 # PSS_Version = "PlanetarySystemStacker"
 
 
@@ -743,6 +743,9 @@ class Configuration(object):
         :param file_name: Optional configuration file name
         :return: ConfigParser object with configuration parameters
         """
+
+        # Initialize the ConfigParser object for parameters which the user can change.
+        self.config_parser_object = ConfigParser()
 
         if not file_name:
             file_name = self.config_filename
