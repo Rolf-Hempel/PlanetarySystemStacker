@@ -1,22 +1,22 @@
 # -*- mode: python -*-
 
-block_cipher = None
+from pathlib import Path
 
-# Integrate astropy as data directory instead of module:
-import astropy
-astropy_path, = astropy.__path__
+block_cipher = None
+s_dir = Path('/home/castor/shares/castor/src/PlanetarySystemStacker')
 
 a = Analysis(['planetary_system_stacker.py'],
-             pathex=['/home/rolf/Pycharm-Projects/PlanetarySystemStacker/planetary_system_stacker'],
+             pathex=[s_dir / 'planetary_system_stacker'],
              binaries=[],
-             datas=[('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/Documentation/Icon/PSS-Icon-64.jpg', '.' ),
-             ('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/Documentation/PlanetarySystemStacker_User-Guide.pdf', '.' ),
-             ('/home/rolf/Pycharm-Projects/PlanetarySystemStacker/planetary_system_stacker/Videos/*', 'Videos' ),
-             (astropy_path, 'astropy')],
-             hiddenimports=['pywt._extensions._cwt', 'scipy._lib.messagestream', 'shelve', 'csv'],  # The last two required by astropy
-             hookspath=[],
+             datas=[(s_dir / 'Documentation/Icon/PSS-Icon-64.jpg', '.' ),
+             (s_dir / 'Documentation/PlanetarySystemStacker_User-Guide.pdf', '.' ),
+             (s_dir / 'planetary_system_stacker/Videos/*', 'Videos' ),
+		],
+             hiddenimports=['pywt._extensions._cwt' ],
+             hookspath=[s_dir / 'planetary_system_stacker/Pyinstaller_hooks'],
              runtime_hooks=[],
-             excludes=['astropy'],
+	     excludes=[],
+             # excludes=['astropy'],
              win_no_prefer_redirects=False,
              win_private_assemblies=False,
              cipher=block_cipher)
