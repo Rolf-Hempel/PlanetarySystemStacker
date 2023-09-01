@@ -7,8 +7,6 @@ from pathlib import Path
 p_dir = Path(os.getenv('CONDA_PREFIX', 'C:\Python39'))
 s_dir = Path('D:\\SW-Development\\Python\\PlanetarySystemStacker')
 
-print(s_dir,s_dir / 'planetary_system_stacker\Binaries\Api-ms-win-core-xstate-l2-1-0.dll')
-
 a = Analysis(['planetary_system_stacker.py'],
              pathex=[s_dir / 'planetary_system_stacker'],
              binaries=[
