@@ -31,4 +31,13 @@ The way to start the program depends on how it was installed:
 * If PSS was installed with PIP, it can be started from the command line by entering "PlanetarySystemStacker".
 * The program can be started in the Python 3 interpreter by executing the main program in the module "planetary_system_stacker.py" .
 
+Run from source on OSX
+* brew install cmake
+* git clone this repo
+* cd into project dir
+* create python env: `python -m myenv`. this creates the folder myenv
+* activate env: `source myenv/bin/activate`
+* pip install -e .
+* python planetary_system_stacker/planetary_system_stacker.py
+
 A [discussion platform](https://www.astronomie.de/PSS/GermanBoard/) for all issues concerning this software project has been created in the context of the German amateur astronomy forum [Astronomie.de](https://www.astronomie.de/). Currently, this forum is in German language only, but an English branch is in preparation. Additionally, an extensive discussion on the subject can be found on the [Cloudy Nights forum](https://www.cloudynights.com/topic/645890-new-stacking-software-project-planetarysystemstacker/).

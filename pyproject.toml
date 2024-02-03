@@ -1,0 +1,38 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "planetary-system-stacker"
+version = "0.9.8"
+description = "PlanetarySystemStacker"
+authors = [{name = "Rolf Hempel", email = "rolf6419@gmx.de"}]
+readme = "README.md"
+license = {text = "GNU General Public License v3 (GPLv3)"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux"
+]
+urls = {Homepage = "https://github.com/Rolf-Hempel/PlanetarySystemStacker"}
+
+dependencies = [
+    'numpy',
+    'matplotlib',
+    'psutil',
+    'PyQt5' ,
+    'scipy',
+    'astropy',
+    'scikit-image',
+    'opencv-python; platform_system == "Windows"',
+    'opencv-python-headless; platform_system == "Darwin" or platform_system == "Linux"'
+]
+
+#requires-python = ">=3.5, <3.7"
+
+[project.scripts]
+PlanetarySystemStacker = "planetary_system_stacker.planetary_system_stacker:main"
+
