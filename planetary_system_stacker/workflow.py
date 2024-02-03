@@ -852,6 +852,7 @@ class Workflow(QtCore.QObject):
 
         # If postprocessing is included after stacking, set the stacked image as input.
         if self.configuration.global_parameters_include_postprocessing:
+            Miscellaneous.protocol("+++ Set the image stack as input for postprocessing +++", self.attached_log_file)
             self.postproc_input_image = self.stack_frames.stacked_image
             self.postproc_input_name = self.stacked_image_name
             self.postprocessed_image_name = PostprocDataObject.set_file_name_processed(

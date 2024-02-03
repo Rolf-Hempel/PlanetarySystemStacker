@@ -124,6 +124,9 @@ class PssConsole(QtCore.QObject):
     signal_compute_frame_qualities = QtCore.pyqtSignal()
     signal_stack_frames = QtCore.pyqtSignal()
     signal_save_stacked_image = QtCore.pyqtSignal()
+    signal_postprocess_image = QtCore.pyqtSignal()
+    signal_save_postprocessed_image = QtCore.pyqtSignal(object)
+
 
     def __init__(self, parent=None):
         super(PssConsole, self).__init__(parent)
@@ -207,6 +210,8 @@ class PssConsole(QtCore.QObject):
         parser.add_argument("--drizzle", choices=["Off", "1.5x", "2x", "3x"], default="Off",
                             help="Drizzle factor (Off, 1.5x, 2x, 3x)")
 
+        parser.add_argument("--config_file", type=str, help="Path to the .pss configuration file. The config is loaded, no other cli arguments are picked up. When a config file is set, postprocessing is also queued.")
+
         arguments = parser.parse_args()
         # self.print_arguments(arguments)
 
@@ -214,61 +219,66 @@ class PssConsole(QtCore.QObject):
         # in the user's home directory is ignored in this case. Modifications to standard values
         # come as command line arguments.
         self.configuration = Configuration()
-        self.configuration.initialize_configuration(read_from_file=False)
 
-        # In the standard configuration postprocessing is included in the workflow. This does not
-        # make sense in command line mode.
-        self.configuration.global_parameters_include_postprocessing = False
+        if( arguments.config_file is not None ):
+            self.configuration.read_config(arguments.config_file)
 
-        # Modify the standard configuration as specified in the command line arguments.
-        self.configuration.global_parameters_store_protocol_with_result = arguments.protocol
-        self.configuration.global_parameters_protocol_level = arguments.protocol_detail
-        if arguments.ram_size == -1:
-            self.configuration.global_parameters_maximum_memory_active = False
-            if arguments.buffering_level == "auto":
-                self.configuration.global_parameters_buffering_level = -1
-            else:
-                self.configuration.global_parameters_buffering_level = int(arguments.buffering_level)
         else:
-            self.configuration.global_parameters_buffering_level = -1
-            self.configuration.global_parameters_maximum_memory_active = True
-            self.configuration.global_parameters_maximum_memory_amount = arguments.ram_size
+            self.configuration.initialize_configuration(read_from_file=False)
 
-        self.configuration.global_parameters_image_format = arguments.out_format
-        self.configuration.global_parameters_parameters_in_filename = arguments.name_add_f or \
-            arguments.name_add_p or arguments.name_add_apb or arguments.name_add_apn
-        self.configuration.global_parameters_stack_number_frames = arguments.name_add_f
-        self.configuration.global_parameters_stack_percent_frames = arguments.name_add_p
-        self.configuration.global_parameters_ap_box_size = arguments.name_add_apb
-        self.configuration.global_parameters_ap_number = arguments.name_add_apn
+            # In the standard configuration postprocessing is included in the workflow. This does not
+            # make sense in command line mode.
+            self.configuration.global_parameters_include_postprocessing = False
 
-        self.configuration.frames_debayering_default = arguments.debayering
-        self.configuration.frames_debayering_method = arguments.debayer_method
-        self.configuration.frames_gauss_width = arguments.noise
+            # Modify the standard configuration as specified in the command line arguments.
+            self.configuration.global_parameters_store_protocol_with_result = arguments.protocol
+            self.configuration.global_parameters_protocol_level = arguments.protocol_detail
+            if arguments.ram_size == -1:
+                self.configuration.global_parameters_maximum_memory_active = False
+                if arguments.buffering_level == "auto":
+                    self.configuration.global_parameters_buffering_level = -1
+                else:
+                    self.configuration.global_parameters_buffering_level = int(arguments.buffering_level)
+            else:
+                self.configuration.global_parameters_buffering_level = -1
+                self.configuration.global_parameters_maximum_memory_active = True
+                self.configuration.global_parameters_maximum_memory_amount = arguments.ram_size
 
-        self.configuration.align_frames_mode = arguments.stab_mode
-        self.configuration.align_frames_rectangle_scale_factor = 100. / arguments.stab_size
-        self.configuration.align_frames_search_width = arguments.stab_sw
-        self.configuration.align_frames_average_frame_percent = arguments.rf_percent
-        self.configuration.align_frames_fast_changing_object = arguments.fast_changing_object
+            self.configuration.global_parameters_image_format = arguments.out_format
+            self.configuration.global_parameters_parameters_in_filename = arguments.name_add_f or \
+                arguments.name_add_p or arguments.name_add_apb or arguments.name_add_apn
+            self.configuration.global_parameters_stack_number_frames = arguments.name_add_f
+            self.configuration.global_parameters_stack_percent_frames = arguments.name_add_p
+            self.configuration.global_parameters_ap_box_size = arguments.name_add_apb
+            self.configuration.global_parameters_ap_number = arguments.name_add_apn
 
-        self.configuration.alignment_points_half_box_width = int(
-            round(arguments.align_box_width / 2))
-        self.configuration.alignment_points_search_width = arguments.align_search_width
-        self.configuration.alignment_points_structure_threshold = arguments.align_min_struct
-        self.configuration.alignment_points_brightness_threshold = arguments.align_min_bright
+            self.configuration.frames_debayering_default = arguments.debayering
+            self.configuration.frames_debayering_method = arguments.debayer_method
+            self.configuration.frames_gauss_width = arguments.noise
 
-        self.configuration.alignment_points_frame_percent = arguments.stack_percent
-        self.configuration.alignment_points_frame_number = -1
+            self.configuration.align_frames_mode = arguments.stab_mode
+            self.configuration.align_frames_rectangle_scale_factor = 100. / arguments.stab_size
+            self.configuration.align_frames_search_width = arguments.stab_sw
+            self.configuration.align_frames_average_frame_percent = arguments.rf_percent
+            self.configuration.align_frames_fast_changing_object = arguments.fast_changing_object
 
-        # If the number of frames to be stacked is given, it has precedence over the percentage.
-        if arguments.stack_number is not None:
-            self.configuration.alignment_points_frame_number = arguments.stack_number
-            self.configuration.alignment_points_frame_percent = -1
+            self.configuration.alignment_points_half_box_width = int(
+                round(arguments.align_box_width / 2))
+            self.configuration.alignment_points_search_width = arguments.align_search_width
+            self.configuration.alignment_points_structure_threshold = arguments.align_min_struct
+            self.configuration.alignment_points_brightness_threshold = arguments.align_min_bright
 
-        self.configuration.frames_normalization = arguments.normalize_bright
-        self.configuration.frames_normalization_threshold = arguments.normalize_bco
-        self.configuration.stack_frames_drizzle_factor_string = arguments.drizzle
+            self.configuration.alignment_points_frame_percent = arguments.stack_percent
+            self.configuration.alignment_points_frame_number = -1
+
+            # If the number of frames to be stacked is given, it has precedence over the percentage.
+            if arguments.stack_number is not None:
+                self.configuration.alignment_points_frame_number = arguments.stack_number
+                self.configuration.alignment_points_frame_percent = -1
+
+            self.configuration.frames_normalization = arguments.normalize_bright
+            self.configuration.frames_normalization_threshold = arguments.normalize_bco
+            self.configuration.stack_frames_drizzle_factor_string = arguments.drizzle
 
         # Re-compute derived parameters after the configuration was changed.
         self.configuration.set_derived_parameters()
@@ -298,6 +308,10 @@ class PssConsole(QtCore.QObject):
             self.workflow.execute_compute_frame_qualities)
         self.signal_stack_frames.connect(self.workflow.execute_stack_frames)
         self.signal_save_stacked_image.connect(self.workflow.execute_save_stacked_image)
+
+        if( arguments.config_file is not None ):
+            self.signal_postprocess_image.connect(self.workflow.execute_postprocess_image)
+            self.signal_save_postprocessed_image.connect(self.workflow.execute_save_postprocessed_image)
 
         # Set "automatic" to True. There is no interactive mode in this case.
         self.automatic = True
@@ -449,6 +463,12 @@ class PssConsole(QtCore.QObject):
 
         elif self.activity == "Save stacked image":
             self.signal_save_stacked_image.emit()
+
+        elif self.activity == "Postprocessing":
+            self.signal_postprocess_image.emit()
+
+        elif self.activity == "Save postprocessed image":
+            self.signal_save_postprocessed_image.emit(self.workflow.postprocessed_image)
 
         elif self.activity == "Next job":
             self.job_index += 1
