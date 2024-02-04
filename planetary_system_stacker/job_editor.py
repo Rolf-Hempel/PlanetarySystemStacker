@@ -29,7 +29,7 @@ from exceptions import InternalError
 from job_dialog import Ui_JobDialog
 
 # The following lists define the allowed file extensions for still images and videos.
-image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
+image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.jpeg', '.png']
 video_extensions = ['.avi', '.mov', '.mp4', '.ser']
 extensions = image_extensions + video_extensions
 
