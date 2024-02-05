@@ -30,7 +30,7 @@ from job_dialog import Ui_JobDialog
 
 # The following lists define the allowed file extensions for still images and videos.
 image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.jpeg', '.png']
-video_extensions = ['.avi', '.mov', '.mp4', '.ser']
+video_extensions = ['.avi', '.mov', '.mp4', '.ser', '.m4v']
 extensions = image_extensions + video_extensions
 
 
@@ -254,10 +254,10 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
         self.file_dialog = FileDialog(self, message,
                                       self.configuration.hidden_parameters_current_dir,
-                                      "Videos (*.avi *.mov *.mp4 *.ser)", options=options)
-        self.file_dialog.setNameFilters(["Still image folders / video files for stacking (*.avi *.mov *.mp4 *.ser)",
+                                      "Videos (*.avi *.mov *.mp4 *.ser *.m4v)", options=options)
+        self.file_dialog.setNameFilters(["Still image folders / video files for stacking (*.avi *.mov *.mp4 *.ser *.m4v)",
                                          "Images for postprocessing (*.tiff *.tif *.fit *.fits *.png *.jpg)"])
-        self.file_dialog.selectNameFilter("Still image folders / video files for stacking (*.avi *.mov *.mp4 *.ser)")
+        self.file_dialog.selectNameFilter("Still image folders / video files for stacking (*.avi *.mov *.mp4 *.ser *.m4v)")
 
         # The list of strings with the new job names is sent by the FileDialog via the signal.
         self.file_dialog.signal_dialog_ready.connect(self.get_input_names)
