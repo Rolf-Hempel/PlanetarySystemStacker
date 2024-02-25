@@ -2,8 +2,8 @@
 
 from sys import argv
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import Qt
 
 from list_view_widget import Ui_ListViewWidget
 

@@ -39,7 +39,7 @@ import matplotlib
 matplotlib.use('Agg')
 import numpy as np
 import psutil
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtWidgets, QtCore, QtGui
 from numpy import uint8, uint16
 import scipy
 import astropy
@@ -64,7 +64,6 @@ from shift_distribution_viewer import ShiftDistributionViewerWidget
 from workflow import Workflow
 from pss_console import PssConsole
 
-QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
 os.environ["QT_AUTO_SCREEN_SCALE_FACTOR"] = "1"
 
 
@@ -452,10 +451,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
-        options = QtWidgets.QFileDialog.Options()
         filename = QtWidgets.QFileDialog.getOpenFileName(self, "Load configuration file",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "*.pss", options=options)
+                                                 "*.pss")
         file_name = filename[0]
 
         # If a valid file was selected, read parameters from the file and open the configuration
@@ -482,11 +480,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         """
 
         # Open the file chooser.
-        options = QtWidgets.QFileDialog.Options()
         filename = QtWidgets.QFileDialog.getSaveFileName(self, "Save configuration file",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Config file (*.pss)",
-                                                 options=options)
+                                                 "Config file (*.pss)")
 
         # Store file only if the chooser did not return with a cancel.
         file_name = filename[0]
@@ -534,19 +530,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
-        options = QtWidgets.QFileDialog.Options()
         message = "Select a video file / a folder with image files for computing a master dark" \
                   " frame"
 
         file_dialog = FileDialog(self, message,
                                  self.configuration.hidden_parameters_current_dir,
-                                 "Videos (*.avi *.mov *.mp4 *.ser)", options=options)
+                                 "Videos (*.avi *.mov *.mp4 *.ser)")
         file_dialog.setNameFilters(["Still image folder / video file (*.avi *.mov *.mp4 *.ser)"])
 
         # The list of strings (length 1) with the path name to the dark frames is sent by the
         # FileDialog via the signal "signal_dialog_ready".
         file_dialog.signal_dialog_ready.connect(self.workflow.execute_create_master_dark)
-        file_dialog.exec_()
+        file_dialog.exec()
 
     @QtCore.pyqtSlot(bool)
     def master_dark_created(self, success):
@@ -560,12 +555,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         """
 
         if success:
-            options = QtWidgets.QFileDialog.Options()
             master_dark_file = QtWidgets.QFileDialog.getSaveFileName(self,
                                                  "Choose a file name for the new master dark frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*png *.tiff *.fits)",
-                                                 options=options)
+                                                 "Images (*png *.tiff *.fits)")
 
             if master_dark_file[0]:
                 Frames.save_image(master_dark_file[0],
@@ -593,11 +586,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
-        options = QtWidgets.QFileDialog.Options()
         master_dark_file = QtWidgets.QFileDialog.getOpenFileName(self,
                                                  "Select image file containing a master dark frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*png *.tiff *.fits)", options=options)
+                                                 "Images (*png *.tiff *.fits)")
 
         if master_dark_file[0]:
             self.signal_load_master_dark.emit(master_dark_file[0])
@@ -617,19 +609,18 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
-        options = QtWidgets.QFileDialog.Options()
         message = "Select a video file / a folder with image files for computing a master flat" \
                   " frame"
 
         file_dialog = FileDialog(self, message,
                                  self.configuration.hidden_parameters_current_dir,
-                                 "Videos (*.avi *.mov *.mp4 *.ser)", options=options)
+                                 "Videos (*.avi *.mov *.mp4 *.ser)")
         file_dialog.setNameFilters(["Still image folder / video file (*.avi *.mov *.mp4 *.ser)"])
 
         # The list of strings (length 1) with the path name to the flat frames is sent by the
         # FileDialog via the signal "signal_dialog_ready".
         file_dialog.signal_dialog_ready.connect(self.workflow.execute_create_master_flat)
-        file_dialog.exec_()
+        file_dialog.exec()
 
     @QtCore.pyqtSlot(bool)
     def master_flat_created(self, success):
@@ -643,12 +634,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         """
 
         if success:
-            options = QtWidgets.QFileDialog.Options()
             master_flat_file = QtWidgets.QFileDialog.getSaveFileName(self,
                                                  "Choose a file name for the new master flat frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*png *.tiff *.fits)",
-                                                 options=options)
+                                                 "Images (*png *.tiff *.fits)")
 
             if master_flat_file[0]:
                 Frames.save_image(master_flat_file[0],
@@ -676,11 +665,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
-        options = QtWidgets.QFileDialog.Options()
         master_flat_file = QtWidgets.QFileDialog.getOpenFileName(self,
                                                  "Select image file containing a master dark frame",
                                                  self.configuration.hidden_parameters_current_dir,
-                                                 "Images (*png *.tiff *.fits)", options=options)
+                                                 "Images (*png *.tiff *.fits)")
 
         if master_flat_file[0]:
             self.signal_load_master_flat.emit(master_flat_file[0])
@@ -1046,11 +1034,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         if not self.automatic:
             msg = QtWidgets.QMessageBox()
             msg.setText(message)
-            msg.setIcon(QtWidgets.QMessageBox.Critical)
+            msg.setIcon(QtWidgets.QMessageBox.Icon.Critical)
             msg.setWindowTitle(self.configuration.global_parameters_version)
             msg.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
-            msg.setStandardButtons(QtWidgets.QMessageBox.Ok)
-            msg.exec_()
+            msg.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
+            msg.exec()
 
         if self.configuration.global_parameters_protocol_level > 0:
             Miscellaneous.protocol(message + "\n", self.workflow.attached_log_file,)
@@ -1074,10 +1062,9 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         :return: -
         """
 
-        options = QtWidgets.QFileDialog.Options()
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
             "Save result as 16bit Png, Tiff or Fits image", self.workflow.stacked_image_name,
-            "Image Files (*png *.tiff *.fits)", options=options)
+            "Image Files (*png *.tiff *.fits)")
 
         if filename and extension:
             Frames.save_image(filename, self.workflow.stack_frames.stacked_image,
@@ -1406,10 +1393,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         quit_msg = "Are you sure you want to exit?"
         reply = QtWidgets.QMessageBox.question(self, self.configuration.global_parameters_version,
                                                quit_msg,
-                                               QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                                               QtWidgets.QMessageBox.No)
+                                               QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                                               QtWidgets.QMessageBox.StandardButton.No)
         # Positive reply: Do it.
-        if reply == QtWidgets.QMessageBox.Yes:
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
             if event:
                 event.accept()
 
@@ -1418,7 +1405,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 self.workflow.attached_log_file.close()
 
             # Store the geometry of main window, so it is placed the same at next program start.
-            if self.windowState() == QtCore.Qt.WindowMaximized:
+            if self.windowState() == QtCore.Qt.WindowState.WindowMaximized:
                 self.configuration.hidden_parameters_main_window_maximized = True
             else:
                 (x0, y0, width, height) = self.geometry().getRect()
@@ -1458,13 +1445,13 @@ def main():
         # app.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling)
         myapp = PlanetarySystemStacker()
         myapp.show()
-        exit(app.exec_())
+        exit(app.exec())
 
     # If command line arguments are passed, execute PSS without a GUI.
     else:
         app = QtCore.QCoreApplication(argv)
         PssConsole()
-        exit(app.exec_())
+        exit(app.exec())
 
 if __name__ == "__main__":
     main()

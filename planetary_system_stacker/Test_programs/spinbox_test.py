@@ -1,8 +1,8 @@
 from sys import argv
 from time import sleep
 
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QApplication, QMainWindow, QProxyStyle, QStyle
+from PyQt6 import QtWidgets, QtCore
+from PyQt6.QtWidgets import QApplication, QMainWindow, QProxyStyle, QStyle
 
 class CustomStyle(QProxyStyle):
     def styleHint(self, hint, option=None, widget=None, returnData=None):

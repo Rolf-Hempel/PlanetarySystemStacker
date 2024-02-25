@@ -3,8 +3,8 @@
 from sys import argv
 from urllib import request
 
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt6 import QtWidgets
+from PyQt6.QtCore import Qt
 
 from gui_with_label import Ui_Form
 
