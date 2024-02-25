@@ -6,7 +6,7 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 class Ui_ListViewWidget(object):
     def setupUi(self, ListViewWidget):
@@ -35,4 +35,3 @@ class Ui_ListViewWidget(object):
         ListViewWidget.setWindowTitle(_translate("ListViewWidget", "Frame"))
         self.addButton.setText(_translate("ListViewWidget", "+"))
         self.removeButton.setText(_translate("ListViewWidget", "-"))
-

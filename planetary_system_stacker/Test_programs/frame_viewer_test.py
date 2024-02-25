@@ -1,6 +1,6 @@
 from sys import argv
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 from cv2 import NORM_MINMAX, normalize, cvtColor, COLOR_GRAY2RGB, circle, line
 from numpy import uint8, uint16
 

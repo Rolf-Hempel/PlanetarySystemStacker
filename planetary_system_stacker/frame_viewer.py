@@ -33,7 +33,7 @@ import matplotlib
 
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 from cv2 import NORM_MINMAX, normalize, cvtColor, COLOR_GRAY2RGB, circle, line
 from matplotlib import patches
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as Canvas
@@ -219,13 +219,13 @@ class FrameViewer(QtWidgets.QGraphicsView):
 
         self.viewrect = self.viewport().rect()
 
-        self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setResizeAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
-        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
-        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarAlwaysOff)
+        self.setTransformationAnchor(QtWidgets.QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QtWidgets.QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(30, 30, 30)))
-        self.setFrameShape(QtWidgets.QFrame.NoFrame)
-        self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
+        self.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
         self.drag_mode = True
 
         # Set the focus on the viewer.
@@ -338,11 +338,11 @@ class FrameViewer(QtWidgets.QGraphicsView):
         # The image is monochrome:
         if len(image_uint8.shape) == 2:
             qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
-                                    QtGui.QImage.Format_Grayscale8)
+                                    QtGui.QImage.Format.Format_Grayscale8)
         # The image is RGB color.
         else:
             qt_image = QtGui.QImage(image_uint8, self.shape_x,
-                                    self.shape_y, 3 * self.shape_x, QtGui.QImage.Format_RGB888)
+                                    self.shape_y, 3 * self.shape_x, QtGui.QImage.Format.Format_RGB888)
         pixmap = QtGui.QPixmap(qt_image)
 
         if pixmap and not pixmap.isNull():
@@ -431,14 +431,14 @@ class FrameViewer(QtWidgets.QGraphicsView):
         """
 
         # If the "+" key is pressed, zoom in. If "-" is pressed, zoom out.
-        if event.key() == QtCore.Qt.Key_Control:
-            self.setDragMode(QtWidgets.QGraphicsView.NoDrag)
+        if event.key() == QtCore.Qt.Key.Key_Control:
+            self.setDragMode(QtWidgets.QGraphicsView.DragMode.NoDrag)
             self.drag_mode = False
-        elif event.key() == QtCore.Qt.Key_Plus and not event.modifiers() & QtCore.Qt.ControlModifier:
+        elif event.key() == QtCore.Qt.Key.Key_Plus and not event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             self.zoom(1)
-        elif event.key() == QtCore.Qt.Key_Minus and not event.modifiers() & QtCore.Qt.ControlModifier:
+        elif event.key() == QtCore.Qt.Key.Key_Minus and not event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             self.zoom(-1)
-        elif event.key() == QtCore.Qt.Key_1 and not event.modifiers() & QtCore.Qt.ControlModifier:
+        elif event.key() == QtCore.Qt.Key.Key_1 and not event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             self.set_original_scale()
         else:
             super(FrameViewer, self).keyPressEvent(event)
@@ -446,8 +446,8 @@ class FrameViewer(QtWidgets.QGraphicsView):
     def keyReleaseEvent(self, event):
         # If the control key is released, switch back to "drag mode".
         # Use default handling for other keys.
-        if event.key() == QtCore.Qt.Key_Control:
-            self.setDragMode(QtWidgets.QGraphicsView.ScrollHandDrag)
+        if event.key() == QtCore.Qt.Key.Key_Control:
+            self.setDragMode(QtWidgets.QGraphicsView.DragMode.ScrollHandDrag)
             self.drag_mode = True
         else:
             super(FrameViewer, self).keyReleaseEvent(event)
