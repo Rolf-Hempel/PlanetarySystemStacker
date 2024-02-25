@@ -29,8 +29,8 @@ from glob import glob
 from sys import argv, exit
 from time import sleep
 
-from PyQt5 import QtCore, QtGui, QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import Qt
 
 from configuration import Configuration
 from exceptions import Error

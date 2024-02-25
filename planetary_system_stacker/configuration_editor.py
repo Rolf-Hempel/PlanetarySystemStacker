@@ -20,9 +20,9 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtGui import QIntValidator
-from PyQt5.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QLabel
+from PyQt6 import QtWidgets, QtCore
+from PyQt6.QtGui import QIntValidator
+from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QVBoxLayout, QLabel
 
 from configuration import ConfigurationParameters
 from parameter_configuration import Ui_ConfigurationDialog
@@ -38,8 +38,8 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         QtWidgets.QFrame.__init__(self, parent)
         self.setupUi(self)
 
-        self.setFrameShape(QtWidgets.QFrame.Panel)
-        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.setFrameShape(QtWidgets.QFrame.Shape.Panel)
+        self.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         self.setObjectName("configuration_editor")
 
         self.setFixedSize(900, 600)
@@ -69,16 +69,16 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fdb_comboBox.addItem('Force Bayer GRBG')
         self.fdb_comboBox.addItem('Force Bayer GBRG')
         self.fdb_comboBox.addItem('Force Bayer BGGR')
-        self.fdb_comboBox.activated[str].connect(self.fdb_changed)
+        self.fdb_comboBox.textActivated.connect(self.fdb_changed)
         self.fdbm_comboBox.addItem('Bilinear')
         self.fdbm_comboBox.addItem('Variable Number of Gradients')
         self.fdbm_comboBox.addItem('Edge Aware')
-        self.fdbm_comboBox.activated[str].connect(self.fdbm_changed)
+        self.fdbm_comboBox.textActivated.connect(self.fdbm_changed)
         self.fn_checkBox.stateChanged.connect(self.fn_changed)
         self.fnt_slider_value.valueChanged['int'].connect(self.fnt_changed)
         self.afm_comboBox.addItem('Surface')
         self.afm_comboBox.addItem('Planet')
-        self.afm_comboBox.activated[str].connect(self.afm_changed)
+        self.afm_comboBox.textActivated.connect(self.afm_changed)
         self.afa_checkBox.stateChanged.connect(self.afa_changed)
         self.afrsf_slider_value.valueChanged['int'].connect(self.afrsf_changed)
         self.afsw_slider_value.valueChanged['int'].connect(self.afsw_changed)
@@ -94,21 +94,21 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.gpbl_combobox.addItem('2')
         self.gpbl_combobox.addItem('3')
         self.gpbl_combobox.addItem('4')
-        self.gpbl_combobox.activated[str].connect(self.gpbl_changed)
+        self.gpbl_combobox.textActivated.connect(self.gpbl_changed)
         self.mr_checkBox.stateChanged.connect(self.mr_changed)
         self.mr_lineEdit.setValidator(QIntValidator(1, 2147483647))
         self.mr_lineEdit.textChanged.connect(self.mr_text_changed)
         self.gpif_comboBox.addItem('png')
         self.gpif_comboBox.addItem('tiff')
         self.gpif_comboBox.addItem('fits')
-        self.gpif_comboBox.activated[str].connect(self.gpif_changed)
+        self.gpif_comboBox.textActivated.connect(self.gpif_changed)
         self.aphbw_slider_value.valueChanged['int'].connect(self.aphbw_changed)
         self.apsw_slider_value.valueChanged['int'].connect(self.apsw_changed)
         self.apst_slider_value.valueChanged['int'].connect(self.apst_changed)
         self.apbt_slider_value.valueChanged['int'].connect(self.apbt_changed)
         self.apfp_comboBox.addItem('Percent of frames to be stacked')
         self.apfp_comboBox.addItem('Number of frames to be stacked')
-        self.apfp_comboBox.activated[str].connect(self.apfp_state_changed)
+        self.apfp_comboBox.textActivated.connect(self.apfp_state_changed)
         self.apfp_spinBox.valueChanged['int'].connect(self.apfp_value_changed)
         self.spp_checkBox.stateChanged.connect(self.spp_changed)
         self.ipfn_checkBox.stateChanged.connect(self.ipfn_changed)
@@ -120,7 +120,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.sfdfs_comboBox.addItem('1.5x')
         self.sfdfs_comboBox.addItem('2x')
         self.sfdfs_comboBox.addItem('3x')
-        self.sfdfs_comboBox.activated[str].connect(self.sfdfs_changed)
+        self.sfdfs_comboBox.textActivated.connect(self.sfdfs_changed)
 
         self.restore_standard_values.clicked.connect(self.restore_standard_parameters)
 
@@ -136,15 +136,15 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fgw_slider_value.setValue(int((self.config_copy.frames_gauss_width + 1) / 2))
         self.fgw_label_display.setText(str(self.config_copy.frames_gauss_width))
         index = self.fdb_comboBox.findText(self.config_copy.frames_debayering_default,
-                                           QtCore.Qt.MatchFixedString)
+                                           QtCore.Qt.MatchFlag.MatchFixedString)
         if index >= 0:
             self.fdb_comboBox.setCurrentIndex(index)
         index = self.fdbm_comboBox.findText(self.config_copy.frames_debayering_method,
-                                            QtCore.Qt.MatchFixedString)
+                                            QtCore.Qt.MatchFlag.MatchFixedString)
         if index >= 0:
             self.fdbm_comboBox.setCurrentIndex(index)
         index = self.afm_comboBox.findText(self.config_copy.align_frames_mode,
-                                           QtCore.Qt.MatchFixedString)
+                                           QtCore.Qt.MatchFlag.MatchFixedString)
         if index >= 0:
             self.afm_comboBox.setCurrentIndex(index)
         self.afm_activate_deactivate_widgets()
@@ -176,7 +176,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.mr_lineEdit.setEnabled(False)
 
         index = self.gpif_comboBox.findText(self.config_copy.global_parameters_image_format,
-                                           QtCore.Qt.MatchFixedString)
+                                           QtCore.Qt.MatchFlag.MatchFixedString)
         if index >= 0:
             self.gpif_comboBox.setCurrentIndex(index)
         self.ipfn_checkBox.setChecked(self.config_copy.global_parameters_parameters_in_filename)
@@ -208,7 +208,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fnt_label_display.setText(str(self.config_copy.frames_normalization_threshold))
         self.ipfn_activate_deactivate_widgets()
         index = self.sfdfs_comboBox.findText(self.config_copy.stack_frames_drizzle_factor_string,
-                                           QtCore.Qt.MatchFixedString)
+                                           QtCore.Qt.MatchFlag.MatchFixedString)
         if index >= 0:
             self.sfdfs_comboBox.setCurrentIndex(index)
 
@@ -284,7 +284,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.nap_checkBox.setEnabled(False)
 
     def afa_changed(self, state):
-        self.config_copy.align_frames_automation = (state == QtCore.Qt.Checked)
+        self.config_copy.align_frames_automation = (state == QtCore.Qt.CheckState.Checked)
 
     def afrsf_changed(self, value):
         self.config_copy.align_frames_rectangle_scale_factor = 100. / value
@@ -296,16 +296,16 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.config_copy.align_frames_average_frame_percent = value
 
     def efs_changed(self, state):
-        self.config_copy.frames_add_selection_dialog = (state == QtCore.Qt.Checked)
+        self.config_copy.frames_add_selection_dialog = (state == QtCore.Qt.CheckState.Checked)
 
     def fco_changed(self, state):
-        self.config_copy.align_frames_fast_changing_object = (state == QtCore.Qt.Checked)
+        self.config_copy.align_frames_fast_changing_object = (state == QtCore.Qt.CheckState.Checked)
 
     def gpwptf_changed(self, state):
-        self.config_copy.global_parameters_write_protocol_to_file = (state == QtCore.Qt.Checked)
+        self.config_copy.global_parameters_write_protocol_to_file = (state == QtCore.Qt.CheckState.Checked)
 
     def gpspwr_changed(self, state):
-        self.config_copy.global_parameters_store_protocol_with_result = (state == QtCore.Qt.Checked)
+        self.config_copy.global_parameters_store_protocol_with_result = (state == QtCore.Qt.CheckState.Checked)
 
     def gppl_changed(self, value):
         self.config_copy.global_parameters_protocol_level = value
@@ -339,7 +339,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.mr_label.setText(text)
 
     def mr_changed(self, state):
-        max_memory_active = (state == QtCore.Qt.Checked)
+        max_memory_active = (state == QtCore.Qt.CheckState.Checked)
         self.mr_activate(max_memory_active)
         self.make_mr_label_visible(max_memory_active)
 
@@ -396,10 +396,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.config_copy.alignment_points_frame_number = value
 
     def spp_changed(self, state):
-        self.config_copy.global_parameters_include_postprocessing = (state == QtCore.Qt.Checked)
+        self.config_copy.global_parameters_include_postprocessing = (state == QtCore.Qt.CheckState.Checked)
 
     def fn_changed(self, state):
-        self.config_copy.frames_normalization = (state == QtCore.Qt.Checked)
+        self.config_copy.frames_normalization = (state == QtCore.Qt.CheckState.Checked)
         self.fn_activate_deactivate_widgets()
 
     def fnt_changed(self, value):
@@ -407,20 +407,20 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fnt_label_display.setText(str(self.config_copy.frames_normalization_threshold))
 
     def ipfn_changed(self, state):
-        self.config_copy.global_parameters_parameters_in_filename = (state == QtCore.Qt.Checked)
+        self.config_copy.global_parameters_parameters_in_filename = (state == QtCore.Qt.CheckState.Checked)
         self.ipfn_activate_deactivate_widgets()
 
     def nfs_changed(self, state):
-        self.config_copy.global_parameters_stack_number_frames = (state == QtCore.Qt.Checked)
+        self.config_copy.global_parameters_stack_number_frames = (state == QtCore.Qt.CheckState.Checked)
 
     def pfs_changed(self, state):
-        self.config_copy.global_parameters_stack_percent_frames = (state == QtCore.Qt.Checked)
+        self.config_copy.global_parameters_stack_percent_frames = (state == QtCore.Qt.CheckState.Checked)
 
     def apbs_changed(self, state):
-        self.config_copy.global_parameters_ap_box_size = (state == QtCore.Qt.Checked)
+        self.config_copy.global_parameters_ap_box_size = (state == QtCore.Qt.CheckState.Checked)
 
     def nap_changed(self, state):
-        self.config_copy.global_parameters_ap_number = (state == QtCore.Qt.Checked)
+        self.config_copy.global_parameters_ap_number = (state == QtCore.Qt.CheckState.Checked)
 
     def sfdfs_changed(self, value):
         self.config_copy.stack_frames_drizzle_factor_string = value

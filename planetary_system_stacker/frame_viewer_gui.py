@@ -6,15 +6,15 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 class Ui_frame_viewer(object):
     def setupUi(self, frame_viewer):
         frame_viewer.setObjectName("frame_viewer")
         frame_viewer.resize(900, 630)
-        frame_viewer.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
-        frame_viewer.setFrameShape(QtWidgets.QFrame.Panel)
-        frame_viewer.setFrameShadow(QtWidgets.QFrame.Sunken)
+        frame_viewer.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
+        frame_viewer.setFrameShape(QtWidgets.QFrame.Shape.Panel)
+        frame_viewer.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         self.grid_layout = QtWidgets.QGridLayout(frame_viewer)
         self.grid_layout.setObjectName("grid_layout")
         self.groupBox_frame_sorting = QtWidgets.QGroupBox(frame_viewer)
@@ -59,7 +59,7 @@ class Ui_frame_viewer(object):
         self.gridLayout_3.addWidget(self.pushButton_set_stacking_limit, 2, 0, 1, 2)
         self.grid_layout.addWidget(self.groupBox_stacking_fraction, 2, 3, 1, 1)
         self.buttonBox = QtWidgets.QDialogButtonBox(frame_viewer)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Cancel|QtWidgets.QDialogButtonBox.StandardButton.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.grid_layout.addWidget(self.buttonBox, 4, 3, 1, 1)
         self.pushButton_play = QtWidgets.QPushButton(frame_viewer)
@@ -71,7 +71,7 @@ class Ui_frame_viewer(object):
         self.slider_frames = QtWidgets.QSlider(frame_viewer)
         self.slider_frames.setMaximum(1000)
         self.slider_frames.setPageStep(20)
-        self.slider_frames.setOrientation(QtCore.Qt.Horizontal)
+        self.slider_frames.setOrientation(QtCore.Qt.Orientation.Horizontal)
         self.slider_frames.setObjectName("slider_frames")
         self.grid_layout.addWidget(self.slider_frames, 4, 0, 1, 1)
         self.label_matplotlib = QtWidgets.QLabel(frame_viewer)
@@ -107,4 +107,3 @@ class Ui_frame_viewer(object):
         self.slider_frames.setToolTip(_translate("frame_viewer", "Use the slider to select the frame to be displayed. As an alternative,\n"
 "you can select the frame with the \'frame sorting\' spinboxes."))
         self.label_matplotlib.setText(_translate("frame_viewer", "Matplotlib placeholder"))
-

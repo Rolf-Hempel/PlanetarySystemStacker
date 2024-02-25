@@ -26,7 +26,7 @@ from glob import glob
 from sys import argv, exit
 from time import time
 
-from PyQt5 import QtCore, QtWidgets
+from PyQt6 import QtCore, QtWidgets
 from numpy import uint8, uint16, int32
 
 from align_frames import AlignFrames
@@ -83,7 +83,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
             y = int(pos.y())
 
             # The left button is pressed.
-            if event.button() == QtCore.Qt.LeftButton:
+            if event.button() == QtCore.Qt.MouseButton.LeftButton:
                 self.left_button_pressed = True
 
                 # Remember the location.
@@ -102,7 +102,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
         if not self.photo_editor.drag_mode and self.photo_editor.hasPhoto():
 
             # The left button is released.
-            if event.button() == QtCore.Qt.LeftButton:
+            if event.button() == QtCore.Qt.MouseButton.LeftButton:
                 self.left_button_pressed = False
 
                 # If a rectangular patch has been defined, store its coordinates.
@@ -398,4 +398,3 @@ if __name__ == '__main__':
            + str(border+window.x_high))
 
     exit()
-
