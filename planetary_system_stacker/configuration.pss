@@ -1,0 +1,82 @@
+[Hidden parameters]
+current directory = /Users/tijmen/Downloads
+main window x0 = 303
+main window y0 = 66
+main window width = 1169
+main window height = 966
+main window maximized = False
+
+[Global parameters]
+display quickstart = True
+version = PlanetarySystemStacker 0.9.8
+protocol level = 1
+write protocol to file = False
+store protocol with result = False
+buffering level = -1
+maximum memory active = False
+maximum memory amount = 7
+include postprocessing = True
+image format = png
+parameters in filename = False
+stack number frames = False
+stack percent frames = False
+ap box size = False
+ap number = False
+
+[Frames]
+gauss width = 7
+debayering default = Auto detect color
+debayering method = Variable Number of Gradients
+normalization = True
+normalization threshold = 15
+add selection dialog = False
+
+[Align frames]
+fast changing object = True
+mode = Planet
+automation = True
+rectangle scale factor = 3.0303030303030303
+search width = 34
+average frame percent = 5
+
+[Alignment points]
+half box width = 24
+search width = 14
+structure threshold = 0.04
+brightness threshold = 10
+frame percent = 28
+frame number = -1
+
+[Stack frames]
+drizzle factor string = 1.5x
+
+[PostprocessingInfo]
+version selected = 1
+
+[PostprocessingVersion 0 RGBAlignment]
+rgb automatic = False
+rgb gauss width = 7
+rgb resolution index = 1
+rgb shift red y = 0.0
+rgb shift red x = 0.0
+rgb shift blue y = 0.0
+rgb shift blue x = 0.0
+
+[PostprocessingVersion 1 RGBAlignment]
+rgb automatic = True
+rgb gauss width = 9
+rgb resolution index = 1
+rgb shift red y = 2.0
+rgb shift red x = -0.5
+rgb shift blue y = 0.0
+rgb shift blue x = -0.5
+
+[PostprocessingVersion 1 Layer 0]
+postprocessing method = Multilevel unsharp masking
+radius = 4.3
+amount = 138.18
+bilateral fraction = 0.47
+bilateral range = 181.5
+denoise = 0.63
+luminance only = False
+
