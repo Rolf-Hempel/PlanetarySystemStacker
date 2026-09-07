@@ -46,16 +46,19 @@ brew install cmake
 
 ## Running
 
-With the venv activated, either invoke the console script or run the module directly:
+With the virtual environment activated, start PSS with:
 ```bash
 PlanetarySystemStacker
-# or
-python planetary_system_stacker/planetary_system_stacker.py
 ```
 
 For CLI (headless) use, pass a config file:
 ```bash
 PlanetarySystemStacker --config_file path/to/config.pss
+```
+
+If the `PlanetarySystemStacker` command isn't found, the source script works too:
+```bash
+python planetary_system_stacker/planetary_system_stacker.py
 ```
 
 ## Upstream binaries (may be outdated)
