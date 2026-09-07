@@ -1,0 +1,40 @@
+# macOS
+.DS_Store
+
+# Python bytecode / caches
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Build / packaging artifacts
+build/
+dist/
+*.egg
+*.egg-info/
+*.whl
+MANIFEST
+
+# PyInstaller / cx_Freeze
+*.spec.bak
+pyinstaller.spec
+planetary_system_stacker.spec
+
+# Virtual environments
+planet-env/
+planet-env-*/
+.venv/
+venv/
+env/
+
+# IDEs
+.idea/
+.vscode/
+*.swp
+
+# Secrets / local config
+key.txt
+key-txt
+
+# Local test / user images (kept out of repo)
+src/Images/
