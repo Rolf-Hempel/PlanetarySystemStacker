@@ -15,10 +15,8 @@ dist/
 *.whl
 MANIFEST
 
-# PyInstaller / cx_Freeze
+# PyInstaller build artifacts (spec file is committed)
 *.spec.bak
-pyinstaller.spec
-planetary_system_stacker.spec
 
 # Virtual environments
 planet-env/

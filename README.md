@@ -61,6 +61,21 @@ If the `PlanetarySystemStacker` command isn't found, the source script works too
 python planetary_system_stacker/planetary_system_stacker.py
 ```
 
+## Building a macOS .app bundle
+
+From an activated venv:
+```bash
+pip install pyinstaller
+pyinstaller PlanetarySystemStacker.spec
+```
+
+The resulting bundle is `dist/PlanetarySystemStacker.app` (~320 MB). It's unsigned and unnotarised, so macOS Gatekeeper will refuse to open it on first launch — right-click the app and choose **Open** to bypass the warning, or run:
+```bash
+xattr -d com.apple.quarantine dist/PlanetarySystemStacker.app
+```
+
+The build targets whatever architecture your Mac has (Apple Silicon or Intel). It won't run on the other architecture without a universal2 build. The spec file uses `pyinstaller_rthook_cv2.py`, a small runtime hook that works around a PyInstaller × OpenCV loader-recursion bug on macOS.
+
 ## Upstream binaries (may be outdated)
 
 Rolf-Hempel's original repo ships a Windows installer and a PyPI package (`planetary-system-stacker`). Both predate the PyQt6 migration and Python 3.12 support, and installing them on modern systems is where most of the [upstream install issues](https://github.com/Rolf-Hempel/PlanetarySystemStacker/issues) come from. Use them at your own risk; the source install above is the maintained path.
