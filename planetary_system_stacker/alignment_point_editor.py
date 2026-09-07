@@ -245,9 +245,9 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
         # This is a workaround: Instead of "93" it should read "QtCore.Qt.Key_Plus", but that
         # returns 43 instead.
-        if event.key() == 93 and event.modifiers() & QtCore.Qt.KeyModifier.ControlModifier:
+        if event.key() == 93 and event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             self.change_ap_size(1)
-        elif event.key() == QtCore.Qt.Key.Key_Minus and event.modifiers() & QtCore.Qt.KeyModifier.ControlModifier:
+        elif event.key() == QtCore.Qt.Key.Key_Minus and event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             self.change_ap_size(-1)
 
     def change_ap_size(self, direction):
@@ -403,9 +403,9 @@ class AlignmentPointEditor(FrameViewer):
         """
 
         # If the control key is pressed, switch to "no drag mode".
-        if event.key() == QtCore.Qt.Key.Key_Z and event.modifiers() & QtCore.Qt.KeyModifier.ControlModifier:
+        if event.key() == QtCore.Qt.Key.Key_Z and event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             self.undoStack.undo()
-        elif event.key() == QtCore.Qt.Key.Key_Y and event.modifiers() & QtCore.Qt.KeyModifier.ControlModifier:
+        elif event.key() == QtCore.Qt.Key.Key_Y and event.modifiers() & QtCore.Qt.KeyboardModifier.ControlModifier:
             self.undoStack.redo()
         else:
             super(AlignmentPointEditor, self).keyPressEvent(event)
@@ -806,7 +806,7 @@ if __name__ == '__main__':
     window = AlignmentPointEditorWidget(None, configuration, align_frames, alignment_points, None)
     window.setMinimumSize(800,600)
     window.showMaximized()
-    app.exec_()
+    app.exec()
 
     print("After AP editing, number of APs: " + str(
         len(alignment_points.alignment_points)) + ", aps dropped because too dim: " + str(

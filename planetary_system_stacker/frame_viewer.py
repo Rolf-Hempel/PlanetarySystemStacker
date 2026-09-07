@@ -1022,7 +1022,7 @@ if __name__ == '__main__':
                                None)
     window.setMinimumSize(800, 600)
     window.showMaximized()
-    app.exec_()
+    app.exec()
 
     print("Percentage of frames to be stacked: " + str(
         configuration.alignment_points_frame_percent) + ", number of frames: " + str(

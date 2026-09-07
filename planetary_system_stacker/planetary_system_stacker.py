@@ -118,11 +118,11 @@ class DisplayImage(QtWidgets.QGraphicsView):
         # The image is monochrome:
         if len(image_uint8.shape) == 2:
             qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, self.shape_x,
-                                    QtGui.QImage.Format_Grayscale8)
+                                    QtGui.QImage.Format.Format_Grayscale8)
         # The image is RGB color.
         else:
             qt_image = QtGui.QImage(image_uint8, self.shape_x, self.shape_y, 3 * self.shape_x,
-                                    QtGui.QImage.Format_RGB888)
+                                    QtGui.QImage.Format.Format_RGB888)
         return QtGui.QPixmap(qt_image)
 
     def update_image(self, new_image):
@@ -1076,8 +1076,8 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         quit_msg = "This is a placeholder for the manual activity " + activity + \
                    ". press OK when you want to continue with the workflow."
         QtWidgets.QMessageBox.question(self, 'Message', quit_msg,
-                                       QtWidgets.QMessageBox.Yes | QtWidgets.QMessageBox.No,
-                                       QtWidgets.QMessageBox.No)
+                                       QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                                       QtWidgets.QMessageBox.StandardButton.No)
 
     def show_current_progress_widgets(self, show):
         """
@@ -1373,11 +1373,11 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                              ))
 
         msgBox = QtWidgets.QMessageBox()
-        msgBox.setIcon(QtWidgets.QMessageBox.Information)
+        msgBox.setIcon(QtWidgets.QMessageBox.Icon.Information)
         msgBox.setWindowIcon(QtGui.QIcon(self.configuration.window_icon))
         msgBox.setText(CONTENT)
         msgBox.setWindowTitle("About PlanetarySystemStacker")
-        msgBox.setStandardButtons(QtWidgets.QMessageBox.Ok)
+        msgBox.setStandardButtons(QtWidgets.QMessageBox.StandardButton.Ok)
         msgBox.exec()
 
     def closeEvent(self, event=None):

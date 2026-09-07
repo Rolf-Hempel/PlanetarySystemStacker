@@ -132,7 +132,7 @@ class JoblistWidget(QtWidgets.QListWidget):
 
     def dragMoveEvent(self, event):
         if event.mimeData().hasUrls():
-            event.setDropAction(QtCore.Qt.CopyAction)
+            event.setDropAction(QtCore.Qt.DropAction.CopyAction)
             event.accept()
         else:
             event.ignore()
@@ -146,7 +146,7 @@ class JoblistWidget(QtWidgets.QListWidget):
         """
 
         if event.mimeData().hasUrls():
-            event.setDropAction(QtCore.Qt.CopyAction)
+            event.setDropAction(QtCore.Qt.DropAction.CopyAction)
             event.accept()
 
             # Construct a list with the job names received by the drop event.
@@ -399,7 +399,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
                 # Identify the selected items and their locations in the job list. Set the selected
                 # Bayer pattern in the corresponding job objects.
-                if menu.exec_(event.globalPos()) and self.pattern is not None:
+                if menu.exec(event.globalPos()) and self.pattern is not None:
                     for item in selected_items:
                         row = source.row(item)
                         self.jobs[row].bayer_option_selected = self.pattern
@@ -416,7 +416,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         """
 
         # If the "+" key is pressed, zoom in. If "-" is pressed, zoom out.
-        if event.key() == QtCore.Qt.Key_Delete:
+        if event.key() == QtCore.Qt.Key.Key_Delete:
             self.remove_job_list()
         else:
             super(JobEditor, self).keyPressEvent(event)

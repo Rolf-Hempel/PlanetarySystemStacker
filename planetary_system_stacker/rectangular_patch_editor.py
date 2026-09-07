@@ -391,7 +391,7 @@ if __name__ == '__main__':
             None)
     window.setMinimumSize(800, 600)
     window.showMaximized()
-    app.exec_()
+    app.exec()
 
     print("Rectangle selected, y_low: " + str(border+window.y_low) + ", y_high: " +
            str(border+window.y_high) + ", x_low: " + str(border+window.x_low) + ", x_high: "

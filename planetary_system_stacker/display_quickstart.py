@@ -116,4 +116,4 @@ if __name__ == '__main__':
     app = QtWidgets.QApplication(argv)
     window = DisplayQuickstart(None, configuration)
     window.show()
-    app.exec_()
+    app.exec()

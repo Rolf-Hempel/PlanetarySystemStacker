@@ -1893,4 +1893,4 @@ if __name__ == '__main__':
     window = PostprocEditorWidget(configuration, input_image, input_file_name,
                                   dummy_status_bar.print_status_bar_info, None)
     window.show()
-    app.exec_()
+    app.exec()
