@@ -1,9 +1,11 @@
 # PlanetarySystemStacker (PSS)
 _Produce a sharp image of a planetary system object (moon, sun, planets) from many seeing-affected frames using the "lucky imaging" technique._
 
+> This is a maintained fork of [Rolf-Hempel/PlanetarySystemStacker](https://github.com/Rolf-Hempel/PlanetarySystemStacker). Upstream has been unmaintained since 2023; this fork lands the outstanding pull requests (PyQt6 migration, Python 3.9–3.12 support) and continues bug fixes.
+
 The program is mainly targeted at extended objects (moon, sun), but it works as well for planets. Results obtained in many tests show at least the same image quality as with the established software AutoStakkert!3.
 
-The software is written in Python 3. The program uses array operations (OpenCV, numpy) wherever possible to speed up execution. A modern graphical user interface (implemented using the QT5 toolkit) and good usability were high priorities in designing the software. PSS is platform-independent and can be used where Python 3 is available. The software has been tested successfully on Windows, various Linux distributions, and macOS. Starting with version 0.8.0, PSS can be used either in GUI mode or from the command line, e.g. as part of a large automatic workflow.
+The software is written in Python 3. The program uses array operations (OpenCV, numpy) wherever possible to speed up execution. A modern graphical user interface (implemented using the Qt6 toolkit) and good usability were high priorities in designing the software. PSS is platform-independent and can be used where Python 3 is available. The software has been tested successfully on Windows, various Linux distributions, and macOS. Starting with version 0.8.0, PSS can be used either in GUI mode or from the command line, e.g. as part of a large automatic workflow.
 
 Input to the program can be either video files or directories containing still images. The following algorithmic steps are performed:
 
@@ -21,23 +23,45 @@ Input to the program can be either video files or directories containing still i
 
 Program execution is most efficient if the image data and all intermediate results can be kept in memory. This, however, requires much RAM space. Therefore, the level of buffering can be selected in the configuration dialog, ranging from 0 (no buffering) to 4 (maximum buffering).
 
-There are three ways to install the program:
-* For Windows users there is an self-contained [installer](https://github.com/Rolf-Hempel/PlanetarySystemStacker/releases). It installs the complete software and creates a starter on the user's desktop.
-* The user installs [Python 3](https://www.python.org/downloads/) (including pip3), and then calls pip3 to install PSS with all its dependencies automatically. This is the preferred way to install PSS in a platform-independent way. Details can be found in the [User Guide](https://github.com/Rolf-Hempel/PlanetarySystemStacker/blob/master/Documentation/PlanetarySystemStacker_User-Guide.pdf).
-* Experienced users can install the Python 3 environment and all packets needed by PSS manually, and then clone the PSS source code from Github. Again, the details are found in the Appendix of the User Guide document.
+## Installation
 
-The way to start the program depends on how it was installed: 
-* If the Windows installer was used, the program is started via the desktop icon.
-* If PSS was installed with PIP, it can be started from the command line by entering "PlanetarySystemStacker".
-* The program can be started in the Python 3 interpreter by executing the main program in the module "planetary_system_stacker.py" .
+Requires Python 3.9 or newer. This fork does not (yet) ship prebuilt binaries or a PyPI release — install from source.
 
-Run from source on OSX
-* brew install cmake
-* git clone this repo
-* cd into project dir
-* create python env: `python -m myenv`. this creates the folder myenv
-* activate env: `source myenv/bin/activate`
-* pip install -e .
-* python planetary_system_stacker/planetary_system_stacker.py
+```bash
+git clone https://github.com/timing/PlanetarySystemStacker.git
+cd PlanetarySystemStacker
+
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate           # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -e .
+```
+
+**macOS note:** if the OpenCV or scikit-image wheels aren't available for your Python version and pip falls back to building from source, install CMake first:
+```bash
+brew install cmake
+```
+
+## Running
+
+With the venv activated, either invoke the console script or run the module directly:
+```bash
+PlanetarySystemStacker
+# or
+python planetary_system_stacker/planetary_system_stacker.py
+```
+
+For CLI (headless) use, pass a config file:
+```bash
+PlanetarySystemStacker --config_file path/to/config.pss
+```
+
+## Upstream binaries (may be outdated)
+
+Rolf-Hempel's original repo ships a Windows installer and a PyPI package (`planetary-system-stacker`). Both predate the PyQt6 migration and Python 3.12 support, and installing them on modern systems is where most of the [upstream install issues](https://github.com/Rolf-Hempel/PlanetarySystemStacker/issues) come from. Use them at your own risk; the source install above is the maintained path.
+
+* Original User Guide (still mostly accurate for algorithm/UI): [PlanetarySystemStacker_User-Guide.pdf](https://github.com/Rolf-Hempel/PlanetarySystemStacker/blob/master/Documentation/PlanetarySystemStacker_User-Guide.pdf)
 
 A [discussion platform](https://www.astronomie.de/PSS/GermanBoard/) for all issues concerning this software project has been created in the context of the German amateur astronomy forum [Astronomie.de](https://www.astronomie.de/). Currently, this forum is in German language only, but an English branch is in preparation. Additionally, an extensive discussion on the subject can be found on the [Cloudy Nights forum](https://www.cloudynights.com/topic/645890-new-stacking-software-project-planetarysystemstacker/).
