@@ -40,5 +40,5 @@ dependencies = [
 ]
 
 [project.scripts]
-PlanetarySystemStacker = "planetary_system_stacker.planetary_system_stacker:main"
+PlanetarySystemStacker = "planetary_system_stacker:main"
 
