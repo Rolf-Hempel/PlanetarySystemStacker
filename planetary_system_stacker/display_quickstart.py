@@ -22,8 +22,8 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 from sys import argv
 
-from PyQt5 import QtWidgets
-from PyQt5.QtCore import Qt
+from PyQt6 import QtWidgets
+from PyQt6.QtCore import Qt
 
 from configuration import Configuration
 from quickstart_gui import Ui_Form
@@ -43,12 +43,12 @@ class DisplayQuickstart(QtWidgets.QWidget, Ui_Form):
 
         # Get the quickstart guide text from a markdown document. The original text is in file
         # "quickstart.md".
-        self.label.setTextFormat(Qt.MarkdownText)
+        self.label.setTextFormat(Qt.TextFormat.MarkdownText)
         markdown_text = """
 ### Quickstart Guide
 
 #### Configuration
-Select 'Edit / Edit configuration' to check if the configuration parameters are set properly. 
+Select 'Edit / Edit configuration' to check if the configuration parameters are set properly.
 The dialog starts with the 'Frame-related Parameters' where the most important choice is the
 stabilization mode:
 * Surface (for extended objects which do not fit into the FoV)
@@ -86,7 +86,7 @@ percentage of frames used for stacking. Try different values to find the optimal
 Postprocessing can follow stacking immediately (if the workflow parameter 'Stacking plus
 postprocessing' is checked), or be executed separately (if the job input is a single image file).
 To process several images with the same parameters, adjust the parameters for the first image in
-interactive mode, and then check 'Automatic' to repeat the same for all other images in batch mode. 
+interactive mode, and then check 'Automatic' to repeat the same for all other images in batch mode.
         """
 
         self.label.setText(markdown_text)

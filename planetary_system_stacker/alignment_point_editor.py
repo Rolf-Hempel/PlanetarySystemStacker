@@ -26,7 +26,8 @@ from glob import glob
 from sys import argv, exit
 from time import time
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtGui import QUndoCommand
 from numpy import uint8
 
 from align_frames import AlignFrames
@@ -89,7 +90,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
             y = int(pos.y())
 
             # The left button is pressed.
-            if event.button() == QtCore.Qt.LeftButton:
+            if event.button() == QtCore.Qt.MouseButton.LeftButton:
                 self.left_button_pressed = True
 
                 # Find the closest AP.
@@ -112,7 +113,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                         self.new_ap = True
 
             # The right button is pressed.
-            elif event.button() == QtCore.Qt.RightButton:
+            elif event.button() == QtCore.Qt.MouseButton.RightButton:
                 self.right_button_pressed = True
 
                 # Remember the location and initialize an object which during mouse moving stores
@@ -135,7 +136,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
             y = int(pos.y())
 
             # The left button is released.
-            if event.button() == QtCore.Qt.LeftButton:
+            if event.button() == QtCore.Qt.MouseButton.LeftButton:
                 self.left_button_pressed = False
 
                 # An existing AP was moved, replace it with the moved one.
@@ -151,7 +152,7 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
                     self.new_ap = False
 
             # The right button is released.
-            elif event.button() == QtCore.Qt.RightButton:
+            elif event.button() == QtCore.Qt.MouseButton.RightButton:
                 self.right_button_pressed = False
 
                 # If the mouse was not moved much between press and release, a single AP is deleted.
@@ -244,9 +245,9 @@ class GraphicsScene(QtWidgets.QGraphicsScene):
 
         # This is a workaround: Instead of "93" it should read "QtCore.Qt.Key_Plus", but that
         # returns 43 instead.
-        if event.key() == 93 and event.modifiers() & QtCore.Qt.ControlModifier:
+        if event.key() == 93 and event.modifiers() & QtCore.Qt.KeyModifier.ControlModifier:
             self.change_ap_size(1)
-        elif event.key() == QtCore.Qt.Key_Minus and event.modifiers() & QtCore.Qt.ControlModifier:
+        elif event.key() == QtCore.Qt.Key.Key_Minus and event.modifiers() & QtCore.Qt.KeyModifier.ControlModifier:
             self.change_ap_size(-1)
 
     def change_ap_size(self, direction):
@@ -300,7 +301,7 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         self.patch_x_low = ap["patch_x_low"]
         self.patch_x_high = ap["patch_x_high"]
         self.pen_boundary = QtGui.QPen(self.color_boundary)
-        self.pen_boundary.setStyle(0)
+        self.pen_boundary.setStyle(QtCore.Qt.PenStyle.SolidLine)
         self.width_x = self.patch_x_high - self.patch_x_low
         self.width_x_external = self.width_x + self.pen_boundary.width()
         self.width_y = self.patch_y_high - self.patch_y_low
@@ -372,7 +373,7 @@ class AlignmentPointEditor(FrameViewer):
         self.image = image
 
         # Initialize the undo stack.
-        self.undoStack = QtWidgets.QUndoStack(self)
+        self.undoStack = QtGui.QUndoStack(self)
 
         # Initialize the alignment point object.
         self.aps = alignment_points
@@ -402,9 +403,9 @@ class AlignmentPointEditor(FrameViewer):
         """
 
         # If the control key is pressed, switch to "no drag mode".
-        if event.key() == QtCore.Qt.Key_Z and event.modifiers() & QtCore.Qt.ControlModifier:
+        if event.key() == QtCore.Qt.Key.Key_Z and event.modifiers() & QtCore.Qt.KeyModifier.ControlModifier:
             self.undoStack.undo()
-        elif event.key() == QtCore.Qt.Key_Y and event.modifiers() & QtCore.Qt.ControlModifier:
+        elif event.key() == QtCore.Qt.Key.Key_Y and event.modifiers() & QtCore.Qt.KeyModifier.ControlModifier:
             self.undoStack.redo()
         else:
             super(AlignmentPointEditor, self).keyPressEvent(event)
@@ -454,7 +455,7 @@ class AlignmentPointEditor(FrameViewer):
         self.undoStack.push(command)
 
 
-class CommandCreateApGrid(QtWidgets.QUndoCommand):
+class CommandCreateApGrid(QUndoCommand):
     """
     Undoable command to replace all existing APs with a new AP grid.
     """
@@ -499,7 +500,7 @@ class CommandCreateApGrid(QtWidgets.QUndoCommand):
         self.photo_editor.setFocus()
 
 
-class CommandAdd(QtWidgets.QUndoCommand):
+class CommandAdd(QUndoCommand):
     """
     Undoable command to add an AP to the AP list.
     """
@@ -523,7 +524,7 @@ class CommandAdd(QtWidgets.QUndoCommand):
         self.photo_editor.setFocus()
 
 
-class CommandRemove(QtWidgets.QUndoCommand):
+class CommandRemove(QUndoCommand):
     """
     Undoable command to remove an AP from the AP list.
     """
@@ -548,7 +549,7 @@ class CommandRemove(QtWidgets.QUndoCommand):
         self.photo_editor.setFocus()
 
 
-class CommandReplace(QtWidgets.QUndoCommand):
+class CommandReplace(QUndoCommand):
     """
     Undoable command to replace an AP on the AP list with another one.
     """
@@ -821,4 +822,3 @@ if __name__ == '__main__':
         AlignmentPoints.set_reference_box(ap, align_frames.mean_frame)
     print("Buffers allocated for " + str(count_updates) + " alignment points.")
     exit()
-

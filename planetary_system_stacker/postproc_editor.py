@@ -27,8 +27,8 @@ from sys import argv, stdout, stderr
 from time import sleep
 
 import psutil
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QProxyStyle, QStyle
+from PyQt6 import QtWidgets, QtCore
+from PyQt6.QtWidgets import QProxyStyle, QStyle
 from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT, \
     COLOR_BGR2HSV, COLOR_HSV2BGR
 from numpy import uint8, uint16, float32
@@ -360,25 +360,25 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.remove_layer_callback(self.layer_index)
 
 
-class CustomStyle(QProxyStyle):
-    """
-    This class is used to prevent the version spinbox from jumping two steps at once. The solution
-    was found on Stackoverflow
-    (https://stackoverflow.com/questions/40746350/why-qspinbox-jumps-twice-the-step-value).
+# class CustomStyle(QProxyStyle):
+#     """
+#     This class is used to prevent the version spinbox from jumping two steps at once. The solution
+#     was found on Stackoverflow
+#     (https://stackoverflow.com/questions/40746350/why-qspinbox-jumps-twice-the-step-value).
 
-    """
+#     """
 
-    def styleHint(self, hint, option=None, widget=None, returnData=None):
-        if hint == QStyle.SH_SpinBox_KeyPressAutoRepeatRate:
-            return 10**6
-        elif hint == QStyle.SH_SpinBox_ClickAutoRepeatRate:
-            return 10**6
-        elif hint == QStyle.SH_SpinBox_ClickAutoRepeatThreshold:
-            # You can use only this condition to avoid the auto-repeat,
-            # but better safe than sorry ;-)
-            return 10**6
-        else:
-            return super().styleHint(hint, option, widget, returnData)
+#     def styleHint(self, hint, option=None, widget=None, returnData=None):
+#         if hint == QStyle.SH_SpinBox_KeyPressAutoRepeatRate:
+#             return 10**6
+#         elif hint == QStyle.SH_SpinBox_ClickAutoRepeatRate:
+#             return 10**6
+#         elif hint == QStyle.SH_SpinBox_ClickAutoRepeatThreshold:
+#             # You can use only this condition to avoid the auto-repeat,
+#             # but better safe than sorry ;-)
+#             return 10**6
+#         else:
+#             return super().styleHint(hint, option, widget, returnData)
 
 
 class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
@@ -423,8 +423,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.spinBox_version.setMinimum(0)
         self.spinBox_compare.setMaximum(configuration.postproc_data_object.number_versions)
         self.spinBox_compare.setMinimum(0)
-        self.spinBox_version.setStyle(CustomStyle())
-        self.spinBox_compare.setStyle(CustomStyle())
+        #self.spinBox_version.setStyle(CustomStyle())
+        #self.spinBox_compare.setStyle(CustomStyle())
 
         # Set the spinbox to the newly created version.
         self.spinBox_version.setValue(self.postproc_data_object.version_selected)
@@ -1335,8 +1335,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         # Initialize a vertical spacer used to fill the lower part of the sharpening widget scroll
         # area.
-        self.spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum,
-                                            QtWidgets.QSizePolicy.Expanding)
+        self.spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum,
+                                            QtWidgets.QSizePolicy.Policy.Expanding)
 
         # Set the resolution index to an impossible value. It is used to check for changes.
         self.rgb_resolution_index = -1
@@ -1427,7 +1427,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         self.version_manager_widget.setEnabled(False)
         self.tabWidget_postproc_control.setEnabled(False)
-        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(False)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).setEnabled(False)
 
     def enable_widgets(self):
         """
@@ -1438,7 +1438,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         self.version_manager_widget.setEnabled(True)
         self.tabWidget_postproc_control.setEnabled(True)
-        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(True)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).setEnabled(True)
 
     def fgw_changed(self, value):
         """
@@ -1484,7 +1484,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             self.finish_rgb_correction_mode()
 
     def rgb_automatic_changed(self, state):
-        rgb_on = state == QtCore.Qt.Checked
+        rgb_on = state == QtCore.Qt.CheckState.Checked
         version = self.postproc_data_object.versions[
             self.postproc_data_object.version_selected]
         version.rgb_automatic = rgb_on

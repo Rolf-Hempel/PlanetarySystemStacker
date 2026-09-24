@@ -32,7 +32,7 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from skimage import img_as_ubyte
-from PyQt5 import QtWidgets
+from PyQt6 import QtWidgets
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints

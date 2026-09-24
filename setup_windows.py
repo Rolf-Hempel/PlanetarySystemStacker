@@ -17,10 +17,10 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     ext_modules=None,
     install_requires=[
-        'numpy < 1.23.0',
+        'numpy',
         'matplotlib',
         'psutil',
-        'PyQt5',
+        'PyQt6 >= 6.2',
         'scipy',
         'astropy',
         'scikit-image',

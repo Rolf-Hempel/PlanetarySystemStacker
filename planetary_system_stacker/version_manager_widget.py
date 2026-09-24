@@ -6,13 +6,13 @@
 #
 # WARNING! All changes made in this file will be lost!
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 class Ui_version_manager_widget(object):
     def setupUi(self, version_manager_widget):
         version_manager_widget.setObjectName("version_manager_widget")
         version_manager_widget.resize(401, 104)
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Preferred, QtWidgets.QSizePolicy.Fixed)
+        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Policy.Preferred, QtWidgets.QSizePolicy.Policy.Fixed)
         sizePolicy.setHorizontalStretch(0)
         sizePolicy.setVerticalStretch(0)
         sizePolicy.setHeightForWidth(version_manager_widget.sizePolicy().hasHeightForWidth())
@@ -70,4 +70,3 @@ class Ui_version_manager_widget(object):
         self.checkBox_blink_compare.setText(_translate("version_manager_widget", "Blink compare with"))
         self.spinBox_version.setToolTip(_translate("version_manager_widget", "Select a postprocessing version. The unprocessed image is version \"0\"."))
         self.label_version.setText(_translate("version_manager_widget", "Version selected"))
-

@@ -8,7 +8,7 @@ Created on Sat Aug 24 08:59:44 2019
 
 import os
 import platform
-from PyQt5 import QtCore
+from PyQt6 import QtCore
 import psutil
 import matplotlib
 import numpy as np

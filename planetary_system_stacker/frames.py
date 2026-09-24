@@ -27,7 +27,7 @@ from os.path import splitext
 from pathlib import Path
 from time import time
 
-from PyQt5 import QtCore
+from PyQt6 import QtCore
 from astropy.io import fits
 from cv2 import imread, VideoCapture, CAP_PROP_FRAME_COUNT, cvtColor, COLOR_RGB2GRAY, \
     COLOR_BGR2RGB, COLOR_BayerGB2BGR, COLOR_BayerBG2BGR, THRESH_TOZERO, threshold, \

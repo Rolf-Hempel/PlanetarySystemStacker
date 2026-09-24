@@ -2,7 +2,7 @@ from argparse import ArgumentParser, ArgumentTypeError
 from time import sleep
 from glob import glob
 
-from PyQt5 import QtCore
+from PyQt6 import QtCore
 
 from configuration import Configuration
 from exceptions import InternalError

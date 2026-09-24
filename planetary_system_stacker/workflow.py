@@ -27,7 +27,7 @@ from os import listdir, rename, remove
 from os.path import splitext, join, dirname
 
 import psutil
-from PyQt5 import QtCore
+from PyQt6 import QtCore
 from numpy import uint16, uint8
 
 from align_frames import AlignFrames
