@@ -293,6 +293,9 @@ class StackFrames(object):
         :return: -
         """
 
+        # Switch profiling of detailed compute times on / off.
+        profiling = False
+
         # First find out if there are holes between AP patches.
         self.prepare_for_stack_blending()
 
@@ -342,8 +345,9 @@ class StackFrames(object):
         self.border_y_low = self.border_y_high = self.border_x_low = self.border_x_high = 0
 
         # Start performance profiling.
-        prof = profile.Profile()
-        prof.enable()
+        if profiling:
+            prof = profile.Profile()
+            prof.enable()
 
         # Go through the list of all frames.
         for frame_index in range(self.frames.number):
@@ -493,9 +497,10 @@ class StackFrames(object):
                 self.my_timer.stop('Stacking: computing background')
 
         # Stop performance profiling and print statistics.
-        prof.disable()
-        stats = pstats.Stats(prof).strip_dirs().sort_stats("tottime")
-        stats.print_stats()
+        if profiling:
+            prof.disable()
+            stats = pstats.Stats(prof).strip_dirs().sort_stats("tottime")
+            stats.print_stats()
 
         if self.progress_signal is not None:
             self.progress_signal.emit("Stack frames", 100)
