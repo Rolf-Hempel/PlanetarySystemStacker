@@ -1,8 +1,6 @@
 # PlanetarySystemStacker (PSS)
 _Produce a sharp image of a planetary system object (moon, sun, planets) from many seeing-affected frames using the "lucky imaging" technique._
 
-> This is a maintained fork of [Rolf-Hempel/PlanetarySystemStacker](https://github.com/Rolf-Hempel/PlanetarySystemStacker). Upstream has been unmaintained since 2023; this fork lands the outstanding pull requests (PyQt6 migration, Python 3.9–3.12 support) and continues bug fixes.
-
 The program is mainly targeted at extended objects (moon, sun), but it works as well for planets. Results obtained in many tests show at least the same image quality as with the established software AutoStakkert!3.
 
 The software is written in Python 3. The program uses array operations (OpenCV, numpy) wherever possible to speed up execution. A modern graphical user interface (implemented using the Qt6 toolkit) and good usability were high priorities in designing the software. PSS is platform-independent and can be used where Python 3 is available. The software has been tested successfully on Windows, various Linux distributions, and macOS. Starting with version 0.8.0, PSS can be used either in GUI mode or from the command line, e.g. as part of a large automatic workflow.
@@ -25,10 +23,18 @@ Program execution is most efficient if the image data and all intermediate resul
 
 ## Installation
 
-Requires Python 3.9 or newer. This fork does not (yet) ship prebuilt binaries or a PyPI release — install from source.
+### Windows installer
+
+A self-contained [Windows installer](https://github.com/Rolf-Hempel/PlanetarySystemStacker/releases)
+is available. It installs the complete software and creates a starter on the desktop, so no Python
+setup is needed. The current release is V0.9.8.
+
+### From source (Windows, Linux, macOS)
+
+Requires Python 3.9 or newer.
 
 ```bash
-git clone https://github.com/timing/PlanetarySystemStacker.git
+git clone https://github.com/Rolf-Hempel/PlanetarySystemStacker.git
 cd PlanetarySystemStacker
 
 # Create and activate a virtual environment
@@ -43,6 +49,15 @@ pip install -e .
 ```bash
 brew install cmake
 ```
+
+### From PyPI
+
+```bash
+pip install planetary-system-stacker
+```
+
+The PyPI package is at 0.9.8.3 and was last uploaded in July 2023, so it predates the PyQt6
+migration. Install from source to get the current code.
 
 ## Running
 
@@ -76,10 +91,9 @@ xattr -d com.apple.quarantine dist/PlanetarySystemStacker.app
 
 The build targets whatever architecture your Mac has (Apple Silicon or Intel). It won't run on the other architecture without a universal2 build. The spec file uses `pyinstaller_rthook_cv2.py`, a small runtime hook that works around a PyInstaller × OpenCV loader-recursion bug on macOS.
 
-## Upstream binaries (may be outdated)
+## Documentation
 
-Rolf-Hempel's original repo ships a Windows installer and a PyPI package (`planetary-system-stacker`). Both predate the PyQt6 migration and Python 3.12 support, and installing them on modern systems is where most of the [upstream install issues](https://github.com/Rolf-Hempel/PlanetarySystemStacker/issues) come from. Use them at your own risk; the source install above is the maintained path.
-
-* Original User Guide (still mostly accurate for algorithm/UI): [PlanetarySystemStacker_User-Guide.pdf](https://github.com/Rolf-Hempel/PlanetarySystemStacker/blob/master/Documentation/PlanetarySystemStacker_User-Guide.pdf)
+* [User Guide (English)](https://github.com/Rolf-Hempel/PlanetarySystemStacker/blob/master/Documentation/PlanetarySystemStacker_User-Guide.pdf)
+* [User Guide (German)](https://github.com/Rolf-Hempel/PlanetarySystemStacker/blob/master/Documentation/PlanetarySystemStacker_User-Guide-German.pdf)
 
 A [discussion platform](https://www.astronomie.de/PSS/GermanBoard/) for all issues concerning this software project has been created in the context of the German amateur astronomy forum [Astronomie.de](https://www.astronomie.de/). Currently, this forum is in German language only, but an English branch is in preparation. Additionally, an extensive discussion on the subject can be found on the [Cloudy Nights forum](https://www.cloudynights.com/topic/645890-new-stacking-software-project-planetarysystemstacker/).
