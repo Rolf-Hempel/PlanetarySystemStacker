@@ -3,7 +3,7 @@ import setuptools
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-release_tag = "0.9.8"
+release_tag = "0.9.9"
 
 setuptools.setup(
     name="planetary-system-stacker",
@@ -17,7 +17,7 @@ setuptools.setup(
     packages=setuptools.find_packages(),
     ext_modules=None,
     install_requires=[
-        'numpy < 1.23.0',
+        'numpy',
         'matplotlib',
         'psutil',
         'PyQt5 >= 5.15',
@@ -35,7 +35,7 @@ setuptools.setup(
         # "Operating System :: POSIX :: Linux",
         # "Operating System :: MacOS"
     ],
-    python_requires='>=3.5, <3.7',
+    python_requires='>=3.5',
     entry_points={
         "console_scripts": [
         "PlanetarySystemStacker=planetary_system_stacker.planetary_system_stacker:main",

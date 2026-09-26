@@ -31,7 +31,8 @@ from ctypes import CDLL
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
-from skimage import img_as_ubyte
+# The following method was moved from skimage to skimage.util.
+from skimage.util import img_as_ubyte
 from PyQt6 import QtWidgets
 
 from align_frames import AlignFrames

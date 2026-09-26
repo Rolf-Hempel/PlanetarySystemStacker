@@ -319,7 +319,11 @@ class AlignmentPointGraphicsItem(QtWidgets.QGraphicsItem):
         painter.setBrush(self.color_boundary)
         painter.drawEllipse(self.x, self.y, self.dot_width, self.dot_width)
         painter.setBrush(self.color_surface)
-        painter.drawRect(self.patch_x_low, self.patch_y_low, self.width_x, self.width_y)
+        # The use of arguments other than int was deprecated long ago and does not work in
+        # Python 3.12 anymore.
+        # painter.drawRect(self.patch_x_low, self.patch_y_low, self.width_x, self.width_y)
+        painter.drawRect(int(self.patch_x_low), int(self.patch_y_low), int(self.width_x),
+                         int(self.width_y))
 
 
 class SelectionRectangleGraphicsItem(QtWidgets.QGraphicsItem):
@@ -355,7 +359,10 @@ class SelectionRectangleGraphicsItem(QtWidgets.QGraphicsItem):
     def paint(self, painter, option, widget):
         painter.setPen(self.pen_boundary)
         painter.setBrush(self.color_surface)
-        painter.drawRect(self.x_low, self.y_low, self.width_x, self.width_y)
+        # The use of arguments other than int was deprecated long ago and does not work in
+        # Python 3.12 anymore.
+        # painter.drawRect(self.x_low, self.y_low, self.width_x, self.width_y)
+        painter.drawRect(int(self.x_low), int(self.y_low), int(self.width_x), int(self.width_y))
 
 
 class AlignmentPointEditor(FrameViewer):

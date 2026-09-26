@@ -38,8 +38,13 @@ print('GaussianBlur took:\t\t\t{0:.2f} [s]'.format(time.time() - tic))
 
 tic = time.time()
 for idx in range(LOOPS):
-    cog_rolf = [ndimage.measurements.center_of_mass(np.uint8(1)*(frame >= (np.max(frame)/2).astype(frame.dtype)))
-                for frame in frames]
+    # Please note that the "center_of_mass" method was moved within the ndimage
+    # package.
+    # cog_rolf = [ndimage.measurements.center_of_mass(np.uint8(1)*(frame >= (np.max(frame)/2).astype(frame.dtype)))
+    #             for frame in frames]
+    cog_rolf = [
+        ndimage.center_of_mass(np.uint8(1) * (frame >= (np.max(frame) / 2).astype(frame.dtype)))
+        for frame in frames]
     cog_rolf = [(int(round(aaa[0])), int(round(aaa[1]))) for aaa in cog_rolf]
 print('Rolf/Jens CoG estimation took:\t\t{0:.2f} [s]'.format(time.time() - tic))
 

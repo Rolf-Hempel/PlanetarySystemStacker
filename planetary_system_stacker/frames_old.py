@@ -50,7 +50,7 @@ class FramesOld(object):
             - Overall image ranking ("rank_frames.frame_score")
             - Ranking frames at alignment points("alignment_points.compute_frame_qualities")
 
-        Currently all versions of all frames are stored during the entire workflow. As an
+        Currently, all versions of all frames are stored during the entire workflow. As an
         alternative, a non-buffered version should be added.
 
     """
@@ -347,8 +347,8 @@ if __name__ == "__main__":
     type = 'image'
     if type == 'image':
         # names = glob('Images/2012_*.tif')
-        # names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
-        names = glob('D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
+        # names = glob(r'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South\*.TIF')
+        names = glob(r'D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2019-01-20\Images\*.TIF')
     else:
         names = 'Videos/short_video.avi'
 

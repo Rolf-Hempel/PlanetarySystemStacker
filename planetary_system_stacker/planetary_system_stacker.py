@@ -316,7 +316,7 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
                 "Specify video(s) or dir(s) with image files to be stacked, or single image "
                 "files for postprocessing (menu: File / Open).", 'red')
 
-        # Show the quickstart guide (if checkbox has not been de-activated.
+        # Show the quickstart guide (if checkbox has not been de-activated).
         if self.configuration.global_parameters_display_quickstart:
             self.display_widget(DisplayQuickstart(self, self.configuration))
 

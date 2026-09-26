@@ -1875,11 +1875,11 @@ class EmulateStatusBar(object):
 
 
 if __name__ == '__main__':
-    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
-    input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\" \
+    # input_file_name = r"D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2018-03-24\Moon_Tile-024_043939_pss.tiff"
+    input_file_name = r"D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter_Richard\\" \
                       "2020-07-29-2145_3-L-Jupiter_ALTAIRGP224C_pss_p70_b48.png"
-    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter\\2019-05-26-0115_4-L-Jupiter_ZWO ASI290MM Mini_pipp_pss.png"
-    # input_file_name = "D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South.stacked.tiff"
+    # input_file_name = r"D:\SW-Development\Python\PlanetarySystemStacker\Examples\Jupiter\2019-05-26-0115_4-L-Jupiter_ZWO ASI290MM Mini_pipp_pss.png"
+    # input_file_name = r"D:\SW-Development\Python\PlanetarySystemStacker\Examples\Moon_2011-04-10\South.stacked.tiff"
 
     input_image = imread(input_file_name, -1)
     # Change colors to standard RGB
