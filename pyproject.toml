@@ -42,3 +42,10 @@ dependencies = [
 [project.scripts]
 PlanetarySystemStacker = "planetary_system_stacker:main"
 
+# The source directory is a path root, not an importable package: the modules
+# inside it import each other by plain name ("from frames import Frames").
+# Setuptools only auto-detects this layout for a directory literally named
+# "src", so point it at ours explicitly.
+[tool.setuptools]
+package-dir = {"" = "planetary_system_stacker"}
+
