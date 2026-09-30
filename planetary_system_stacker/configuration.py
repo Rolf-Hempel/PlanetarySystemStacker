@@ -33,7 +33,7 @@ from exceptions import ArgumentError
 from miscellaneous import Miscellaneous
 
 # Set the current software version.
-PSS_Version = "PlanetarySystemStacker 0.9.9"
+PSS_Version = "PlanetarySystemStacker 0.10.0"
 # PSS_Version = "PlanetarySystemStacker"
 
 
@@ -274,13 +274,14 @@ class Configuration(object):
         :return: -
         """
 
-        if read_from_file:
-            # The config file for persistent parameter storage is located in the user's home
-            # directory, as is the detailed logfile.
-            self.home = expanduser("~")
-            self.config_filename = join(self.home, ".PlanetarySystemStacker.ini")
-            self.protocol_filename = join(self.home, "PlanetarySystemStacker.log")
+        # The config file for persistent parameter storage is located in the user's home
+        # directory, as is the detailed logfile. Set the names even if the file is not read:
+        # "write_config" and the protocol writer refer to them either way.
+        self.home = expanduser("~")
+        self.config_filename = join(self.home, ".PlanetarySystemStacker.ini")
+        self.protocol_filename = join(self.home, "PlanetarySystemStacker.log")
 
+        if read_from_file:
             # Determine if there is a configuration file from a previous run.
             self.config_file_exists = isfile(self.config_filename)
         else:

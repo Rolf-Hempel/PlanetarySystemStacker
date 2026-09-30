@@ -3,7 +3,7 @@ _Produce a sharp image of a planetary system object (moon, sun, planets) from ma
 
 The program is mainly targeted at extended objects (moon, sun), but it works as well for planets. Results obtained in many tests show at least the same image quality as with the established software AutoStakkert!3.
 
-The software is written in Python 3. The program uses array operations (OpenCV, numpy) wherever possible to speed up execution. A modern graphical user interface (implemented using the QT5 toolkit) and good usability were high priorities in designing the software. PSS is platform-independent and can be used where Python 3 is available. The software has been tested successfully on Windows, various Linux distributions, and macOS. Starting with version 0.8.0, PSS can be used either in GUI mode or from the command line, e.g. as part of a large automatic workflow.
+The software is written in Python 3. The program uses array operations (OpenCV, numpy) wherever possible to speed up execution. A modern graphical user interface (implemented using the Qt6 toolkit) and good usability were high priorities in designing the software. PSS is platform-independent and can be used where Python 3 is available. The software has been tested successfully on Windows, various Linux distributions, and macOS. Starting with version 0.8.0, PSS can be used either in GUI mode or from the command line, e.g. as part of a large automatic workflow.
 
 Input to the program can be either video files or directories containing still images. The following algorithmic steps are performed:
 
@@ -21,14 +21,79 @@ Input to the program can be either video files or directories containing still i
 
 Program execution is most efficient if the image data and all intermediate results can be kept in memory. This, however, requires much RAM space. Therefore, the level of buffering can be selected in the configuration dialog, ranging from 0 (no buffering) to 4 (maximum buffering).
 
-There are three ways to install the program:
-* For Windows users there is an self-contained [installer](https://github.com/Rolf-Hempel/PlanetarySystemStacker/releases). It installs the complete software and creates a starter on the user's desktop.
-* The user installs [Python 3](https://www.python.org/downloads/) (including pip3), and then calls pip3 to install PSS with all its dependencies automatically. This is the preferred way to install PSS in a platform-independent way. Details can be found in the [User Guide](https://github.com/Rolf-Hempel/PlanetarySystemStacker/blob/master/Documentation/PlanetarySystemStacker_User-Guide.pdf).
-* Experienced users can install the Python 3 environment and all packets needed by PSS manually, and then clone the PSS source code from Github. Again, the details are found in the Appendix of the User Guide document.
+## Installation
 
-The way to start the program depends on how it was installed: 
-* If the Windows installer was used, the program is started via the desktop icon.
-* If PSS was installed with PIP, it can be started from the command line by entering "PlanetarySystemStacker".
-* The program can be started in the Python 3 interpreter by executing the main program in the module "planetary_system_stacker.py" .
+### Windows installer
+
+A self-contained [Windows installer](https://github.com/Rolf-Hempel/PlanetarySystemStacker/releases)
+is available. It installs the complete software and creates a starter on the desktop, so no Python
+setup is needed. The current release is V0.9.8.
+
+### From source (Windows, Linux, macOS)
+
+Requires Python 3.9 or newer.
+
+```bash
+git clone https://github.com/Rolf-Hempel/PlanetarySystemStacker.git
+cd PlanetarySystemStacker
+
+# Create and activate a virtual environment
+python3 -m venv venv
+source venv/bin/activate           # Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -e .
+```
+
+**macOS note:** if the OpenCV or scikit-image wheels aren't available for your Python version and pip falls back to building from source, install CMake first:
+```bash
+brew install cmake
+```
+
+### From PyPI
+
+```bash
+pip install planetary-system-stacker
+```
+
+The PyPI package is at 0.9.8.3 and was last uploaded in July 2023, so it predates the PyQt6
+migration. Install from source to get the current code.
+
+## Running
+
+With the virtual environment activated, start PSS with:
+```bash
+PlanetarySystemStacker
+```
+
+For CLI (headless) use, pass a config file:
+```bash
+PlanetarySystemStacker --config_file path/to/config.pss
+```
+
+If the `PlanetarySystemStacker` command isn't found, the source script works too:
+```bash
+python planetary_system_stacker/planetary_system_stacker.py
+```
+
+## Building a macOS .app bundle
+
+From an activated venv:
+```bash
+pip install pyinstaller
+pyinstaller PlanetarySystemStacker.spec
+```
+
+The resulting bundle is `dist/PlanetarySystemStacker.app` (~320 MB). It's unsigned and unnotarised, so macOS Gatekeeper will refuse to open it on first launch — right-click the app and choose **Open** to bypass the warning, or run:
+```bash
+xattr -d com.apple.quarantine dist/PlanetarySystemStacker.app
+```
+
+The build targets whatever architecture your Mac has (Apple Silicon or Intel). It won't run on the other architecture without a universal2 build. The spec file uses `pyinstaller_rthook_cv2.py`, a small runtime hook that works around a PyInstaller × OpenCV loader-recursion bug on macOS.
+
+## Documentation
+
+* [User Guide (English)](https://github.com/Rolf-Hempel/PlanetarySystemStacker/blob/master/Documentation/PlanetarySystemStacker_User-Guide.pdf)
+* [User Guide (German)](https://github.com/Rolf-Hempel/PlanetarySystemStacker/blob/master/Documentation/PlanetarySystemStacker_User-Guide-German.pdf)
 
 A [discussion platform](https://www.astronomie.de/PSS/GermanBoard/) for all issues concerning this software project has been created in the context of the German amateur astronomy forum [Astronomie.de](https://www.astronomie.de/). Currently, this forum is in German language only, but an English branch is in preparation. Additionally, an extensive discussion on the subject can be found on the [Cloudy Nights forum](https://www.cloudynights.com/topic/645890-new-stacking-software-project-planetarysystemstacker/).

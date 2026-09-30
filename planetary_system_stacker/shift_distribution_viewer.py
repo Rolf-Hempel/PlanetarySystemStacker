@@ -21,7 +21,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 """
 
 from numpy import arange
-from PyQt5 import QtWidgets
+from PyQt6 import QtWidgets
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
@@ -101,8 +101,8 @@ class ShiftDistributionViewerWidget(QtWidgets.QFrame, Ui_shift_distribution_view
         QtWidgets.QFrame.__init__(self, parent)
         self.setupUi(self)
 
-        self.setFrameShape(QtWidgets.QFrame.Panel)
-        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.setFrameShape(QtWidgets.QFrame.Shape.Panel)
+        self.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         self.setObjectName("shift_distribution_viewer")
 
         self.setFixedSize(900, 600)

@@ -33,7 +33,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 # The following method was moved from skimage to skimage.util.
 from skimage.util import img_as_ubyte
-from PyQt5 import QtWidgets
+from PyQt6 import QtWidgets
 
 from align_frames import AlignFrames
 from alignment_points import AlignmentPoints

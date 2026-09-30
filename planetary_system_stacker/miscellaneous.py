@@ -1252,6 +1252,8 @@ class Miscellaneous(object):
         :return: Processed image in the same 16bit uint format as the input image.
         """
 
+        print("post process")
+
         # Check if the original image is selected (version 0). In this case nothing is to be done.
         if not layers:
             return image.astype(uint16)
@@ -1324,6 +1326,7 @@ class Miscellaneous(object):
 
     @staticmethod
     def gaussian_sharpen(input_image, amount, radius, luminance_only=False):
+        print("gaussian_sharpen")
         """
         Sharpen an image with a Gaussian kernel. The input image can be B/W or color.
 
@@ -1402,6 +1405,7 @@ class Miscellaneous(object):
 
     @staticmethod
     def wavelet_sharpen(input_image, amount, radius):
+        print ("wavelet_sharpen")
         """
         Sharpen a B/W or color image with wavelets. The underlying algorithm was taken from the
         Gimp wavelet plugin, originally written in C and published under the GPLv2+ license at:

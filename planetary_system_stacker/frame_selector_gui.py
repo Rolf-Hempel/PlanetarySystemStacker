@@ -7,20 +7,20 @@
 # WARNING! All changes made in this file will be lost!
 
 
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 
 class Ui_frame_selector(object):
     def setupUi(self, frame_selector):
         frame_selector.setObjectName("frame_selector")
         frame_selector.resize(900, 630)
-        frame_selector.setLocale(QtCore.QLocale(QtCore.QLocale.English, QtCore.QLocale.UnitedStates))
-        frame_selector.setFrameShape(QtWidgets.QFrame.Panel)
-        frame_selector.setFrameShadow(QtWidgets.QFrame.Sunken)
+        frame_selector.setLocale(QtCore.QLocale(QtCore.QLocale.Language.English, QtCore.QLocale.Country.UnitedStates))
+        frame_selector.setFrameShape(QtWidgets.QFrame.Shape.Panel)
+        frame_selector.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         self.gridLayout = QtWidgets.QGridLayout(frame_selector)
         self.gridLayout.setObjectName("gridLayout")
         self.buttonBox = QtWidgets.QDialogButtonBox(frame_selector)
-        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.Cancel|QtWidgets.QDialogButtonBox.Ok)
+        self.buttonBox.setStandardButtons(QtWidgets.QDialogButtonBox.StandardButton.Cancel|QtWidgets.QDialogButtonBox.StandardButton.Ok)
         self.buttonBox.setObjectName("buttonBox")
         self.gridLayout.addWidget(self.buttonBox, 2, 3, 1, 2)
         self.pushButton_play = QtWidgets.QPushButton(frame_selector)
@@ -32,7 +32,7 @@ class Ui_frame_selector(object):
         self.slider_frames = QtWidgets.QSlider(frame_selector)
         self.slider_frames.setMaximum(1000)
         self.slider_frames.setPageStep(1)
-        self.slider_frames.setOrientation(QtCore.Qt.Horizontal)
+        self.slider_frames.setOrientation(QtCore.Qt.Orientation.Horizontal)
         self.slider_frames.setObjectName("slider_frames")
         self.gridLayout.addWidget(self.slider_frames, 2, 0, 1, 1)
         self.verticalLayout = QtWidgets.QVBoxLayout()

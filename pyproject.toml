@@ -1,0 +1,51 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "planetary-system-stacker"
+version = "0.10.0"
+description = "PlanetarySystemStacker"
+authors = [{name = "Rolf Hempel", email = "rolf6419@gmx.de"}]
+readme = "README.md"
+license = {text = "GNU General Public License v3 (GPLv3)"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Development Status :: 4 - Beta",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: MacOS",
+    "Operating System :: POSIX :: Linux"
+]
+urls = {Homepage = "https://github.com/Rolf-Hempel/PlanetarySystemStacker"}
+
+requires-python = ">=3.9"
+
+dependencies = [
+    'numpy',
+    'matplotlib',
+    'psutil',
+    'PyQt6',
+    'scipy',
+    'astropy',
+    'scikit-image',
+    'opencv-python; platform_system == "Windows"',
+    'opencv-python-headless; platform_system == "Darwin" or platform_system == "Linux"',
+	#'workflow',
+	#'enum34; python_version<"3.4"' # workflow installs enum34 which pyinstaller doesn't like
+]
+
+[project.scripts]
+PlanetarySystemStacker = "planetary_system_stacker:main"
+
+# The source directory is a path root, not an importable package: the modules
+# inside it import each other by plain name ("from frames import Frames").
+# Setuptools only auto-detects this layout for a directory literally named
+# "src", so point it at ours explicitly.
+[tool.setuptools]
+package-dir = {"" = "planetary_system_stacker"}
+

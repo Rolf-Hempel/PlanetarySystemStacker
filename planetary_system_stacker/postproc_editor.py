@@ -27,8 +27,8 @@ from sys import argv, stdout, stderr
 from time import sleep
 
 import psutil
-from PyQt5 import QtWidgets, QtCore
-from PyQt5.QtWidgets import QProxyStyle, QStyle
+from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6.QtWidgets import QProxyStyle, QStyle
 from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT, \
     COLOR_BGR2HSV, COLOR_HSV2BGR
 from numpy import uint8, uint16, float32
@@ -369,11 +369,11 @@ class CustomStyle(QProxyStyle):
     """
 
     def styleHint(self, hint, option=None, widget=None, returnData=None):
-        if hint == QStyle.SH_SpinBox_KeyPressAutoRepeatRate:
+        if hint == QStyle.StyleHint.SH_SpinBox_KeyPressAutoRepeatRate:
             return 10**6
-        elif hint == QStyle.SH_SpinBox_ClickAutoRepeatRate:
+        elif hint == QStyle.StyleHint.SH_SpinBox_ClickAutoRepeatRate:
             return 10**6
-        elif hint == QStyle.SH_SpinBox_ClickAutoRepeatThreshold:
+        elif hint == QStyle.StyleHint.SH_SpinBox_ClickAutoRepeatThreshold:
             # You can use only this condition to avoid the auto-repeat,
             # but better safe than sorry ;-)
             return 10**6
@@ -425,6 +425,10 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.spinBox_compare.setMinimum(0)
         self.spinBox_version.setStyle(CustomStyle())
         self.spinBox_compare.setStyle(CustomStyle())
+
+        # Keep the original palettes for "set_spinbox_color" to restore.
+        self.spinBox_version_palette = QtGui.QPalette(self.spinBox_version.palette())
+        self.spinBox_compare_palette = QtGui.QPalette(self.spinBox_compare.palette())
 
         # Set the spinbox to the newly created version.
         self.spinBox_version.setValue(self.postproc_data_object.version_selected)
@@ -530,17 +534,39 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         """
 
         if selected and compare:
-            self.spinBox_version.setStyleSheet('color: red')
-            self.spinBox_compare.setStyleSheet('color: red')
+            self.set_spinbox_color(self.spinBox_version, 'red')
+            self.set_spinbox_color(self.spinBox_compare, 'red')
         elif not selected and not compare:
-            self.spinBox_version.setStyleSheet('color: black')
-            self.spinBox_compare.setStyleSheet('color: black')
+            self.set_spinbox_color(self.spinBox_version, None)
+            self.set_spinbox_color(self.spinBox_compare, None)
         elif selected:
-            self.spinBox_version.setStyleSheet('color: red')
-            self.spinBox_compare.setStyleSheet('color: white')
+            self.set_spinbox_color(self.spinBox_version, 'red')
+            self.set_spinbox_color(self.spinBox_compare, 'white')
         elif compare:
-            self.spinBox_version.setStyleSheet('color: white')
-            self.spinBox_compare.setStyleSheet('color: red')
+            self.set_spinbox_color(self.spinBox_version, 'white')
+            self.set_spinbox_color(self.spinBox_compare, 'red')
+
+    def set_spinbox_color(self, spinbox, color):
+        """
+        Set the font color of a version spinbox, or restore its original color.
+
+        The palette is used rather than a stylesheet: a stylesheet takes the widget off the native
+        style, which changes its size hint and reflows the layout on every blink.
+
+        :param spinbox: The spinbox to be recolored.
+        :param color: Name of the font color, or None to restore the original palette.
+        :return: -
+        """
+
+        original = self.spinBox_version_palette if spinbox is self.spinBox_version \
+            else self.spinBox_compare_palette
+
+        if color is None:
+            spinbox.setPalette(original)
+        else:
+            palette = QtGui.QPalette(original)
+            palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor(color))
+            spinbox.setPalette(palette)
 
     def save_version(self):
         """
@@ -565,7 +591,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
-        options = QtWidgets.QFileDialog.Options()
+        options = QtWidgets.QFileDialog.Option(0)
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
                             "Save result as 16bit png, tiff or fits image",
                             self.postproc_data_object.file_name_processed,
@@ -1335,8 +1361,8 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         # Initialize a vertical spacer used to fill the lower part of the sharpening widget scroll
         # area.
-        self.spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Minimum,
-                                            QtWidgets.QSizePolicy.Expanding)
+        self.spacerItem = QtWidgets.QSpacerItem(20, 40, QtWidgets.QSizePolicy.Policy.Minimum,
+                                            QtWidgets.QSizePolicy.Policy.Expanding)
 
         # Set the resolution index to an impossible value. It is used to check for changes.
         self.rgb_resolution_index = -1
@@ -1427,7 +1453,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         self.version_manager_widget.setEnabled(False)
         self.tabWidget_postproc_control.setEnabled(False)
-        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(False)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).setEnabled(False)
 
     def enable_widgets(self):
         """
@@ -1438,7 +1464,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
 
         self.version_manager_widget.setEnabled(True)
         self.tabWidget_postproc_control.setEnabled(True)
-        self.buttonBox.button(QtWidgets.QDialogButtonBox.Ok).setEnabled(True)
+        self.buttonBox.button(QtWidgets.QDialogButtonBox.StandardButton.Ok).setEnabled(True)
 
     def fgw_changed(self, value):
         """
@@ -1484,7 +1510,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             self.finish_rgb_correction_mode()
 
     def rgb_automatic_changed(self, state):
-        rgb_on = state == QtCore.Qt.Checked
+        rgb_on = QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked
         version = self.postproc_data_object.versions[
             self.postproc_data_object.version_selected]
         version.rgb_automatic = rgb_on
@@ -1893,4 +1919,4 @@ if __name__ == '__main__':
     window = PostprocEditorWidget(configuration, input_image, input_file_name,
                                   dummy_status_bar.print_status_bar_info, None)
     window.show()
-    app.exec_()
+    app.exec()

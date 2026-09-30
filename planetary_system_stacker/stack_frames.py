@@ -20,7 +20,7 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 
 """
 
-from glob import glob
+#from glob import glob
 from math import ceil
 from statistics import median
 from time import sleep
@@ -28,10 +28,9 @@ from warnings import filterwarnings
 import cProfile as profile
 import pstats
 
-import matplotlib
-
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
+#import matplotlib
+#matplotlib.use('Agg')
+#import matplotlib.pyplot as plt
 from cv2 import FONT_HERSHEY_SIMPLEX, putText, resize, INTER_CUBIC, INTER_LINEAR, \
     waitKey, destroyAllWindows, imshow
 from numpy import zeros, full, empty, float32, newaxis, arange, count_nonzero, \
@@ -768,19 +767,30 @@ class StackFrames(object):
 
 
 if __name__ == "__main__":
+    import argparse
     # Initalize the timer object used to measure execution times of program sections.
     my_timer = timer()
 
-    # Images can either be extracted from a video file or a batch of single photographs. Select
-    # the example for the test run.
+    # Initialize argument parser
+    parser = argparse.ArgumentParser(description='Process some images or a video.')
+    parser.add_argument('files', type=str, nargs='+', help='Path to the images or video file. For images, specify each file or use a shell pattern like "Images/2012*.tif".')
+
+    args = parser.parse_args()
+
     type = 'video'
-    if type == 'image':
-        names = glob(
-            r'D:\SW-Development\Python\PlanetarySystemStacker\planetary_system_stacker\Images/2012*.tif')
-        # names = glob.glob('Images/Moon_Tile-031*ap85_8b.tif')
-        # names = glob.glob('Images/Example-3*.jpg')
+
+    if not args.files:
+        parser.error("No files provided. Please specify at least one file path.")
+   
+    # The args.files will contain a list of files if shell expands it, or a single item if it's likely a video file
+    if len(args.files) == 1:
+        # It's likely a single video file
+        names = args.files[0]
     else:
-        names = r'D:\SW-Development\Python\PlanetarySystemStacker\planetary_system_stacker\Videos/short_video.avi'
+        # It's a list of image files
+        names = args.files
+        type = 'image'
+
     print(names)
 
     # Choose if AP grid and stacked image are to be visualized.
@@ -791,6 +801,9 @@ if __name__ == "__main__":
     # Get configuration parameters.
     configuration = Configuration()
     configuration.initialize_configuration()
+
+    # todo: cli paramterize this
+    configuration.global_parameters_stack_percent_frames = 100
 
     my_timer.create('Read all frames')
     try:

@@ -23,14 +23,14 @@ along with PSS.  If not, see <http://www.gnu.org/licenses/>.
 from copy import deepcopy
 from pathlib import Path
 
-from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtWidgets, QtCore, QtGui
 
 from exceptions import InternalError
 from job_dialog import Ui_JobDialog
 
 # The following lists define the allowed file extensions for still images and videos.
-image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.png']
-video_extensions = ['.avi', '.mov', '.mp4', '.ser']
+image_extensions = ['.tif', '.tiff', '.fit', '.fits', '.jpg', '.jpeg', '.png']
+video_extensions = ['.avi', '.mov', '.mp4', '.ser', '.m4v']
 extensions = image_extensions + video_extensions
 
 
@@ -46,8 +46,8 @@ class FileDialog(QtWidgets.QFileDialog):
         super(FileDialog, self).__init__(*args, **kwargs)
         # Do not use the native dialog of the OS. Otherwise the selection model tree is not
         # available as expected.
-        self.setOption(QtWidgets.QFileDialog.DontUseNativeDialog, True)
-        self.setFileMode(QtWidgets.QFileDialog.ExistingFiles)
+        self.setOption(QtWidgets.QFileDialog.Option.DontUseNativeDialog, True)
+        self.setFileMode(QtWidgets.QFileDialog.FileMode.ExistingFiles)
         self.tree = self.findChild(QtWidgets.QTreeView)
 
     def accept(self):
@@ -121,8 +121,8 @@ class JoblistWidget(QtWidgets.QListWidget):
         super().__init__(parent)
 
         self.setAcceptDrops(True)
-        self.setSelectionMode(QtWidgets.QAbstractItemView.ExtendedSelection)
-        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.setSelectionMode(QtWidgets.QAbstractItemView.SelectionMode.ExtendedSelection)
+        self.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
 
     def dragEnterEvent(self, event):
         if event.mimeData().hasUrls:
@@ -132,7 +132,7 @@ class JoblistWidget(QtWidgets.QListWidget):
 
     def dragMoveEvent(self, event):
         if event.mimeData().hasUrls():
-            event.setDropAction(QtCore.Qt.CopyAction)
+            event.setDropAction(QtCore.Qt.DropAction.CopyAction)
             event.accept()
         else:
             event.ignore()
@@ -146,7 +146,7 @@ class JoblistWidget(QtWidgets.QListWidget):
         """
 
         if event.mimeData().hasUrls():
-            event.setDropAction(QtCore.Qt.CopyAction)
+            event.setDropAction(QtCore.Qt.DropAction.CopyAction)
             event.accept()
 
             # Construct a list with the job names received by the drop event.
@@ -188,8 +188,8 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         self.gridLayout.addWidget(self.job_list_widget, 0, 0, 1, 6)
         self.job_list_widget.signal_job_entries.connect(self.get_input_names)
 
-        self.setFrameShape(QtWidgets.QFrame.Panel)
-        self.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.setFrameShape(QtWidgets.QFrame.Shape.Panel)
+        self.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
         self.setObjectName("configuration_editor")
 
         # The following line was deactivated. Otherwise the instructions under the joblist
@@ -248,20 +248,21 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         :return: -
         """
 
-        options = QtWidgets.QFileDialog.Options()
+        #options = QtWidgets.QFileDialog.Option
         message = "Select video file(s)/folders with image files for stacking, and/or " \
                   "image files for postprocessing"
 
         self.file_dialog = FileDialog(self, message,
                                       self.configuration.hidden_parameters_current_dir,
-                                      "Videos (*.avi *.mov *.mp4 *.ser)", options=options)
-        self.file_dialog.setNameFilters(["Still image folders / video files for stacking (*.avi *.mov *.mp4 *.ser)",
+                                      "Videos (*.avi *.mov *.mp4 *.ser *.m4v)")
+        self.file_dialog.setNameFilters(["Still image folders / video files for stacking (*.avi *.mov *.mp4 *.ser *.m4v)",
                                          "Images for postprocessing (*.tiff *.tif *.fit *.fits *.png *.jpg)"])
-        self.file_dialog.selectNameFilter("Still image folders / video files for stacking (*.avi *.mov *.mp4 *.ser)")
+        self.file_dialog.selectNameFilter("Still image folders / video files for stacking (*.avi *.mov *.mp4 *.ser *.m4v)")
+        #self.file_dialog.setOptions(QtWidgets.QFileDialog.Option.ShowDirsOnly)
 
         # The list of strings with the new job names is sent by the FileDialog via the signal.
         self.file_dialog.signal_dialog_ready.connect(self.get_input_names)
-        self.file_dialog.exec_()
+        self.file_dialog.exec()
 
     def get_input_names(self, input_names):
         """
@@ -341,7 +342,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
             self.pattern = 'Force Bayer BGGR'
 
         # The context menu is opened on a job list entry.
-        if (event.type() == QtCore.QEvent.ContextMenu and
+        if (event.type() == QtCore.QEvent.Type.ContextMenu and
                 source is self.job_list_widget):
 
             # Show the context menu only if job items are selected for which debayering is
@@ -354,43 +355,43 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
                 # Create the context menu. Mark those patterns checked which have been set for at least
                 # one selected job list entry.
                 menu = QtWidgets.QMenu()
-                action1 = QtWidgets.QAction('Auto detect color', menu, checkable=True)
+                action1 = QtGui.QAction('Auto detect color', menu, checkable=True)
                 action1.triggered.connect(action1_triggered)
                 if 'Auto detect color' in checked_patterns:
                     action1.setChecked(True)
                 menu.addAction(action1)
                 menu.addSeparator()
-                action2 = QtWidgets.QAction('RGB', menu, checkable=True)
+                action2 = QtGui.QAction('RGB', menu, checkable=True)
                 action2.triggered.connect(action2_triggered)
                 if 'RGB' in checked_patterns:
                     action2.setChecked(True)
                 menu.addAction(action2)
-                action3 = QtWidgets.QAction('BGR', menu, checkable=True)
+                action3 = QtGui.QAction('BGR', menu, checkable=True)
                 action3.triggered.connect(action3_triggered)
                 if 'BGR' in checked_patterns:
                     action3.setChecked(True)
                 menu.addAction(action3)
-                action4 = QtWidgets.QAction('Grayscale', menu, checkable=True)
+                action4 = QtGui.QAction('Grayscale', menu, checkable=True)
                 action4.triggered.connect(action4_triggered)
                 if 'Grayscale' in checked_patterns:
                     action4.setChecked(True)
                 menu.addAction(action4)
-                action5 = QtWidgets.QAction('Force Bayer RGGB', menu, checkable=True)
+                action5 = QtGui.QAction('Force Bayer RGGB', menu, checkable=True)
                 action5.triggered.connect(action5_triggered)
                 if 'Force Bayer RGGB' in checked_patterns:
                     action5.setChecked(True)
                 menu.addAction(action5)
-                action6 = QtWidgets.QAction('Force Bayer GRBG', menu, checkable=True)
+                action6 = QtGui.QAction('Force Bayer GRBG', menu, checkable=True)
                 action6.triggered.connect(action6_triggered)
                 if 'Force Bayer GRBG' in checked_patterns:
                     action6.setChecked(True)
                 menu.addAction(action6)
-                action7 = QtWidgets.QAction('Force Bayer GBRG', menu, checkable=True)
+                action7 = QtGui.QAction('Force Bayer GBRG', menu, checkable=True)
                 action7.triggered.connect(action7_triggered)
                 if 'Force Bayer GBRG' in checked_patterns:
                     action7.setChecked(True)
                 menu.addAction(action7)
-                action8 = QtWidgets.QAction('Force Bayer BGGR', menu, checkable=True)
+                action8 = QtGui.QAction('Force Bayer BGGR', menu, checkable=True)
                 action8.triggered.connect(action8_triggered)
                 if 'Force Bayer BGGR' in checked_patterns:
                     action8.setChecked(True)
@@ -398,7 +399,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
 
                 # Identify the selected items and their locations in the job list. Set the selected
                 # Bayer pattern in the corresponding job objects.
-                if menu.exec_(event.globalPos()) and self.pattern is not None:
+                if menu.exec(event.globalPos()) and self.pattern is not None:
                     for item in selected_items:
                         row = source.row(item)
                         self.jobs[row].bayer_option_selected = self.pattern
@@ -415,7 +416,7 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
         """
 
         # If the "+" key is pressed, zoom in. If "-" is pressed, zoom out.
-        if event.key() == QtCore.Qt.Key_Delete:
+        if event.key() == QtCore.Qt.Key.Key_Delete:
             self.remove_job_list()
         else:
             super(JobEditor, self).keyPressEvent(event)

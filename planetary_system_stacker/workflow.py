@@ -27,7 +27,7 @@ from os import listdir, rename, remove
 from os.path import splitext, join, dirname
 
 import psutil
-from PyQt5 import QtCore
+from PyQt6 import QtCore
 from numpy import uint16, uint8
 
 from align_frames import AlignFrames
@@ -852,6 +852,7 @@ class Workflow(QtCore.QObject):
 
         # If postprocessing is included after stacking, set the stacked image as input.
         if self.configuration.global_parameters_include_postprocessing:
+            Miscellaneous.protocol("+++ Set the image stack as input for postprocessing +++", self.attached_log_file)
             self.postproc_input_image = self.stack_frames.stacked_image
             self.postproc_input_name = self.stacked_image_name
             self.postprocessed_image_name = PostprocDataObject.set_file_name_processed(
