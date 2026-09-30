@@ -284,7 +284,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.nap_checkBox.setEnabled(False)
 
     def afa_changed(self, state):
-        self.config_copy.align_frames_automation = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.align_frames_automation = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def afrsf_changed(self, value):
         self.config_copy.align_frames_rectangle_scale_factor = 100. / value
@@ -296,16 +296,16 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.config_copy.align_frames_average_frame_percent = value
 
     def efs_changed(self, state):
-        self.config_copy.frames_add_selection_dialog = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.frames_add_selection_dialog = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def fco_changed(self, state):
-        self.config_copy.align_frames_fast_changing_object = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.align_frames_fast_changing_object = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def gpwptf_changed(self, state):
-        self.config_copy.global_parameters_write_protocol_to_file = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.global_parameters_write_protocol_to_file = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def gpspwr_changed(self, state):
-        self.config_copy.global_parameters_store_protocol_with_result = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.global_parameters_store_protocol_with_result = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def gppl_changed(self, value):
         self.config_copy.global_parameters_protocol_level = value
@@ -339,7 +339,7 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.mr_label.setText(text)
 
     def mr_changed(self, state):
-        max_memory_active = (state == QtCore.Qt.CheckState.Checked)
+        max_memory_active = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
         self.mr_activate(max_memory_active)
         self.make_mr_label_visible(max_memory_active)
 
@@ -396,10 +396,10 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
             self.config_copy.alignment_points_frame_number = value
 
     def spp_changed(self, state):
-        self.config_copy.global_parameters_include_postprocessing = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.global_parameters_include_postprocessing = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def fn_changed(self, state):
-        self.config_copy.frames_normalization = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.frames_normalization = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
         self.fn_activate_deactivate_widgets()
 
     def fnt_changed(self, value):
@@ -407,20 +407,20 @@ class ConfigurationEditor(QtWidgets.QFrame, Ui_ConfigurationDialog):
         self.fnt_label_display.setText(str(self.config_copy.frames_normalization_threshold))
 
     def ipfn_changed(self, state):
-        self.config_copy.global_parameters_parameters_in_filename = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.global_parameters_parameters_in_filename = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
         self.ipfn_activate_deactivate_widgets()
 
     def nfs_changed(self, state):
-        self.config_copy.global_parameters_stack_number_frames = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.global_parameters_stack_number_frames = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def pfs_changed(self, state):
-        self.config_copy.global_parameters_stack_percent_frames = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.global_parameters_stack_percent_frames = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def apbs_changed(self, state):
-        self.config_copy.global_parameters_ap_box_size = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.global_parameters_ap_box_size = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def nap_changed(self, state):
-        self.config_copy.global_parameters_ap_number = (state == QtCore.Qt.CheckState.Checked)
+        self.config_copy.global_parameters_ap_number = (QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked)
 
     def sfdfs_changed(self, value):
         self.config_copy.stack_frames_drizzle_factor_string = value

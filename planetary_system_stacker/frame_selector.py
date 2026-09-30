@@ -319,10 +319,10 @@ class FrameSelectorWidget(QtWidgets.QFrame, Ui_frame_selector):
             # trigger the "use_triggered" or "not_use_triggered" method below.
             if event.type() == QtCore.QEvent.Type.ContextMenu:
                 menu = QtWidgets.QMenu()
-                action1 = QtWidgets.QAction('Use for stacking', menu)
+                action1 = QtGui.QAction('Use for stacking', menu)
                 action1.triggered.connect(self.use_triggered)
                 menu.addAction((action1))
-                action2 = QtWidgets.QAction("Don't use for stacking", menu)
+                action2 = QtGui.QAction("Don't use for stacking", menu)
                 action2.triggered.connect(self.not_use_triggered)
                 menu.addAction((action2))
                 menu.exec(event.globalPos())

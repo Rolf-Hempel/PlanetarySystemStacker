@@ -360,25 +360,25 @@ class SharpeningLayerWidget(QtWidgets.QWidget, Ui_sharpening_layer_widget):
         self.remove_layer_callback(self.layer_index)
 
 
-# class CustomStyle(QProxyStyle):
-#     """
-#     This class is used to prevent the version spinbox from jumping two steps at once. The solution
-#     was found on Stackoverflow
-#     (https://stackoverflow.com/questions/40746350/why-qspinbox-jumps-twice-the-step-value).
+class CustomStyle(QProxyStyle):
+    """
+    This class is used to prevent the version spinbox from jumping two steps at once. The solution
+    was found on Stackoverflow
+    (https://stackoverflow.com/questions/40746350/why-qspinbox-jumps-twice-the-step-value).
 
-#     """
+    """
 
-#     def styleHint(self, hint, option=None, widget=None, returnData=None):
-#         if hint == QStyle.SH_SpinBox_KeyPressAutoRepeatRate:
-#             return 10**6
-#         elif hint == QStyle.SH_SpinBox_ClickAutoRepeatRate:
-#             return 10**6
-#         elif hint == QStyle.SH_SpinBox_ClickAutoRepeatThreshold:
-#             # You can use only this condition to avoid the auto-repeat,
-#             # but better safe than sorry ;-)
-#             return 10**6
-#         else:
-#             return super().styleHint(hint, option, widget, returnData)
+    def styleHint(self, hint, option=None, widget=None, returnData=None):
+        if hint == QStyle.StyleHint.SH_SpinBox_KeyPressAutoRepeatRate:
+            return 10**6
+        elif hint == QStyle.StyleHint.SH_SpinBox_ClickAutoRepeatRate:
+            return 10**6
+        elif hint == QStyle.StyleHint.SH_SpinBox_ClickAutoRepeatThreshold:
+            # You can use only this condition to avoid the auto-repeat,
+            # but better safe than sorry ;-)
+            return 10**6
+        else:
+            return super().styleHint(hint, option, widget, returnData)
 
 
 class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
@@ -423,8 +423,8 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.spinBox_version.setMinimum(0)
         self.spinBox_compare.setMaximum(configuration.postproc_data_object.number_versions)
         self.spinBox_compare.setMinimum(0)
-        #self.spinBox_version.setStyle(CustomStyle())
-        #self.spinBox_compare.setStyle(CustomStyle())
+        self.spinBox_version.setStyle(CustomStyle())
+        self.spinBox_compare.setStyle(CustomStyle())
 
         # Set the spinbox to the newly created version.
         self.spinBox_version.setValue(self.postproc_data_object.version_selected)
@@ -565,7 +565,7 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         :return: -
         """
 
-        options = QtWidgets.QFileDialog.Options()
+        options = QtWidgets.QFileDialog.Option(0)
         filename, extension = QtWidgets.QFileDialog.getSaveFileName(self,
                             "Save result as 16bit png, tiff or fits image",
                             self.postproc_data_object.file_name_processed,
@@ -1484,7 +1484,7 @@ class PostprocEditorWidget(QtWidgets.QFrame, Ui_postproc_editor):
             self.finish_rgb_correction_mode()
 
     def rgb_automatic_changed(self, state):
-        rgb_on = state == QtCore.Qt.CheckState.Checked
+        rgb_on = QtCore.Qt.CheckState(state) == QtCore.Qt.CheckState.Checked
         version = self.postproc_data_object.versions[
             self.postproc_data_object.version_selected]
         version.rgb_automatic = rgb_on

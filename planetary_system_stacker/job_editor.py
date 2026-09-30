@@ -355,43 +355,43 @@ class JobEditor(QtWidgets.QFrame, Ui_JobDialog):
                 # Create the context menu. Mark those patterns checked which have been set for at least
                 # one selected job list entry.
                 menu = QtWidgets.QMenu()
-                action1 = QtWidgets.QAction('Auto detect color', menu, checkable=True)
+                action1 = QtGui.QAction('Auto detect color', menu, checkable=True)
                 action1.triggered.connect(action1_triggered)
                 if 'Auto detect color' in checked_patterns:
                     action1.setChecked(True)
                 menu.addAction(action1)
                 menu.addSeparator()
-                action2 = QtWidgets.QAction('RGB', menu, checkable=True)
+                action2 = QtGui.QAction('RGB', menu, checkable=True)
                 action2.triggered.connect(action2_triggered)
                 if 'RGB' in checked_patterns:
                     action2.setChecked(True)
                 menu.addAction(action2)
-                action3 = QtWidgets.QAction('BGR', menu, checkable=True)
+                action3 = QtGui.QAction('BGR', menu, checkable=True)
                 action3.triggered.connect(action3_triggered)
                 if 'BGR' in checked_patterns:
                     action3.setChecked(True)
                 menu.addAction(action3)
-                action4 = QtWidgets.QAction('Grayscale', menu, checkable=True)
+                action4 = QtGui.QAction('Grayscale', menu, checkable=True)
                 action4.triggered.connect(action4_triggered)
                 if 'Grayscale' in checked_patterns:
                     action4.setChecked(True)
                 menu.addAction(action4)
-                action5 = QtWidgets.QAction('Force Bayer RGGB', menu, checkable=True)
+                action5 = QtGui.QAction('Force Bayer RGGB', menu, checkable=True)
                 action5.triggered.connect(action5_triggered)
                 if 'Force Bayer RGGB' in checked_patterns:
                     action5.setChecked(True)
                 menu.addAction(action5)
-                action6 = QtWidgets.QAction('Force Bayer GRBG', menu, checkable=True)
+                action6 = QtGui.QAction('Force Bayer GRBG', menu, checkable=True)
                 action6.triggered.connect(action6_triggered)
                 if 'Force Bayer GRBG' in checked_patterns:
                     action6.setChecked(True)
                 menu.addAction(action6)
-                action7 = QtWidgets.QAction('Force Bayer GBRG', menu, checkable=True)
+                action7 = QtGui.QAction('Force Bayer GBRG', menu, checkable=True)
                 action7.triggered.connect(action7_triggered)
                 if 'Force Bayer GBRG' in checked_patterns:
                     action7.setChecked(True)
                 menu.addAction(action7)
-                action8 = QtWidgets.QAction('Force Bayer BGGR', menu, checkable=True)
+                action8 = QtGui.QAction('Force Bayer BGGR', menu, checkable=True)
                 action8.triggered.connect(action8_triggered)
                 if 'Force Bayer BGGR' in checked_patterns:
                     action8.setChecked(True)
