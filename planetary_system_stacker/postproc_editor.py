@@ -27,7 +27,7 @@ from sys import argv, stdout, stderr
 from time import sleep
 
 import psutil
-from PyQt6 import QtWidgets, QtCore
+from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import QProxyStyle, QStyle
 from cv2 import imread, cvtColor, COLOR_BGR2RGB, GaussianBlur, bilateralFilter, BORDER_DEFAULT, \
     COLOR_BGR2HSV, COLOR_HSV2BGR
@@ -426,6 +426,10 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         self.spinBox_version.setStyle(CustomStyle())
         self.spinBox_compare.setStyle(CustomStyle())
 
+        # Keep the original palettes for "set_spinbox_color" to restore.
+        self.spinBox_version_palette = QtGui.QPalette(self.spinBox_version.palette())
+        self.spinBox_compare_palette = QtGui.QPalette(self.spinBox_compare.palette())
+
         # Set the spinbox to the newly created version.
         self.spinBox_version.setValue(self.postproc_data_object.version_selected)
 
@@ -530,17 +534,39 @@ class VersionManagerWidget(QtWidgets.QWidget, Ui_version_manager_widget):
         """
 
         if selected and compare:
-            self.spinBox_version.setStyleSheet('color: red')
-            self.spinBox_compare.setStyleSheet('color: red')
+            self.set_spinbox_color(self.spinBox_version, 'red')
+            self.set_spinbox_color(self.spinBox_compare, 'red')
         elif not selected and not compare:
-            self.spinBox_version.setStyleSheet('color: black')
-            self.spinBox_compare.setStyleSheet('color: black')
+            self.set_spinbox_color(self.spinBox_version, None)
+            self.set_spinbox_color(self.spinBox_compare, None)
         elif selected:
-            self.spinBox_version.setStyleSheet('color: red')
-            self.spinBox_compare.setStyleSheet('color: white')
+            self.set_spinbox_color(self.spinBox_version, 'red')
+            self.set_spinbox_color(self.spinBox_compare, 'white')
         elif compare:
-            self.spinBox_version.setStyleSheet('color: white')
-            self.spinBox_compare.setStyleSheet('color: red')
+            self.set_spinbox_color(self.spinBox_version, 'white')
+            self.set_spinbox_color(self.spinBox_compare, 'red')
+
+    def set_spinbox_color(self, spinbox, color):
+        """
+        Set the font color of a version spinbox, or restore its original color.
+
+        The palette is used rather than a stylesheet: a stylesheet takes the widget off the native
+        style, which changes its size hint and reflows the layout on every blink.
+
+        :param spinbox: The spinbox to be recolored.
+        :param color: Name of the font color, or None to restore the original palette.
+        :return: -
+        """
+
+        original = self.spinBox_version_palette if spinbox is self.spinBox_version \
+            else self.spinBox_compare_palette
+
+        if color is None:
+            spinbox.setPalette(original)
+        else:
+            palette = QtGui.QPalette(original)
+            palette.setColor(QtGui.QPalette.ColorRole.Text, QtGui.QColor(color))
+            spinbox.setPalette(palette)
 
     def save_version(self):
         """
