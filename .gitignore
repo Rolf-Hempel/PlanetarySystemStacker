@@ -35,4 +35,12 @@ key.txt
 key-txt
 
 # Local test / user images (kept out of repo)
-src/Images/
+planetary_system_stacker/Images/
+
+# Capture files dropped into Videos/ for testing. The four small samples below
+# are part of the repo; anything else stays local.
+planetary_system_stacker/Videos/*
+!planetary_system_stacker/Videos/16bit_mono.ser
+!planetary_system_stacker/Videos/8bit_mono.ser
+!planetary_system_stacker/Videos/short_video.avi
+!planetary_system_stacker/Videos/another_short_video.avi
