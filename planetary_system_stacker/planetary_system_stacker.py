@@ -280,8 +280,10 @@ class PlanetarySystemStacker(QtWidgets.QMainWindow):
         self.job_number = 0
         self.job_index = 0
         self.jobs = []
-        self.activities = ['Previous job', 'Read frames', 'Rank frames', 'Align frames',
-                           'Select stack size', 'Set ROI', 'Set alignment points',
+        # 'Select frames' must be listed too: "change_go_back_activity" looks up every activity
+        # the workflow can set, and the optional frame selection dialog is one of them.
+        self.activities = ['Previous job', 'Read frames', 'Rank frames', 'Select frames',
+                           'Align frames', 'Select stack size', 'Set ROI', 'Set alignment points',
                            'Compute frame qualities', 'Stack frames', 'Save stacked image',
                            'Postprocessing', 'Save postprocessed image', 'Next job']
         self.activity = 'Read frames'
